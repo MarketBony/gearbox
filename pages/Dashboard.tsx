@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
+import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost } from '../types';
 import { db } from '../services/dataService';
 import { PLAQUES_STRUCTURE, BRANDS, SERVICES, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS } from '../constants';
@@ -60,11 +61,13 @@ const Dashboard: React.FC = () => {
   // --- FILTER STATES ---
   // Default to current year (Jan 1 to Dec 31)
   const currentYear = new Date().getFullYear();
-  const [dateStart, setDateStart] = useState<string>(`${currentYear}-01-01`);
-  const [dateEnd, setDateEnd] = useState<string>(`${currentYear}-12-31`);
-  
-  const [filterContext, setFilterContext] = useState<string>('All'); // Plaque or Site
-  const [filterBrand, setFilterBrand] = useState<BrandType | 'All'>('All');
+  const [dateStart, setDateStart] = useSessionState<string>('dashboard_dateStart', `${currentYear}-01-01`);
+  const [dateEnd, setDateEnd] = useSessionState<string>('dashboard_dateEnd', `${currentYear}-12-31`);
+
+  const [filterContext, setFilterContext] = useSessionState<string>('dashboard_filterContext', 'All'); // Plaque or Site
+  const [filterBrand, setFilterBrand] = useSessionState<BrandType | 'All'>('dashboard_filterBrand', 'All');
+
+  const scrollRef = useScrollRestore('dashboard', !loading);
 
   useEffect(() => {
     const load = async () => {
@@ -280,7 +283,7 @@ const Dashboard: React.FC = () => {
       <div className="px-6 py-5 bg-bony-panel border-b border-bony-border shrink-0 z-20 shadow-md transition-colors">
          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
              <div>
-                 <h2 className="text-2xl text-bony-text font-title mb-1 flex items-center gap-2">
+                 <h2 className="text-lg md:text-2xl text-bony-text font-title mb-1 flex items-center gap-2">
                      <Activity className="text-bony-orange"/> Cockpit Général
                  </h2>
                  <p className="text-xs text-bony-muted font-sans tracking-wide">
@@ -351,7 +354,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* --- CONTENT SCROLL AREA --- */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6 pb-20">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-6 space-y-6 pb-20">
           
           {/* 1. KPI CARDS */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -523,7 +526,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* 3. DETAILS ROW (Upcoming Deadlines & Social Posts) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[400px]">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:h-[400px]">
               
               {/* LEFT: PROJECT DEADLINES */}
               <div className="bg-bony-panel border border-bony-border rounded-xl p-5 flex flex-col h-full shadow-sm">

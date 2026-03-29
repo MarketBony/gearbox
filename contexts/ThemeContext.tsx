@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useAuth } from './AuthContext';
 
 type Theme = 'dark' | 'light';
 
@@ -10,34 +11,34 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Default to 'dark' as requested
-  const [theme, setTheme] = useState<Theme>('dark');
+const getThemeKey = (userId: string) => `gearbox_theme_${userId}`;
 
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  // During loading, fall back to localStorage to avoid flash
+  const userId = user?.id || localStorage.getItem('gearbox_auth_user_id') || 'default';
+
+  const [theme, setTheme] = useState<Theme>(() => {
+    const currentUserId = localStorage.getItem('gearbox_auth_user_id') || 'default';
+    const saved = localStorage.getItem(getThemeKey(currentUserId));
+    return (saved as Theme) || 'light';
+  });
+
+  // Reload theme preference when the logged-in user changes
   useEffect(() => {
-    // 1. Check LocalStorage
-    const savedTheme = localStorage.getItem('gearbox_theme') as Theme | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-    } else {
-      // Default constraint: Dark mode by default
-      setTheme('dark');
-    }
-  }, []);
+    const saved = localStorage.getItem(getThemeKey(userId));
+    setTheme((saved as Theme) || 'light');
+  }, [userId]);
 
   useEffect(() => {
     const root = window.document.documentElement;
-    
-    // Tailwind uses the 'dark' class. 
-    // If theme is dark, add class. If light, remove class.
     if (theme === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
-    
-    localStorage.setItem('gearbox_theme', theme);
-  }, [theme]);
+    localStorage.setItem(getThemeKey(userId), theme);
+  }, [theme, userId]);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));

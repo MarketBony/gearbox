@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { FixedExpense, ServiceType, Site, PlaqueName } from '../types';
 import { db } from '../services/dataService';
 import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN } from '../constants';
@@ -6,21 +7,23 @@ import { Plus, Trash2, Edit2, Save, X, Search, Filter, Euro, Calendar, MapPin, M
 
 const FixedExpenses: React.FC = () => {
     const [expenses, setExpenses] = useState<FixedExpense[]>([]);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useSessionState<string>('fixedexpenses_searchTerm', '');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentExpense, setCurrentExpense] = useState<Partial<FixedExpense>>({});
     const [isEditing, setIsEditing] = useState(false);
     const [showSiteDropdown, setShowSiteDropdown] = useState(false);
 
     // Filters
-    const [filterSite, setFilterSite] = useState<string>('All');
-    const [filterService, setFilterService] = useState<ServiceType | 'All'>('All');
-    const [filterStartDate, setFilterStartDate] = useState<string>('');
-    const [filterEndDate, setFilterEndDate] = useState<string>('');
+    const [filterSite, setFilterSite] = useSessionState<string>('fixedexpenses_filterSite', 'All');
+    const [filterService, setFilterService] = useSessionState<ServiceType | 'All'>('fixedexpenses_filterService', 'All');
+    const [filterStartDate, setFilterStartDate] = useSessionState<string>('fixedexpenses_filterStartDate', '');
+    const [filterEndDate, setFilterEndDate] = useSessionState<string>('fixedexpenses_filterEndDate', '');
 
     // Sorting
-    const [sortField, setSortField] = useState<keyof FixedExpense>('date');
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [sortField, setSortField] = useSessionState<keyof FixedExpense>('fixedexpenses_sortField', 'date');
+    const [sortOrder, setSortOrder] = useSessionState<'asc' | 'desc'>('fixedexpenses_sortOrder', 'desc');
+
+    const scrollRef = useScrollRestore('fixedexpenses');
 
     useEffect(() => {
         loadExpenses();
@@ -225,9 +228,9 @@ const FixedExpenses: React.FC = () => {
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Période</span>
                             <span className="text-bony-text text-lg font-bold font-sans">{totalAmount.toLocaleString()} €</span>
                         </div>
-                        <button 
-                            onClick={() => openModal()} 
-                            className="flex items-center gap-2 bg-bony-gradient text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20"
+                        <button
+                            onClick={() => openModal()}
+                            className="flex items-center gap-2 bg-bony-gradient text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20 min-h-[44px]"
                         >
                             <Plus size={18} />
                             NOUVELLE DÉPENSE
@@ -299,8 +302,43 @@ const FixedExpenses: React.FC = () => {
                 </div>
 
                 {/* Table */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                    <div className="bg-bony-panel rounded-xl border border-bony-border overflow-hidden shadow-sm">
+                <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-6">
+                    {/* Mobile card list */}
+                    <div className="md:hidden space-y-3">
+                        {filteredExpenses.length === 0 ? (
+                            <div className="flex flex-col items-center gap-2 py-12 text-slate-500 italic">
+                                <Search size={32} className="opacity-20"/>
+                                <p>Aucune dépense fixe trouvée.</p>
+                            </div>
+                        ) : (
+                            filteredExpenses.map((expense) => (
+                                <div key={expense.id} className="bg-bony-panel border border-bony-border rounded-lg p-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-bony-orange">
+                                            {new Date(expense.date).toLocaleDateString()}
+                                        </span>
+                                        <span className="font-bold text-bony-text">
+                                            {expense.amount.toLocaleString()} €
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-2 text-xs text-slate-500">
+                                        <span>{expense.site}</span><span>·</span><span>{expense.service}</span>
+                                    </div>
+                                    {expense.comment && <p className="text-xs text-slate-400 truncate">{expense.comment}</p>}
+                                    <div className="flex gap-2 justify-end">
+                                        <button onClick={() => openModal(expense)} className="p-1.5 rounded-md hover:bg-bony-blue/10 text-slate-400 hover:text-bony-blue transition">
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button onClick={() => handleDelete(expense.id)} className="p-1.5 rounded-md hover:bg-red-500/10 text-slate-400 hover:text-red-500 transition">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="hidden md:block bg-bony-panel rounded-xl border border-bony-border overflow-hidden shadow-sm">
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-slate-100 dark:bg-black/20 text-[10px] uppercase font-bold text-slate-500 sticky top-0 z-10 backdrop-blur-sm">
                                 <tr>
@@ -386,7 +424,7 @@ const FixedExpenses: React.FC = () => {
                 {/* Modal */}
                 {isModalOpen && (
                     <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                        <div className="bg-bony-panel border border-bony-border rounded-xl p-6 max-w-lg w-full shadow-2xl space-y-6">
+                        <div className="bg-bony-panel border border-bony-border rounded-xl p-6 w-full max-w-lg md:max-w-2xl shadow-2xl space-y-6">
                             <div className="flex justify-between items-center border-b border-bony-border pb-4">
                                 <h3 className="text-xl font-title text-bony-text flex items-center gap-2">
                                     {isEditing ? <Edit2 size={20} className="text-bony-blue"/> : <Plus size={20} className="text-bony-orange"/>}

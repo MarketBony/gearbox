@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSessionState } from '../hooks/useSessionState';
 import { db } from '../services/dataService';
 import { Project, ServiceType, BrandType, ProjectType } from '../types';
 import { SERVICE_COLORS, BRANDS, SERVICES, PROJECT_TYPES, BRAND_COLORS } from '../constants';
@@ -258,14 +259,14 @@ const ProjectBarGantt: React.FC<{ project: Project, viewStart: Date, totalDays: 
 const Agenda: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   // CHANGED: Default view is 'Semaine' and Date is Today (new Date())
-  const [view, setView] = useState<ViewMode>('Semaine');
-  const [currentDate, setCurrentDate] = useState(new Date()); 
-  
+  const [view, setView] = useSessionState<ViewMode>('agenda_view', 'Semaine');
+  const [currentDate, setCurrentDate] = useState(new Date());
+
   // Filters
   const [showFilters, setShowFilters] = useState(false);
-  const [filterBrand, setFilterBrand] = useState<BrandType | 'All'>('All');
-  const [filterService, setFilterService] = useState<ServiceType | 'All'>('All');
-  const [filterType, setFilterType] = useState<ProjectType | 'All'>('All');
+  const [filterBrand, setFilterBrand] = useSessionState<BrandType | 'All'>('agenda_filterBrand', 'All');
+  const [filterService, setFilterService] = useSessionState<ServiceType | 'All'>('agenda_filterService', 'All');
+  const [filterType, setFilterType] = useSessionState<ProjectType | 'All'>('agenda_filterType', 'All');
 
   useEffect(() => {
     const load = async () => {
@@ -554,7 +555,7 @@ const Agenda: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-bony-dark p-6 animate-fade-in">
+    <div className="h-screen flex flex-col bg-bony-dark p-3 md:p-6 animate-fade-in">
       
       {/* HEADER CONTROLS */}
       <div className="flex flex-col gap-4 mb-4 shrink-0">
@@ -569,9 +570,9 @@ const Agenda: React.FC = () => {
                 </div>
 
                 <div className="flex gap-4">
-                    <button 
+                    <button
                         onClick={() => setShowFilters(!showFilters)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition border ${
+                        className={`flex items-center gap-2 px-3 py-1.5 min-h-[44px] rounded-lg transition border ${
                             showFilters 
                             ? 'bg-white text-bony-dark border-white' 
                             : 'bg-bony-panel text-slate-500 dark:text-slate-300 border-bony-border hover:text-slate-900 dark:hover:text-white'
@@ -585,7 +586,7 @@ const Agenda: React.FC = () => {
                             <button
                                 key={v}
                                 onClick={() => setView(v)}
-                                className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition ${
+                                className={`px-3 py-1.5 min-h-[44px] rounded text-[10px] font-bold uppercase tracking-wider transition ${
                                     view === v 
                                     ? 'bg-bony-gradient text-white shadow-lg' 
                                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/5'
@@ -600,7 +601,7 @@ const Agenda: React.FC = () => {
 
           {/* FILTERS TOOLBAR */}
           {showFilters && (
-              <div className="bg-bony-panel border border-bony-border rounded-lg p-3 flex gap-6 animate-in slide-in-from-top-2">
+              <div className="bg-bony-panel border border-bony-border rounded-lg p-3 flex flex-wrap gap-4 animate-in slide-in-from-top-2">
                   <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold text-slate-500 uppercase">Marque:</span>
                       <select value={filterBrand} onChange={e => setFilterBrand(e.target.value as any)} className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1 text-xs text-slate-900 dark:text-white outline-none">

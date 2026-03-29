@@ -110,8 +110,8 @@ const Settings: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className="p-8 h-screen overflow-y-auto custom-scrollbar bg-bony-dark animate-fade-in pb-20">
-        <h2 className="text-3xl text-white font-title mb-8 flex items-center gap-3">
+    <div className="p-3 md:p-8 h-screen overflow-y-auto custom-scrollbar bg-bony-dark animate-fade-in pb-20">
+        <h2 className="text-xl md:text-3xl text-white font-title mb-8 flex items-center gap-3">
             <UserIcon className="text-bony-violet" size={32}/> Paramètres du Compte
         </h2>
 
@@ -164,7 +164,7 @@ const Settings: React.FC = () => {
                             className="w-full bg-black/30 border border-bony-border rounded p-2 text-white text-sm outline-none focus:border-bony-orange"
                         />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1">Nouveau mot de passe</label>
                             <input 
@@ -193,7 +193,7 @@ const Settings: React.FC = () => {
                 </div>
                 <button 
                     onClick={handleUpdateProfile}
-                    className="px-6 py-2 bg-bony-gradient text-white font-bold rounded-lg shadow-lg hover:opacity-90 transition flex items-center gap-2"
+                    className="px-6 py-2 min-h-[44px] bg-bony-gradient text-white font-bold rounded-lg shadow-lg hover:opacity-90 transition flex items-center gap-2"
                 >
                     <Save size={16}/> Enregistrer mon profil
                 </button>
@@ -204,7 +204,7 @@ const Settings: React.FC = () => {
         {user.role === 'Master' && (
             <div className="max-w-6xl mx-auto mt-12 animate-in slide-in-from-bottom-4">
                 <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
                         <ShieldAlert className="text-red-500" size={24}/> Gestion des Utilisateurs (Master)
                     </h3>
                     <button 
@@ -215,7 +215,7 @@ const Settings: React.FC = () => {
                     </button>
                 </div>
 
-                <div className="bg-bony-panel border border-bony-border rounded-xl overflow-hidden shadow-lg">
+                <div className="bg-bony-panel border border-bony-border rounded-xl overflow-hidden shadow-lg overflow-x-auto">
                     <table className="w-full text-left">
                         <thead className="bg-black/30 text-xs font-bold text-slate-500 uppercase tracking-widest">
                             <tr>

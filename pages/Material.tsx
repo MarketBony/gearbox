@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { db } from '../services/dataService';
 import { Equipment, EquipmentBooking, Site, ServiceType, BrandType } from '../types';
 import { Plus, Calendar, Package, Trash2, Edit, ChevronLeft, ChevronRight, Search, Filter, X, AlertCircle } from 'lucide-react';
@@ -149,15 +150,17 @@ const BookingPill: React.FC<{
 };
 
 const Material: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'planning' | 'inventory'>('planning');
+    const [activeTab, setActiveTab] = useSessionState<'planning' | 'inventory'>('material_activeTab', 'planning');
     const [equipment, setEquipment] = useState<Equipment[]>([]);
     const [bookings, setBookings] = useState<EquipmentBooking[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Planning State
-    const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
+    const [viewMode, setViewMode] = useSessionState<'week' | 'month'>('material_viewMode', 'week');
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | 'All'>('All');
+    const [selectedEquipmentId, setSelectedEquipmentId] = useSessionState<string | 'All'>('material_selectedEquipmentId', 'All');
+
+    const scrollRef = useScrollRestore('material', !loading);
 
     // Modal State
     const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
@@ -419,7 +422,7 @@ const Material: React.FC = () => {
                         </div>
                     ))}
                 </div>
-                <div className="flex-1 flex flex-col bg-bony-border gap-[1px] overflow-y-auto custom-scrollbar">
+                <div ref={scrollRef} className="flex-1 flex flex-col bg-bony-border gap-[1px] overflow-y-auto custom-scrollbar">
                     {weeks.map((week, weekIdx) => {
                         const weekStart = week[0].date;
                         const weekEnd = week[6].date;
@@ -563,14 +566,14 @@ const Material: React.FC = () => {
             <div className="flex-1 flex flex-col h-full overflow-hidden">
                 
                 {/* Header */}
-                <div className="h-16 border-b border-bony-border flex items-center justify-between px-6 bg-bony-panel shrink-0">
-                    <h2 className="text-xl font-title text-bony-text flex items-center gap-2">
+                <div className="h-16 border-b border-bony-border flex items-center justify-between px-3 md:px-6 bg-bony-panel shrink-0">
+                    <h2 className="text-base md:text-xl font-title text-bony-text flex items-center gap-2">
                         <div className="p-2 bg-bony-orange/10 rounded-lg">
                             <Package size={24} className="text-bony-orange"/>
                         </div>
                         Gestion Matériel
                     </h2>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 md:gap-4">
                         <div className="flex bg-bony-dark rounded-lg p-1 border border-bony-border">
                             <button 
                                 onClick={() => setActiveTab('planning')}
@@ -586,17 +589,17 @@ const Material: React.FC = () => {
                             </button>
                         </div>
                         {activeTab === 'planning' ? (
-                            <button 
-                                onClick={() => openBookingModal()} 
-                                className="flex items-center gap-2 bg-bony-gradient text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20"
+                            <button
+                                onClick={() => openBookingModal()}
+                                className="flex items-center gap-2 bg-bony-gradient text-white px-4 py-2 min-h-[44px] rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20"
                             >
                                 <Plus size={18} />
                                 RÉSERVER
                             </button>
                         ) : (
-                            <button 
-                                onClick={() => openInventoryModal()} 
-                                className="flex items-center gap-2 bg-bony-gradient text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20"
+                            <button
+                                onClick={() => openInventoryModal()}
+                                className="flex items-center gap-2 bg-bony-gradient text-white px-4 py-2 min-h-[44px] rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20"
                             >
                                 <Plus size={18} />
                                 AJOUTER MATÉRIEL
@@ -610,8 +613,8 @@ const Material: React.FC = () => {
                     {activeTab === 'planning' && (
                         <>
                             {/* Planning Controls */}
-                            <div className="p-4 border-b border-bony-border bg-bony-panel/50 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
+                            <div className="p-3 md:p-4 border-b border-bony-border bg-bony-panel/50 flex flex-wrap items-center gap-3 md:justify-between">
+                                <div className="flex flex-wrap items-center gap-2 md:gap-4">
                                     <div className="flex items-center bg-bony-dark rounded-lg border border-bony-border">
                                         <button onClick={() => navigateDate('prev')} className="p-2 hover:bg-bony-panel text-slate-400 hover:text-bony-text rounded-l-lg"><ChevronLeft size={18}/></button>
                                         <button onClick={handleToday} className="px-3 py-2 text-xs font-bold text-slate-500 hover:text-bony-text border-x border-bony-border">AUJOURD'HUI</button>
@@ -653,8 +656,10 @@ const Material: React.FC = () => {
                             </div>
 
                             {/* Planning Grid */}
-                            <div className="flex-1 overflow-hidden p-4 bg-bony-dark">
-                                {viewMode === 'week' ? renderWeekView() : renderMonthView()}
+                            <div className="flex-1 overflow-hidden p-4 bg-bony-dark overflow-x-auto md:overflow-hidden">
+                                <div className="min-w-[600px] md:min-w-0 h-full">
+                                    {viewMode === 'week' ? renderWeekView() : renderMonthView()}
+                                </div>
                             </div>
                         </>
                     )}

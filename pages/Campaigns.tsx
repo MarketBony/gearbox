@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Task, Site, ServiceType, BrandType, PlaqueName, TaskChannel } from '../types';
 import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
@@ -68,22 +69,24 @@ const Campaigns: React.FC = () => {
 
   // --- GLOBAL CHART FILTERS ---
   const currentYear = new Date().getFullYear();
-  const [chartStartDate, setChartStartDate] = useState<string>(`${currentYear}-01-01`);
-  const [chartEndDate, setChartEndDate] = useState<string>(`${currentYear}-12-31`);
-  const [globalType, setGlobalType] = useState<ChartTypeFilter>('Tout');
-  
+  const [chartStartDate, setChartStartDate] = useSessionState<string>('campaigns_chartStartDate', `${currentYear}-01-01`);
+  const [chartEndDate, setChartEndDate] = useSessionState<string>('campaigns_chartEndDate', `${currentYear}-12-31`);
+  const [globalType, setGlobalType] = useSessionState<ChartTypeFilter>('campaigns_globalType', 'Tout');
+
   // Specific toggle for Chart 2 metric
-  const [c2Metric, setC2Metric] = useState<MetricFilter>('Volume');
+  const [c2Metric, setC2Metric] = useSessionState<MetricFilter>('campaigns_c2Metric', 'Volume');
 
   // --- MAIN LIST FILTER STATES ---
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterContext, setFilterContext] = useState<string>('All');
-  const [filterService, setFilterService] = useState<ServiceType | 'All'>('All');
-  const [filterBrand, setFilterBrand] = useState<BrandType | 'All'>('All');
-  const [filterChannel, setFilterChannel] = useState<'All' | 'SMS' | 'E-mail'>('All');
-  const [filterStartDate, setFilterStartDate] = useState('');
-  const [filterEndDate, setFilterEndDate] = useState('');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [searchTerm, setSearchTerm] = useSessionState<string>('campaigns_searchTerm', '');
+  const [filterContext, setFilterContext] = useSessionState<string>('campaigns_filterContext', 'All');
+  const [filterService, setFilterService] = useSessionState<ServiceType | 'All'>('campaigns_filterService', 'All');
+  const [filterBrand, setFilterBrand] = useSessionState<BrandType | 'All'>('campaigns_filterBrand', 'All');
+  const [filterChannel, setFilterChannel] = useSessionState<'All' | 'SMS' | 'E-mail'>('campaigns_filterChannel', 'All');
+  const [filterStartDate, setFilterStartDate] = useSessionState<string>('campaigns_filterStartDate', '');
+  const [filterEndDate, setFilterEndDate] = useSessionState<string>('campaigns_filterEndDate', '');
+  const [sortOrder, setSortOrder] = useSessionState<'asc' | 'desc'>('campaigns_sortOrder', 'desc');
+
+  const scrollRef = useScrollRestore('campaigns');
 
   useEffect(() => {
     loadData();
@@ -306,7 +309,7 @@ const Campaigns: React.FC = () => {
     <div className="flex flex-col h-screen overflow-hidden bg-bony-dark">
       
       {/* --- GLOBAL CHART CONTROLS --- */}
-      <div className="px-6 py-2 bg-bony-panel border-b border-bony-border flex items-center justify-between shrink-0">
+      <div className="px-3 md:px-6 py-2 bg-bony-panel border-b border-bony-border flex items-center justify-between shrink-0">
          <div className="flex items-center gap-4">
              {/* DATE PICKERS */}
              <div className="flex items-center gap-2 bg-slate-100 dark:bg-black/30 p-1 rounded border border-bony-border">
@@ -339,7 +342,7 @@ const Campaigns: React.FC = () => {
       </div>
 
       {/* --- DASHBOARD GRAPHIQUE (Fixed Height) --- */}
-      <div className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4 border-b border-bony-border bg-bony-dark shrink-0 h-64">
+      <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-bony-border bg-bony-dark shrink-0 md:h-64 h-auto">
           
           {/* CHART 1: Nb Campagnes */}
           <div className="bg-bony-panel border border-bony-border rounded-xl p-3 flex flex-col relative shadow-sm">
@@ -501,11 +504,11 @@ const Campaigns: React.FC = () => {
                   </div>
               </div>
               <div className="flex gap-2">
-                  <button 
+                  <button
                       onClick={() => setShowFilters(!showFilters)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition border ${
-                          showFilters 
-                          ? 'bg-bony-orange text-white border-bony-orange' 
+                      className={`flex items-center gap-2 px-3 py-1.5 min-h-[44px] rounded-lg transition border ${
+                          showFilters
+                          ? 'bg-bony-orange text-white border-bony-orange'
                           : 'bg-slate-100 dark:bg-black/30 text-slate-500 dark:text-slate-300 border-bony-border hover:text-slate-900 dark:hover:text-white'
                       }`}
                   >
@@ -531,7 +534,7 @@ const Campaigns: React.FC = () => {
           {showFilters && (
             <div className="bg-slate-50 dark:bg-black/40 border border-bony-border rounded-lg p-4 mt-2 space-y-4 animate-in slide-in-from-top-2 duration-200">
                 {/* Filters Content (Same as before) */}
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {/* Canal */}
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase">Canal</label>
@@ -600,7 +603,7 @@ const Campaigns: React.FC = () => {
       </div>
 
       {/* CAMPAIGN LIST - TABLE HEADER */}
-      <div className="px-6 py-2 border-b border-bony-border bg-slate-100 dark:bg-black/20 flex gap-4 text-[9px] font-bold text-slate-500 uppercase tracking-widest shrink-0">
+      <div className="hidden md:flex px-6 py-2 border-b border-bony-border bg-slate-100 dark:bg-black/20 gap-4 text-[9px] font-bold text-slate-500 uppercase tracking-widest shrink-0">
           <button 
             onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
             className="w-20 text-center flex items-center justify-center gap-1 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
@@ -622,9 +625,29 @@ const Campaigns: React.FC = () => {
       </div>
 
       {/* CAMPAIGN LIST - ROWS */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pt-2">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-6 pt-2">
           {filteredCampaigns.length > 0 ? (
-            <div className="space-y-2">
+            <>
+              {/* Mobile card view */}
+              <div className="md:hidden space-y-2">
+                {filteredCampaigns.map(c => (
+                  <div key={c.id} className="bg-bony-panel border border-bony-border rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-bony-orange">{new Date(c.parentStartDate).toLocaleDateString('fr-FR')}</span>
+                      <span className="text-xs font-bold text-slate-500">{c.channel}</span>
+                    </div>
+                    <p className="text-sm font-medium text-bony-text truncate">{c.name || c.parentProjectName}</p>
+                    <div className="flex gap-3 text-xs text-slate-500">
+                      <span>{c.parentProjectSite}</span>
+                      {c.volumetry && <span>Vol: {c.volumetry}</span>}
+                      {c.cost && <span>{c.cost.toLocaleString('fr-FR')}€</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table view */}
+              <div className="hidden md:block space-y-2">
                 {filteredCampaigns.map((task, idx) => {
                     const isEmail = task.channel === 'E-mail';
                     const ChannelIcon = isEmail ? Mail : MessageSquare;
@@ -767,7 +790,8 @@ const Campaigns: React.FC = () => {
                         </div>
                     );
                 })}
-            </div>
+              </div>
+            </>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-50">
                 <Megaphone size={64} className="mb-4 text-slate-400 dark:text-slate-700"/>

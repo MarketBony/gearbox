@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { OneOffExpense, ServiceType, Site, PlaqueName } from '../types';
 import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,9 +23,11 @@ const Expenses: React.FC = () => {
   });
 
   // Filters
-  const [filterSite, setFilterSite] = useState<string>('All');
-  const [filterService, setFilterService] = useState<string>('All');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filterSite, setFilterSite] = useSessionState<string>('expenses_filterSite', 'All');
+  const [filterService, setFilterService] = useSessionState<string>('expenses_filterService', 'All');
+  const [searchTerm, setSearchTerm] = useSessionState<string>('expenses_searchTerm', '');
+
+  const scrollRef = useScrollRestore('expenses', !loading);
 
   useEffect(() => {
     loadData();
@@ -130,7 +133,7 @@ const Expenses: React.FC = () => {
   );
 
   return (
-    <div className="p-6 h-screen flex flex-col overflow-hidden animate-fade-in bg-bony-dark">
+    <div className="p-3 md:p-6 h-screen flex flex-col overflow-hidden animate-fade-in bg-bony-dark">
       {/* Header */}
       <div className="flex justify-between items-end mb-6 border-b border-bony-border pb-4 shrink-0">
         <div>
@@ -140,9 +143,9 @@ const Expenses: React.FC = () => {
           </h2>
           <p className="text-xs text-slate-500 font-sans">GESTION DES DÉPENSES HORS PROJETS</p>
         </div>
-        <button 
+        <button
           onClick={() => handleOpenModal()}
-          className="bg-bony-gradient text-white px-4 py-2 rounded-lg text-sm font-bold uppercase shadow-lg hover:shadow-bony-orange/20 transition-all flex items-center gap-2"
+          className="bg-bony-gradient text-white px-4 py-2 rounded-lg text-sm font-bold uppercase shadow-lg hover:shadow-bony-orange/20 transition-all flex items-center gap-2 min-h-[44px]"
         >
           <Plus size={18} /> Ajouter une dépense
         </button>
@@ -198,8 +201,48 @@ const Expenses: React.FC = () => {
 
       {/* Table */}
       <div className="flex-1 bg-bony-panel border border-bony-border rounded-xl overflow-hidden flex flex-col shadow-lg">
-        <div className="overflow-y-auto custom-scrollbar flex-1">
-          <table className="w-full text-left border-collapse">
+        <div ref={scrollRef} className="overflow-y-auto custom-scrollbar flex-1">
+          {/* Mobile card list */}
+          <div className="md:hidden space-y-3 p-3">
+            {loading ? (
+              <p className="text-center text-slate-500 py-8">Chargement...</p>
+            ) : filteredExpenses.length === 0 ? (
+              <p className="text-center text-slate-500 py-8">Aucune dépense trouvée</p>
+            ) : (
+              filteredExpenses.map((exp) => (
+                <div key={exp.id} className="bg-bony-panel border border-bony-border rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-bony-orange">
+                      {new Date(exp.date).toLocaleDateString('fr-FR')}
+                    </span>
+                    <span className="font-bold text-bony-text">
+                      {exp.amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 text-xs text-slate-500">
+                    <span>{exp.site}</span><span>·</span><span>{exp.service}</span>
+                  </div>
+                  {exp.comment && <p className="text-xs text-slate-400 truncate">{exp.comment}</p>}
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => handleOpenModal(exp)}
+                      className="p-1.5 text-slate-400 hover:text-bony-orange hover:bg-bony-orange/10 rounded transition-colors"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(exp.id)}
+                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <table className="hidden md:table w-full text-left border-collapse">
             <thead className="bg-slate-100 dark:bg-black/20 text-[10px] uppercase font-bold text-slate-500 sticky top-0 z-10 backdrop-blur-sm">
               <tr>
                 <th className="p-4 border-b border-bony-border w-32">Date</th>

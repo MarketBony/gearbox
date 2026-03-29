@@ -60,7 +60,7 @@ const InnerApp: React.FC = () => {
   return (
     <div className="flex h-screen bg-bony-dark text-bony-text font-sans selection:bg-blue-500/30 transition-colors duration-300">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      <main className="flex-1 ml-20 lg:ml-64 relative overflow-hidden">
+      <main className="flex-1 ml-0 md:ml-20 lg:ml-64 relative overflow-hidden pb-16 md:pb-0">
         {renderContent()}
       </main>
     </div>

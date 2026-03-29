@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { BudgetLine, ServiceType, BrandType, Project, PlaqueName, Site, FixedExpense } from '../types';
 import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,24 +19,30 @@ const YEARS = [2024, 2025, 2026];
 const Budget: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState<Tab>('Suivi');
+  const [activeTab, setActiveTab] = useSessionState<Tab>('budget_activeTab', 'Suivi');
   const [budgets, setBudgets] = useState<BudgetLine[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [expandedSites, setExpandedSites] = useState<Set<string>>(new Set());
+
+  // expandedSites persisted as string[] in session, exposed as Set<string>
+  const [expandedSitesArr, setExpandedSitesArr] = useSessionState<string[]>('budget_expandedSites', []);
+  const expandedSites = useMemo(() => new Set(expandedSitesArr), [expandedSitesArr]);
+  const setExpandedSites = useCallback((s: Set<string>) => setExpandedSitesArr([...s]), [setExpandedSitesArr]);
 
   // Permissions
   const canEditProvisions = user?.role === 'Master' || user?.role === 'Administrator';
 
   // --- FILTERS ---
-  const [filterPlaque, setFilterPlaque] = useState<string>('All');
-  const [filterBrand, setFilterBrand] = useState<BrandType | 'All'>('All');
-  const [filterService, setFilterService] = useState<ServiceType | 'All'>('All');
-  const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
-  const [filterMonthStart, setFilterMonthStart] = useState<number>(0); // 0 = Jan
-  const [filterMonthEnd, setFilterMonthEnd] = useState<number>(11);   // 11 = Dec
+  const [filterPlaque, setFilterPlaque] = useSessionState<string>('budget_filterPlaque', 'All');
+  const [filterBrand, setFilterBrand] = useSessionState<BrandType | 'All'>('budget_filterBrand', 'All');
+  const [filterService, setFilterService] = useSessionState<ServiceType | 'All'>('budget_filterService', 'All');
+  const [filterYear, setFilterYear] = useSessionState<number>('budget_filterYear', new Date().getFullYear());
+  const [filterMonthStart, setFilterMonthStart] = useSessionState<number>('budget_filterMonthStart', 0); // 0 = Jan
+  const [filterMonthEnd, setFilterMonthEnd] = useSessionState<number>('budget_filterMonthEnd', 11);   // 11 = Dec
+
+  const scrollRef = useScrollRestore('budget', !loading);
 
   useEffect(() => {
     loadData();
@@ -357,7 +364,7 @@ const Budget: React.FC = () => {
       });
 
       return (
-          <div className="flex-1 overflow-y-auto custom-scrollbar pb-20">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar pb-20 p-3 md:p-0">
              <div className="bg-bony-panel border border-bony-border p-6 rounded-xl mb-6 flex items-center justify-between shadow-lg">
                  <div>
                      <h3 className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-1">Budget Prévisionnel Groupe (Annuel)</h3>
@@ -500,7 +507,7 @@ const Budget: React.FC = () => {
           <div className="flex-1 flex flex-col overflow-hidden">
               
               {/* FILTERS BAR */}
-              <div className="mb-4 flex flex-wrap gap-4 items-center bg-bony-panel p-3 rounded-xl border border-bony-border shrink-0">
+              <div className="mb-4 flex flex-wrap gap-2 items-center bg-bony-panel p-3 rounded-xl border border-bony-border shrink-0">
                   <div className="flex items-center gap-2">
                        <Filter size={14} className="text-bony-orange"/>
                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Périmètre :</span>
@@ -579,7 +586,7 @@ const Budget: React.FC = () => {
               </div>
 
               {/* KPIS ROW */}
-              <div className="grid grid-cols-4 gap-4 mb-4 shrink-0">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4 shrink-0">
                   <div className="bg-bony-panel p-4 rounded-xl border border-bony-border flex flex-col justify-between">
                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Budget Prévu ({periodLabel})</div>
                       <div className="text-2xl font-title text-slate-900 dark:text-white">{totalForecast.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}</div>
@@ -612,15 +619,15 @@ const Budget: React.FC = () => {
               </div>
 
               {/* MAIN CONTENT SPLIT */}
-              <div className="flex-1 flex gap-4 min-h-0 overflow-hidden">
-                  
+              <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0 overflow-auto md:overflow-hidden">
+
                   {/* LEFT: CHART (COMPOSED) */}
-                  <div className="w-1/3 bg-bony-panel border border-bony-border rounded-xl p-4 flex flex-col">
+                  <div className="md:w-1/3 bg-bony-panel border border-bony-border rounded-xl p-4 flex flex-col">
                       <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-widest mb-4 flex items-center gap-2">
                           <TrendingUp size={14} className="text-bony-violet"/> Évolution Mensuelle
                       </h3>
-                      <div className="flex-1 min-h-0">
-                          <ResponsiveContainer width="100%" height="100%">
+                      <div className="flex-1 min-h-[200px]">
+                          <ResponsiveContainer width="100%" height="100%" minHeight={200}>
                               <ComposedChart data={chartData} margin={{top:10, right:10, left:-20, bottom:0}}>
                                   <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#e2e8f0'} vertical={false}/>
                                   <XAxis dataKey="name" stroke={theme === 'dark' ? '#64748b' : '#94a3b8'} fontSize={10} tickLine={false} axisLine={false}/>
@@ -727,7 +734,7 @@ const Budget: React.FC = () => {
   };
 
   return (
-    <div className="p-6 h-screen flex flex-col overflow-hidden animate-fade-in bg-bony-dark">
+    <div className="p-3 md:p-6 h-screen flex flex-col overflow-hidden animate-fade-in bg-bony-dark">
       {/* Header */}
       <div className="flex justify-between items-end mb-6 border-b border-bony-border pb-4 shrink-0">
           <div>

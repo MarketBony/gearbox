@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSessionState } from '../hooks/useSessionState';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
 import { SocialPost, SocialStatus, SocialNetwork, BrandType, ServiceType, SocialTarget, Site, PlaqueName, DigitalTags } from '../types';
@@ -550,21 +551,21 @@ const TagsManager: React.FC<{
 const Digital: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState<Tab>('Calendrier Editorial');
+  const [activeTab, setActiveTab] = useSessionState<Tab>('digital_activeTab', 'Calendrier Editorial');
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [tags, setTags] = useState<DigitalTags>({ networks: [], co2: [] });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Filters & Sort
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterBrand, setFilterBrand] = useState<BrandType | 'All'>('All');
-  const [filterService, setFilterService] = useState<ServiceType | 'All'>('All');
-  const [filterConcession, setFilterConcession] = useState<string>('All');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); 
+  const [searchTerm, setSearchTerm] = useSessionState<string>('digital_searchTerm', '');
+  const [filterBrand, setFilterBrand] = useSessionState<BrandType | 'All'>('digital_filterBrand', 'All');
+  const [filterService, setFilterService] = useSessionState<ServiceType | 'All'>('digital_filterService', 'All');
+  const [filterConcession, setFilterConcession] = useSessionState<string>('digital_filterConcession', 'All');
+  const [sortOrder, setSortOrder] = useSessionState<'asc' | 'desc'>('digital_sortOrder', 'asc');
 
   // Planning View State
-  const [calendarView, setCalendarView] = useState<CalendarView>('Mois');
+  const [calendarView, setCalendarView] = useSessionState<CalendarView>('digital_calendarView', 'Mois');
   const [planningDate, setPlanningDate] = useState(new Date());
   
   // Tooltip State
@@ -917,8 +918,29 @@ const Digital: React.FC = () => {
                   </div>
               </div>
 
-              {/* Calendar Grid Container */}
-              <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-4">
+              {/* Mobile: list of upcoming posts instead of calendar grid */}
+              <div className="md:hidden overflow-y-auto flex-1 p-3 space-y-2">
+                  {filteredPosts.length > 0 ? (
+                      filteredPosts
+                          .slice()
+                          .sort((a, b) => a.date.localeCompare(b.date))
+                          .map(post => (
+                              <div key={post.id} className="bg-bony-panel border border-bony-border rounded-lg p-3 space-y-1">
+                                  <div className="flex items-center justify-between">
+                                      <span className="text-xs font-bold text-bony-orange">{new Date(post.date).toLocaleDateString('fr-FR')}</span>
+                                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border border-bony-border text-slate-500">{post.status}</span>
+                                  </div>
+                                  <p className="text-sm font-medium text-bony-text truncate">{post.title || 'Sans titre'}</p>
+                                  <p className="text-xs text-slate-500 truncate">{post.concessions?.slice(0,2).join(', ')}</p>
+                              </div>
+                          ))
+                  ) : (
+                      <div className="text-center py-10 text-slate-500 text-sm">Aucune publication</div>
+                  )}
+              </div>
+
+              {/* Desktop: calendar grid */}
+              <div className="hidden md:flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-4">
                   {/* Header Row (Only needed for Month View here, Week view has headers inside columns) */}
                   {calendarView === 'Mois' && (
                       <div className="grid grid-cols-7 mb-2 shrink-0">
@@ -929,7 +951,7 @@ const Digital: React.FC = () => {
                           ))}
                       </div>
                   )}
-                  
+
                   {calendarView === 'Mois' ? renderMonthGrid() : renderWeekGrid()}
               </div>
           </div>
@@ -950,7 +972,7 @@ const Digital: React.FC = () => {
       return (
           <div className="flex-1 flex flex-col min-h-0 bg-bony-dark">
               {/* TABLE HEADER */}
-              <div className="flex items-center gap-4 px-6 py-3 border-b border-bony-border bg-slate-100 dark:bg-black/40 text-[10px] font-bold text-slate-500 uppercase tracking-widest sticky top-0 z-20 shadow-lg backdrop-blur-md">
+              <div className="hidden md:flex items-center gap-4 px-6 py-3 border-b border-bony-border bg-slate-100 dark:bg-black/40 text-[10px] font-bold text-slate-500 uppercase tracking-widest sticky top-0 z-20 shadow-lg backdrop-blur-md">
                   <div className="w-1.5"></div>
                   <div className="w-32 flex items-center gap-1 cursor-pointer hover:text-bony-text transition-colors" onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}>
                       DATE / STATUT
@@ -963,7 +985,7 @@ const Digital: React.FC = () => {
               </div>
 
               {/* LIST */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar pb-6 p-4 space-y-3">
+              <div className="flex-1 overflow-y-auto custom-scrollbar pb-6 p-2 md:p-4 space-y-3">
                   {filteredPosts.length > 0 ? (
                       filteredPosts.map(post => (
                           <EditoRow 
@@ -990,10 +1012,10 @@ const Digital: React.FC = () => {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-bony-dark animate-fade-in transition-colors">
         {/* Header */}
-        <div className="px-6 py-4 bg-white dark:bg-bony-panel border-b border-bony-border shrink-0 z-30 shadow-md">
-            <div className="flex justify-between items-end mb-4">
+        <div className="px-3 py-3 md:px-6 md:py-4 bg-white dark:bg-bony-panel border-b border-bony-border shrink-0 z-30 shadow-md">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-3 mb-4">
                 <div>
-                    <h2 className="text-2xl text-slate-900 dark:text-bony-text font-title mb-1 flex items-center gap-3">
+                    <h2 className="text-lg md:text-2xl text-slate-900 dark:text-bony-text font-title mb-1 flex items-center gap-3">
                         <Globe className="text-bony-violet"/> Digital & Social
                     </h2>
                     <div className="flex items-center gap-3">
@@ -1014,7 +1036,7 @@ const Digital: React.FC = () => {
                             <button 
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all ${activeTab === tab ? 'bg-bony-gradient text-white shadow-lg' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-bony-text'}`}
+                                className={`px-2 py-1.5 md:px-4 md:py-2 min-h-[36px] rounded-md text-xs font-bold uppercase transition-all ${activeTab === tab ? 'bg-bony-gradient text-white shadow-lg' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-bony-text'}`}
                             >
                                 {tab === 'Archives' && <Archive size={12} className="inline mr-1 mb-0.5"/>}
                                 {tab === 'Planning Digital' && <Calendar size={12} className="inline mr-1 mb-0.5"/>}
@@ -1028,7 +1050,7 @@ const Digital: React.FC = () => {
 
             {/* Toolbar (Only for Calendar & Archives) */}
             {activeTab !== 'Planning Digital' && activeTab !== 'Gestion des TAGS' && (
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-2">
                     {/* Search */}
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />

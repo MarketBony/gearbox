@@ -57,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     localStorage.removeItem('gearbox_auth_user_id');
+    sessionStorage.clear();
     setUser(null);
   };
 

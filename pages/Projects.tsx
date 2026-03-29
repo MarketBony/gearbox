@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Task, TaskStatus, ServiceType, PlaqueName, Site, BrandType, ProjectType } from '../types';
 import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,7 +18,13 @@ interface ProjectsProps {
 const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedProject, setSelectedProjectRaw] = useState<Project | null>(null);
+  const SESSION_SELECTED_KEY = `gearbox_session_projects_${viewMode}_selectedId`;
+  const setSelectedProject = useCallback((p: Project | null) => {
+    setSelectedProjectRaw(p);
+    if (p) sessionStorage.setItem(SESSION_SELECTED_KEY, p.id);
+    else sessionStorage.removeItem(SESSION_SELECTED_KEY);
+  }, [SESSION_SELECTED_KEY]);
   const [saving, setSaving] = useState(false);
   const [showSiteDropdown, setShowSiteDropdown] = useState(false);
 
@@ -30,16 +37,18 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // --- FILTER STATES ---
-  const [showFilters, setShowFilters] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterContext, setFilterContext] = useState<string>('All');
-  const [filterService, setFilterService] = useState<ServiceType | 'All'>('All');
-  const [filterBrand, setFilterBrand] = useState<BrandType | 'All'>('All');
-  const [filterType, setFilterType] = useState<ProjectType | 'All'>('All');
-  const [filterStatus, setFilterStatus] = useState<string>('All');
-  const [filterStartDate, setFilterStartDate] = useState('');
-  const [filterEndDate, setFilterEndDate] = useState('');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showFilters, setShowFilters] = useSessionState<boolean>(`projects_${viewMode}_showFilters`, false);
+  const [searchTerm, setSearchTerm] = useSessionState<string>(`projects_${viewMode}_searchTerm`, '');
+  const [filterContext, setFilterContext] = useSessionState<string>(`projects_${viewMode}_filterContext`, 'All');
+  const [filterService, setFilterService] = useSessionState<ServiceType | 'All'>(`projects_${viewMode}_filterService`, 'All');
+  const [filterBrand, setFilterBrand] = useSessionState<BrandType | 'All'>(`projects_${viewMode}_filterBrand`, 'All');
+  const [filterType, setFilterType] = useSessionState<ProjectType | 'All'>(`projects_${viewMode}_filterType`, 'All');
+  const [filterStatus, setFilterStatus] = useSessionState<string>(`projects_${viewMode}_filterStatus`, 'All');
+  const [filterStartDate, setFilterStartDate] = useSessionState<string>(`projects_${viewMode}_filterStartDate`, '');
+  const [filterEndDate, setFilterEndDate] = useSessionState<string>(`projects_${viewMode}_filterEndDate`, '');
+  const [sortOrder, setSortOrder] = useSessionState<'asc' | 'desc'>(`projects_${viewMode}_sortOrder`, 'desc');
+
+  const scrollRef = useScrollRestore(`projects_${viewMode}`);
 
   useEffect(() => {
     loadProjects();
@@ -73,17 +82,20 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const loadProjects = async () => {
     const data = await db.getProjects();
     setProjects(data);
-    
+
     const pendingId = window.sessionStorage.getItem('pendingProjectId');
-    if (pendingId) {
-        const found = data.find(p => p.id === pendingId);
+    const savedId = window.sessionStorage.getItem(`gearbox_session_projects_${viewMode}_selectedId`);
+    const targetId = pendingId || savedId;
+
+    if (targetId) {
+        const found = data.find(p => p.id === targetId);
         if (found) {
             const isArchived = found.status === 'Archived';
             if ((viewMode === 'archived' && isArchived) || (viewMode === 'current' && !isArchived)) {
-                setSelectedProject(found);
+                setSelectedProjectRaw(found);
             }
-            window.sessionStorage.removeItem('pendingProjectId');
         }
+        if (pendingId) window.sessionStorage.removeItem('pendingProjectId');
     }
   };
 
@@ -400,8 +412,8 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
           </div>
       )}
 
-      {/* List Panel */}
-      <div className="w-1/3 min-w-[350px] border-r border-bony-border flex flex-col bg-bony-panel">
+      {/* List Panel — full width on mobile, 1/3 on desktop */}
+      <div className={`${selectedProject ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 md:min-w-[350px] border-r border-bony-border flex-col bg-bony-panel`}>
         
         <div className="p-4 border-b border-bony-border space-y-3 bg-bony-panel z-20 shadow-md">
             <div className="flex justify-between items-center">
@@ -496,7 +508,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
             </div>
         )}
         
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar">
           {filteredProjects.length > 0 ? filteredProjects.map(project => {
             const isSelected = selectedProject?.id === project.id;
             return (
@@ -556,13 +568,19 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
         </div>
       </div>
 
-      {/* Detail Panel */}
-      <div className="flex-1 bg-bony-dark flex flex-col h-full overflow-hidden">
+      {/* Detail Panel — hidden on mobile when no project selected */}
+      <div className={`${selectedProject ? 'flex' : 'hidden md:flex'} flex-1 bg-bony-dark flex-col h-full overflow-hidden`}>
         {selectedProject ? (
           <>
-            <div className="h-14 border-b border-bony-border flex items-center justify-between px-6 bg-bony-panel shrink-0 transition-colors">
-               <div className="text-sm text-slate-400 flex items-center gap-3">
-                 <span className="font-sans text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-black/20 px-2 py-1 rounded">ID: {selectedProject.id}</span>
+            <div className="h-14 border-b border-bony-border flex items-center justify-between px-3 md:px-6 bg-bony-panel shrink-0 transition-colors">
+               <div className="text-sm text-slate-400 flex items-center gap-2 md:gap-3 min-w-0">
+                 <button
+                   onClick={() => setSelectedProject(null)}
+                   className="md:hidden flex items-center gap-1 text-xs font-bold text-slate-500 bg-slate-100 dark:bg-white/10 px-2 py-1.5 rounded-lg shrink-0 min-h-[36px]"
+                 >
+                   ← Retour
+                 </button>
+                 <span className="font-sans text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-black/20 px-2 py-1 rounded hidden md:inline">ID: {selectedProject.id}</span>
                  {saving && <span className="text-bony-orange flex items-center text-xs animate-pulse font-bold"><Save size={12} className="mr-1"/> SAUVEGARDE...</span>}
                  {!canEdit && <span className="flex items-center gap-1 text-red-400 text-xs font-bold uppercase border border-red-500/20 bg-red-500/10 px-2 py-0.5 rounded"><Lock size={10}/> Lecture Seule</span>}
                </div>
@@ -594,7 +612,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                )}
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-10">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-6 lg:p-10">
                 <div className="max-w-6xl mx-auto space-y-10 pb-20">
                     
                     <div className="space-y-2">
