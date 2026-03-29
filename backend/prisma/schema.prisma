@@ -1,0 +1,147 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  Master
+  Administrator
+  Coordinator
+  DigitalManager
+  Guest
+}
+
+model User {
+  id           String   @id @default(uuid())
+  loginId      String   @unique
+  passwordHash String
+  name         String
+  role         UserRole
+  avatarColor  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Project {
+  id            String   @id @default(uuid())
+  name          String
+  site          String
+  service       String[] // Stored as array of strings
+  brands        String[]
+  projectType   String
+  status        String
+  startDate     DateTime
+  endDate       DateTime
+  budgetPlanned Float
+  budgetActual  Float
+  description   String
+  progress      Float
+  tasks         Task[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Task {
+  id           String   @id @default(uuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name         String
+  channel      String
+  cost         Float
+  status       String
+  volumetry    Float?
+  openRate     Float?
+  npaiRate     Float?
+  stopRate     Float?
+  clickRate    Float?
+  codTxt       String?
+  billedAmount Float?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Campaign {
+  id            String   @id @default(uuid())
+  name          String
+  site          String
+  service       String[]
+  type          String
+  startDate     DateTime
+  endDate       DateTime
+  budgetPlanned Float
+  status        String
+  roi           Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SocialPost {
+  id          String   @id @default(uuid())
+  title       String
+  status      String
+  date        DateTime
+  targets     String[]
+  brands      String[]
+  service     String
+  networks    String[]
+  concessions String[]
+  mediaFiles  String[]
+  link        String
+  wording     String
+  lom         String
+  co2         String
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model DigitalTags {
+  id       String   @id @default(uuid())
+  networks String[]
+  co2      String[]
+}
+
+model Contact {
+  id              String   @id @default(uuid())
+  firstName       String
+  lastName        String
+  email           String
+  phone           String
+  site            String
+  service         String
+  type            String
+  rgpdConsent     Boolean
+  tags            String[]
+  lastContactDate DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model BudgetLine {
+  id        String   @id @default(uuid())
+  site      String
+  brands    String[]
+  year      Int
+  // Storing entries as JSON because it's a fixed structure of arrays in the frontend
+  // { VN: number[], VO: number[], ... }
+  entries   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([site, year])
+}
+
+model OneOffExpense {
+  id        String   @id @default(uuid())
+  date      DateTime
+  service   String
+  site      String
+  comment   String?
+  amount    Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

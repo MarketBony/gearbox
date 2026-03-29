@@ -1,0 +1,134 @@
+
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GEARBOX – Plaque Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts: Syncopate & Albert Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:ital,wght@0,100..900;1,100..900&family=Syncopate:wght@400;700&display=swap" rel="stylesheet">
+
+    <script>
+      tailwind.config = {
+        darkMode: 'class', // Activation manuelle via classe 'dark'
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Albert Sans"', 'sans-serif'],
+              title: ['"Syncopate"', 'sans-serif'],
+            },
+            colors: {
+              bony: {
+                orange: '#f75632',
+                violet: '#8f12ab',
+                blue: '#293f74',
+                // Utilisation de variables CSS pour le theming
+                dark: 'var(--bg-main)',  
+                panel: 'var(--bg-panel)', 
+                border: 'var(--border-color)',
+                text: 'var(--text-main)',
+                muted: 'var(--text-muted)',
+                input: 'var(--bg-input)'
+              },
+              gearbox: { 
+                dark: 'var(--bg-main)',
+                panel: 'var(--bg-panel)',
+                accent: '#f75632', 
+              }
+            },
+            backgroundImage: {
+              'bony-gradient': 'linear-gradient(to right, #f75632, #8f12ab)',
+              'bony-gradient-hover': 'linear-gradient(to right, #ff6b4a, #a62bc4)',
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      /* DEFINITION DU THEME */
+      :root {
+        /* Mode Clair */
+        --bg-main: #f1f5f9;      /* Slate 100 - Fond général */
+        --bg-panel: #ffffff;     /* White - Panneaux */
+        --bg-input: #f8fafc;     /* Slate 50 - Inputs */
+        --border-color: #cbd5e1; /* Slate 300 - Bordures plus visibles */
+        --text-main: #0f172a;    /* Slate 900 - Texte principal */
+        --text-muted: #64748b;   /* Slate 500 - Texte secondaire */
+      }
+
+      html.dark {
+        /* Mode Sombre */
+        --bg-main: #121212;      /* Noir profond */
+        --bg-panel: #1E1E1E;     /* Gris foncé */
+        --bg-input: rgba(0, 0, 0, 0.2); /* Fond inputs */
+        --border-color: #333333; /* Bordures subtiles */
+        --text-main: #ffffff;    /* Blanc */
+        --text-muted: #94a3b8;   /* Slate 400 */
+      }
+
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--bg-main); 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border-color); 
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #f75632; 
+      }
+
+      body {
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        font-family: 'Albert Sans', sans-serif;
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+
+      /* Transitions douces pour les éléments de thème */
+      .bg-bony-panel, .bg-bony-dark, .border-bony-border {
+        transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+      }
+
+      h1, h2, h3, h4, h5, h6 {
+        font-family: 'Syncopate', sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      
+      /* Input resets for better theming */
+      input, select, textarea {
+        color: var(--text-main);
+      }
+      input::placeholder, textarea::placeholder {
+        color: var(--text-muted);
+        opacity: 0.7;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.574.0",
+    "recharts": "https://esm.sh/recharts@^3.7.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
