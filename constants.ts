@@ -11,9 +11,16 @@ export const PLAQUES_STRUCTURE: Record<PlaqueName, Site[]> = {
 
 export const SITES: Site[] = [
     ...Object.values(PLAQUES_STRUCTURE).flat(),
-    'Alpine',
-    'Nissan'
+    'Montluçon',
+    'Saint-Etienne',
+    // Alpine et Nissan sont des buckets budgétaires, pas des sites géographiques sélectionnables
 ];
+
+// Sites où Alpine est présent (projets tagués Alpine → budget routé vers entité Alpine)
+export const ALPINE_SITES: Site[] = ['Clermont', 'Le Puy-en-Velay', 'Vichy'];
+
+// Sites où Nissan est présent (projets tagués Nissan → budget routé vers entité Nissan)
+export const NISSAN_SITES: Site[] = ['Clermont', 'Montluçon', 'Moulins', 'Le Puy-en-Velay', 'Saint-Etienne', 'Rodez', 'Albi', 'Aurillac'];
 
 export const SERVICES: ServiceType[] = ['VN', 'VO', 'APV', 'PR', 'Tous Services'];
 

@@ -8,7 +8,9 @@ export type Site =
   | 'Issoire' | 'Brioude' | 'Mende' | 'Le Puy-en-Velay'
   // PLAQUE SUD-OUEST
   | 'Albi' | 'Rodez' | 'Millau' | 'Aurillac' | 'Figeac' | 'Gaillac' | 'Villefranche' | 'Carmaux' | 'Lavaur'
-  // ENTITÉS SPÉCIFIQUES
+  // ENTITÉS NISSAN (sites géographiques Nissan uniquement)
+  | 'Montluçon' | 'Saint-Etienne'
+  // ENTITÉS SPÉCIFIQUES (buckets budgétaires)
   | 'Alpine' | 'Nissan';
 
 export type PlaqueName = 'PLAQUE CENTRE' | 'PLAQUE NORD' | 'PLAQUE SUD' | 'PLAQUE SUD-OUEST';
@@ -151,6 +153,7 @@ export interface FixedExpense {
   budgetDistribution?: Record<string, number>; // Site -> Percentage (0-100)
   comment: string;
   amount: number;
+  brand?: BrandType; // Pour le routage budgétaire Alpine/Nissan
 }
 
 // --- BUDGET FORECAST TYPES ---

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { FixedExpense, ServiceType, Site, PlaqueName } from '../types';
+import { FixedExpense, ServiceType, Site, PlaqueName, BrandType } from '../types';
 import { db } from '../services/dataService';
-import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN } from '../constants';
+import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN } from '../constants';
 import { Plus, Trash2, Edit2, Save, X, Search, Filter, Euro, Calendar, MapPin, MessageSquare, Briefcase, ArrowUp, ArrowDown, ChevronDown, Check, PieChart } from 'lucide-react';
 
 const FixedExpenses: React.FC = () => {
@@ -75,6 +75,15 @@ const FixedExpenses: React.FC = () => {
         }
     };
 
+    // Marques disponibles selon les sites sélectionnés
+    const getAvailableBrands = (sites: string[]): BrandType[] => {
+        return BRANDS.filter(b => {
+            if (b === 'Alpine') return sites.some(s => ALPINE_SITES.includes(s as Site));
+            if (b === 'Nissan') return sites.some(s => NISSAN_SITES.includes(s as Site));
+            return true;
+        });
+    };
+
     const openModal = (expense?: FixedExpense) => {
         if (expense) {
             setCurrentExpense({ ...expense });
@@ -87,7 +96,8 @@ const FixedExpenses: React.FC = () => {
                 sites: ['Clermont'],
                 budgetDistribution: { 'Clermont': 100 },
                 amount: 0,
-                comment: ''
+                comment: '',
+                brand: undefined
             });
             setIsEditing(false);
         }
@@ -513,6 +523,22 @@ const FixedExpenses: React.FC = () => {
                                                             })}
                                                         </div>
                                                     ))}
+                                                    <div className="mb-1">
+                                                        <div className="px-3 py-1 text-[10px] uppercase font-bold text-red-400/70">SITES NISSAN</div>
+                                                        {(['Montluçon', 'Saint-Etienne'] as Site[]).map(site => {
+                                                            const isSelected = (currentExpense.sites || []).includes(site);
+                                                            return (
+                                                                <button
+                                                                    key={site}
+                                                                    onClick={() => updateSiteSelection(site)}
+                                                                    className={`w-full text-left px-3 py-1.5 text-xs rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between ${isSelected ? 'text-bony-blue font-bold bg-blue-50 dark:bg-blue-900/20' : 'text-slate-600 dark:text-slate-400'}`}
+                                                                >
+                                                                    {site}
+                                                                    {isSelected && <Check size={14}/>}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -530,6 +556,46 @@ const FixedExpenses: React.FC = () => {
                                         </select>
                                     </div>
                                 </div>
+
+                                {/* BRAND SECTION */}
+                                {(() => {
+                                    const selectedSites = currentExpense.sites || (currentExpense.site ? [currentExpense.site] : []);
+                                    const availableBrands = getAvailableBrands(selectedSites);
+                                    const hasAlpineOrNissan = availableBrands.some(b => b === 'Alpine' || b === 'Nissan');
+                                    if (!hasAlpineOrNissan) return null;
+                                    return (
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                                                Marque (routage budgétaire)
+                                            </label>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    onClick={() => setCurrentExpense({...currentExpense, brand: undefined})}
+                                                    className={`px-3 py-1.5 rounded text-xs font-bold border transition-all ${
+                                                        !currentExpense.brand
+                                                        ? 'bg-bony-gradient border-transparent text-white shadow'
+                                                        : 'bg-slate-100 dark:bg-black/20 border-bony-border text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                                    }`}
+                                                >
+                                                    Aucune
+                                                </button>
+                                                {availableBrands.filter(b => b === 'Alpine' || b === 'Nissan').map(b => (
+                                                    <button
+                                                        key={b}
+                                                        onClick={() => setCurrentExpense({...currentExpense, brand: b})}
+                                                        className={`px-3 py-1.5 rounded text-xs font-bold border transition-all ${
+                                                            currentExpense.brand === b
+                                                            ? `${BRAND_COLORS[b]} shadow scale-105`
+                                                            : 'bg-slate-100 dark:bg-black/20 border-bony-border text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                                        }`}
+                                                    >
+                                                        {b}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
 
                                 {/* BUDGET ALLOCATION SECTION */}
                                 {(currentExpense.sites && currentExpense.sites.length > 1) && (

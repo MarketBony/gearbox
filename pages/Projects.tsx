@@ -4,7 +4,7 @@ import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Task, TaskStatus, ServiceType, PlaqueName, Site, BrandType, ProjectType } from '../types';
 import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
-import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, PROJECT_TYPES, TASK_CHANNELS, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN } from '../constants';
+import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, PROJECT_TYPES, TASK_CHANNELS, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, ALPINE_SITES, NISSAN_SITES } from '../constants';
 import { 
     Plus, Save, Trash2, FolderKanban, CheckCircle2, Circle, PlayCircle, 
     CalendarCheck, Coins, TrendingUp, TrendingDown, Search, Filter, X, 
@@ -740,6 +740,22 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                         })}
                                                     </div>
                                                 ))}
+                                                <div className="mb-1">
+                                                    <div className="px-3 py-1 text-[10px] uppercase font-bold text-red-400/70">SITES NISSAN</div>
+                                                    {(['Montluçon', 'Saint-Etienne'] as Site[]).map(site => {
+                                                        const isSelected = (selectedProject.sites || []).includes(site);
+                                                        return (
+                                                            <button
+                                                                key={site}
+                                                                onClick={() => updateSiteSelection(site)}
+                                                                className={`w-full text-left px-3 py-1.5 text-xs rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between ${isSelected ? 'text-bony-blue font-bold bg-blue-50 dark:bg-blue-900/20' : 'text-slate-600 dark:text-slate-400'}`}
+                                                            >
+                                                                {site}
+                                                                {isSelected && <Check size={14}/>}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         )}
                                      </div>
@@ -783,7 +799,12 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                 <div>
                                     <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2">Marques</label>
                                     <div className="flex flex-wrap gap-2">
-                                        {BRANDS.map(b => {
+                                        {BRANDS.filter(b => {
+                                            const currentSites = selectedProject.sites || (selectedProject.site ? [selectedProject.site] : []);
+                                            if (b === 'Alpine') return currentSites.some(s => ALPINE_SITES.includes(s as Site));
+                                            if (b === 'Nissan') return currentSites.some(s => NISSAN_SITES.includes(s as Site));
+                                            return true;
+                                        }).map(b => {
                                             const isSelected = (selectedProject.brands || []).includes(b);
                                             const colorClass = BRAND_COLORS[b];
                                             return (

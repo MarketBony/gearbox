@@ -175,11 +175,18 @@ const Budget: React.FC = () => {
               if (targetSite === 'Thiers' || targetSite === 'Ambert') targetSite = 'Ricoux';
               if (targetSite === 'Riom') targetSite = 'Mozac';
 
+              // Alpine/Nissan brand routing: override target to entity bucket
+              const pBrands = p.brands || [];
+              if (pBrands.includes('Alpine') && siteStats['Alpine']) {
+                  targetSite = 'Alpine';
+              } else if (pBrands.includes('Nissan') && siteStats['Nissan']) {
+                  targetSite = 'Nissan';
+              }
+
               if (!siteStats[targetSite]) return;
 
               // Brand Filter
               if (filterBrand !== 'All') {
-                  const pBrands = p.brands || [];
                   if (!pBrands.includes(filterBrand) && !pBrands.includes('Groupe')) return;
               }
 
@@ -242,6 +249,13 @@ const Budget: React.FC = () => {
               let targetSite = rawSite;
               if (targetSite === 'Thiers' || targetSite === 'Ambert') targetSite = 'Ricoux';
               if (targetSite === 'Riom') targetSite = 'Mozac';
+
+              // Alpine/Nissan brand routing: override target to entity bucket
+              if (exp.brand === 'Alpine' && siteStats['Alpine']) {
+                  targetSite = 'Alpine';
+              } else if (exp.brand === 'Nissan' && siteStats['Nissan']) {
+                  targetSite = 'Nissan';
+              }
 
               if (!siteStats[targetSite]) return;
 
