@@ -1,35 +1,352 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost } from '../types';
 import { db } from '../services/dataService';
-import { PLAQUES_STRUCTURE, BRANDS, SERVICES, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS } from '../constants';
-import { 
-  TrendingUp, 
-  Wallet, 
+import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS } from '../constants';
+import {
+  TrendingUp,
+  Wallet,
   Megaphone,
-  AlertTriangle,
   Target,
-  Filter,
   Calendar,
   Layers,
   Activity,
   ArrowRight,
-  Info,
   Globe,
-  Share2,
   Instagram,
   Facebook,
   Linkedin,
   Youtube,
   MapPin,
-  Video
+  Video,
+  ChevronDown,
+  ChevronRight,
+  Check,
+  X,
+  Search,
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
   ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Legend, Area
 } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
+
+// --- DATE HELPERS ---
+const toLocalIso = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const formatDateBtn = (iso: string): string => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const getPeriodRanges = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const mo = now.getMonth();
+  const day = now.getDay();
+  const monOffset = day === 0 ? -6 : 1 - day;
+  const mon = new Date(now); mon.setDate(now.getDate() + monOffset);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const q = Math.floor(mo / 3);
+  return {
+    week:    { start: toLocalIso(mon), end: toLocalIso(sun) },
+    month:   { start: toLocalIso(new Date(y, mo, 1)), end: toLocalIso(new Date(y, mo + 1, 0)) },
+    quarter: { start: toLocalIso(new Date(y, q * 3, 1)), end: toLocalIso(new Date(y, q * 3 + 3, 0)) },
+    year:    { start: `${y}-01-01`, end: `${y}-12-31` },
+  };
+};
+
+// --- COMPONENT: DATE RANGE PICKER ---
+interface DateRangePickerProps {
+  startDate: string; endDate: string;
+  onStartChange: (v: string) => void; onEndChange: (v: string) => void;
+}
+const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, onStartChange, onEndChange }) => {
+  const [open, setOpen] = useState(false);
+  const [customMode, setCustomMode] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const shortcuts = [
+    { label: 'Cette semaine', apply: () => { const r = getPeriodRanges(); onStartChange(r.week.start); onEndChange(r.week.end); setOpen(false); } },
+    { label: 'Ce mois', apply: () => { const r = getPeriodRanges(); onStartChange(r.month.start); onEndChange(r.month.end); setOpen(false); } },
+    { label: 'Ce trimestre', apply: () => { const r = getPeriodRanges(); onStartChange(r.quarter.start); onEndChange(r.quarter.end); setOpen(false); } },
+    { label: 'Cette année', apply: () => { const r = getPeriodRanges(); onStartChange(r.year.start); onEndChange(r.year.end); setOpen(false); } },
+    { label: 'Personnalisé', apply: () => setCustomMode(true) },
+  ];
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger: two date buttons */}
+      <div className="flex items-center gap-1.5">
+        <div className="flex flex-col">
+          <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Du</span>
+          <button
+            onClick={() => { setOpen(!open); setCustomMode(false); }}
+            className="flex items-center gap-1.5 text-xs font-bold text-bony-text hover:text-bony-orange transition whitespace-nowrap"
+          >
+            {formatDateBtn(startDate)} <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+        <span className="text-slate-400 text-xs mt-3">→</span>
+        <div className="flex flex-col">
+          <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Au</span>
+          <button
+            onClick={() => { setOpen(!open); setCustomMode(false); }}
+            className="flex items-center gap-1.5 text-xs font-bold text-bony-text hover:text-bony-orange transition whitespace-nowrap"
+          >
+            {formatDateBtn(endDate)} <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <>
+          {/* Mobile backdrop */}
+          <div className="sm:hidden fixed inset-0 z-40 bg-black/60" onClick={() => setOpen(false)} />
+          <div className={`
+            z-50 bg-bony-panel border border-bony-border rounded-xl shadow-2xl overflow-hidden
+            sm:absolute sm:top-full sm:left-0 sm:mt-2 sm:w-52
+            fixed bottom-0 left-0 right-0 rounded-b-none sm:rounded-xl
+          `}>
+            {!customMode ? (
+              <div className="p-1">
+                {shortcuts.map(s => (
+                  <button key={s.label} onClick={s.apply} className="w-full text-left px-3 py-2.5 text-xs font-bold text-bony-text hover:bg-white/5 rounded-lg transition flex items-center justify-between">
+                    {s.label}
+                    {s.label === 'Personnalisé' && <ChevronRight size={14} className="text-slate-500" />}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Période personnalisée</span>
+                  <button onClick={() => setCustomMode(false)} className="text-slate-400 hover:text-bony-text"><X size={14} /></button>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Du</label>
+                    <input type="date" value={startDate} onChange={e => onStartChange(e.target.value)}
+                      className="w-full bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5 text-xs text-bony-text outline-none focus:border-bony-orange transition" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Au</label>
+                    <input type="date" value={endDate} onChange={e => onEndChange(e.target.value)}
+                      className="w-full bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5 text-xs text-bony-text outline-none focus:border-bony-orange transition" />
+                  </div>
+                </div>
+                <button onClick={() => setOpen(false)} className="w-full py-2 rounded-lg bg-bony-gradient text-white text-xs font-bold mt-1">
+                  Appliquer
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// --- COMPONENT: SITE CONTEXT PICKER ---
+const ALL_PLAQUE_SITES = Object.values(PLAQUES_STRUCTURE).flat();
+const SPECIAL_SITES: string[] = ['Alpine', 'Nissan'];
+
+interface SiteContextPickerProps {
+  selected: string[];
+  onChange: (v: string[]) => void;
+}
+const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [expandedPlaques, setExpandedPlaques] = useState<Set<string>>(new Set(Object.keys(PLAQUES_STRUCTURE)));
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = (site: string) =>
+    onChange(selected.includes(site) ? selected.filter(s => s !== site) : [...selected, site]);
+
+  const togglePlaque = (plaqueSites: string[]) => {
+    const allSelected = plaqueSites.every(s => selected.includes(s));
+    if (allSelected) onChange(selected.filter(s => !plaqueSites.includes(s)));
+    else onChange([...selected.filter(s => !plaqueSites.includes(s)), ...plaqueSites]);
+  };
+
+  const toggleExpandPlaque = (p: string) => {
+    const next = new Set(expandedPlaques);
+    next.has(p) ? next.delete(p) : next.add(p);
+    setExpandedPlaques(next);
+  };
+
+  const selectAll = () => onChange([...ALL_PLAQUE_SITES, ...SPECIAL_SITES]);
+  const clearAll = () => onChange([]);
+
+  const isAll = selected.length === 0;
+
+  const triggerLabel = isAll
+    ? 'Tout le réseau'
+    : selected.length === 1
+      ? selected[0]
+      : `${selected.length} sites`;
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger */}
+      <div className="flex flex-col">
+        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Périmètre</span>
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-1.5 text-xs font-bold text-bony-orange hover:text-bony-violet transition whitespace-nowrap"
+        >
+          {triggerLabel}
+          <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <>
+          <div className="sm:hidden fixed inset-0 z-40 bg-black/60" onClick={() => setOpen(false)} />
+          <div className={`
+            z-50 bg-bony-panel border border-bony-border shadow-2xl overflow-hidden flex flex-col
+            sm:absolute sm:top-full sm:left-0 sm:mt-2 sm:w-64 sm:max-h-80 sm:rounded-xl
+            fixed bottom-0 left-0 right-0 rounded-t-2xl max-h-[75vh]
+          `}>
+            {/* Search (mobile always, desktop on focus) */}
+            <div className="p-2 border-b border-bony-border shrink-0">
+              <div className="flex items-center gap-2 bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5">
+                <Search size={13} className="text-slate-500 shrink-0" />
+                <input
+                  type="text" value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Rechercher un site…"
+                  className="flex-1 bg-transparent text-xs text-bony-text outline-none placeholder-bony-muted"
+                />
+                {search && <button onClick={() => setSearch('')}><X size={12} className="text-slate-400" /></button>}
+              </div>
+            </div>
+
+            {/* All / None buttons */}
+            <div className="flex gap-1 px-2 py-1.5 border-b border-bony-border shrink-0">
+              <button onClick={clearAll} className={`flex-1 text-[10px] font-bold py-1 rounded transition ${isAll ? 'bg-bony-orange/20 text-bony-orange border border-bony-orange/40' : 'text-slate-500 hover:text-bony-text hover:bg-white/5'}`}>
+                Tout le réseau
+              </button>
+              <button onClick={selectAll} className="flex-1 text-[10px] font-bold py-1 rounded text-slate-500 hover:text-bony-text hover:bg-white/5 transition">
+                Tout sélectionner
+              </button>
+            </div>
+
+            {/* Sites list */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar py-1">
+              {Object.entries(PLAQUES_STRUCTURE).map(([plaqueName, sites]) => {
+                const filtered = sites.filter(s => !search || s.toLowerCase().includes(search.toLowerCase()));
+                if (search && filtered.length === 0) return null;
+                const expanded = expandedPlaques.has(plaqueName);
+                const allSelected = sites.every(s => selected.includes(s));
+                const someSelected = sites.some(s => selected.includes(s));
+                return (
+                  <div key={plaqueName}>
+                    <div className="flex items-center px-2 py-1">
+                      <button
+                        onClick={() => toggleExpandPlaque(plaqueName)}
+                        className="flex items-center gap-1 flex-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-bony-text transition"
+                      >
+                        <ChevronRight size={11} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
+                        {plaqueName}
+                      </button>
+                      <button
+                        onClick={() => togglePlaque(sites as string[])}
+                        className={`w-4 h-4 rounded border flex items-center justify-center transition ${
+                          allSelected ? 'bg-bony-orange border-bony-orange' : someSelected ? 'bg-bony-orange/30 border-bony-orange/50' : 'border-bony-border hover:border-bony-orange/50'
+                        }`}
+                      >
+                        {(allSelected || someSelected) && <Check size={10} className="text-white" />}
+                      </button>
+                    </div>
+                    {(expanded || search) && (search ? filtered : sites).map(site => (
+                      <button
+                        key={site}
+                        onClick={() => toggle(site)}
+                        className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition"
+                      >
+                        <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
+                        {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+              {/* Alpine / Nissan */}
+              <div>
+                <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Entités Spécifiques</div>
+                {SPECIAL_SITES.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
+                  <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                    <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
+                    {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// --- COMPONENT: BRAND PICKER ---
+interface BrandPickerProps { selected: BrandType[]; onChange: (v: BrandType[]) => void; }
+const BrandPicker: React.FC<BrandPickerProps> = ({ selected, onChange }) => {
+  const isAll = selected.length === 0;
+  const toggle = (b: BrandType) =>
+    onChange(selected.includes(b) ? selected.filter(x => x !== b) : [...selected, b]);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Marque</span>
+      <div className="flex flex-wrap gap-1.5">
+        {/* All chip */}
+        <button
+          onClick={() => onChange([])}
+          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+            isAll
+              ? 'bg-bony-gradient border-transparent text-white shadow'
+              : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          Toutes
+        </button>
+        {/* Brand chips */}
+        {BRANDS.map(b => {
+          const active = selected.includes(b);
+          return (
+            <button
+              key={b}
+              onClick={() => toggle(b)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                active ? `${BRAND_COLORS[b]} scale-105 shadow` : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'
+              }`}
+            >
+              {b}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 // --- COLORS ---
 const COLORS = {
@@ -64,8 +381,8 @@ const Dashboard: React.FC = () => {
   const [dateStart, setDateStart] = useSessionState<string>('dashboard_dateStart', `${currentYear}-01-01`);
   const [dateEnd, setDateEnd] = useSessionState<string>('dashboard_dateEnd', `${currentYear}-12-31`);
 
-  const [filterContext, setFilterContext] = useSessionState<string>('dashboard_filterContext', 'All'); // Plaque or Site
-  const [filterBrand, setFilterBrand] = useSessionState<BrandType | 'All'>('dashboard_filterBrand', 'All');
+  const [filterContexts, setFilterContexts] = useSessionState<string[]>('dashboard_filterContexts', []);
+  const [filterBrands, setFilterBrands] = useSessionState<BrandType[]>('dashboard_filterBrands', []);
 
   const scrollRef = useScrollRestore('dashboard', !loading);
 
@@ -128,17 +445,14 @@ const Dashboard: React.FC = () => {
 
     // 1. Filter Logic Helpers
     const isSiteInScope = (site: string) => {
-        if (filterContext === 'All') return true;
-        if (filterContext === 'GROUPE BONY') return true;
-        if (PLAQUES_STRUCTURE[filterContext as PlaqueName]) {
-            return PLAQUES_STRUCTURE[filterContext as PlaqueName].includes(site as Site) || site === filterContext;
-        }
-        return site === filterContext;
+        if (filterContexts.length === 0) return true;
+        if (filterContexts.includes('GROUPE BONY')) return true;
+        return filterContexts.includes(site);
     };
 
     const isBrandInScope = (projectBrands: BrandType[]) => {
-        if (filterBrand === 'All') return true;
-        return projectBrands.includes(filterBrand) || projectBrands.includes('Groupe');
+        if (filterBrands.length === 0) return true;
+        return projectBrands.includes('Groupe') || filterBrands.some(b => projectBrands.includes(b));
     };
 
     // 2. Process BUDGETS
@@ -228,15 +542,14 @@ const Dashboard: React.FC = () => {
     const upcomingPosts = socialPosts
         .filter(p => {
              // Scope Check for Social
-             if (filterContext !== 'All') {
-                 // Simplistic check for social scope (assuming concessions array)
+             if (filterContexts.length > 0) {
                  const pScope = p.concessions || [];
-                 const match = pScope.includes(filterContext) || pScope.includes('GROUPE BONY') || (PLAQUES_STRUCTURE[filterContext as PlaqueName] && pScope.some(s => PLAQUES_STRUCTURE[filterContext as PlaqueName].includes(s as Site)));
+                 const match = pScope.includes('GROUPE BONY') || filterContexts.some(ctx => pScope.includes(ctx));
                  if (!match) return false;
              }
              // Brand check
-             if (filterBrand !== 'All') {
-                 if (!p.brands.includes(filterBrand) && !p.brands.includes('Groupe')) return false;
+             if (filterBrands.length > 0) {
+                 if (!p.brands.includes('Groupe') && !filterBrands.some(b => p.brands.includes(b))) return false;
              }
 
              if (p.archived) return false;
@@ -257,7 +570,7 @@ const Dashboard: React.FC = () => {
         upcomingPosts
     };
 
-  }, [projects, budgets, socialPosts, dateStart, dateEnd, filterContext, filterBrand]);
+  }, [projects, budgets, socialPosts, dateStart, dateEnd, filterContexts, filterBrands]);
 
   // --- RENDER HELPERS ---
   const formatCurrency = (val: number) => val.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
@@ -292,63 +605,20 @@ const Dashboard: React.FC = () => {
              </div>
 
              {/* FILTERS */}
-             <div className="flex items-center gap-3 bg-slate-100 dark:bg-black/30 p-1.5 rounded-xl border border-bony-border/50">
-                 
-                 {/* DATE RANGE */}
-                 <div className="px-2 flex gap-2">
-                     <div>
-                        <label className="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Du</label>
-                        <input 
-                            type="date"
-                            value={dateStart}
-                            onChange={(e) => setDateStart(e.target.value)}
-                            className="bg-transparent text-xs font-bold text-bony-text outline-none cursor-pointer border-b border-bony-border pb-0.5"
-                        />
-                     </div>
-                     <div className="pt-4 text-slate-500">→</div>
-                     <div>
-                        <label className="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Au</label>
-                        <input 
-                            type="date"
-                            value={dateEnd}
-                            onChange={(e) => setDateEnd(e.target.value)}
-                            className="bg-transparent text-xs font-bold text-bony-text outline-none cursor-pointer border-b border-bony-border pb-0.5"
-                        />
-                     </div>
-                 </div>
-                 <div className="w-px h-6 bg-bony-border"></div>
-
-                 {/* Context */}
-                 <div className="px-2">
-                     <label className="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Périmètre</label>
-                     <select 
-                        value={filterContext} onChange={(e) => setFilterContext(e.target.value)}
-                        className="bg-transparent text-xs font-bold text-bony-orange outline-none cursor-pointer max-w-[120px] truncate"
-                     >
-                         <option value="All">TOUT LE RÉSEAU</option>
-                         {Object.entries(PLAQUES_STRUCTURE).map(([plaque, sites]) => (
-                             <optgroup key={plaque} label={plaque}>
-                                 <option value={plaque}>★ {plaque}</option>
-                                 {sites.map(s => <option key={s} value={s}>{s}</option>)}
-                             </optgroup>
-                         ))}
-                         <option value="Alpine">Alpine</option>
-                         <option value="Nissan">Nissan</option>
-                     </select>
-                 </div>
-                 <div className="w-px h-6 bg-bony-border"></div>
-
-                 {/* Brand */}
-                 <div className="px-2">
-                     <label className="block text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Marque</label>
-                     <select 
-                        value={filterBrand} onChange={(e) => setFilterBrand(e.target.value as any)}
-                        className="bg-transparent text-xs font-bold text-bony-text outline-none cursor-pointer"
-                     >
-                         <option value="All">Toutes</option>
-                         {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
-                     </select>
-                 </div>
+             <div className="flex flex-wrap items-center gap-3 bg-slate-100 dark:bg-black/30 px-3 py-2.5 rounded-xl border border-bony-border/50">
+                 {/* 1. Date Range */}
+                 <DateRangePicker
+                   startDate={dateStart}
+                   endDate={dateEnd}
+                   onStartChange={setDateStart}
+                   onEndChange={setDateEnd}
+                 />
+                 <div className="w-px h-6 bg-bony-border hidden sm:block" />
+                 {/* 2. Périmètre multi-select */}
+                 <SiteContextPicker selected={filterContexts} onChange={setFilterContexts} />
+                 <div className="w-px h-6 bg-bony-border hidden sm:block" />
+                 {/* 3. Marques chips */}
+                 <BrandPicker selected={filterBrands} onChange={setFilterBrands} />
              </div>
          </div>
       </div>
