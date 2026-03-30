@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import Digital from './pages/Digital';
+import Chat from './pages/Chat';
 import Campaigns from './pages/Campaigns';
 import Material from './pages/Material';
 import Budget from './pages/Budget';
@@ -46,6 +47,7 @@ const InnerApp: React.FC = () => {
       case 'dashboard': return <Dashboard />;
       case 'projects': return <Projects viewMode="current" />;
       case 'digital': return <Digital />;
+      case 'chat': return <Chat />;
       case 'archives': return <Projects viewMode="archived" />;
       case 'campaigns': return <Campaigns />;
       case 'material': return <Material />;

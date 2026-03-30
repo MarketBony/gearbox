@@ -156,6 +156,34 @@ export interface FixedExpense {
   brand?: BrandType; // Pour le routage budgétaire Alpine/Nissan
 }
 
+// --- CHAT TYPES ---
+export interface ChatConversation {
+  id: string;
+  type: 'general' | 'private';
+  participants: string[]; // userIds
+  name?: string;
+  pinnedBy: string[]; // userIds
+  lastMessage?: string;
+  lastMessageAt?: string;
+  unreadCounts: Record<string, number>; // userId -> count
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderColor: string;
+  content: string;
+  type: 'text' | 'image';
+  timestamp: string;
+  edited: boolean;
+  editedAt?: string;
+  deleted: boolean;
+  reactions: Record<string, string[]>; // emoji -> userId[]
+  replyToId?: string;
+}
+
 // --- BUDGET FORECAST TYPES ---
 export interface BudgetLine {
   site: Site;

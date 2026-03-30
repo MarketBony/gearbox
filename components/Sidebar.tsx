@@ -17,7 +17,8 @@ import {
   Moon,
   Euro,
   MoreHorizontal,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -34,6 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'projects', icon: FolderKanban, label: 'Projets' },
     { id: 'digital', icon: Globe, label: 'Digital' },
+    { id: 'chat', icon: MessageSquare, label: 'Chat' },
     { id: 'campaigns', icon: Megaphone, label: 'Campagnes' },
     { id: 'material', icon: Package, label: 'Matériel' },
     { id: 'agenda', icon: CalendarDays, label: 'Agenda' },

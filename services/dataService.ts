@@ -1,5 +1,5 @@
 
-import { Project, Campaign, Equipment, EquipmentBooking, Expense, BudgetLine, User, SocialPost, DigitalTags, FixedExpense } from '../types';
+import { Project, Campaign, Equipment, EquipmentBooking, Expense, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage } from '../types';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS } from '../constants';
 
 // In a real scenario, this connects to the Electron preload script exposed via window.electron
@@ -217,6 +217,35 @@ class DataService {
       }
       localStorage.setItem('gearbox_digital_tags', JSON.stringify(tags));
       await new Promise(r => setTimeout(r, 200));
+  }
+
+  // --- CHAT ---
+  getConversations(): ChatConversation[] {
+    const data = localStorage.getItem('gearbox_conversations');
+    const convs: ChatConversation[] = data ? JSON.parse(data) : [];
+    // Ensure general conversation exists
+    if (!convs.find(c => c.id === 'general')) {
+      const general: ChatConversation = {
+        id: 'general', type: 'general', participants: [],
+        name: 'Chat Général', pinnedBy: [], unreadCounts: {}
+      };
+      convs.unshift(general);
+      localStorage.setItem('gearbox_conversations', JSON.stringify(convs));
+    }
+    return convs;
+  }
+
+  saveConversations(convs: ChatConversation[]) {
+    localStorage.setItem('gearbox_conversations', JSON.stringify(convs));
+  }
+
+  getMessages(conversationId: string): ChatMessage[] {
+    const data = localStorage.getItem(`gearbox_messages_${conversationId}`);
+    return data ? JSON.parse(data) : [];
+  }
+
+  saveMessages(conversationId: string, messages: ChatMessage[]) {
+    localStorage.setItem(`gearbox_messages_${conversationId}`, JSON.stringify(messages));
   }
 
   async authenticate(loginId: string, password: string): Promise<User | null> {
