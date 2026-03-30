@@ -50,11 +50,16 @@ const getPeriodRanges = () => {
   const mon = new Date(now); mon.setDate(now.getDate() + monOffset);
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
   const q = Math.floor(mo / 3);
+  const prevQ = q === 0 ? 3 : q - 1;
+  const prevQYear = q === 0 ? y - 1 : y;
   return {
-    week:    { start: toLocalIso(mon), end: toLocalIso(sun) },
-    month:   { start: toLocalIso(new Date(y, mo, 1)), end: toLocalIso(new Date(y, mo + 1, 0)) },
-    quarter: { start: toLocalIso(new Date(y, q * 3, 1)), end: toLocalIso(new Date(y, q * 3 + 3, 0)) },
-    year:    { start: `${y}-01-01`, end: `${y}-12-31` },
+    today:       { start: toLocalIso(now), end: toLocalIso(now) },
+    week:        { start: toLocalIso(mon), end: toLocalIso(sun) },
+    month:       { start: toLocalIso(new Date(y, mo, 1)), end: toLocalIso(new Date(y, mo + 1, 0)) },
+    quarter:     { start: toLocalIso(new Date(y, q * 3, 1)), end: toLocalIso(new Date(y, q * 3 + 3, 0)) },
+    prevQuarter: { start: toLocalIso(new Date(prevQYear, prevQ * 3, 1)), end: toLocalIso(new Date(prevQYear, prevQ * 3 + 3, 0)) },
+    year:        { start: `${y}-01-01`, end: `${y}-12-31` },
+    prevYear:    { start: `${y - 1}-01-01`, end: `${y - 1}-12-31` },
   };
 };
 
@@ -66,89 +71,108 @@ interface DateRangePickerProps {
 const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, onStartChange, onEndChange }) => {
   const [open, setOpen] = useState(false);
   const [customMode, setCustomMode] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  const handleOpen = () => {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 8, left: rect.left });
+    }
+    setOpen(v => !v);
+    setCustomMode(false);
+  };
+
+  const close = () => { setOpen(false); setCustomMode(false); };
 
   const shortcuts = [
-    { label: 'Cette semaine', apply: () => { const r = getPeriodRanges(); onStartChange(r.week.start); onEndChange(r.week.end); setOpen(false); } },
-    { label: 'Ce mois', apply: () => { const r = getPeriodRanges(); onStartChange(r.month.start); onEndChange(r.month.end); setOpen(false); } },
-    { label: 'Ce trimestre', apply: () => { const r = getPeriodRanges(); onStartChange(r.quarter.start); onEndChange(r.quarter.end); setOpen(false); } },
-    { label: 'Cette année', apply: () => { const r = getPeriodRanges(); onStartChange(r.year.start); onEndChange(r.year.end); setOpen(false); } },
-    { label: 'Personnalisé', apply: () => setCustomMode(true) },
+    { label: "Aujourd'hui",         apply: () => { const r = getPeriodRanges(); onStartChange(r.today.start);       onEndChange(r.today.end);       close(); } },
+    { label: 'Cette semaine',        apply: () => { const r = getPeriodRanges(); onStartChange(r.week.start);        onEndChange(r.week.end);        close(); } },
+    { label: 'Ce mois',              apply: () => { const r = getPeriodRanges(); onStartChange(r.month.start);       onEndChange(r.month.end);       close(); } },
+    { label: 'Ce trimestre',         apply: () => { const r = getPeriodRanges(); onStartChange(r.quarter.start);     onEndChange(r.quarter.end);     close(); } },
+    { label: 'Le trimestre dernier', apply: () => { const r = getPeriodRanges(); onStartChange(r.prevQuarter.start); onEndChange(r.prevQuarter.end); close(); } },
+    { label: 'Cette année',          apply: () => { const r = getPeriodRanges(); onStartChange(r.year.start);        onEndChange(r.year.end);        close(); } },
+    { label: "L'année dernière",     apply: () => { const r = getPeriodRanges(); onStartChange(r.prevYear.start);    onEndChange(r.prevYear.end);    close(); } },
+    { label: 'Personnalisé',         apply: () => setCustomMode(true) },
   ];
 
+  const shortcutList = (
+    <div className="p-1">
+      {shortcuts.map(s => (
+        <button key={s.label} onClick={s.apply}
+          className="w-full text-left px-3 py-2.5 text-xs font-bold text-bony-text hover:bg-white/5 rounded-lg transition flex items-center justify-between">
+          {s.label}
+          {s.label === 'Personnalisé' && <ChevronRight size={14} className="text-slate-500" />}
+        </button>
+      ))}
+    </div>
+  );
+
+  const customForm = (
+    <div className="p-4 space-y-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Période personnalisée</span>
+        <button onClick={() => setCustomMode(false)} className="text-slate-400 hover:text-bony-text"><X size={14} /></button>
+      </div>
+      <div className="space-y-2">
+        <div>
+          <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Du</label>
+          <input type="date" value={startDate} onChange={e => onStartChange(e.target.value)}
+            className="w-full bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5 text-xs text-bony-text outline-none focus:border-bony-orange transition" />
+        </div>
+        <div>
+          <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Au</label>
+          <input type="date" value={endDate} onChange={e => onEndChange(e.target.value)}
+            className="w-full bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5 text-xs text-bony-text outline-none focus:border-bony-orange transition" />
+        </div>
+      </div>
+      <button onClick={close} className="w-full py-2 rounded-lg bg-bony-gradient text-white text-xs font-bold mt-1">
+        Appliquer
+      </button>
+    </div>
+  );
+
   return (
-    <div ref={ref} className="relative">
-      {/* Trigger: two date buttons */}
+    <div ref={triggerRef} className="relative">
+      {/* Trigger */}
       <div className="flex items-center gap-1.5">
         <div className="flex flex-col">
           <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Du</span>
-          <button
-            onClick={() => { setOpen(!open); setCustomMode(false); }}
-            className="flex items-center gap-1.5 text-xs font-bold text-bony-text hover:text-bony-orange transition whitespace-nowrap"
-          >
+          <button onClick={handleOpen}
+            className="flex items-center gap-1.5 text-xs font-bold text-bony-text hover:text-bony-orange transition whitespace-nowrap">
             {formatDateBtn(startDate)} <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
           </button>
         </div>
         <span className="text-slate-400 text-xs mt-3">→</span>
         <div className="flex flex-col">
           <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Au</span>
-          <button
-            onClick={() => { setOpen(!open); setCustomMode(false); }}
-            className="flex items-center gap-1.5 text-xs font-bold text-bony-text hover:text-bony-orange transition whitespace-nowrap"
-          >
+          <button onClick={handleOpen}
+            className="flex items-center gap-1.5 text-xs font-bold text-bony-text hover:text-bony-orange transition whitespace-nowrap">
             {formatDateBtn(endDate)} <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
           </button>
         </div>
       </div>
 
-      {/* Dropdown */}
       {open && (
         <>
-          {/* Mobile backdrop */}
-          <div className="sm:hidden fixed inset-0 z-40 bg-black/60" onClick={() => setOpen(false)} />
-          <div className={`
-            z-50 bg-bony-panel border border-bony-border rounded-xl shadow-2xl overflow-hidden
-            sm:absolute sm:top-full sm:left-0 sm:mt-2 sm:w-52
-            fixed bottom-0 left-0 right-0 rounded-b-none sm:rounded-xl
-          `}>
-            {!customMode ? (
-              <div className="p-1">
-                {shortcuts.map(s => (
-                  <button key={s.label} onClick={s.apply} className="w-full text-left px-3 py-2.5 text-xs font-bold text-bony-text hover:bg-white/5 rounded-lg transition flex items-center justify-between">
-                    {s.label}
-                    {s.label === 'Personnalisé' && <ChevronRight size={14} className="text-slate-500" />}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="p-4 space-y-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Période personnalisée</span>
-                  <button onClick={() => setCustomMode(false)} className="text-slate-400 hover:text-bony-text"><X size={14} /></button>
-                </div>
-                <div className="space-y-2">
-                  <div>
-                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Du</label>
-                    <input type="date" value={startDate} onChange={e => onStartChange(e.target.value)}
-                      className="w-full bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5 text-xs text-bony-text outline-none focus:border-bony-orange transition" />
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Au</label>
-                    <input type="date" value={endDate} onChange={e => onEndChange(e.target.value)}
-                      className="w-full bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5 text-xs text-bony-text outline-none focus:border-bony-orange transition" />
-                  </div>
-                </div>
-                <button onClick={() => setOpen(false)} className="w-full py-2 rounded-lg bg-bony-gradient text-white text-xs font-bold mt-1">
-                  Appliquer
-                </button>
-              </div>
-            )}
+          {/* Backdrop — closes dropdown on outside click */}
+          <div className="fixed inset-0 z-[9990]" onClick={close} />
+
+          {/* Mobile: bottom sheet */}
+          <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] bg-bony-panel border-t border-bony-border rounded-t-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-bony-border">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Période</span>
+              <button onClick={close}><X size={16} className="text-slate-400" /></button>
+            </div>
+            {customMode ? customForm : shortcutList}
+          </div>
+
+          {/* Desktop: fixed dropdown */}
+          <div
+            className="hidden sm:block fixed z-[9999] bg-bony-panel border border-bony-border rounded-xl shadow-2xl overflow-hidden w-52"
+            style={{ top: pos.top, left: pos.left }}
+          >
+            {customMode ? customForm : shortcutList}
           </div>
         </>
       )}
@@ -168,13 +192,8 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [expandedPlaques, setExpandedPlaques] = useState<Set<string>>(new Set(Object.keys(PLAQUES_STRUCTURE)));
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLDivElement>(null);
 
   const toggle = (site: string) =>
     onChange(selected.includes(site) ? selected.filter(s => s !== site) : [...selected, site]);
@@ -202,13 +221,21 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
       ? selected[0]
       : `${selected.length} sites`;
 
+  const handleOpen = () => {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 8, left: rect.left });
+    }
+    setOpen(v => !v);
+  };
+
   return (
-    <div ref={ref} className="relative">
+    <div ref={triggerRef} className="relative">
       {/* Trigger */}
       <div className="flex flex-col">
         <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Périmètre</span>
         <button
-          onClick={() => setOpen(!open)}
+          onClick={handleOpen}
           className="flex items-center gap-1.5 text-xs font-bold text-bony-orange hover:text-bony-violet transition whitespace-nowrap"
         >
           {triggerLabel}
@@ -219,87 +246,93 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
       {/* Dropdown */}
       {open && (
         <>
-          <div className="sm:hidden fixed inset-0 z-40 bg-black/60" onClick={() => setOpen(false)} />
-          <div className={`
-            z-50 bg-bony-panel border border-bony-border shadow-2xl overflow-hidden flex flex-col
-            sm:absolute sm:top-full sm:left-0 sm:mt-2 sm:w-64 sm:max-h-80 sm:rounded-xl
-            fixed bottom-0 left-0 right-0 rounded-t-2xl max-h-[75vh]
-          `}>
-            {/* Search (mobile always, desktop on focus) */}
-            <div className="p-2 border-b border-bony-border shrink-0">
-              <div className="flex items-center gap-2 bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5">
-                <Search size={13} className="text-slate-500 shrink-0" />
-                <input
-                  type="text" value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder="Rechercher un site…"
-                  className="flex-1 bg-transparent text-xs text-bony-text outline-none placeholder-bony-muted"
-                />
-                {search && <button onClick={() => setSearch('')}><X size={12} className="text-slate-400" /></button>}
-              </div>
-            </div>
+          {/* Backdrop */}
+          <div className="fixed inset-0 z-[9990]" onClick={() => setOpen(false)} />
 
-            {/* All / None buttons */}
-            <div className="flex gap-1 px-2 py-1.5 border-b border-bony-border shrink-0">
-              <button onClick={clearAll} className={`flex-1 text-[10px] font-bold py-1 rounded transition ${isAll ? 'bg-bony-orange/20 text-bony-orange border border-bony-orange/40' : 'text-slate-500 hover:text-bony-text hover:bg-white/5'}`}>
-                Tout le réseau
-              </button>
-              <button onClick={selectAll} className="flex-1 text-[10px] font-bold py-1 rounded text-slate-500 hover:text-bony-text hover:bg-white/5 transition">
-                Tout sélectionner
-              </button>
-            </div>
-
-            {/* Sites list */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar py-1">
-              {Object.entries(PLAQUES_STRUCTURE).map(([plaqueName, sites]) => {
-                const filtered = sites.filter(s => !search || s.toLowerCase().includes(search.toLowerCase()));
-                if (search && filtered.length === 0) return null;
-                const expanded = expandedPlaques.has(plaqueName);
-                const allSelected = sites.every(s => selected.includes(s));
-                const someSelected = sites.some(s => selected.includes(s));
-                return (
-                  <div key={plaqueName}>
-                    <div className="flex items-center px-2 py-1">
-                      <button
-                        onClick={() => toggleExpandPlaque(plaqueName)}
-                        className="flex items-center gap-1 flex-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-bony-text transition"
-                      >
-                        <ChevronRight size={11} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
-                        {plaqueName}
-                      </button>
-                      <button
-                        onClick={() => togglePlaque(sites as string[])}
-                        className={`w-4 h-4 rounded border flex items-center justify-center transition ${
-                          allSelected ? 'bg-bony-orange border-bony-orange' : someSelected ? 'bg-bony-orange/30 border-bony-orange/50' : 'border-bony-border hover:border-bony-orange/50'
-                        }`}
-                      >
-                        {(allSelected || someSelected) && <Check size={10} className="text-white" />}
-                      </button>
-                    </div>
-                    {(expanded || search) && (search ? filtered : sites).map(site => (
-                      <button
-                        key={site}
-                        onClick={() => toggle(site)}
-                        className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition"
-                      >
+          {/* Shared inner content rendered in both mobile and desktop containers */}
+          {(() => {
+            const inner = (
+              <>
+                <div className="p-2 border-b border-bony-border shrink-0">
+                  <div className="flex items-center gap-2 bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5">
+                    <Search size={13} className="text-slate-500 shrink-0" />
+                    <input
+                      type="text" value={search} onChange={e => setSearch(e.target.value)}
+                      placeholder="Rechercher un site…"
+                      className="flex-1 bg-transparent text-xs text-bony-text outline-none placeholder-bony-muted"
+                    />
+                    {search && <button onClick={() => setSearch('')}><X size={12} className="text-slate-400" /></button>}
+                  </div>
+                </div>
+                <div className="flex gap-1 px-2 py-1.5 border-b border-bony-border shrink-0">
+                  <button onClick={clearAll} className={`flex-1 text-[10px] font-bold py-1 rounded transition ${isAll ? 'bg-bony-orange/20 text-bony-orange border border-bony-orange/40' : 'text-slate-500 hover:text-bony-text hover:bg-white/5'}`}>
+                    Tout le réseau
+                  </button>
+                  <button onClick={selectAll} className="flex-1 text-[10px] font-bold py-1 rounded text-slate-500 hover:text-bony-text hover:bg-white/5 transition">
+                    Tout sélectionner
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar py-1">
+                  {Object.entries(PLAQUES_STRUCTURE).map(([plaqueName, sites]) => {
+                    const filtered = sites.filter(s => !search || s.toLowerCase().includes(search.toLowerCase()));
+                    if (search && filtered.length === 0) return null;
+                    const expanded = expandedPlaques.has(plaqueName);
+                    const allSelected = sites.every(s => selected.includes(s));
+                    const someSelected = sites.some(s => selected.includes(s));
+                    return (
+                      <div key={plaqueName}>
+                        <div className="flex items-center px-2 py-1">
+                          <button onClick={() => toggleExpandPlaque(plaqueName)}
+                            className="flex items-center gap-1 flex-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-bony-text transition">
+                            <ChevronRight size={11} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
+                            {plaqueName}
+                          </button>
+                          <button onClick={() => togglePlaque(sites as string[])}
+                            className={`w-4 h-4 rounded border flex items-center justify-center transition ${
+                              allSelected ? 'bg-bony-orange border-bony-orange' : someSelected ? 'bg-bony-orange/30 border-bony-orange/50' : 'border-bony-border hover:border-bony-orange/50'
+                            }`}>
+                            {(allSelected || someSelected) && <Check size={10} className="text-white" />}
+                          </button>
+                        </div>
+                        {(expanded || search) && (search ? filtered : sites).map(site => (
+                          <button key={site} onClick={() => toggle(site)}
+                            className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                            <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
+                            {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  <div>
+                    <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Entités Spécifiques</div>
+                    {SPECIAL_SITES.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
+                      <button key={site} onClick={() => toggle(site)}
+                        className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
                         <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
                         {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
                       </button>
                     ))}
                   </div>
-                );
-              })}
-              {/* Alpine / Nissan */}
-              <div>
-                <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Entités Spécifiques</div>
-                {SPECIAL_SITES.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
-                  <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
-                    <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
-                    {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+                </div>
+              </>
+            );
+            return (
+              <>
+                {/* Mobile: bottom sheet */}
+                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] bg-bony-panel border-t border-bony-border shadow-2xl overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">
+                  {inner}
+                </div>
+                {/* Desktop: fixed dropdown */}
+                <div
+                  className="hidden sm:flex fixed z-[9999] bg-bony-panel border border-bony-border rounded-xl shadow-2xl overflow-hidden flex-col w-64 max-h-80"
+                  style={{ top: pos.top, left: pos.left }}
+                >
+                  {inner}
+                </div>
+              </>
+            );
+          })()}
         </>
       )}
     </div>
@@ -307,6 +340,7 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
 };
 
 // --- COMPONENT: BRAND PICKER ---
+const BRAND_CHIPS: BrandType[] = ['Renault', 'Dacia', 'Alpine', 'Nissan', 'Mobilize'];
 interface BrandPickerProps { selected: BrandType[]; onChange: (v: BrandType[]) => void; }
 const BrandPicker: React.FC<BrandPickerProps> = ({ selected, onChange }) => {
   const isAll = selected.length === 0;
@@ -317,19 +351,17 @@ const BrandPicker: React.FC<BrandPickerProps> = ({ selected, onChange }) => {
     <div className="flex flex-col gap-1">
       <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Marque</span>
       <div className="flex flex-wrap gap-1.5">
-        {/* All chip */}
         <button
           onClick={() => onChange([])}
           className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
             isAll
               ? 'bg-bony-gradient border-transparent text-white shadow'
-              : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 hover:text-slate-900 dark:hover:text-white'
+              : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'
           }`}
         >
           Toutes
         </button>
-        {/* Brand chips */}
-        {BRANDS.map(b => {
+        {BRAND_CHIPS.map(b => {
           const active = selected.includes(b);
           return (
             <button
@@ -340,6 +372,47 @@ const BrandPicker: React.FC<BrandPickerProps> = ({ selected, onChange }) => {
               }`}
             >
               {b}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// --- COMPONENT: SERVICE PICKER ---
+const SERVICE_CHIPS: ServiceType[] = ['VN', 'VO', 'APV', 'PR'];
+interface ServicePickerProps { selected: ServiceType[]; onChange: (v: ServiceType[]) => void; }
+const ServicePicker: React.FC<ServicePickerProps> = ({ selected, onChange }) => {
+  const isAll = selected.length === 0;
+  const toggle = (s: ServiceType) =>
+    onChange(selected.includes(s) ? selected.filter(x => x !== s) : [...selected, s]);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Service</span>
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          onClick={() => onChange([])}
+          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+            isAll
+              ? 'bg-bony-gradient border-transparent text-white shadow'
+              : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'
+          }`}
+        >
+          Tous
+        </button>
+        {SERVICE_CHIPS.map(s => {
+          const active = selected.includes(s);
+          return (
+            <button
+              key={s}
+              onClick={() => toggle(s)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                active ? `${SERVICE_COLORS[s]} scale-105 shadow` : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'
+              }`}
+            >
+              {s}
             </button>
           );
         })}
@@ -383,6 +456,7 @@ const Dashboard: React.FC = () => {
 
   const [filterContexts, setFilterContexts] = useSessionState<string[]>('dashboard_filterContexts', []);
   const [filterBrands, setFilterBrands] = useSessionState<BrandType[]>('dashboard_filterBrands', []);
+  const [filterServices, setFilterServices] = useSessionState<ServiceType[]>('dashboard_filterServices', []);
 
   const scrollRef = useScrollRestore('dashboard', !loading);
 
@@ -455,13 +529,20 @@ const Dashboard: React.FC = () => {
         return projectBrands.includes('Groupe') || filterBrands.some(b => projectBrands.includes(b));
     };
 
+    const isServiceInScope = (projectServices: string[]) => {
+        if (filterServices.length === 0) return true;
+        if (projectServices.includes('Tous Services')) return true;
+        return filterServices.some(s => projectServices.includes(s));
+    };
+
     // 2. Process BUDGETS
     const chartYear = dStart.getFullYear();
 
     budgets.forEach(b => {
         if (!isSiteInScope(b.site)) return;
-        
+
         (['VN', 'VO', 'PR', 'APV'] as const).forEach(svc => {
+            if (filterServices.length > 0 && !filterServices.includes(svc as ServiceType)) return;
             b.entries[svc].forEach((val, monthIdx) => {
                 monthlyTrend[monthIdx].prevu += val;
                 const checkDate = new Date(chartYear, monthIdx, 15);
@@ -481,6 +562,9 @@ const Dashboard: React.FC = () => {
 
         const pBrands = p.brands || [];
         if (!isBrandInScope(pBrands)) return;
+
+        const pServices = p.service || [];
+        if (!isServiceInScope(pServices)) return;
 
         if (p.status === 'Active') activeProjectsCount++;
         
@@ -570,7 +654,7 @@ const Dashboard: React.FC = () => {
         upcomingPosts
     };
 
-  }, [projects, budgets, socialPosts, dateStart, dateEnd, filterContexts, filterBrands]);
+  }, [projects, budgets, socialPosts, dateStart, dateEnd, filterContexts, filterBrands, filterServices]);
 
   // --- RENDER HELPERS ---
   const formatCurrency = (val: number) => val.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
@@ -619,6 +703,9 @@ const Dashboard: React.FC = () => {
                  <div className="w-px h-6 bg-bony-border hidden sm:block" />
                  {/* 3. Marques chips */}
                  <BrandPicker selected={filterBrands} onChange={setFilterBrands} />
+                 <div className="w-px h-6 bg-bony-border hidden sm:block" />
+                 {/* 4. Services chips */}
+                 <ServicePicker selected={filterServices} onChange={setFilterServices} />
              </div>
          </div>
       </div>
