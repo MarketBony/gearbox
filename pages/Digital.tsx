@@ -25,6 +25,20 @@ const LOCKED_NETWORKS = [
 ];
 
 // --- HELPER: DATE UTILS ---
+// Parse "YYYY-MM-DD" en date locale sans décalage UTC
+const parseLocalDate = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+};
+
+// Convertit une Date locale en "YYYY-MM-DD" sans passer par UTC
+const toLocalIso = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+};
+
 const getStartOfWeek = (d: Date) => {
     const date = new Date(d);
     const day = date.getDay();
@@ -902,8 +916,8 @@ const Digital: React.FC = () => {
       });
 
       return filtered.sort((a,b) => {
-          const dateA = new Date(a.date).getTime();
-          const dateB = new Date(b.date).getTime();
+          const dateA = parseLocalDate(a.date).getTime();
+          const dateB = parseLocalDate(b.date).getTime();
           return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
       });
   }, [posts, activeTab, searchTerm, filterBrand, filterService, filterConcession, sortOrder]);
@@ -950,7 +964,7 @@ const Digital: React.FC = () => {
                   <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-tight mb-1">{hoveredPostData.title || 'Sans titre'}</h4>
                   <div className="flex items-center gap-2 text-xs text-slate-500">
                       <Clock size={12} />
-                      <span className="font-sans">{new Date(hoveredPostData.date).toLocaleDateString('fr-FR')}</span>
+                      <span className="font-sans">{parseLocalDate(hoveredPostData.date).toLocaleDateString('fr-FR')}</span>
                   </div>
               </div>
 
@@ -997,7 +1011,7 @@ const Digital: React.FC = () => {
       const handleToday = () => setPlanningDate(new Date());
 
       const getPostsForDay = (d: Date) => {
-          const iso = d.toISOString().split('T')[0];
+          const iso = toLocalIso(d);
           return filteredPosts.filter(p => p.date === iso);
       };
 
@@ -1167,7 +1181,7 @@ const Digital: React.FC = () => {
                           .map(post => (
                               <div key={post.id} className="bg-bony-panel border border-bony-border rounded-lg p-3 space-y-1">
                                   <div className="flex items-center justify-between">
-                                      <span className="text-xs font-bold text-bony-orange">{new Date(post.date).toLocaleDateString('fr-FR')}</span>
+                                      <span className="text-xs font-bold text-bony-orange">{parseLocalDate(post.date).toLocaleDateString('fr-FR')}</span>
                                       <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border border-bony-border text-slate-500">{post.status}</span>
                                   </div>
                                   <p className="text-sm font-medium text-bony-text truncate">{post.title || 'Sans titre'}</p>
