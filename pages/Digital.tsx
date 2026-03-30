@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
 import { SocialPost, SocialStatus, SocialNetwork, BrandType, ServiceType, SocialTarget, Site, PlaqueName, DigitalTags } from '../types';
 import { SOCIAL_STATUS_COLORS, BRANDS, SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTIONS, SITES, BRAND_COLORS } from '../constants';
-import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle } from 'lucide-react';
+import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
 type Tab = 'Calendrier Editorial' | 'Planning Digital' | 'Archives' | 'Gestion des TAGS';
@@ -131,6 +131,227 @@ const VisualMultiSelect: React.FC<VisualMultiSelectProps> = ({ label, options, s
     );
 };
 
+// --- MEDIA TYPES & HELPERS ---
+interface PostMediaItem {
+    id: string;
+    postId: string;
+    name: string;
+    type: string;
+    size: number;
+    base64: string;
+    uploadedAt: string;
+    uploadedBy: string;
+}
+
+const MEDIA_MAX_SIZE = 2 * 1024 * 1024; // 2 MB
+const MEDIA_ACCEPTED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const mediaKey = (postId: string) => `gearbox_media_${postId}`;
+const loadPostMedias = (postId: string): PostMediaItem[] => {
+    try { return JSON.parse(localStorage.getItem(mediaKey(postId)) ?? '[]'); } catch { return []; }
+};
+const savePostMedias = (postId: string, items: PostMediaItem[]) =>
+    localStorage.setItem(mediaKey(postId), JSON.stringify(items));
+
+// --- COMPONENT: MEDIA MANAGER MODAL ---
+interface MediaManagerModalProps {
+    post: SocialPost;
+    canEdit: boolean;
+    uploaderName: string;
+    onClose: () => void;
+    onCountChange: (postId: string, count: number) => void;
+}
+
+const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, uploaderName, onClose, onCountChange }) => {
+    const [medias, setMedias] = useState<PostMediaItem[]>(() => loadPostMedias(post.id));
+    const [dragging, setDragging] = useState(false);
+    const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const persist = (items: PostMediaItem[]) => {
+        savePostMedias(post.id, items);
+        setMedias(items);
+        onCountChange(post.id, items.length);
+    };
+
+    const processFiles = (files: FileList | File[]) => {
+        setError(null);
+        Array.from(files).forEach(file => {
+            if (!MEDIA_ACCEPTED.includes(file.type)) {
+                setError(`Format non supporté : "${file.name}". Accepté : JPG, PNG, GIF, WebP.`);
+                return;
+            }
+            if (file.size > MEDIA_MAX_SIZE) {
+                setError(`"${file.name}" dépasse la limite de 2 Mo (${(file.size / 1024 / 1024).toFixed(1)} Mo). Compresse le fichier avant envoi.`);
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = e => {
+                const item: PostMediaItem = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    postId: post.id,
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    base64: e.target!.result as string,
+                    uploadedAt: new Date().toISOString(),
+                    uploadedBy: uploaderName,
+                };
+                setMedias(prev => {
+                    const updated = [...prev, item];
+                    savePostMedias(post.id, updated);
+                    onCountChange(post.id, updated.length);
+                    return updated;
+                });
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const handleDelete = (id: string) => {
+        if (!confirm('Supprimer ce média définitivement ?')) return;
+        persist(medias.filter(m => m.id !== id));
+    };
+
+    const handleDownload = (m: PostMediaItem) => {
+        const a = document.createElement('a');
+        a.href = m.base64;
+        a.download = m.name;
+        a.click();
+    };
+
+    return (
+        <>
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                <div className="bg-bony-panel border border-bony-border rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]">
+
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-bony-border shrink-0">
+                        <h3 className="font-title text-bony-text flex items-center gap-2 text-base">
+                            <div className="p-1.5 bg-bony-orange/10 rounded-lg">
+                                <Image size={16} className="text-bony-orange" />
+                            </div>
+                            Médias
+                            <span className="text-bony-muted font-sans text-sm font-normal truncate max-w-[280px]">
+                                — {post.title || 'Publication sans titre'}
+                            </span>
+                        </h3>
+                        <button onClick={onClose} className="text-slate-400 hover:text-bony-text transition p-1 rounded">
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    {/* Drop zone (only if canEdit) */}
+                    {canEdit && (
+                        <div
+                            className={`mx-5 mt-4 border-2 border-dashed rounded-xl p-5 text-center transition-all cursor-pointer select-none ${dragging ? 'border-bony-orange bg-bony-orange/5 scale-[1.01]' : 'border-bony-border hover:border-bony-orange/50 hover:bg-bony-orange/5'}`}
+                            onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                            onDragLeave={() => setDragging(false)}
+                            onDrop={e => { e.preventDefault(); setDragging(false); processFiles(e.dataTransfer.files); }}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            <Upload size={24} className={`mx-auto mb-2 transition-colors ${dragging ? 'text-bony-orange' : 'text-slate-400'}`} />
+                            <p className="text-sm text-bony-muted">
+                                Glisse des images ici ou{' '}
+                                <span className="text-bony-orange font-bold">clique pour parcourir</span>
+                            </p>
+                            <p className="text-[10px] text-bony-muted mt-1 uppercase tracking-widest">JPG · PNG · GIF · WebP — max 2 Mo</p>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept={MEDIA_ACCEPTED.join(',')}
+                                multiple
+                                className="hidden"
+                                onChange={e => { if (e.target.files) processFiles(e.target.files); e.target.value = ''; }}
+                            />
+                        </div>
+                    )}
+
+                    {/* Error */}
+                    {error && (
+                        <div className="mx-5 mt-3 px-3 py-2.5 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-400 flex items-start gap-2 shrink-0">
+                            <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                            <span>{error}</span>
+                        </div>
+                    )}
+
+                    {/* Gallery */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-5 pt-4">
+                        {medias.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center gap-2 py-10 text-bony-muted">
+                                <Image size={36} className="opacity-20" />
+                                <p className="text-sm">Aucun média pour ce post</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {medias.map(m => (
+                                    <div key={m.id} className="group relative rounded-xl overflow-hidden border border-bony-border bg-bony-dark aspect-square">
+                                        <img
+                                            src={m.base64}
+                                            alt={m.name}
+                                            className="w-full h-full object-cover cursor-zoom-in hover:opacity-90 transition"
+                                            onClick={() => setLightboxSrc(m.base64)}
+                                        />
+                                        {/* Overlay on hover */}
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/55 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                                            <button
+                                                onClick={e => { e.stopPropagation(); handleDownload(m); }}
+                                                className="p-2 bg-bony-panel/90 rounded-lg text-bony-blue hover:bg-bony-panel transition"
+                                                title="Télécharger"
+                                            >
+                                                <Download size={16} />
+                                            </button>
+                                            {canEdit && (
+                                                <button
+                                                    onClick={e => { e.stopPropagation(); handleDelete(m.id); }}
+                                                    className="p-2 bg-bony-panel/90 rounded-lg text-red-400 hover:bg-red-500/20 transition"
+                                                    title="Supprimer"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        {/* Filename bar */}
+                                        <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-gradient-to-t from-black/80 to-transparent text-[9px] text-white truncate">
+                                            {m.name}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-5 py-3 border-t border-bony-border shrink-0 flex items-center justify-between">
+                        <span className="text-[10px] text-bony-muted uppercase tracking-widest">
+                            {medias.length} média{medias.length !== 1 ? 's' : ''}
+                        </span>
+                        <button onClick={onClose} className="px-4 py-1.5 rounded-lg text-sm font-bold text-slate-500 hover:text-bony-text transition">
+                            Fermer
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Lightbox */}
+            {lightboxSrc && (
+                <div
+                    className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out"
+                    onClick={() => setLightboxSrc(null)}
+                >
+                    <img src={lightboxSrc} alt="Aperçu" className="max-w-full max-h-full object-contain rounded-xl shadow-2xl" />
+                    <button
+                        className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+                        onClick={() => setLightboxSrc(null)}
+                    >
+                        <X size={24} />
+                    </button>
+                </div>
+            )}
+        </>
+    );
+};
+
 // --- COMPONENT: EDITO ROW ---
 interface EditoRowProps {
     post: SocialPost;
@@ -139,9 +360,11 @@ interface EditoRowProps {
     isArchivedView?: boolean;
     networkOptions: string[];
     co2Options: string[];
+    mediaCount: number;
+    onOpenMedia: (postId: string) => void;
 }
 
-const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, canEdit, isArchivedView, networkOptions, co2Options }) => {
+const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, canEdit, isArchivedView, networkOptions, co2Options, mediaCount, onOpenMedia }) => {
     const [isWordingFocused, setIsWordingFocused] = useState(false);
     
     // Status Color Strip
@@ -309,16 +532,17 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, canEdit, isArchived
 
             {/* COL 5: Media & Actions */}
             <div className="w-12 flex flex-col items-center gap-3 shrink-0 border-l border-bony-border pl-2 py-2">
-                <button 
-                    disabled={!canEdit}
-                    onClick={() => {
-                        const newMedia = post.mediaFiles.length > 0 ? [] : ['placeholder'];
-                        onUpdate({...post, mediaFiles: newMedia});
-                    }}
-                    className={`w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${post.mediaFiles.length > 0 ? 'bg-emerald-500/20 border-emerald-500 text-emerald-500 dark:text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 'bg-slate-100 dark:bg-black/40 border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-600 hover:text-slate-900 dark:hover:text-white hover:border-slate-500'}`}
-                    title={post.mediaFiles.length > 0 ? `${post.mediaFiles.length} Médias` : "Ajouter Média"}
+                <button
+                    onClick={() => onOpenMedia(post.id)}
+                    className={`relative w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${mediaCount > 0 ? 'bg-bony-orange/10 border-bony-orange text-bony-orange shadow-[0_0_10px_rgba(247,86,50,0.15)]' : 'bg-slate-100 dark:bg-black/40 border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-600 hover:text-slate-900 dark:hover:text-white hover:border-bony-orange/50'}`}
+                    title={mediaCount > 0 ? `${mediaCount} média${mediaCount > 1 ? 's' : ''}` : 'Gérer les médias'}
                 >
                     <Image size={18}/>
+                    {mediaCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-bony-orange text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none shadow">
+                            {mediaCount > 9 ? '9+' : mediaCount}
+                        </span>
+                    )}
                 </button>
 
                 <div className="flex-1"></div>
@@ -556,6 +780,8 @@ const Digital: React.FC = () => {
   const [tags, setTags] = useState<DigitalTags>({ networks: [], co2: [] });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [mediaModalPostId, setMediaModalPostId] = useState<string | null>(null);
+  const [mediaCounts, setMediaCounts] = useState<Record<string, number>>({});
 
   // Filters & Sort
   const [searchTerm, setSearchTerm] = useSessionState<string>('digital_searchTerm', '');
@@ -585,6 +811,10 @@ const Digital: React.FC = () => {
           db.getSocialPosts(),
           db.getDigitalTags()
       ]);
+      // Init media counts from localStorage
+      const counts: Record<string, number> = {};
+      pData.forEach(p => { counts[p.id] = loadPostMedias(p.id).length; });
+      setMediaCounts(counts);
       setPosts(pData);
       setTags(tData);
       setLoading(false);
@@ -592,11 +822,21 @@ const Digital: React.FC = () => {
 
   const handleUpdatePost = async (updatedPost: SocialPost) => {
       if (!canEdit) return;
+      // Suppression automatique des médias lors de l'archivage
+      const oldPost = posts.find(p => p.id === updatedPost.id);
+      if (oldPost && !oldPost.archived && updatedPost.archived) {
+          localStorage.removeItem(mediaKey(updatedPost.id));
+          setMediaCounts(prev => ({ ...prev, [updatedPost.id]: 0 }));
+      }
       setSaving(true);
       const newPosts = posts.map(p => p.id === updatedPost.id ? updatedPost : p);
       setPosts(newPosts);
       await db.saveSocialPosts(newPosts);
       setTimeout(() => setSaving(false), 500);
+  };
+
+  const handleMediaCountChange = (postId: string, count: number) => {
+      setMediaCounts(prev => ({ ...prev, [postId]: count }));
   };
 
   const handleUpdateTags = async (newTags: DigitalTags) => {
@@ -988,14 +1228,16 @@ const Digital: React.FC = () => {
               <div className="flex-1 overflow-y-auto custom-scrollbar pb-6 p-2 md:p-4 space-y-3">
                   {filteredPosts.length > 0 ? (
                       filteredPosts.map(post => (
-                          <EditoRow 
-                            key={post.id} 
-                            post={post} 
-                            onUpdate={handleUpdatePost} 
+                          <EditoRow
+                            key={post.id}
+                            post={post}
+                            onUpdate={handleUpdatePost}
                             canEdit={canEdit}
                             isArchivedView={isArchivedView}
                             networkOptions={tags.networks}
                             co2Options={tags.co2}
+                            mediaCount={mediaCounts[post.id] ?? 0}
+                            onOpenMedia={setMediaModalPostId}
                           />
                       ))
                   ) : (
@@ -1103,6 +1345,21 @@ const Digital: React.FC = () => {
 
         {/* Content */}
         {renderContent()}
+
+        {/* Media Manager Modal */}
+        {mediaModalPostId && (() => {
+            const post = posts.find(p => p.id === mediaModalPostId);
+            if (!post) return null;
+            return (
+                <MediaManagerModal
+                    post={post}
+                    canEdit={canEdit && !post.archived}
+                    uploaderName={user?.name ?? 'Utilisateur'}
+                    onClose={() => setMediaModalPostId(null)}
+                    onCountChange={handleMediaCountChange}
+                />
+            );
+        })()}
     </div>
   );
 };
