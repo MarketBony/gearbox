@@ -207,6 +207,7 @@ export interface ActivityLog {
   action: string;
   entity: string;
   entityName: string;
+  entityId?: string;
   timestamp: string;
 }
 

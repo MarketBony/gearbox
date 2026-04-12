@@ -127,6 +127,8 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const [showSiteDropdown, setShowSiteDropdown] = useState(false);
   const [showTeamDropdown, setShowTeamDropdown] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
 
   // --- PERMISSIONS ---
   const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Coordinator';
@@ -245,7 +247,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const confirmArchive = async () => {
       if (projectToArchive && canEdit) {
           await handleUpdateProject(projectToArchive);
-          if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a archivé le projet', entity: 'project', entityName: projectToArchive.name, timestamp: new Date().toISOString() });
+          if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a archivé le projet', entity: 'project', entityName: projectToArchive.name, entityId: projectToArchive.id, timestamp: new Date().toISOString() });
           setShowArchiveConfirm(false);
           setProjectToArchive(null);
           setSelectedProject(null);
@@ -260,18 +262,27 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
           await db.saveProjects(updatedProjects);
           setProjects(updatedProjects);
           setSelectedProject(null);
-          if (user && deletedProject) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé le projet', entity: 'project', entityName: deletedProject.name, timestamp: new Date().toISOString() });
+          if (user && deletedProject) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé le projet', entity: 'project', entityName: deletedProject.name, entityId: deletedProject.id, timestamp: new Date().toISOString() });
       } catch (error) {
           console.error("Error deleting project:", error);
           alert("Une erreur est survenue lors de la suppression.");
       }
   };
 
-  const createProject = async () => {
+  const openCreateModal = () => {
     if (!canEdit) return;
+    setNewProjectName('');
+    setShowCreateModal(true);
+  };
+
+  const confirmCreateProject = async () => {
+    const trimmed = newProjectName.trim();
+    if (!trimmed) return;
+    setShowCreateModal(false);
+    setNewProjectName('');
     const newProject: Project = {
       id: Math.random().toString(36).substr(2, 9),
-      name: 'Nouveau Projet',
+      name: trimmed,
       site: 'Clermont',
       sites: ['Clermont'],
       budgetDistribution: { 'Clermont': 100 },
@@ -292,7 +303,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
     setProjects(updated);
     await db.saveProjects(updated);
     setSelectedProject(newProject);
-    if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a créé le projet', entity: 'project', entityName: newProject.name, timestamp: new Date().toISOString() });
+    if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a créé le projet', entity: 'project', entityName: newProject.name, entityId: newProject.id, timestamp: new Date().toISOString() });
   };
 
   const updateSiteSelection = (newSite: string) => {
@@ -505,6 +516,39 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   return (
     <div className="flex h-screen overflow-hidden bg-bony-dark relative">
       
+      {showCreateModal && (
+          <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-bony-panel border border-bony-border rounded-xl p-6 max-w-sm w-full shadow-2xl">
+                  <h3 className="text-lg font-title text-bony-text mb-1">Nouveau Projet</h3>
+                  <p className="text-xs text-bony-muted mb-4">Donnez un nom à votre projet pour commencer.</p>
+                  <input
+                      type="text"
+                      value={newProjectName}
+                      onChange={e => setNewProjectName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') confirmCreateProject(); if (e.key === 'Escape') setShowCreateModal(false); }}
+                      placeholder="Nom du projet..."
+                      autoFocus
+                      className="w-full bg-white dark:bg-black/30 border border-slate-300 dark:border-bony-border rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:border-bony-orange transition mb-5"
+                  />
+                  <div className="flex justify-end gap-3">
+                      <button
+                          onClick={() => { setShowCreateModal(false); setNewProjectName(''); }}
+                          className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-bony-text transition"
+                      >
+                          ANNULER
+                      </button>
+                      <button
+                          onClick={confirmCreateProject}
+                          disabled={!newProjectName.trim()}
+                          className="px-4 py-2 rounded-lg text-sm font-bold bg-bony-gradient text-white hover:opacity-90 transition shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                          CRÉER
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {showArchiveConfirm && (
           <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
               <div className="bg-bony-panel border border-bony-border rounded-xl p-6 max-w-md w-full shadow-2xl">
@@ -553,8 +597,8 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                         {showFilters ? <X size={20} /> : <Filter size={20} />}
                     </button>
                     {viewMode === 'current' && canEdit && (
-                        <button 
-                            onClick={createProject} 
+                        <button
+                            onClick={openCreateModal}
                             className="p-2 bg-bony-gradient rounded-lg text-white hover:opacity-90 transition shadow-lg shadow-bony-orange/20"
                         >
                             <Plus size={20} />

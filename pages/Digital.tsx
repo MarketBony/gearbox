@@ -796,6 +796,8 @@ const Digital: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [mediaModalPostId, setMediaModalPostId] = useState<string | null>(null);
   const [mediaCounts, setMediaCounts] = useState<Record<string, number>>({});
+  const [showCreatePostModal, setShowCreatePostModal] = useState(false);
+  const [newPostTitle, setNewPostTitle] = useState('');
 
   // Filters & Sort
   const [searchTerm, setSearchTerm] = useSessionState<string>('digital_searchTerm', '');
@@ -863,11 +865,20 @@ const Digital: React.FC = () => {
       setTimeout(() => setSaving(false), 500);
   };
 
-  const createPost = async () => {
+  const openCreatePostModal = () => {
       if (!canEdit) return;
+      setNewPostTitle('');
+      setShowCreatePostModal(true);
+  };
+
+  const confirmCreatePost = async () => {
+      const trimmed = newPostTitle.trim();
+      if (!trimmed) return;
+      setShowCreatePostModal(false);
+      setNewPostTitle('');
       const newPost: SocialPost = {
           id: `sp-${Date.now()}`,
-          title: '',
+          title: trimmed,
           status: 'À venir',
           date: new Date().toISOString().split('T')[0],
           targets: [],
@@ -882,11 +893,10 @@ const Digital: React.FC = () => {
           co2: '',
           archived: false
       };
-      // Add to top
       const newPosts = [newPost, ...posts];
       setPosts(newPosts);
       await db.saveSocialPosts(newPosts);
-      if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a créé une publication', entity: 'post', entityName: '(sans titre)', timestamp: new Date().toISOString() });
+      if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a créé la publication', entity: 'post', entityName: trimmed, entityId: newPost.id, timestamp: new Date().toISOString() });
   };
 
   const filteredPosts = useMemo(() => {
@@ -1269,7 +1279,42 @@ const Digital: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-bony-dark animate-fade-in transition-colors">
+    <div className="flex flex-col h-full overflow-hidden bg-bony-dark animate-fade-in transition-colors relative">
+
+        {/* Create Post Modal */}
+        {showCreatePostModal && (
+            <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-bony-panel border border-bony-border rounded-xl p-6 max-w-sm w-full shadow-2xl">
+                    <h3 className="text-lg font-title text-bony-text mb-1">Nouvelle Publication</h3>
+                    <p className="text-xs text-bony-muted mb-4">Donnez un titre à votre publication pour commencer.</p>
+                    <input
+                        type="text"
+                        value={newPostTitle}
+                        onChange={e => setNewPostTitle(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') confirmCreatePost(); if (e.key === 'Escape') setShowCreatePostModal(false); }}
+                        placeholder="Titre de la publication..."
+                        autoFocus
+                        className="w-full bg-white dark:bg-black/30 border border-slate-300 dark:border-bony-border rounded-lg px-3 py-2.5 text-sm text-slate-900 dark:text-white outline-none focus:border-bony-violet transition mb-5"
+                    />
+                    <div className="flex justify-end gap-3">
+                        <button
+                            onClick={() => { setShowCreatePostModal(false); setNewPostTitle(''); }}
+                            className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-bony-text transition"
+                        >
+                            ANNULER
+                        </button>
+                        <button
+                            onClick={confirmCreatePost}
+                            disabled={!newPostTitle.trim()}
+                            className="px-4 py-2 rounded-lg text-sm font-bold bg-bony-gradient text-white hover:opacity-90 transition shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            CRÉER
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* Header */}
         <div className="px-3 py-3 md:px-6 md:py-4 bg-white dark:bg-bony-panel border-b border-bony-border shrink-0 z-30 shadow-md">
             <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-3 mb-4">
@@ -1348,8 +1393,8 @@ const Digital: React.FC = () => {
 
                     {/* Add Button */}
                     {canEdit && activeTab === 'Calendrier Editorial' && (
-                        <button 
-                            onClick={createPost}
+                        <button
+                            onClick={openCreatePostModal}
                             className="flex items-center gap-2 px-6 py-2 bg-bony-gradient hover:opacity-90 text-white rounded-lg transition shadow-lg shadow-bony-violet/20"
                         >
                             <Plus size={18} />

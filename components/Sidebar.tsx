@@ -71,6 +71,43 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     setShowActivity(false);
   };
 
+  const handleEntryClick = (entry: ActivityLog) => {
+    closeActivity();
+    const detail: Record<string, string> = {};
+    switch (entry.entity) {
+      case 'project':
+        detail.tab = 'projects';
+        if (entry.entityId) {
+          window.sessionStorage.setItem('pendingProjectId', entry.entityId);
+          detail.projectId = entry.entityId;
+        }
+        break;
+      case 'post':
+        detail.tab = 'digital';
+        break;
+      case 'task':
+        detail.tab = 'campaigns';
+        if (entry.entityId) {
+          window.sessionStorage.setItem('pendingProjectId', entry.entityId);
+          detail.projectId = entry.entityId;
+        }
+        break;
+      case 'fixed-expense':
+        detail.tab = 'fixed-expenses';
+        break;
+      case 'equipment':
+      case 'booking':
+        detail.tab = 'material';
+        break;
+      case 'user':
+        detail.tab = 'settings';
+        break;
+      default:
+        detail.tab = 'dashboard';
+    }
+    window.dispatchEvent(new CustomEvent('gearbox-navigate', { detail }));
+  };
+
   const unreadCount = activityLog.filter(e =>
     lastReadTs ? new Date(e.timestamp) > new Date(lastReadTs) : true
   ).length;
@@ -301,7 +338,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                   return (
                     <div
                       key={entry.id}
-                      className={`flex items-start gap-3 p-3 transition-colors ${isUnread ? 'bg-bony-orange/5' : ''}`}
+                      onClick={() => handleEntryClick(entry)}
+                      className={`flex items-start gap-3 p-3 transition-colors cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 ${isUnread ? 'bg-bony-orange/5' : ''}`}
                     >
                       <div className="shrink-0 mt-0.5">
                         <Avatar userId={entry.userId} name={entry.userName} color={entry.userColor} size={30} />
