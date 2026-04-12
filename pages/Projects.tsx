@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { Project, Task, TaskStatus, ServiceType, PlaqueName, Site, BrandType, ProjectType, User } from '../types';
+import { Project, Task, TaskStatus, ServiceType, PlaqueName, Site, BrandType, ProjectType, User, ActivityLog } from '../types';
 import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, PROJECT_TYPES, TASK_CHANNELS, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, ALPINE_SITES, NISSAN_SITES } from '../constants';
@@ -245,6 +245,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const confirmArchive = async () => {
       if (projectToArchive && canEdit) {
           await handleUpdateProject(projectToArchive);
+          if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a archivé le projet', entity: 'project', entityName: projectToArchive.name, timestamp: new Date().toISOString() });
           setShowArchiveConfirm(false);
           setProjectToArchive(null);
           setSelectedProject(null);
@@ -254,10 +255,12 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const handleDeleteProject = async (id: string) => {
       try {
           const currentProjects = await db.getProjects();
+          const deletedProject = currentProjects.find(p => p.id === id);
           const updatedProjects = currentProjects.filter(p => p.id !== id);
           await db.saveProjects(updatedProjects);
           setProjects(updatedProjects);
           setSelectedProject(null);
+          if (user && deletedProject) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé le projet', entity: 'project', entityName: deletedProject.name, timestamp: new Date().toISOString() });
       } catch (error) {
           console.error("Error deleting project:", error);
           alert("Une erreur est survenue lors de la suppression.");
@@ -289,6 +292,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
     setProjects(updated);
     await db.saveProjects(updated);
     setSelectedProject(newProject);
+    if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a créé le projet', entity: 'project', entityName: newProject.name, timestamp: new Date().toISOString() });
   };
 
   const updateSiteSelection = (newSite: string) => {

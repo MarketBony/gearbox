@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { db } from '../services/dataService';
-import { Equipment, EquipmentBooking, Site, ServiceType, BrandType } from '../types';
+import { Equipment, EquipmentBooking, Site, ServiceType, BrandType, ActivityLog } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 import { Plus, Calendar, Package, Trash2, Edit, ChevronLeft, ChevronRight, Search, Filter, X, AlertCircle } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, isSameDay, startOfMonth, endOfMonth, addMonths, subMonths, isWithinInterval, parseISO, getDay, getDate } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -150,6 +151,7 @@ const BookingPill: React.FC<{
 };
 
 const Material: React.FC = () => {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useSessionState<'planning' | 'inventory'>('material_activeTab', 'planning');
     const [equipment, setEquipment] = useState<Equipment[]>([]);
     const [bookings, setBookings] = useState<EquipmentBooking[]>([]);
@@ -255,15 +257,18 @@ const Material: React.FC = () => {
 
         await db.saveEquipment(updatedEquipment);
         setEquipment(updatedEquipment);
+        if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: isEditing ? 'a modifié le matériel' : 'a ajouté le matériel', entity: 'equipment', entityName: currentEquipment.name || 'Matériel', timestamp: new Date().toISOString() });
         setIsInventoryModalOpen(false);
         setCurrentEquipment({});
     };
 
     const handleDeleteEquipment = async (id: string) => {
         if (confirm("Êtes-vous sûr de vouloir supprimer ce matériel ?")) {
+            const toDelete = equipment.find(e => e.id === id);
             const updatedEquipment = equipment.filter(e => e.id !== id);
             await db.saveEquipment(updatedEquipment);
             setEquipment(updatedEquipment);
+            if (user && toDelete) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé le matériel', entity: 'equipment', entityName: toDelete.name, timestamp: new Date().toISOString() });
         }
     };
 
@@ -313,6 +318,7 @@ const Material: React.FC = () => {
 
         await db.saveEquipmentBookings(updatedBookings);
         setBookings(updatedBookings);
+        if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: isEditing ? 'a modifié une réservation matériel' : 'a créé une réservation matériel', entity: 'booking', entityName: eq.name, timestamp: new Date().toISOString() });
         setIsBookingModalOpen(false);
         setCurrentBooking({});
     };
@@ -321,9 +327,12 @@ const Material: React.FC = () => {
         try {
             // Fetch latest bookings to ensure we're working with current data
             const currentBookings = await db.getEquipmentBookings();
+            const toDelete = currentBookings.find(b => b.id === id);
+            const eqName = toDelete ? (equipment.find(e => e.id === toDelete.equipmentId)?.name || 'Matériel') : 'Matériel';
             const updatedBookings = currentBookings.filter(b => b.id !== id);
             await db.saveEquipmentBookings(updatedBookings);
             setBookings(updatedBookings);
+            if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé une réservation matériel', entity: 'booking', entityName: eqName, timestamp: new Date().toISOString() });
         } catch (error) {
             console.error("Error deleting booking:", error);
             alert("Une erreur est survenue lors de la suppression.");

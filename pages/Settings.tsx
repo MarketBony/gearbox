@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
-import { User, UserRole } from '../types';
+import { User, UserRole, ActivityLog } from '../types';
 import { Save, User as UserIcon, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import Avatar, { avatarKey } from '../components/Avatar';
@@ -284,9 +284,11 @@ const Settings: React.FC = () => {
         avatarColor: '#' + Math.floor(Math.random() * 16777215).toString(16)
       };
       await db.saveUser(newUser);
+      if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a créé l'utilisateur", entity: 'user', entityName: newUser.name, timestamp: new Date().toISOString() });
     } else {
       const updatedUser = { ...allUsers.find(u => u.id === editingUserId), ...editForm } as User;
       await db.saveUser(updatedUser);
+      if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a modifié l'utilisateur", entity: 'user', entityName: updatedUser.name, timestamp: new Date().toISOString() });
     }
     await loadAllUsers();
     cancelEdit();
@@ -294,7 +296,9 @@ const Settings: React.FC = () => {
 
   const deleteUser = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) return;
+    const toDelete = allUsers.find(u => u.id === id);
     await db.deleteUser(id);
+    if (user && toDelete) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a supprimé l'utilisateur", entity: 'user', entityName: toDelete.name, timestamp: new Date().toISOString() });
     await loadAllUsers();
   };
 

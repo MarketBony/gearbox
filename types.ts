@@ -199,6 +199,17 @@ export interface BudgetLine {
   };
 }
 
+export interface ActivityLog {
+  id: string;
+  userId: string;
+  userName: string;
+  userColor: string;
+  action: string;
+  entity: string;
+  entityName: string;
+  timestamp: string;
+}
+
 export interface IpcApi {
   loadData: (table: string) => Promise<any[]>;
   saveData: (table: string, data: any) => Promise<void>;

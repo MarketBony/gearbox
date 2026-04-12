@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { Project, Task, Site, ServiceType, BrandType, PlaqueName, TaskChannel } from '../types';
+import { Project, Task, Site, ServiceType, BrandType, PlaqueName, TaskChannel, ActivityLog } from '../types';
 import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS } from '../constants';
@@ -134,8 +134,13 @@ const Campaigns: React.FC = () => {
     });
     setProjects(updatedProjects);
     await db.saveProjects(updatedProjects);
+    if (field === 'status' && user) {
+        const project = projects.find(p => p.id === projectId);
+        const task = project?.tasks.find(t => t.id === taskId);
+        if (task) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: `a changé le statut de la tâche`, entity: 'task', entityName: task.name || taskId, timestamp: new Date().toISOString() });
+    }
     setTimeout(() => setSaving(false), 500);
-  }, [projects, canEdit]);
+  }, [projects, canEdit, user]);
 
   // --- CHART HELPERS --- (Simplified for brevity, logic unchanged)
   // ... (Chart logic remains identical to previous file, reused here)

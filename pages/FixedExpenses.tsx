@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { FixedExpense, ServiceType, Site, PlaqueName, BrandType } from '../types';
+import { FixedExpense, ServiceType, Site, PlaqueName, BrandType, ActivityLog } from '../types';
 import { db } from '../services/dataService';
+import { useAuth } from '../contexts/AuthContext';
 import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN } from '../constants';
 import { Plus, Trash2, Edit2, Save, X, Search, Filter, Euro, Calendar, MapPin, MessageSquare, Briefcase, ArrowUp, ArrowDown, ChevronDown, Check, PieChart } from 'lucide-react';
 
 const FixedExpenses: React.FC = () => {
+    const { user } = useAuth();
     const [expenses, setExpenses] = useState<FixedExpense[]>([]);
     const [searchTerm, setSearchTerm] = useSessionState<string>('fixedexpenses_searchTerm', '');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,6 +54,7 @@ const FixedExpenses: React.FC = () => {
         }
 
         let updatedExpenses = [...expenses];
+        const expenseName = currentExpense.comment || currentExpense.site || 'Dépense fixe';
         if (isEditing && currentExpense.id) {
             updatedExpenses = updatedExpenses.map(e => e.id === currentExpense.id ? currentExpense as FixedExpense : e);
         } else {
@@ -64,14 +67,17 @@ const FixedExpenses: React.FC = () => {
 
         setExpenses(updatedExpenses);
         await db.saveFixedExpenses(updatedExpenses);
+        if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: isEditing ? 'a modifié une dépense fixe' : 'a créé une dépense fixe', entity: 'fixed-expense', entityName: expenseName, timestamp: new Date().toISOString() });
         closeModal();
     };
 
     const handleDelete = async (id: string) => {
         if (confirm('Êtes-vous sûr de vouloir supprimer cette dépense ?')) {
+            const toDelete = expenses.find(e => e.id === id);
             const updated = expenses.filter(e => e.id !== id);
             setExpenses(updated);
             await db.saveFixedExpenses(updated);
+            if (user && toDelete) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé une dépense fixe', entity: 'fixed-expense', entityName: toDelete.comment || toDelete.site || 'Dépense fixe', timestamp: new Date().toISOString() });
         }
     };
 

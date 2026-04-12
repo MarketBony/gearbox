@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSessionState } from '../hooks/useSessionState';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
-import { SocialPost, SocialStatus, SocialNetwork, BrandType, ServiceType, SocialTarget, Site, PlaqueName, DigitalTags } from '../types';
+import { SocialPost, SocialStatus, SocialNetwork, BrandType, ServiceType, SocialTarget, Site, PlaqueName, DigitalTags, ActivityLog } from '../types';
 import { SOCIAL_STATUS_COLORS, BRANDS, SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTIONS, SITES, BRAND_COLORS } from '../constants';
 import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
@@ -838,7 +838,8 @@ const Digital: React.FC = () => {
       if (!canEdit) return;
       // Suppression automatique des médias lors de l'archivage
       const oldPost = posts.find(p => p.id === updatedPost.id);
-      if (oldPost && !oldPost.archived && updatedPost.archived) {
+      const isArchiving = oldPost && !oldPost.archived && updatedPost.archived;
+      if (isArchiving) {
           localStorage.removeItem(mediaKey(updatedPost.id));
           setMediaCounts(prev => ({ ...prev, [updatedPost.id]: 0 }));
       }
@@ -846,6 +847,7 @@ const Digital: React.FC = () => {
       const newPosts = posts.map(p => p.id === updatedPost.id ? updatedPost : p);
       setPosts(newPosts);
       await db.saveSocialPosts(newPosts);
+      if (isArchiving && user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a archivé la publication', entity: 'post', entityName: updatedPost.title || '(sans titre)', timestamp: new Date().toISOString() });
       setTimeout(() => setSaving(false), 500);
   };
 
@@ -884,6 +886,7 @@ const Digital: React.FC = () => {
       const newPosts = [newPost, ...posts];
       setPosts(newPosts);
       await db.saveSocialPosts(newPosts);
+      if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a créé une publication', entity: 'post', entityName: '(sans titre)', timestamp: new Date().toISOString() });
   };
 
   const filteredPosts = useMemo(() => {

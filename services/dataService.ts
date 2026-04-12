@@ -1,5 +1,5 @@
 
-import { Project, Campaign, Equipment, EquipmentBooking, Expense, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage } from '../types';
+import { Project, Campaign, Equipment, EquipmentBooking, Expense, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog } from '../types';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS } from '../constants';
 
 // In a real scenario, this connects to the Electron preload script exposed via window.electron
@@ -246,6 +246,33 @@ class DataService {
 
   saveMessages(conversationId: string, messages: ChatMessage[]) {
     localStorage.setItem(`gearbox_messages_${conversationId}`, JSON.stringify(messages));
+  }
+
+  // --- USER CRUD ---
+  async saveUser(user: User) {
+    const users = await this.getUsers();
+    const idx = users.findIndex(u => u.id === user.id);
+    if (idx >= 0) users[idx] = user;
+    else users.push(user);
+    await this.saveUsers(users);
+  }
+
+  async deleteUser(id: string) {
+    const users = await this.getUsers();
+    await this.saveUsers(users.filter(u => u.id !== id));
+  }
+
+  // --- ACTIVITY LOG ---
+  getActivityLog(): ActivityLog[] {
+    const data = localStorage.getItem('gearbox_activity_log');
+    return data ? JSON.parse(data) : [];
+  }
+
+  logActivity(entry: ActivityLog) {
+    const log = this.getActivityLog();
+    const updated = [entry, ...log].slice(0, 200);
+    localStorage.setItem('gearbox_activity_log', JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('gearbox-activity-updated'));
   }
 
   async authenticate(loginId: string, password: string): Promise<User | null> {

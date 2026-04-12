@@ -1,8 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import Avatar from './Avatar';
+import { db } from '../services/dataService';
+import { ActivityLog } from '../types';
 import {
   LayoutDashboard,
   FolderKanban,
@@ -19,8 +21,19 @@ import {
   Euro,
   MoreHorizontal,
   X,
-  MessageSquare
+  MessageSquare,
+  Bell
 } from 'lucide-react';
+
+const relativeTime = (iso: string): string => {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "à l'instant";
+  if (m < 60) return `il y a ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `il y a ${h}h`;
+  return `il y a ${Math.floor(h / 24)}j`;
+};
 
 interface SidebarProps {
   activeTab: string;
@@ -31,6 +44,36 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const { logout, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
+  const [activityLog, setActivityLog] = useState<ActivityLog[]>([]);
+  const [lastReadTs, setLastReadTs] = useState<string | null>(null);
+
+  const loadActivity = () => {
+    setActivityLog(db.getActivityLog());
+    setLastReadTs(localStorage.getItem('gearbox_activity_last_read'));
+  };
+
+  useEffect(() => {
+    loadActivity();
+    const handler = () => loadActivity();
+    window.addEventListener('gearbox-activity-updated', handler);
+    return () => window.removeEventListener('gearbox-activity-updated', handler);
+  }, []);
+
+  const openActivity = () => {
+    setShowActivity(true);
+  };
+
+  const closeActivity = () => {
+    const now = new Date().toISOString();
+    localStorage.setItem('gearbox_activity_last_read', now);
+    setLastReadTs(now);
+    setShowActivity(false);
+  };
+
+  const unreadCount = activityLog.filter(e =>
+    lastReadTs ? new Date(e.timestamp) > new Date(lastReadTs) : true
+  ).length;
 
   const mainItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -138,6 +181,20 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
 
         <div className="p-4 border-t border-bony-border bg-bony-dark space-y-2 shrink-0">
           <button
+            onClick={openActivity}
+            className="w-full flex items-center p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded transition-colors group relative"
+          >
+            <div className="relative">
+              <Bell size={20} className="group-hover:text-bony-orange transition-colors" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-bony-orange text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </div>
+            <span className="ml-3 hidden lg:block text-sm font-bold">Fil d'actualité</span>
+          </button>
+          <button
             onClick={toggleTheme}
             className="w-full flex items-center p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded transition-colors group"
           >
@@ -213,6 +270,62 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
         </button>
       </div>
 
+      {/* ===== ACTIVITY PANEL OVERLAY ===== */}
+      {showActivity && (
+        <div className="fixed inset-0 z-[200] flex">
+          <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={closeActivity} />
+          <div className="w-80 md:w-96 bg-bony-panel border-l border-bony-border h-full flex flex-col shadow-2xl">
+            {/* Header */}
+            <div className="p-4 border-b border-bony-border flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <Bell size={18} className="text-bony-orange" />
+                <h3 className="font-title text-sm font-bold text-bony-text tracking-widest uppercase">Fil d'actualité</h3>
+              </div>
+              <button
+                onClick={closeActivity}
+                className="p-1.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            {/* Entries */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-bony-border">
+              {activityLog.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400 p-8">
+                  <Bell size={32} strokeWidth={1} />
+                  <p className="text-sm text-center">Aucune activité récente.</p>
+                </div>
+              ) : (
+                activityLog.map(entry => {
+                  const isUnread = lastReadTs ? new Date(entry.timestamp) > new Date(lastReadTs) : true;
+                  return (
+                    <div
+                      key={entry.id}
+                      className={`flex items-start gap-3 p-3 transition-colors ${isUnread ? 'bg-bony-orange/5' : ''}`}
+                    >
+                      <div className="shrink-0 mt-0.5">
+                        <Avatar userId={entry.userId} name={entry.userName} color={entry.userColor} size={30} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-bony-text leading-snug">
+                          <span className="font-semibold">{entry.userName}</span>{' '}
+                          <span className="text-slate-500 dark:text-slate-400">{entry.action}</span>{' '}
+                          <span className="text-bony-orange font-semibold">{entry.entityName}</span>
+                        </p>
+                        <p className="text-[10px] text-bony-muted mt-0.5">{relativeTime(entry.timestamp)}</p>
+                      </div>
+                      {isUnread && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-bony-orange shrink-0 mt-1.5" />
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ===== MORE MENU OVERLAY (mobile) ===== */}
       {showMoreMenu && (
         <div className="md:hidden fixed inset-0 z-[60] flex flex-col justify-end">
@@ -254,7 +367,21 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
               })}
             </div>
 
-            <div className="border-t border-bony-border pt-3 flex gap-3">
+            <div className="border-t border-bony-border pt-3 flex gap-3 flex-wrap">
+              <button
+                onClick={() => { setShowMoreMenu(false); openActivity(); }}
+                className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 min-h-[44px] relative"
+              >
+                <div className="relative">
+                  <Bell size={18} />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-3.5 bg-bony-orange text-white text-[8px] font-bold rounded-full flex items-center justify-center px-0.5">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs font-bold">Actualités</span>
+              </button>
               <button
                 onClick={() => { toggleTheme(); setShowMoreMenu(false); }}
                 className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 min-h-[44px]"
