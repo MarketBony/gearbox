@@ -3,9 +3,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
 import { User, UserRole, ActivityLog } from '../types';
-import { Save, User as UserIcon, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn } from 'lucide-react';
+import { Save, User as UserIcon, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn, MapPin, Cake } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import Avatar, { avatarKey } from '../components/Avatar';
+import { SITES } from '../constants';
 
 // --- Types for react-easy-crop ---
 interface CropArea { x: number; y: number; width: number; height: number; }
@@ -218,6 +219,16 @@ const RoleBadge: React.FC<{ role: string }> = ({ role }) => {
   );
 };
 
+const USER_PREFS_KEY = (id: string) => `gearbox_user_prefs_${id}`;
+
+interface UserPrefs { city: string; birthdate: string; }
+const loadUserPrefs = (id: string): UserPrefs => {
+  try { return { city: '', birthdate: '', ...JSON.parse(localStorage.getItem(USER_PREFS_KEY(id)) || '{}') }; }
+  catch { return { city: '', birthdate: '' }; }
+};
+const saveUserPrefs = (id: string, prefs: UserPrefs) =>
+  localStorage.setItem(USER_PREFS_KEY(id), JSON.stringify(prefs));
+
 // --- Main Settings ---
 const Settings: React.FC = () => {
   const { user, updateProfile } = useAuth();
@@ -229,20 +240,35 @@ const Settings: React.FC = () => {
   const [profileMsg, setProfileMsg] = useState({ type: '', text: '' });
   const [showAvatarModal, setShowAvatarModal] = useState(false);
 
+  // User prefs (city + birthdate) for own profile
+  const [userCity, setUserCity] = useState('');
+  const [userBirthdate, setUserBirthdate] = useState('');
+
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
+  const [editPrefs, setEditPrefs] = useState<UserPrefs>({ city: '', birthdate: '' });
   const [isAddingUser, setIsAddingUser] = useState(false);
   // Avatar modal for master managing other users
   const [avatarTargetUser, setAvatarTargetUser] = useState<User | null>(null);
+  // Map userId -> prefs for display in user table
+  const [allUserPrefs, setAllUserPrefs] = useState<Record<string, UserPrefs>>({});
 
   useEffect(() => {
+    if (user) {
+      const prefs = loadUserPrefs(user.id);
+      setUserCity(prefs.city);
+      setUserBirthdate(prefs.birthdate);
+    }
     if (user?.role === 'Master') loadAllUsers();
   }, [user]);
 
   const loadAllUsers = async () => {
     const users = await db.getUsers();
     setAllUsers(users);
+    const prefsMap: Record<string, UserPrefs> = {};
+    users.forEach(u => { prefsMap[u.id] = loadUserPrefs(u.id); });
+    setAllUserPrefs(prefsMap);
   };
 
   const handleUpdateProfile = async () => {
@@ -266,6 +292,7 @@ const Settings: React.FC = () => {
 
     const updatedUser: User = { ...user, name, password: newPassword ? newPassword : user.password };
     await updateProfile(updatedUser);
+    saveUserPrefs(user.id, { city: userCity, birthdate: userBirthdate });
     setProfileMsg({ type: 'success', text: 'Profil mis à jour avec succès.' });
     setOldPassword(''); setNewPassword(''); setConfirmPassword('');
   };
@@ -273,10 +300,11 @@ const Settings: React.FC = () => {
   const startEdit = (targetUser: User) => {
     setEditingUserId(targetUser.id);
     setEditForm({ ...targetUser });
+    setEditPrefs(loadUserPrefs(targetUser.id));
     setIsAddingUser(false);
   };
 
-  const cancelEdit = () => { setEditingUserId(null); setEditForm({}); setIsAddingUser(false); };
+  const cancelEdit = () => { setEditingUserId(null); setEditForm({}); setEditPrefs({ city: '', birthdate: '' }); setIsAddingUser(false); };
 
   const saveUser = async () => {
     if (!editForm.name || !editForm.loginId || !editForm.role) return;
@@ -290,10 +318,12 @@ const Settings: React.FC = () => {
         avatarColor: '#' + Math.floor(Math.random() * 16777215).toString(16)
       };
       await db.saveUser(newUser);
+      saveUserPrefs(newUser.id, editPrefs);
       if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a créé l'utilisateur", entity: 'user', entityName: newUser.name, timestamp: new Date().toISOString() });
     } else {
       const updatedUser = { ...allUsers.find(u => u.id === editingUserId), ...editForm } as User;
       await db.saveUser(updatedUser);
+      saveUserPrefs(updatedUser.id, editPrefs);
       if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a modifié l'utilisateur", entity: 'user', entityName: updatedUser.name, timestamp: new Date().toISOString() });
     }
     await loadAllUsers();
@@ -360,6 +390,26 @@ const Settings: React.FC = () => {
               <label className="block text-xs font-bold text-slate-600 dark:text-slate-500 mb-1">Nom affiché</label>
               <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputCls} />
             </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-500 mb-1 flex items-center gap-1">
+                <MapPin size={11} /> Ville de référence (météo)
+              </label>
+              <select value={userCity} onChange={e => setUserCity(e.target.value)} className={inputCls}>
+                <option value="">— Sélectionner une ville —</option>
+                {SITES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-500 mb-1 flex items-center gap-1">
+                <Cake size={11} /> Date de naissance
+              </label>
+              <input
+                type="date"
+                value={userBirthdate}
+                onChange={e => setUserBirthdate(e.target.value)}
+                className={inputCls}
+              />
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -404,7 +454,7 @@ const Settings: React.FC = () => {
               <ShieldAlert className="text-red-500" size={24} /> Gestion des Utilisateurs (Master)
             </h3>
             <button
-              onClick={() => { setIsAddingUser(true); setEditingUserId('new'); setEditForm({ role: 'Coordinator', password: 'admin' }); }}
+              onClick={() => { setIsAddingUser(true); setEditingUserId('new'); setEditForm({ role: 'Coordinator', password: 'admin' }); setEditPrefs({ city: '', birthdate: '' }); }}
               className="px-4 py-2 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white rounded-lg text-xs font-bold uppercase flex items-center gap-2 border border-slate-300 dark:border-white/10 transition"
             >
               <Plus size={16} /> Nouvel Utilisateur
@@ -419,6 +469,8 @@ const Settings: React.FC = () => {
                   <th className="p-4">Nom</th>
                   <th className="p-4">ID Connexion</th>
                   <th className="p-4">Rang</th>
+                  <th className="p-4">Ville</th>
+                  <th className="p-4">Anniversaire</th>
                   <th className="p-4">Mot de passe</th>
                   <th className="p-4 text-right">Actions</th>
                 </tr>
@@ -444,6 +496,15 @@ const Settings: React.FC = () => {
                         <option value="Guest">Guest</option>
                         <option value="External">External</option>
                       </select>
+                    </td>
+                    <td className="p-4">
+                      <select className={tableInputCls} value={editPrefs.city} onChange={e => setEditPrefs({ ...editPrefs, city: e.target.value })}>
+                        <option value="">—</option>
+                        {SITES.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </td>
+                    <td className="p-4">
+                      <input type="date" className={tableInputCls} value={editPrefs.birthdate} onChange={e => setEditPrefs({ ...editPrefs, birthdate: e.target.value })} />
                     </td>
                     <td className="p-4">
                       <input className={tableInputCls} placeholder="Mot de passe" value={editForm.password || ''} onChange={e => setEditForm({ ...editForm, password: e.target.value })} />
@@ -483,6 +544,15 @@ const Settings: React.FC = () => {
                           </select>
                         </td>
                         <td className="p-4">
+                          <select className={editInputCls} value={editPrefs.city} onChange={e => setEditPrefs({ ...editPrefs, city: e.target.value })}>
+                            <option value="">—</option>
+                            {SITES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-4">
+                          <input type="date" className={editInputCls} value={editPrefs.birthdate} onChange={e => setEditPrefs({ ...editPrefs, birthdate: e.target.value })} />
+                        </td>
+                        <td className="p-4">
                           <input className={editInputCls} placeholder="Laisser vide si inchangé" value={editForm.password || ''} onChange={e => setEditForm({ ...editForm, password: e.target.value })} />
                         </td>
                         <td className="p-4 text-right">
@@ -513,6 +583,16 @@ const Settings: React.FC = () => {
                       <td className="p-4 font-bold text-slate-800 dark:text-slate-200">{u.name}</td>
                       <td className="p-4 font-sans text-slate-500 dark:text-slate-400">{u.loginId}</td>
                       <td className="p-4"><RoleBadge role={u.role} /></td>
+                      <td className="p-4 text-xs text-slate-500 dark:text-slate-400">
+                        {allUserPrefs[u.id]?.city
+                          ? <span className="flex items-center gap-1"><MapPin size={10} className="text-blue-400" />{allUserPrefs[u.id].city}</span>
+                          : <span className="text-slate-300 dark:text-slate-700">—</span>}
+                      </td>
+                      <td className="p-4 text-xs text-slate-500 dark:text-slate-400">
+                        {allUserPrefs[u.id]?.birthdate
+                          ? <span className="flex items-center gap-1"><Cake size={10} className="text-pink-400" />{new Date(allUserPrefs[u.id].birthdate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+                          : <span className="text-slate-300 dark:text-slate-700">—</span>}
+                      </td>
                       <td className="p-4 text-slate-400 dark:text-slate-600 font-sans text-xs">••••••</td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition">

@@ -22,7 +22,8 @@ import {
   MoreHorizontal,
   X,
   MessageSquare,
-  Bell
+  Bell,
+  Sparkles
 } from 'lucide-react';
 
 const relativeTime = (iso: string): string => {
@@ -130,6 +131,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const isExternal = user?.role === 'External';
 
   const allMainItems = [
+    { id: 'hello-marketing', icon: Sparkles, label: 'Hello Marketing' },
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'projects', icon: FolderKanban, label: 'Projets' },
     { id: 'digital', icon: Globe, label: 'Digital' },
@@ -142,7 +144,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   ];
 
   const mainItems = isExternal
-    ? allMainItems.filter(i => i.id === 'digital' || i.id === 'chat')
+    ? allMainItems.filter(i => ['digital', 'chat', 'hello-marketing'].includes(i.id))
     : allMainItems;
 
   // Bottom nav: first 5 items shown directly, rest + extras in More menu

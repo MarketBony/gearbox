@@ -12,6 +12,7 @@ import FixedExpenses from './pages/FixedExpenses';
 import Agenda from './pages/Agenda';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
+import HelloMarketing from './pages/HelloMarketing';
 import { db } from './services/dataService';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -42,13 +43,14 @@ const InnerApp: React.FC = () => {
       return <Login />;
   }
 
-  const EXTERNAL_ALLOWED_TABS = ['digital', 'chat'];
+  const EXTERNAL_ALLOWED_TABS = ['digital', 'chat', 'hello-marketing'];
 
   const renderContent = () => {
     const isExternal = user?.role === 'External';
     const tab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(activeTab)) ? 'digital' : activeTab;
 
     switch (tab) {
+      case 'hello-marketing': return <HelloMarketing />;
       case 'dashboard': return <Dashboard />;
       case 'projects': return <Projects viewMode="current" />;
       case 'digital': return <Digital />;
