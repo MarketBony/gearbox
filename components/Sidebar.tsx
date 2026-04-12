@@ -47,17 +47,32 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const [showActivity, setShowActivity] = useState(false);
   const [activityLog, setActivityLog] = useState<ActivityLog[]>([]);
   const [lastReadTs, setLastReadTs] = useState<string | null>(null);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   const loadActivity = () => {
     setActivityLog(db.getActivityLog());
     setLastReadTs(localStorage.getItem('gearbox_activity_last_read'));
   };
 
+  const loadChatUnread = () => {
+    if (!user) return;
+    const data = localStorage.getItem('gearbox_conversations');
+    const convs: any[] = data ? JSON.parse(data) : [];
+    const total = convs.reduce((sum: number, c: any) => sum + (c.unreadCounts?.[user.id] ?? 0), 0);
+    setChatUnreadCount(total);
+  };
+
   useEffect(() => {
     loadActivity();
-    const handler = () => loadActivity();
-    window.addEventListener('gearbox-activity-updated', handler);
-    return () => window.removeEventListener('gearbox-activity-updated', handler);
+    loadChatUnread();
+    const actHandler = () => loadActivity();
+    const chatHandler = () => loadChatUnread();
+    window.addEventListener('gearbox-activity-updated', actHandler);
+    window.addEventListener('gearbox-chat-unread-updated', chatHandler);
+    return () => {
+      window.removeEventListener('gearbox-activity-updated', actHandler);
+      window.removeEventListener('gearbox-chat-unread-updated', chatHandler);
+    };
   }, []);
 
   const openActivity = () => {
@@ -188,7 +203,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                   <div className="absolute inset-0 bg-bony-gradient opacity-100" />
                 )}
                 <div className="relative z-10 flex items-center w-full">
-                  <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className={isActive ? "text-white" : "group-hover:text-bony-orange transition-colors"} />
+                  <div className="relative">
+                    <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className={isActive ? "text-white" : "group-hover:text-bony-orange transition-colors"} />
+                    {item.id === 'chat' && chatUnreadCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-bony-orange text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
+                        {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                      </span>
+                    )}
+                  </div>
                   <span className={`ml-4 font-medium hidden lg:block tracking-wide ${isActive ? 'font-bold' : ''}`}>
                     {item.label}
                   </span>
@@ -302,7 +324,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                 isActive ? 'text-bony-orange' : 'text-slate-400 dark:text-slate-500'
               }`}
             >
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+              <div className="relative">
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                {item.id === 'chat' && chatUnreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[14px] h-3.5 bg-bony-orange text-white text-[8px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
+                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                  </span>
+                )}
+              </div>
               <span className="text-[9px] font-bold leading-none truncate px-0.5">
                 {item.label.split(' ')[0]}
               </span>

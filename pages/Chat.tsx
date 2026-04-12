@@ -6,9 +6,10 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   MessageSquare, Plus, Send, Star, StarOff, ArrowLeft,
   MoreHorizontal, Pencil, Trash2, X, Image, Reply, Check,
-  Users, UserPlus, UserMinus, ChevronRight, Hash
+  Users, UserPlus, UserMinus, ChevronRight, Hash, Camera, Upload, ZoomIn
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
+import Cropper from 'react-easy-crop';
 
 const REACTIONS = ['👍', '❤️', '😂', '😮'];
 const MAX_IMAGE_SIZE = 300 * 1024;
@@ -46,7 +47,8 @@ const ConvAvatar: React.FC<{
   meId: string;
   isActive?: boolean;
   size?: number;
-}> = ({ conv, members, meId, isActive, size = 38 }) => {
+  groupPhoto?: string;
+}> = ({ conv, members, meId, isActive, size = 38, groupPhoto }) => {
   if (conv.type === 'general') {
     return (
       <div
@@ -66,7 +68,18 @@ const ConvAvatar: React.FC<{
     return <Avatar userId={other.id} name={other.name} color={isActive ? '#ffffff44' : other.avatarColor} size={size} />;
   }
 
-  // Group
+  // Group — custom photo takes priority
+  if (groupPhoto) {
+    return (
+      <img
+        src={groupPhoto}
+        alt="Groupe"
+        style={{ width: size, height: size }}
+        className="rounded-full object-cover shrink-0 border border-bony-border"
+      />
+    );
+  }
+
   const others = members.filter(u => u.id !== meId).slice(0, 2);
   if (others.length === 0) {
     return (
@@ -98,6 +111,139 @@ const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
   </div>
 );
 
+// --- Group avatar localStorage key ---
+const convAvatarKey = (convId: string) => `gearbox_conv_avatar_${convId}`;
+
+// --- Crop helper (circular, 200×200) ---
+interface CropArea { x: number; y: number; width: number; height: number; }
+interface CropPoint { x: number; y: number; }
+
+const getCroppedImg = (imageSrc: string, cropPixels: CropArea): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 200; canvas.height = 200;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('No canvas context')); return; }
+      ctx.beginPath();
+      ctx.arc(100, 100, 100, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(img, cropPixels.x, cropPixels.y, cropPixels.width, cropPixels.height, 0, 0, 200, 200);
+      resolve(canvas.toDataURL('image/jpeg', 0.88));
+    };
+    img.onerror = reject;
+    img.src = imageSrc;
+  });
+
+// --- Group Avatar Crop Modal ---
+interface GroupAvatarModalProps { convId: string; convName: string; onClose: () => void; }
+const GroupAvatarCropModal: React.FC<GroupAvatarModalProps> = ({ convId, convName, onClose }) => {
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [crop, setCrop] = useState<CropPoint>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<CropArea | null>(null);
+  const [error, setError] = useState('');
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const hasExisting = !!localStorage.getItem(convAvatarKey(convId));
+
+  const handleFile = (file: File | null | undefined) => {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setError('Format non supporté. Utilisez jpg, png ou webp.'); return; }
+    if (file.size > 2 * 1024 * 1024) { setError('Fichier trop lourd (max 2 Mo).'); return; }
+    setError('');
+    const reader = new FileReader();
+    reader.onload = e => { setCropSrc(e.target?.result as string); setZoom(1); setCrop({ x: 0, y: 0 }); };
+    reader.readAsDataURL(file);
+  };
+
+  const handleValidate = async () => {
+    if (!cropSrc || !croppedAreaPixels) return;
+    try {
+      const base64 = await getCroppedImg(cropSrc, croppedAreaPixels);
+      localStorage.setItem(convAvatarKey(convId), base64);
+      window.dispatchEvent(new CustomEvent('gearbox-conv-avatar-updated', { detail: { convId } }));
+      onClose();
+    } catch { setError('Erreur lors du recadrage. Réessayez.'); }
+  };
+
+  const handleDelete = () => {
+    localStorage.removeItem(convAvatarKey(convId));
+    window.dispatchEvent(new CustomEvent('gearbox-conv-avatar-updated', { detail: { convId } }));
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-bony-border">
+          <div>
+            <h3 className="font-title text-slate-900 dark:text-bony-text flex items-center gap-2">
+              <Camera size={18} className="text-bony-orange" /> Photo du groupe
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-bony-muted mt-0.5">{convName}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-bony-text transition"><X size={20} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          {!cropSrc ? (
+            <div
+              onDragOver={e => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }}
+              onClick={() => fileInputRef.current?.click()}
+              className={`h-44 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3 cursor-pointer transition-all ${dragging ? 'border-bony-orange bg-bony-orange/10' : 'border-slate-300 dark:border-bony-border hover:border-bony-orange/60 hover:bg-slate-50 dark:hover:bg-white/3'}`}
+            >
+              <Upload size={32} className={`transition-colors ${dragging ? 'text-bony-orange' : 'text-slate-400'}`} />
+              <div className="text-center">
+                <p className="text-sm font-bold text-slate-700 dark:text-bony-text">Glisser une photo ici</p>
+                <p className="text-[11px] text-slate-500 dark:text-bony-muted mt-0.5">ou cliquer pour parcourir</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-1">jpg, png, webp — max 2 Mo</p>
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => handleFile(e.target.files?.[0])} />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="relative h-64 rounded-xl overflow-hidden bg-black">
+                <Cropper
+                  image={cropSrc} crop={crop} zoom={zoom} aspect={1} cropShape="round" showGrid={false}
+                  onCropChange={setCrop} onZoomChange={setZoom}
+                  onCropComplete={(_: unknown, pixels: CropArea) => setCroppedAreaPixels(pixels)}
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <ZoomIn size={14} className="text-slate-400 shrink-0" />
+                <input type="range" min={1} max={3} step={0.05} value={zoom} onChange={e => setZoom(Number(e.target.value))} className="flex-1 accent-bony-orange" />
+              </div>
+              <button onClick={() => setCropSrc(null)} className="text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-bony-text transition underline">
+                Choisir une autre photo
+              </button>
+            </div>
+          )}
+          {error && <p className="text-xs text-red-500 font-bold">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            {cropSrc && (
+              <button onClick={handleValidate} className="flex-1 py-2.5 rounded-xl bg-bony-gradient text-white text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                <Check size={16} /> Valider
+              </button>
+            )}
+            {hasExisting && (
+              <button onClick={handleDelete} className="flex-1 py-2.5 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 text-sm font-bold hover:bg-red-500/20 transition flex items-center justify-center gap-2">
+                <Trash2 size={16} /> Supprimer la photo
+              </button>
+            )}
+            {!cropSrc && !hasExisting && (
+              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 text-sm font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition">Annuler</button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ========================
 // --- MAIN COMPONENT ---
 // ========================
@@ -127,6 +273,10 @@ const Chat: React.FC = () => {
   const [editingGroupName, setEditingGroupName] = useState(false);
   const [tempGroupName, setTempGroupName] = useState('');
 
+  // Group avatar modal + cache
+  const [showGroupAvatarModal, setShowGroupAvatarModal] = useState(false);
+  const [convAvatars, setConvAvatars] = useState<Record<string, string>>({});
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -139,6 +289,21 @@ const Chat: React.FC = () => {
     const visible = filterVisible(all);
     if (visible.length > 0) openConversation(visible[0].id, all);
   }, []);
+
+  // Load group avatar photos from localStorage + listen for updates
+  useEffect(() => {
+    const load = () => {
+      const avatars: Record<string, string> = {};
+      conversations.filter(c => c.type === 'group').forEach(c => {
+        const photo = localStorage.getItem(convAvatarKey(c.id));
+        if (photo) avatars[c.id] = photo;
+      });
+      setConvAvatars(avatars);
+    };
+    load();
+    window.addEventListener('gearbox-conv-avatar-updated', load);
+    return () => window.removeEventListener('gearbox-conv-avatar-updated', load);
+  }, [conversations]);
 
   // Filter conversations visible to the current user
   const filterVisible = (all: ChatConversation[]): ChatConversation[] => {
@@ -184,6 +349,7 @@ const Chat: React.FC = () => {
     );
     db.saveConversations(updated);
     setConversations(updated);
+    window.dispatchEvent(new CustomEvent('gearbox-chat-unread-updated'));
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
   };
 
@@ -226,6 +392,7 @@ const Chat: React.FC = () => {
     });
     db.saveConversations(updatedConvs);
     setConversations(updatedConvs);
+    window.dispatchEvent(new CustomEvent('gearbox-chat-unread-updated'));
     setReplyTo(null);
     setInput('');
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
@@ -439,7 +606,7 @@ const Chat: React.FC = () => {
                     onClick={() => handleSelectConv(conv.id)}
                   >
                     <div className="relative shrink-0">
-                      <ConvAvatar conv={conv} members={members} meId={me!.id} isActive={isActive} size={38} />
+                      <ConvAvatar conv={conv} members={members} meId={me!.id} isActive={isActive} size={38} groupPhoto={conv.type === 'group' ? convAvatars[conv.id] : undefined} />
                       {pinned && <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-bony-orange rounded-full flex items-center justify-center"><Star size={8} className="text-white fill-white" /></div>}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -479,7 +646,7 @@ const Chat: React.FC = () => {
                         onClick={() => handleSelectConv(conv.id)}
                       >
                         <div className="relative shrink-0">
-                          <ConvAvatar conv={conv} members={members} meId={me!.id} isActive={isActive} size={38} />
+                          <ConvAvatar conv={conv} members={members} meId={me!.id} isActive={isActive} size={38} groupPhoto={conv.type === 'group' ? convAvatars[conv.id] : undefined} />
                           {pinned && <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-bony-orange rounded-full flex items-center justify-center"><Star size={8} className="text-white fill-white" /></div>}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -518,7 +685,7 @@ const Chat: React.FC = () => {
                     onClick={() => handleSelectConv(conv.id)}
                   >
                     <div className="relative shrink-0">
-                      <ConvAvatar conv={conv} members={members} meId={me!.id} isActive={isActive} size={38} />
+                      <ConvAvatar conv={conv} members={members} meId={me!.id} isActive={isActive} size={38} groupPhoto={conv.type === 'group' ? convAvatars[conv.id] : undefined} />
                       {pinned && <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-bony-orange rounded-full flex items-center justify-center"><Star size={8} className="text-white fill-white" /></div>}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -551,7 +718,20 @@ const Chat: React.FC = () => {
                 <ArrowLeft size={20} />
               </button>
 
-              <ConvAvatar conv={activeConv} members={activeMembers} meId={me!.id} size={36} />
+              {activeConv.type === 'group' ? (
+                <button
+                  onClick={() => setShowGroupAvatarModal(true)}
+                  className="relative group/ga shrink-0 rounded-full focus:outline-none"
+                  title="Changer la photo du groupe"
+                >
+                  <ConvAvatar conv={activeConv} members={activeMembers} meId={me!.id} size={36} groupPhoto={convAvatars[activeConv.id]} />
+                  <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover/ga:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                    <Camera size={13} className="text-white" />
+                  </div>
+                </button>
+              ) : (
+                <ConvAvatar conv={activeConv} members={activeMembers} meId={me!.id} size={36} />
+              )}
 
               <div className="flex-1 min-w-0">
                 {editingGroupName ? (
@@ -985,6 +1165,15 @@ const Chat: React.FC = () => {
           <img src={lightboxSrc} alt="Agrandissement" className="max-w-full max-h-full rounded-xl object-contain shadow-2xl" />
           <button className="absolute top-4 right-4 text-white/70 hover:text-white" onClick={() => setLightboxSrc(null)}><X size={28} /></button>
         </div>
+      )}
+
+      {/* ===== GROUP AVATAR MODAL ===== */}
+      {showGroupAvatarModal && activeConv?.type === 'group' && (
+        <GroupAvatarCropModal
+          convId={activeConv.id}
+          convName={getConvName(activeConv)}
+          onClose={() => setShowGroupAvatarModal(false)}
+        />
       )}
     </div>
   );
