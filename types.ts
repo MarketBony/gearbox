@@ -26,7 +26,7 @@ export type TaskChannel = '' | 'SMS' | 'E-mail' | 'GMB' | 'Radio' | 'Print' | 'A
 export type TaskStatus = 'Todo' | 'InProgress' | 'Done' | 'Programmed' | 'Empty';
 
 // --- AUTH TYPES ---
-export type UserRole = 'Master' | 'Administrator' | 'Coordinator' | 'Digital Manager' | 'Guest';
+export type UserRole = 'Master' | 'Administrator' | 'Coordinator' | 'Digital Manager' | 'Guest' | 'External';
 
 export interface User {
   id: string;

@@ -69,7 +69,9 @@ const Chat: React.FC = () => {
     const convs = db.getConversations();
     setConversations(convs);
     if (!activeConvId && convs.length > 0) {
-      openConversation(convs[0].id, convs);
+      const isExternal = me?.role === 'External';
+      const allowed = isExternal ? convs.filter(c => c.type !== 'general') : convs;
+      if (allowed.length > 0) openConversation(allowed[0].id, convs);
     }
   };
 
@@ -265,7 +267,12 @@ const Chat: React.FC = () => {
   };
 
   // Sort conversations: pinned first, then by lastMessageAt
-  const sortedConvs = [...conversations].sort((a, b) => {
+  // External users cannot see the general channel
+  const visibleConversations = me?.role === 'External'
+    ? conversations.filter(c => c.type !== 'general')
+    : conversations;
+
+  const sortedConvs = [...visibleConversations].sort((a, b) => {
     const aPin = a.pinnedBy.includes(me?.id ?? '');
     const bPin = b.pinnedBy.includes(me?.id ?? '');
     if (aPin !== bPin) return aPin ? -1 : 1;

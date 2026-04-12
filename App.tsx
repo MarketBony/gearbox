@@ -42,8 +42,13 @@ const InnerApp: React.FC = () => {
       return <Login />;
   }
 
+  const EXTERNAL_ALLOWED_TABS = ['digital', 'chat'];
+
   const renderContent = () => {
-    switch (activeTab) {
+    const isExternal = user?.role === 'External';
+    const tab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(activeTab)) ? 'digital' : activeTab;
+
+    switch (tab) {
       case 'dashboard': return <Dashboard />;
       case 'projects': return <Projects viewMode="current" />;
       case 'digital': return <Digital />;
@@ -55,7 +60,7 @@ const InnerApp: React.FC = () => {
       case 'budget': return <Budget />;
       case 'fixed-expenses': return <FixedExpenses />;
       case 'settings': return <Settings />;
-      default: return <Dashboard />;
+      default: return isExternal ? <Digital /> : <Dashboard />;
     }
   };
 

@@ -112,7 +112,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     lastReadTs ? new Date(e.timestamp) > new Date(lastReadTs) : true
   ).length;
 
-  const mainItems = [
+  const isExternal = user?.role === 'External';
+
+  const allMainItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'projects', icon: FolderKanban, label: 'Projets' },
     { id: 'digital', icon: Globe, label: 'Digital' },
@@ -124,13 +126,19 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     { id: 'fixed-expenses', icon: Euro, label: 'Dépenses Fixes' },
   ];
 
+  const mainItems = isExternal
+    ? allMainItems.filter(i => i.id === 'digital' || i.id === 'chat')
+    : allMainItems;
+
   // Bottom nav: first 5 items shown directly, rest + extras in More menu
   const bottomNavItems = mainItems.slice(0, 5);
-  const moreNavItems = [
-    ...mainItems.slice(5),
-    { id: 'archives', icon: Archive, label: 'Projets Archivés' },
-    { id: 'settings', icon: Settings, label: 'Paramètres' },
-  ];
+  const moreNavItems = isExternal
+    ? []
+    : [
+        ...mainItems.slice(5),
+        { id: 'archives', icon: Archive, label: 'Projets Archivés' },
+        { id: 'settings', icon: Settings, label: 'Paramètres' },
+      ];
 
   const logoColor = theme === 'dark' ? 'white' : '#0f172a';
 
@@ -189,48 +197,52 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             );
           })}
 
-          <div className="pt-4 mt-4 border-t border-bony-border">
-            <div className="px-3 mb-2 text-[10px] font-bold text-bony-muted uppercase tracking-widest hidden lg:block">Historique</div>
-            {[{ id: 'archives', icon: Archive, label: 'Projets Archivés' }].map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center p-3 rounded-lg transition-all duration-300 group relative overflow-hidden ${
-                    isActive
-                      ? 'text-white bg-slate-800'
-                      : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <div className="relative z-10 flex items-center w-full">
-                    <Icon size={20} strokeWidth={2} className={isActive ? "text-white" : "group-hover:text-bony-text transition-colors"} />
-                    <span className={`ml-4 font-medium hidden lg:block tracking-wide ${isActive ? 'font-bold' : ''}`}>
-                      {item.label}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          {!isExternal && (
+            <div className="pt-4 mt-4 border-t border-bony-border">
+              <div className="px-3 mb-2 text-[10px] font-bold text-bony-muted uppercase tracking-widest hidden lg:block">Historique</div>
+              {[{ id: 'archives', icon: Archive, label: 'Projets Archivés' }].map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full flex items-center p-3 rounded-lg transition-all duration-300 group relative overflow-hidden ${
+                      isActive
+                        ? 'text-white bg-slate-800'
+                        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <div className="relative z-10 flex items-center w-full">
+                      <Icon size={20} strokeWidth={2} className={isActive ? "text-white" : "group-hover:text-bony-text transition-colors"} />
+                      <span className={`ml-4 font-medium hidden lg:block tracking-wide ${isActive ? 'font-bold' : ''}`}>
+                        {item.label}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </nav>
 
         <div className="p-4 border-t border-bony-border bg-bony-dark space-y-2 shrink-0">
-          <button
-            onClick={openActivity}
-            className="w-full flex items-center p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded transition-colors group relative"
-          >
-            <div className="relative">
-              <Bell size={20} className="group-hover:text-bony-orange transition-colors" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-bony-orange text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              )}
-            </div>
-            <span className="ml-3 hidden lg:block text-sm font-bold">Fil d'actualité</span>
-          </button>
+          {!isExternal && (
+            <button
+              onClick={openActivity}
+              className="w-full flex items-center p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded transition-colors group relative"
+            >
+              <div className="relative">
+                <Bell size={20} className="group-hover:text-bony-orange transition-colors" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-bony-orange text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </div>
+              <span className="ml-3 hidden lg:block text-sm font-bold">Fil d'actualité</span>
+            </button>
+          )}
           <button
             onClick={toggleTheme}
             className="w-full flex items-center p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded transition-colors group"
@@ -249,17 +261,19 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             <span className="ml-3 hidden lg:block text-sm font-bold">Me déconnecter</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center p-2 rounded transition-colors group ${
-                activeTab === 'settings'
-                ? 'text-slate-900 dark:text-white bg-slate-100 dark:bg-white/5'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Settings size={20} className="group-hover:text-bony-violet transition-colors" />
-            <span className="ml-3 hidden lg:block text-sm">Paramètres</span>
-          </button>
+          {!isExternal && (
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`w-full flex items-center p-2 rounded transition-colors group ${
+                  activeTab === 'settings'
+                  ? 'text-slate-900 dark:text-white bg-slate-100 dark:bg-white/5'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Settings size={20} className="group-hover:text-bony-violet transition-colors" />
+              <span className="ml-3 hidden lg:block text-sm">Paramètres</span>
+            </button>
+          )}
 
           <div className="mt-4 hidden lg:flex flex-col items-center justify-center gap-1.5">
             {user && (
@@ -269,6 +283,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             <div className="text-xs font-bold text-bony-text uppercase flex items-center gap-1">
               {user?.loginId}
               {user?.role === 'Digital Manager' && <Globe size={10} className="text-bony-violet"/>}
+              {user?.role === 'External' && <span className="text-[8px] font-bold text-cyan-500 border border-cyan-500/40 rounded px-1">EXT</span>}
             </div>
           </div>
         </div>
