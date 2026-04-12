@@ -161,8 +161,9 @@ export interface FixedExpense {
 // --- CHAT TYPES ---
 export interface ChatConversation {
   id: string;
-  type: 'general' | 'private';
+  type: 'general' | 'private' | 'group';
   participants: string[]; // userIds
+  adminIds?: string[];    // group admins (group type only)
   name?: string;
   pinnedBy: string[]; // userIds
   lastMessage?: string;
