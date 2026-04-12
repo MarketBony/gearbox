@@ -18,15 +18,13 @@ interface TeamSectionProps {
     unassignedUsers: User[];
     allUsers: User[];
     canEdit: boolean;
-    currentUserId: string;
-    creatorId: string;
     showDropdown: boolean;
     setShowDropdown: (v: boolean) => void;
     onAdd: (userId: string) => void;
     onRemove: (userId: string) => void;
 }
 const TeamSection: React.FC<TeamSectionProps> = ({
-    assignedIds, unassignedUsers, allUsers, canEdit, currentUserId, creatorId,
+    assignedIds, unassignedUsers, allUsers, canEdit,
     showDropdown, setShowDropdown, onAdd, onRemove,
 }) => {
     const btnRef = useRef<HTMLButtonElement>(null);
@@ -47,9 +45,7 @@ const TeamSection: React.FC<TeamSectionProps> = ({
                 {assignedIds.map(uid => {
                     const u = allUsers.find(x => x.id === uid);
                     if (!u) return null;
-                    // Hide remove button for the connected user if they are the creator
-                    const isCreatorSelf = uid === creatorId && uid === currentUserId;
-                    const canRemove = canEdit && !isCreatorSelf;
+                    const canRemove = canEdit;
                     return (
                         <div key={uid} className="relative group/av">
                             <Avatar userId={u.id} name={u.name} color={u.avatarColor} size={34} />
@@ -953,16 +949,12 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                             {(() => {
                                 const assignedIds = selectedProject.assignedUsers || [];
                                 const unassignedUsers = users.filter(u => !assignedIds.includes(u.id));
-                                // creator = first assigned user (set at creation time)
-                                const creatorId = assignedIds[0];
                                 return (
                                     <TeamSection
                                         assignedIds={assignedIds}
                                         unassignedUsers={unassignedUsers}
                                         allUsers={users}
                                         canEdit={canEdit}
-                                        currentUserId={user?.id ?? ''}
-                                        creatorId={creatorId}
                                         showDropdown={showTeamDropdown}
                                         setShowDropdown={setShowTeamDropdown}
                                         onAdd={addAssignedUser}
