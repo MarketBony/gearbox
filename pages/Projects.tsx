@@ -8,7 +8,7 @@ import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLOR
 import {
     Plus, Save, Trash2, FolderKanban, CheckCircle2, Circle, PlayCircle,
     CalendarCheck, Coins, TrendingUp, TrendingDown, Search, Filter, X,
-    Archive, AlertTriangle, ArrowRight, Wallet, ArrowUp, ArrowDown, Lock, ChevronDown, Check, PieChart, UserCircle
+    Archive, AlertTriangle, ArrowRight, Wallet, ArrowUp, ArrowDown, Lock, ChevronDown, ChevronRight, Check, PieChart, UserCircle
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 
@@ -109,6 +109,164 @@ const TeamSection: React.FC<TeamSectionProps> = ({
     );
 };
 
+// --- FILTER COMPONENTS ---
+const ALL_PROJ_PLAQUE_SITES = Object.values(PLAQUES_STRUCTURE).flat() as string[];
+const PROJ_SPECIAL_SITES: string[] = ['Alpine', 'Nissan'];
+
+interface ProjSitePickerProps { selected: string[]; onChange: (v: string[]) => void; }
+const ProjSitePicker: React.FC<ProjSitePickerProps> = ({ selected, onChange }) => {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const [expandedPlaques, setExpandedPlaques] = useState<Set<string>>(new Set(Object.keys(PLAQUES_STRUCTURE)));
+    const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+    const triggerRef = useRef<HTMLDivElement>(null);
+
+    const toggle = (site: string) =>
+        onChange(selected.includes(site) ? selected.filter(s => s !== site) : [...selected, site]);
+    const togglePlaque = (plaqueSites: string[]) => {
+        const allSel = plaqueSites.every(s => selected.includes(s));
+        if (allSel) onChange(selected.filter(s => !plaqueSites.includes(s)));
+        else onChange([...selected.filter(s => !plaqueSites.includes(s)), ...plaqueSites]);
+    };
+    const toggleExpandPlaque = (p: string) => {
+        const next = new Set(expandedPlaques);
+        next.has(p) ? next.delete(p) : next.add(p);
+        setExpandedPlaques(next);
+    };
+    const selectAll = () => onChange([...ALL_PROJ_PLAQUE_SITES, ...PROJ_SPECIAL_SITES]);
+    const clearAll = () => onChange([]);
+    const isAll = selected.length === 0;
+
+    const triggerLabel = isAll ? 'Tout le réseau' : selected.length === 1 ? selected[0] : `${selected.length} sites`;
+
+    const handleOpen = () => {
+        if (!open && triggerRef.current) {
+            const rect = triggerRef.current.getBoundingClientRect();
+            setPos({ top: rect.bottom + 8, left: rect.left });
+        }
+        setOpen(v => !v);
+    };
+
+    return (
+        <div ref={triggerRef} className="relative">
+            <div className="flex flex-col">
+                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Périmètre</span>
+                <button onClick={handleOpen} className="flex items-center gap-1.5 text-xs font-bold text-bony-orange hover:text-bony-violet transition whitespace-nowrap">
+                    {triggerLabel}
+                    <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
+            </div>
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-[9990]" onClick={() => setOpen(false)} />
+                    {(() => {
+                        const inner = (
+                            <>
+                                <div className="p-2 border-b border-bony-border shrink-0">
+                                    <div className="flex items-center gap-2 bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5">
+                                        <Search size={13} className="text-slate-500 shrink-0" />
+                                        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un site…" className="flex-1 bg-transparent text-xs text-bony-text outline-none placeholder-bony-muted" />
+                                        {search && <button onClick={() => setSearch('')}><X size={12} className="text-slate-400" /></button>}
+                                    </div>
+                                </div>
+                                <div className="flex gap-1 px-2 py-1.5 border-b border-bony-border shrink-0">
+                                    <button onClick={clearAll} className={`flex-1 text-[10px] font-bold py-1 rounded transition ${isAll ? 'bg-bony-orange/20 text-bony-orange border border-bony-orange/40' : 'text-slate-500 hover:text-bony-text hover:bg-white/5'}`}>Tout le réseau</button>
+                                    <button onClick={selectAll} className="flex-1 text-[10px] font-bold py-1 rounded text-slate-500 hover:text-bony-text hover:bg-white/5 transition">Tout sélectionner</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto custom-scrollbar py-1">
+                                    {Object.entries(PLAQUES_STRUCTURE).map(([plaqueName, sites]) => {
+                                        const filtered = sites.filter(s => !search || s.toLowerCase().includes(search.toLowerCase()));
+                                        if (search && filtered.length === 0) return null;
+                                        const expanded = expandedPlaques.has(plaqueName);
+                                        const allSel = sites.every(s => selected.includes(s));
+                                        const someSel = sites.some(s => selected.includes(s));
+                                        return (
+                                            <div key={plaqueName}>
+                                                <div className="flex items-center px-2 py-1">
+                                                    <button onClick={() => toggleExpandPlaque(plaqueName)} className="flex items-center gap-1 flex-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-bony-text transition">
+                                                        <ChevronRight size={11} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
+                                                        {plaqueName}
+                                                    </button>
+                                                    <button onClick={() => togglePlaque(sites as string[])} className={`w-4 h-4 rounded border flex items-center justify-center transition ${allSel ? 'bg-bony-orange border-bony-orange' : someSel ? 'bg-bony-orange/30 border-bony-orange/50' : 'border-bony-border hover:border-bony-orange/50'}`}>
+                                                        {(allSel || someSel) && <Check size={10} className="text-white" />}
+                                                    </button>
+                                                </div>
+                                                {(expanded || search) && (search ? filtered : sites).map(site => (
+                                                    <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                                                        <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
+                                                        {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        );
+                                    })}
+                                    <div>
+                                        <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Entités Spécifiques</div>
+                                        {PROJ_SPECIAL_SITES.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
+                                            <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                                                <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
+                                                {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        );
+                        return (
+                            <>
+                                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] bg-bony-panel border-t border-bony-border shadow-2xl overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">{inner}</div>
+                                <div className="hidden sm:flex fixed z-[9999] bg-bony-panel border border-bony-border rounded-xl shadow-2xl overflow-hidden flex-col w-64 max-h-80" style={{ top: pos.top, left: pos.left }}>{inner}</div>
+                            </>
+                        );
+                    })()}
+                </>
+            )}
+        </div>
+    );
+};
+
+const PROJ_BRAND_CHIPS: BrandType[] = ['Renault', 'Dacia', 'Alpine', 'Nissan', 'Mobilize'];
+interface ProjBrandPickerProps { selected: BrandType[]; onChange: (v: BrandType[]) => void; }
+const ProjBrandPicker: React.FC<ProjBrandPickerProps> = ({ selected, onChange }) => {
+    const isAll = selected.length === 0;
+    const toggle = (b: BrandType) => onChange(selected.includes(b) ? selected.filter(x => x !== b) : [...selected, b]);
+    return (
+        <div className="flex flex-col gap-1">
+            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Marque</span>
+            <div className="flex flex-wrap gap-1.5">
+                <button onClick={() => onChange([])} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${isAll ? 'bg-bony-gradient border-transparent text-white shadow' : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'}`}>Toutes</button>
+                {PROJ_BRAND_CHIPS.map(b => {
+                    const active = selected.includes(b);
+                    return (
+                        <button key={b} onClick={() => toggle(b)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${active ? `${BRAND_COLORS[b]} scale-105 shadow` : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'}`}>{b}</button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+const PROJ_SERVICE_CHIPS: ServiceType[] = ['VN', 'VO', 'APV', 'PR'];
+interface ProjServicePickerProps { selected: ServiceType[]; onChange: (v: ServiceType[]) => void; }
+const ProjServicePicker: React.FC<ProjServicePickerProps> = ({ selected, onChange }) => {
+    const isAll = selected.length === 0;
+    const toggle = (s: ServiceType) => onChange(selected.includes(s) ? selected.filter(x => x !== s) : [...selected, s]);
+    return (
+        <div className="flex flex-col gap-1">
+            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Service</span>
+            <div className="flex flex-wrap gap-1.5">
+                <button onClick={() => onChange([])} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${isAll ? 'bg-bony-gradient border-transparent text-white shadow' : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'}`}>Tous</button>
+                {PROJ_SERVICE_CHIPS.map(s => {
+                    const active = selected.includes(s);
+                    return (
+                        <button key={s} onClick={() => toggle(s)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${active ? `${SERVICE_COLORS[s]} scale-105 shadow` : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'}`}>{s}</button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 interface ProjectsProps {
     viewMode?: 'current' | 'archived';
 }
@@ -141,13 +299,11 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   // --- FILTER STATES ---
   const [showFilters, setShowFilters] = useSessionState<boolean>(`projects_${viewMode}_showFilters`, false);
   const [searchTerm, setSearchTerm] = useSessionState<string>(`projects_${viewMode}_searchTerm`, '');
-  const [filterContext, setFilterContext] = useSessionState<string>(`projects_${viewMode}_filterContext`, 'All');
-  const [filterService, setFilterService] = useSessionState<ServiceType | 'All'>(`projects_${viewMode}_filterService`, 'All');
-  const [filterBrand, setFilterBrand] = useSessionState<BrandType | 'All'>(`projects_${viewMode}_filterBrand`, 'All');
+  const [filterSites, setFilterSites] = useSessionState<string[]>(`projects_${viewMode}_filterSites`, []);
+  const [filterBrands, setFilterBrands] = useSessionState<BrandType[]>(`projects_${viewMode}_filterBrands`, []);
+  const [filterServices, setFilterServices] = useSessionState<ServiceType[]>(`projects_${viewMode}_filterServices`, []);
   const [filterType, setFilterType] = useSessionState<ProjectType | 'All'>(`projects_${viewMode}_filterType`, 'All');
   const [filterStatus, setFilterStatus] = useSessionState<string>(`projects_${viewMode}_filterStatus`, 'All');
-  const [filterStartDate, setFilterStartDate] = useSessionState<string>(`projects_${viewMode}_filterStartDate`, '');
-  const [filterEndDate, setFilterEndDate] = useSessionState<string>(`projects_${viewMode}_filterEndDate`, '');
   const [sortOrder, setSortOrder] = useSessionState<'asc' | 'desc'>(`projects_${viewMode}_sortOrder`, 'desc');
 
   const scrollRef = useScrollRestore(`projects_${viewMode}`);
@@ -443,36 +599,33 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
         if (viewMode === 'archived' && p.status !== 'Archived') return false;
 
         if (searchTerm && !p.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-        
-        if (filterContext !== 'All') {
-            const isGroup = filterContext === 'GROUPE BONY';
-            const isPlaque = Object.keys(PLAQUES_STRUCTURE).includes(filterContext);
-            if (!isGroup) {
+
+        if (filterSites.length > 0) {
+            const matchesSite = filterSites.some(sel => {
+                if (sel === 'GROUPE BONY') return true;
+                const isPlaque = Object.keys(PLAQUES_STRUCTURE).includes(sel);
                 if (isPlaque) {
-                     const sitesInPlaque = PLAQUES_STRUCTURE[filterContext as PlaqueName];
-                     const match = p.site === filterContext || sitesInPlaque.includes(p.site as Site);
-                     if (!match) return false;
-                } else {
-                     if (p.site !== filterContext) return false;
+                    const sitesInPlaque = PLAQUES_STRUCTURE[sel as PlaqueName];
+                    return p.site === sel || sitesInPlaque.includes(p.site as Site);
                 }
-            }
+                return p.site === sel;
+            });
+            if (!matchesSite) return false;
         }
 
-        if (filterService !== 'All') {
-            const hasService = p.service.includes(filterService) || p.service.includes('Tous Services');
+        if (filterServices.length > 0) {
+            const hasService = filterServices.some(s => p.service.includes(s) || p.service.includes('Tous Services'));
             if (!hasService) return false;
         }
 
-        if (filterBrand !== 'All') {
-             const pBrands = p.brands || [];
-             const hasBrand = pBrands.includes(filterBrand) || pBrands.includes('Groupe');
-             if (!hasBrand) return false;
+        if (filterBrands.length > 0) {
+            const pBrands = p.brands || [];
+            const hasBrand = filterBrands.some(b => pBrands.includes(b) || pBrands.includes('Groupe'));
+            if (!hasBrand) return false;
         }
 
         if (filterType !== 'All' && p.projectType !== filterType) return false;
         if (filterStatus !== 'All' && p.status !== filterStatus) return false;
-        if (filterStartDate && p.endDate < filterStartDate) return false;
-        if (filterEndDate && p.startDate > filterEndDate) return false;
 
         return true;
     });
@@ -483,7 +636,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
         return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
     });
 
-  }, [projects, viewMode, searchTerm, filterContext, filterService, filterBrand, filterType, filterStatus, filterStartDate, filterEndDate, sortOrder]);
+  }, [projects, viewMode, searchTerm, filterSites, filterServices, filterBrands, filterType, filterStatus, sortOrder]);
 
   const budgetVariance = selectedProject ? (selectedProject.budgetPlanned - selectedProject.budgetActual) : 0;
   const isUnderBudget = budgetVariance >= 0;
@@ -491,15 +644,16 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
     ? Math.abs((budgetVariance / selectedProject.budgetPlanned) * 100).toFixed(1) 
     : '0.0';
 
+  const activeFilterCount = filterSites.length + filterBrands.length + filterServices.length
+      + (filterType !== 'All' ? 1 : 0) + (filterStatus !== 'All' ? 1 : 0);
+
   const resetFilters = () => {
       setSearchTerm('');
-      setFilterContext('All');
-      setFilterService('All');
-      setFilterBrand('All');
+      setFilterSites([]);
+      setFilterBrands([]);
+      setFilterServices([]);
       setFilterType('All');
       setFilterStatus('All');
-      setFilterStartDate('');
-      setFilterEndDate('');
       setSortOrder('desc');
   };
 
@@ -589,12 +743,15 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                     {viewMode === 'archived' ? 'Archives' : 'Projets'}
                 </h2>
                 <div className="flex gap-2">
-                    <button 
+                    <button
                         onClick={() => setShowFilters(!showFilters)}
-                        className={`p-2 rounded-lg transition border ${showFilters ? 'bg-bony-orange text-white border-bony-orange' : 'bg-slate-100 dark:bg-black/30 text-slate-500 border-bony-border hover:text-bony-text'}`}
+                        className={`relative p-2 rounded-lg transition border ${showFilters || activeFilterCount > 0 ? 'bg-bony-orange text-white border-bony-orange' : 'bg-slate-100 dark:bg-black/30 text-slate-500 border-bony-border hover:text-bony-text'}`}
                         title="Filtres avancés"
                     >
                         {showFilters ? <X size={20} /> : <Filter size={20} />}
+                        {!showFilters && activeFilterCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 bg-bony-orange text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-bony-panel">{activeFilterCount}</span>
+                        )}
                     </button>
                     {viewMode === 'current' && canEdit && (
                         <button
@@ -620,11 +777,12 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
         </div>
 
         {showFilters && (
-            <div className="bg-slate-50 dark:bg-black/40 border-b border-bony-border p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                
+            <div className="bg-slate-50 dark:bg-black/40 border-b border-bony-border p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
+
+                {/* Sort row */}
                 <div className="flex justify-between items-center pb-2 border-b border-bony-border">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Trier par date</label>
-                    <button 
+                    <button
                         onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
                         className="flex items-center gap-2 text-xs font-bold text-bony-text bg-white dark:bg-black/30 px-3 py-1.5 rounded border border-bony-border hover:border-bony-orange transition"
                     >
@@ -633,19 +791,26 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                     </button>
                 </div>
 
+                {/* Périmètre */}
+                <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Périmètre</label>
+                    <ProjSitePicker selected={filterSites} onChange={setFilterSites} />
+                </div>
+
+                {/* Marques */}
+                <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Marques</label>
+                    <ProjBrandPicker selected={filterBrands} onChange={setFilterBrands} />
+                </div>
+
+                {/* Services */}
+                <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Services</label>
+                    <ProjServicePicker selected={filterServices} onChange={setFilterServices} />
+                </div>
+
+                {/* Type + Statut */}
                 <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Plaque / Site</label>
-                        <select value={filterContext} onChange={(e) => setFilterContext(e.target.value)} className="w-full bg-bony-panel border border-bony-border rounded p-2 text-[10px] text-bony-text outline-none focus:border-bony-blue">
-                            <option value="All">TOUT LE RÉSEAU</option>
-                            {Object.entries(PLAQUES_STRUCTURE).map(([plaqueName, sites]) => (
-                                <optgroup key={plaqueName} label={plaqueName}>
-                                    <option value={plaqueName}>★ {plaqueName}</option>
-                                    {sites.map(site => <option key={site} value={site}>{site}</option>)}
-                                </optgroup>
-                            ))}
-                        </select>
-                    </div>
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase">Objet (Type)</label>
                         <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="w-full bg-bony-panel border border-bony-border rounded p-2 text-[10px] text-bony-text outline-none focus:border-bony-blue">
@@ -654,20 +819,17 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                         </select>
                     </div>
                     <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Marque</label>
-                        <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value as any)} className="w-full bg-bony-panel border border-bony-border rounded p-2 text-[10px] text-bony-text outline-none focus:border-bony-blue">
-                            <option value="All">TOUTES MARQUES</option>
-                            {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
-                        </select>
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Service</label>
-                        <select value={filterService} onChange={(e) => setFilterService(e.target.value as any)} className="w-full bg-bony-panel border border-bony-border rounded p-2 text-[10px] text-bony-text outline-none focus:border-bony-blue">
-                            <option value="All">TOUS SERVICES</option>
-                            {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Statut</label>
+                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full bg-bony-panel border border-bony-border rounded p-2 text-[10px] text-bony-text outline-none focus:border-bony-blue">
+                            <option value="All">TOUS STATUTS</option>
+                            <option value="Draft">Brouillon</option>
+                            <option value="Active">Actif</option>
+                            <option value="Done">Terminé</option>
+                            {viewMode === 'archived' && <option value="Archived">Archivé</option>}
                         </select>
                     </div>
                 </div>
+
                 <div className="flex justify-between items-center pt-2 border-t border-bony-border">
                     <button onClick={resetFilters} className="text-[10px] font-bold text-slate-500 hover:text-bony-text underline">RÉINITIALISER</button>
                     <div className="text-[10px] font-sans text-bony-orange">{filteredProjects.length} RÉSULTAT(S)</div>
