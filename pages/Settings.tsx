@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
 import { User, UserRole } from '../types';
-import { Save, User as UserIcon, Lock, Shield, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn } from 'lucide-react';
+import { Save, User as UserIcon, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import Avatar, { avatarKey } from '../components/Avatar';
 
@@ -31,12 +31,13 @@ const getCroppedImg = (imageSrc: string, cropPixels: CropArea): Promise<string> 
     img.src = imageSrc;
   });
 
-// --- Avatar Upload Modal ---
+// --- Shared Avatar Upload Modal ---
 interface AvatarModalProps {
   userId: string;
+  userName: string;
   onClose: () => void;
 }
-const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, onClose }) => {
+const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, userName, onClose }) => {
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState<CropPoint>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -90,22 +91,24 @@ const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, onClose }) => {
   return (
     <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-bony-panel border border-bony-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
+        className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-bony-border">
-          <h3 className="font-title text-bony-text flex items-center gap-2">
-            <Camera size={18} className="text-bony-orange" /> Photo de profil
-          </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-bony-text transition">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-bony-border">
+          <div>
+            <h3 className="font-title text-slate-900 dark:text-bony-text flex items-center gap-2">
+              <Camera size={18} className="text-bony-orange" /> Photo de profil
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-bony-muted mt-0.5">{userName}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-bony-text transition">
             <X size={20} />
           </button>
         </div>
 
         <div className="p-5 space-y-4">
           {!cropSrc ? (
-            /* Drop zone */
             <div
               onDragOver={e => { e.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
@@ -114,14 +117,14 @@ const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, onClose }) => {
               className={`h-44 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3 cursor-pointer transition-all ${
                 dragging
                   ? 'border-bony-orange bg-bony-orange/10'
-                  : 'border-bony-border hover:border-bony-orange/60 hover:bg-white/3'
+                  : 'border-slate-300 dark:border-bony-border hover:border-bony-orange/60 hover:bg-slate-50 dark:hover:bg-white/3'
               }`}
             >
-              <Upload size={32} className={`transition-colors ${dragging ? 'text-bony-orange' : 'text-slate-500'}`} />
+              <Upload size={32} className={`transition-colors ${dragging ? 'text-bony-orange' : 'text-slate-400'}`} />
               <div className="text-center">
-                <p className="text-sm font-bold text-bony-text">Glisser une photo ici</p>
-                <p className="text-[11px] text-bony-muted mt-0.5">ou cliquer pour parcourir</p>
-                <p className="text-[10px] text-slate-600 mt-1">jpg, png, webp — max 2 Mo</p>
+                <p className="text-sm font-bold text-slate-700 dark:text-bony-text">Glisser une photo ici</p>
+                <p className="text-[11px] text-slate-500 dark:text-bony-muted mt-0.5">ou cliquer pour parcourir</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-1">jpg, png, webp — max 2 Mo</p>
               </div>
               <input
                 ref={fileInputRef}
@@ -132,7 +135,6 @@ const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, onClose }) => {
               />
             </div>
           ) : (
-            /* Cropper */
             <div className="space-y-3">
               <div className="relative h-64 rounded-xl overflow-hidden bg-black">
                 <Cropper
@@ -147,14 +149,11 @@ const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, onClose }) => {
                   onCropComplete={(_: unknown, pixels: CropArea) => setCroppedAreaPixels(pixels)}
                 />
               </div>
-              {/* Zoom slider */}
               <div className="flex items-center gap-3">
-                <ZoomIn size={14} className="text-slate-500 shrink-0" />
+                <ZoomIn size={14} className="text-slate-400 shrink-0" />
                 <input
                   type="range"
-                  min={1}
-                  max={3}
-                  step={0.05}
+                  min={1} max={3} step={0.05}
                   value={zoom}
                   onChange={e => setZoom(Number(e.target.value))}
                   className="flex-1 accent-bony-orange"
@@ -162,18 +161,15 @@ const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, onClose }) => {
               </div>
               <button
                 onClick={() => setCropSrc(null)}
-                className="text-[11px] text-slate-500 hover:text-bony-text transition underline"
+                className="text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-bony-text transition underline"
               >
                 Choisir une autre photo
               </button>
             </div>
           )}
 
-          {error && (
-            <p className="text-xs text-red-400 font-bold">{error}</p>
-          )}
+          {error && <p className="text-xs text-red-500 font-bold">{error}</p>}
 
-          {/* Actions */}
           <div className="flex gap-2 pt-1">
             {cropSrc && (
               <button
@@ -186,13 +182,13 @@ const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, onClose }) => {
             {hasExistingPhoto && (
               <button
                 onClick={handleDelete}
-                className="flex-1 py-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 text-sm font-bold hover:bg-red-500/20 transition flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 text-sm font-bold hover:bg-red-500/20 transition flex items-center justify-center gap-2"
               >
                 <Trash2 size={16} /> Supprimer la photo
               </button>
             )}
             {!cropSrc && !hasExistingPhoto && (
-              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-white/5 text-slate-400 text-sm font-bold hover:bg-white/10 transition">
+              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 text-sm font-bold hover:bg-slate-200 dark:hover:bg-white/10 transition">
                 Annuler
               </button>
             )}
@@ -203,7 +199,20 @@ const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, onClose }) => {
   );
 };
 
-// --- Main Settings component ---
+// --- Role badge helper ---
+const RoleBadge: React.FC<{ role: string }> = ({ role }) => {
+  const cls =
+    role === 'Master'
+      ? 'border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10'
+      : role === 'Administrator'
+        ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10'
+        : 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10';
+  return (
+    <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${cls}`}>{role}</span>
+  );
+};
+
+// --- Main Settings ---
 const Settings: React.FC = () => {
   const { user, updateProfile } = useAuth();
 
@@ -218,6 +227,8 @@ const Settings: React.FC = () => {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [isAddingUser, setIsAddingUser] = useState(false);
+  // Avatar modal for master managing other users
+  const [avatarTargetUser, setAvatarTargetUser] = useState<User | null>(null);
 
   useEffect(() => {
     if (user?.role === 'Master') loadAllUsers();
@@ -247,17 +258,10 @@ const Settings: React.FC = () => {
       }
     }
 
-    const updatedUser: User = {
-      ...user,
-      name,
-      password: newPassword ? newPassword : user.password
-    };
-
+    const updatedUser: User = { ...user, name, password: newPassword ? newPassword : user.password };
     await updateProfile(updatedUser);
     setProfileMsg({ type: 'success', text: 'Profil mis à jour avec succès.' });
-    setOldPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    setOldPassword(''); setNewPassword(''); setConfirmPassword('');
   };
 
   const startEdit = (targetUser: User) => {
@@ -266,11 +270,7 @@ const Settings: React.FC = () => {
     setIsAddingUser(false);
   };
 
-  const cancelEdit = () => {
-    setEditingUserId(null);
-    setEditForm({});
-    setIsAddingUser(false);
-  };
+  const cancelEdit = () => { setEditingUserId(null); setEditForm({}); setIsAddingUser(false); };
 
   const saveUser = async () => {
     if (!editForm.name || !editForm.loginId || !editForm.role) return;
@@ -300,14 +300,18 @@ const Settings: React.FC = () => {
 
   if (!user) return null;
 
+  // Input classes
+  const inputCls = 'w-full bg-white dark:bg-black/30 border border-slate-300 dark:border-bony-border rounded p-2 text-slate-900 dark:text-white text-sm outline-none focus:border-bony-orange transition';
+  const tableInputCls = 'bg-white dark:bg-black/40 border border-bony-orange/50 rounded p-1 text-slate-900 dark:text-white w-full text-sm';
+
   return (
-    <div className="p-3 md:p-8 h-screen overflow-y-auto custom-scrollbar bg-bony-dark animate-fade-in pb-20">
-      <h2 className="text-xl md:text-3xl text-white font-title mb-8 flex items-center gap-3">
+    <div className="p-3 md:p-8 h-screen overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-bony-dark animate-fade-in pb-20">
+      <h2 className="text-xl md:text-3xl text-slate-900 dark:text-white font-title mb-8 flex items-center gap-3">
         <UserIcon className="text-bony-violet" size={32} /> Paramètres du Compte
       </h2>
 
       {/* SECTION 1: MY PROFILE */}
-      <div className="max-w-4xl mx-auto bg-bony-panel border border-bony-border rounded-xl p-6 mb-10 shadow-lg relative overflow-hidden">
+      <div className="max-w-4xl mx-auto bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-xl p-6 mb-10 shadow-sm dark:shadow-lg relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full bg-bony-gradient" />
 
         <div className="flex items-start gap-6 mb-6">
@@ -323,17 +327,9 @@ const Settings: React.FC = () => {
             </div>
           </button>
           <div>
-            <h3 className="text-xl font-bold text-white">{user.name}</h3>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">{user.name}</h3>
             <div className="flex items-center gap-2 mt-1">
-              <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${
-                user.role === 'Master'
-                  ? 'border-purple-500 text-purple-400 bg-purple-500/10'
-                  : user.role === 'Administrator'
-                    ? 'border-blue-500 text-blue-400 bg-blue-500/10'
-                    : 'border-emerald-500 text-emerald-400 bg-emerald-500/10'
-              }`}>
-                {user.role}
-              </span>
+              <RoleBadge role={user.role} />
               <span className="text-xs text-slate-500">ID: {user.loginId}</span>
             </div>
             <button
@@ -347,60 +343,43 @@ const Settings: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-4">
-            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest border-b border-white/5 pb-2">Identité</h4>
+            <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-200 dark:border-white/5 pb-2">
+              Identité
+            </h4>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Nom affiché</label>
-              <input
-                type="text"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                className="w-full bg-black/30 border border-bony-border rounded p-2 text-white text-sm outline-none focus:border-bony-violet"
-              />
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-500 mb-1">Nom affiché</label>
+              <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputCls} />
             </div>
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest border-b border-white/5 pb-2">Sécurité</h4>
+            <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-200 dark:border-white/5 pb-2">
+              Sécurité
+            </h4>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Ancien mot de passe</label>
-              <input
-                type="password"
-                value={oldPassword}
-                onChange={e => setOldPassword(e.target.value)}
-                placeholder="Requis pour changer"
-                className="w-full bg-black/30 border border-bony-border rounded p-2 text-white text-sm outline-none focus:border-bony-orange"
-              />
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-500 mb-1">Ancien mot de passe</label>
+              <input type="password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} placeholder="Requis pour changer" className={inputCls} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Nouveau mot de passe</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  className="w-full bg-black/30 border border-bony-border rounded p-2 text-white text-sm outline-none focus:border-bony-orange"
-                />
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-500 mb-1">Nouveau mot de passe</label>
+                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Confirmer</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  className="w-full bg-black/30 border border-bony-border rounded p-2 text-white text-sm outline-none focus:border-bony-orange"
-                />
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-500 mb-1">Confirmer</label>
+                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={inputCls} />
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-8 pt-4 border-t border-white/5">
-          <div className={`text-xs font-bold ${profileMsg.type === 'error' ? 'text-red-400' : 'text-emerald-400'}`}>
+        <div className="flex items-center justify-between mt-8 pt-4 border-t border-slate-200 dark:border-white/5">
+          <div className={`text-xs font-bold ${profileMsg.type === 'error' ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
             {profileMsg.text}
           </div>
           <button
             onClick={handleUpdateProfile}
-            className="px-6 py-2 min-h-[44px] bg-bony-gradient text-white font-bold rounded-lg shadow-lg hover:opacity-90 transition flex items-center gap-2"
+            className="px-6 py-2 min-h-[44px] bg-bony-gradient text-white font-bold rounded-lg shadow hover:opacity-90 transition flex items-center gap-2"
           >
             <Save size={16} /> Enregistrer mon profil
           </button>
@@ -409,22 +388,22 @@ const Settings: React.FC = () => {
 
       {/* SECTION 2: USER MANAGEMENT (MASTER ONLY) */}
       {user.role === 'Master' && (
-        <div className="max-w-6xl mx-auto mt-12 animate-in slide-in-from-bottom-4">
+        <div className="max-w-6xl mx-auto mt-12">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+            <h3 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <ShieldAlert className="text-red-500" size={24} /> Gestion des Utilisateurs (Master)
             </h3>
             <button
               onClick={() => { setIsAddingUser(true); setEditingUserId('new'); setEditForm({ role: 'Coordinator', password: 'admin' }); }}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold uppercase flex items-center gap-2 border border-white/10 transition"
+              className="px-4 py-2 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white rounded-lg text-xs font-bold uppercase flex items-center gap-2 border border-slate-300 dark:border-white/10 transition"
             >
               <Plus size={16} /> Nouvel Utilisateur
             </button>
           </div>
 
-          <div className="bg-bony-panel border border-bony-border rounded-xl overflow-hidden shadow-lg overflow-x-auto">
+          <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-xl overflow-hidden shadow-sm dark:shadow-lg overflow-x-auto">
             <table className="w-full text-left">
-              <thead className="bg-black/30 text-xs font-bold text-slate-500 uppercase tracking-widest">
+              <thead className="bg-slate-50 dark:bg-black/30 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 dark:border-bony-border">
                 <tr>
                   <th className="p-4 w-16"></th>
                   <th className="p-4">Nom</th>
@@ -434,87 +413,100 @@ const Settings: React.FC = () => {
                   <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 text-sm">
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-sm">
+
+                {/* ADD NEW ROW */}
                 {isAddingUser && (
                   <tr className="bg-bony-orange/10 border-l-4 border-bony-orange">
                     <td className="p-4 text-center"><Plus size={16} className="text-bony-orange" /></td>
                     <td className="p-4">
-                      <input className="bg-black/40 border border-bony-orange/50 rounded p-1 text-white w-full" placeholder="Nom complet" autoFocus value={editForm.name || ''} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+                      <input className={tableInputCls} placeholder="Nom complet" autoFocus value={editForm.name || ''} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
                     </td>
                     <td className="p-4">
-                      <input className="bg-black/40 border border-bony-orange/50 rounded p-1 text-white w-full" placeholder="ID" value={editForm.loginId || ''} onChange={e => setEditForm({ ...editForm, loginId: e.target.value })} />
+                      <input className={tableInputCls} placeholder="ID" value={editForm.loginId || ''} onChange={e => setEditForm({ ...editForm, loginId: e.target.value })} />
                     </td>
                     <td className="p-4">
-                      <select className="bg-black/40 border border-bony-orange/50 rounded p-1 text-white w-full" value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value as UserRole })}>
+                      <select className={tableInputCls} value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value as UserRole })}>
                         <option value="Master">Master</option>
                         <option value="Administrator">Administrator</option>
                         <option value="Coordinator">Coordinator</option>
                       </select>
                     </td>
                     <td className="p-4">
-                      <input className="bg-black/40 border border-bony-orange/50 rounded p-1 text-white w-full" placeholder="Mot de passe" value={editForm.password || ''} onChange={e => setEditForm({ ...editForm, password: e.target.value })} />
+                      <input className={tableInputCls} placeholder="Mot de passe" value={editForm.password || ''} onChange={e => setEditForm({ ...editForm, password: e.target.value })} />
                     </td>
-                    <td className="p-4 text-right flex justify-end gap-2">
-                      <button onClick={saveUser} className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded hover:bg-emerald-500/40"><Check size={16} /></button>
-                      <button onClick={cancelEdit} className="p-1.5 bg-red-500/20 text-red-400 rounded hover:bg-red-500/40"><X size={16} /></button>
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button onClick={saveUser} className="p-1.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded hover:bg-emerald-500/30"><Check size={16} /></button>
+                        <button onClick={cancelEdit} className="p-1.5 bg-red-500/20 text-red-500 rounded hover:bg-red-500/30"><X size={16} /></button>
+                      </div>
                     </td>
                   </tr>
                 )}
 
+                {/* LIST USERS */}
                 {allUsers.map(u => {
                   const isEditing = editingUserId === u.id;
+
                   if (isEditing) {
+                    const editInputCls = 'bg-white dark:bg-black/40 border border-blue-500/50 rounded p-1 text-slate-900 dark:text-white w-full text-sm';
                     return (
-                      <tr key={u.id} className="bg-blue-500/10 border-l-4 border-blue-500">
-                        <td className="p-4 text-center"><Edit2 size={16} className="text-blue-400" /></td>
+                      <tr key={u.id} className="bg-blue-50 dark:bg-blue-500/10 border-l-4 border-blue-500">
+                        <td className="p-4 text-center"><Edit2 size={16} className="text-blue-500" /></td>
                         <td className="p-4">
-                          <input className="bg-black/40 border border-blue-500/50 rounded p-1 text-white w-full" value={editForm.name || ''} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+                          <input className={editInputCls} value={editForm.name || ''} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
                         </td>
                         <td className="p-4">
-                          <input className="bg-black/40 border border-blue-500/50 rounded p-1 text-white w-full" value={editForm.loginId || ''} onChange={e => setEditForm({ ...editForm, loginId: e.target.value })} />
+                          <input className={editInputCls} value={editForm.loginId || ''} onChange={e => setEditForm({ ...editForm, loginId: e.target.value })} />
                         </td>
                         <td className="p-4">
-                          <select className="bg-black/40 border border-blue-500/50 rounded p-1 text-white w-full" value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value as UserRole })}>
+                          <select className={editInputCls} value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value as UserRole })}>
                             <option value="Master">Master</option>
                             <option value="Administrator">Administrator</option>
                             <option value="Coordinator">Coordinator</option>
                           </select>
                         </td>
                         <td className="p-4">
-                          <input className="bg-black/40 border border-blue-500/50 rounded p-1 text-white w-full" placeholder="Laisser vide si inchangé" value={editForm.password || ''} onChange={e => setEditForm({ ...editForm, password: e.target.value })} />
+                          <input className={editInputCls} placeholder="Laisser vide si inchangé" value={editForm.password || ''} onChange={e => setEditForm({ ...editForm, password: e.target.value })} />
                         </td>
-                        <td className="p-4 text-right flex justify-end gap-2">
-                          <button onClick={saveUser} className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded hover:bg-emerald-500/40"><Check size={16} /></button>
-                          <button onClick={cancelEdit} className="p-1.5 bg-red-500/20 text-red-400 rounded hover:bg-red-500/40"><X size={16} /></button>
+                        <td className="p-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button onClick={saveUser} className="p-1.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded hover:bg-emerald-500/30"><Check size={16} /></button>
+                            <button onClick={cancelEdit} className="p-1.5 bg-red-500/20 text-red-500 rounded hover:bg-red-500/30"><X size={16} /></button>
+                          </div>
                         </td>
                       </tr>
                     );
                   }
 
                   return (
-                    <tr key={u.id} className="hover:bg-white/5 transition group">
+                    <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition group">
                       <td className="p-4">
-                        <Avatar userId={u.id} name={u.name} color={u.avatarColor} size={32} />
+                        {/* Clickable avatar for master to change profile photo */}
+                        <button
+                          onClick={() => setAvatarTargetUser(u)}
+                          className="relative group/av rounded-full focus:outline-none"
+                          title="Modifier la photo de profil"
+                        >
+                          <Avatar userId={u.id} name={u.name} color={u.avatarColor} size={36} />
+                          <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover/av:opacity-100 transition-opacity flex items-center justify-center">
+                            <Camera size={13} className="text-white" />
+                          </div>
+                        </button>
                       </td>
-                      <td className="p-4 font-bold text-slate-200">{u.name}</td>
-                      <td className="p-4 font-sans text-slate-400">{u.loginId}</td>
-                      <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${
-                          u.role === 'Master'
-                            ? 'border-purple-500 text-purple-400'
-                            : u.role === 'Administrator'
-                              ? 'border-blue-500 text-blue-400'
-                              : 'border-emerald-500 text-emerald-400'
-                        }`}>
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="p-4 text-slate-600 font-sans text-xs">••••••</td>
+                      <td className="p-4 font-bold text-slate-800 dark:text-slate-200">{u.name}</td>
+                      <td className="p-4 font-sans text-slate-500 dark:text-slate-400">{u.loginId}</td>
+                      <td className="p-4"><RoleBadge role={u.role} /></td>
+                      <td className="p-4 text-slate-400 dark:text-slate-600 font-sans text-xs">••••••</td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition">
-                          <button onClick={() => startEdit(u)} className="p-1.5 hover:bg-white/10 rounded text-slate-300"><Edit2 size={16} /></button>
+                          <button onClick={() => startEdit(u)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded text-slate-500 dark:text-slate-300">
+                            <Edit2 size={16} />
+                          </button>
                           {u.role !== 'Master' && (
-                            <button onClick={() => deleteUser(u.id)} className="p-1.5 hover:bg-red-500/20 rounded text-red-400"><Trash2 size={16} /></button>
+                            <button onClick={() => deleteUser(u.id)} className="p-1.5 hover:bg-red-500/20 rounded text-red-500">
+                              <Trash2 size={16} />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -527,8 +519,22 @@ const Settings: React.FC = () => {
         </div>
       )}
 
+      {/* Avatar modal — own profile */}
       {showAvatarModal && (
-        <AvatarUploadModal userId={user.id} onClose={() => setShowAvatarModal(false)} />
+        <AvatarUploadModal
+          userId={user.id}
+          userName={user.name}
+          onClose={() => setShowAvatarModal(false)}
+        />
+      )}
+
+      {/* Avatar modal — master editing another user */}
+      {avatarTargetUser && (
+        <AvatarUploadModal
+          userId={avatarTargetUser.id}
+          userName={avatarTargetUser.name}
+          onClose={() => setAvatarTargetUser(null)}
+        />
       )}
     </div>
   );
