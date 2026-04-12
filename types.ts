@@ -43,6 +43,7 @@ export interface Task {
   channel: TaskChannel;
   cost: number;
   status: TaskStatus;
+  assignedUserId?: string;
   // --- New Fields for Campaign Management ---
   volumetry?: number;
   openRate?: number;
@@ -70,6 +71,7 @@ export interface Project {
   description: string;
   progress: number;
   tasks: Task[];
+  assignedUsers?: string[];
 }
 
 export interface Campaign {

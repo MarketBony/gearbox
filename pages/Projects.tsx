@@ -1,15 +1,16 @@
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { Project, Task, TaskStatus, ServiceType, PlaqueName, Site, BrandType, ProjectType } from '../types';
+import { Project, Task, TaskStatus, ServiceType, PlaqueName, Site, BrandType, ProjectType, User } from '../types';
 import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, PROJECT_TYPES, TASK_CHANNELS, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, ALPINE_SITES, NISSAN_SITES } from '../constants';
-import { 
-    Plus, Save, Trash2, FolderKanban, CheckCircle2, Circle, PlayCircle, 
-    CalendarCheck, Coins, TrendingUp, TrendingDown, Search, Filter, X, 
-    Archive, AlertTriangle, ArrowRight, Wallet, ArrowUp, ArrowDown, Lock, ChevronDown, Check, PieChart
+import {
+    Plus, Save, Trash2, FolderKanban, CheckCircle2, Circle, PlayCircle,
+    CalendarCheck, Coins, TrendingUp, TrendingDown, Search, Filter, X,
+    Archive, AlertTriangle, ArrowRight, Wallet, ArrowUp, ArrowDown, Lock, ChevronDown, Check, PieChart, UserCircle
 } from 'lucide-react';
+import Avatar from '../components/Avatar';
 
 interface ProjectsProps {
     viewMode?: 'current' | 'archived';
@@ -27,6 +28,8 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   }, [SESSION_SELECTED_KEY]);
   const [saving, setSaving] = useState(false);
   const [showSiteDropdown, setShowSiteDropdown] = useState(false);
+  const [showTeamDropdown, setShowTeamDropdown] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
 
   // --- PERMISSIONS ---
   const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Coordinator';
@@ -52,6 +55,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
 
   useEffect(() => {
     loadProjects();
+    db.getUsers().then(setUsers);
 
     const handleNavigation = (e: CustomEvent) => {
         if (e.detail && e.detail.projectId) {
@@ -181,7 +185,8 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
       budgetActual: 0,
       description: '',
       progress: 0,
-      tasks: []
+      tasks: [],
+      assignedUsers: user ? [user.id] : [],
     };
     const updated = [...projects, newProject];
     setProjects(updated);
@@ -301,6 +306,22 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
       if (!selectedProject || !canEdit) return;
       const newTasks = selectedProject.tasks.filter(t => t.id !== taskId);
       handleUpdateProject({ ...selectedProject, tasks: newTasks });
+  };
+
+  const addAssignedUser = (userId: string) => {
+      if (!selectedProject || !canEdit) return;
+      const current = selectedProject.assignedUsers || [];
+      if (current.includes(userId)) return;
+      handleUpdateProject({ ...selectedProject, assignedUsers: [...current, userId] });
+      setShowTeamDropdown(false);
+  };
+
+  const removeAssignedUser = (userId: string) => {
+      if (!selectedProject || !canEdit) return;
+      const current = selectedProject.assignedUsers || [];
+      if (current.length <= 1) return;
+      if (!confirm('Retirer cet utilisateur du projet ?')) return;
+      handleUpdateProject({ ...selectedProject, assignedUsers: current.filter(id => id !== userId) });
   };
 
   const filteredProjects = useMemo(() => {
@@ -826,6 +847,74 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                 </div>
                             </div>
 
+                            {/* TEAM SECTION */}
+                            {(() => {
+                                const assignedIds = selectedProject.assignedUsers || [];
+                                const unassignedUsers = users.filter(u => !assignedIds.includes(u.id));
+                                return (
+                                    <div className="pt-2">
+                                        <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-3">Équipe projet</label>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            {assignedIds.map(uid => {
+                                                const u = users.find(x => x.id === uid);
+                                                if (!u) return null;
+                                                return (
+                                                    <div key={uid} className="relative group/av">
+                                                        <Avatar userId={u.id} name={u.name} color={u.avatarColor} size={34} />
+                                                        {/* Tooltip */}
+                                                        <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover/av:opacity-100 pointer-events-none z-20 shadow-lg">
+                                                            {u.name}<br/><span className="text-slate-400">{u.role}</span>
+                                                        </div>
+                                                        {canEdit && assignedIds.length > 1 && (
+                                                            <button
+                                                                onClick={() => removeAssignedUser(u.id)}
+                                                                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/av:opacity-100 transition shadow"
+                                                            >
+                                                                <X size={8} className="text-white" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                            {canEdit && unassignedUsers.length > 0 && (
+                                                <div className="relative">
+                                                    {showTeamDropdown && (
+                                                        <div className="fixed inset-0 z-[90]" onClick={() => setShowTeamDropdown(false)} />
+                                                    )}
+                                                    <button
+                                                        onClick={() => setShowTeamDropdown(v => !v)}
+                                                        className="w-[34px] h-[34px] rounded-full border-2 border-dashed border-bony-border text-slate-400 hover:border-bony-orange hover:text-bony-orange transition flex items-center justify-center"
+                                                        title="Ajouter un membre"
+                                                    >
+                                                        <Plus size={14} />
+                                                    </button>
+                                                    {showTeamDropdown && (
+                                                        <div className="absolute top-full left-0 mt-1.5 bg-white dark:bg-bony-panel border border-bony-border rounded-xl shadow-2xl z-[100] min-w-[180px] overflow-hidden">
+                                                            {unassignedUsers.map(u => (
+                                                                <button
+                                                                    key={u.id}
+                                                                    onClick={() => addAssignedUser(u.id)}
+                                                                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
+                                                                >
+                                                                    <Avatar userId={u.id} name={u.name} color={u.avatarColor} size={26} />
+                                                                    <div>
+                                                                        <p className="text-xs font-bold text-bony-text leading-tight">{u.name}</p>
+                                                                        <p className="text-[9px] text-bony-muted">{u.role}</p>
+                                                                    </div>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {assignedIds.length === 0 && (
+                                                <span className="text-xs text-slate-400 italic">Aucun membre assigné</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
                             {/* BUDGET ALLOCATION SECTION */}
                             {(selectedProject.sites && selectedProject.sites.length > 1) && (
                                 <div className="mt-6 pt-6 border-t border-bony-border animate-in fade-in">
@@ -950,6 +1039,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                         <th className="p-3">Nom de la tâche</th>
                                         <th className="p-3 w-32">Canal</th>
                                         <th className="p-3 w-40">Statut</th>
+                                        <th className="p-3 w-36">Assigné</th>
                                         <th className="p-3 w-28 text-right">Coût (€)</th>
                                         <th className="p-3 w-10"></th>
                                     </tr>
@@ -994,8 +1084,29 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                 </select>
                                             </td>
                                             <td className="p-3">
-                                                <input 
-                                                    type="number" 
+                                                <div className="flex items-center gap-1.5">
+                                                    {task.assignedUserId ? (() => {
+                                                        const au = users.find(u => u.id === task.assignedUserId);
+                                                        return au ? <Avatar userId={au.id} name={au.name} color={au.avatarColor} size={20} /> : null;
+                                                    })() : (
+                                                        <UserCircle size={20} className="text-slate-300 dark:text-slate-600 shrink-0" />
+                                                    )}
+                                                    <select
+                                                        value={task.assignedUserId || ''}
+                                                        disabled={!canEdit}
+                                                        onChange={e => updateTask(task.id, 'assignedUserId', e.target.value || undefined)}
+                                                        className="flex-1 bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-1.5 py-1.5 text-xs text-bony-text outline-none focus:border-bony-blue appearance-none cursor-pointer disabled:opacity-50"
+                                                    >
+                                                        <option value="">— Non assigné —</option>
+                                                        {users.map(u => (
+                                                            <option key={u.id} value={u.id}>{u.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </td>
+                                            <td className="p-3">
+                                                <input
+                                                    type="number"
                                                     disabled={!canEdit}
                                                     value={task.cost}
                                                     onChange={(e) => updateTask(task.id, 'cost', Number(e.target.value))}
@@ -1013,7 +1124,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                     ))}
                                     {selectedProject.tasks.length === 0 && (
                                         <tr>
-                                            <td colSpan={6} className="p-8 text-center text-slate-500 text-sm italic">
+                                            <td colSpan={7} className="p-8 text-center text-slate-500 text-sm italic">
                                                 Aucune tâche définie. Ajoutez des tâches pour piloter le budget et l'avancement.
                                             </td>
                                         </tr>
