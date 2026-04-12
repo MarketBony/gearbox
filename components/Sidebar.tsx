@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import Avatar from './Avatar';
 import {
   LayoutDashboard,
   FolderKanban,
@@ -166,8 +167,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             <span className="ml-3 hidden lg:block text-sm">Paramètres</span>
           </button>
 
-          <div className="mt-4 hidden lg:flex flex-col items-center justify-center">
-            <div className="text-[9px] text-bony-muted mb-0.5">CONNECTÉ EN TANT QUE</div>
+          <div className="mt-4 hidden lg:flex flex-col items-center justify-center gap-1.5">
+            {user && (
+              <Avatar userId={user.id} name={user.name} color={user.avatarColor} size={36} />
+            )}
+            <div className="text-[9px] text-bony-muted">CONNECTÉ EN TANT QUE</div>
             <div className="text-xs font-bold text-bony-text uppercase flex items-center gap-1">
               {user?.loginId}
               {user?.role === 'Digital Manager' && <Globe size={10} className="text-bony-violet"/>}

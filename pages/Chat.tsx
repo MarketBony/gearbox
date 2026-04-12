@@ -7,6 +7,7 @@ import {
   MessageSquare, Plus, Send, Star, StarOff, ArrowLeft,
   MoreHorizontal, Pencil, Trash2, X, Image, Reply, Check
 } from 'lucide-react';
+import Avatar from '../components/Avatar';
 
 const REACTIONS = ['👍', '❤️', '😂', '😮'];
 const MAX_IMAGE_SIZE = 300 * 1024; // 300 KB
@@ -37,16 +38,6 @@ const dayLabel = (iso: string): string => {
 
 const msgTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-
-interface AvatarProps { name: string; color?: string; size?: number; }
-const Avatar: React.FC<AvatarProps> = ({ name, color = '#64748b', size = 32 }) => (
-  <div
-    className="rounded-full flex items-center justify-center font-bold text-white shrink-0 select-none"
-    style={{ width: size, height: size, fontSize: size * 0.38, backgroundColor: color }}
-  >
-    {name.charAt(0).toUpperCase()}
-  </div>
-);
 
 // --- Main Component ---
 const Chat: React.FC = () => {
@@ -119,6 +110,11 @@ const Chat: React.FC = () => {
     if (conv.type === 'general') return '#f75632';
     const other = conv.participants.filter(id => id !== me?.id)[0];
     return users.find(u => u.id === other)?.avatarColor ?? '#64748b';
+  };
+
+  const getConvUserId = (conv: ChatConversation) => {
+    if (conv.type === 'general') return 'general';
+    return conv.participants.filter(id => id !== me?.id)[0] ?? 'general';
   };
 
   const unreadCount = (conv: ChatConversation) =>
@@ -330,7 +326,7 @@ const Chat: React.FC = () => {
                 onClick={() => handleSelectConv(conv.id)}
               >
                 <div className="relative shrink-0">
-                  <Avatar name={getConvName(conv)} color={isActive ? '#ffffff44' : color} size={38} />
+                  <Avatar userId={getConvUserId(conv)} name={getConvName(conv)} color={isActive ? '#ffffff44' : color} size={38} />
                   {pinned && (
                     <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-bony-orange rounded-full flex items-center justify-center">
                       <Star size={8} className="text-white fill-white" />
@@ -384,7 +380,7 @@ const Chat: React.FC = () => {
               >
                 <ArrowLeft size={20} />
               </button>
-              <Avatar name={getConvName(activeConv)} color={getConvColor(activeConv)} size={36} />
+              <Avatar userId={getConvUserId(activeConv)} name={getConvName(activeConv)} color={getConvColor(activeConv)} size={36} />
               <div>
                 <p className="font-bold text-sm text-bony-text">{getConvName(activeConv)}</p>
                 <p className="text-[10px] text-bony-muted">
@@ -416,7 +412,7 @@ const Chat: React.FC = () => {
                         className={`group flex gap-2 mb-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}
                         onDoubleClick={() => { if (isMe && !isDeleted) startEdit(msg); }}
                       >
-                        {!isMe && <Avatar name={msg.senderName} color={msg.senderColor} size={28} />}
+                        {!isMe && <Avatar userId={msg.senderId} name={msg.senderName} color={msg.senderColor} size={28} />}
 
                         <div className={`flex flex-col max-w-[70%] ${isMe ? 'items-end' : 'items-start'}`}>
                           {/* Sender name + time */}
@@ -633,7 +629,7 @@ const Chat: React.FC = () => {
                   onClick={() => startPrivateConv(u.id)}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition"
                 >
-                  <Avatar name={u.name} color={u.avatarColor} size={34} />
+                  <Avatar userId={u.id} name={u.name} color={u.avatarColor} size={34} />
                   <div className="text-left">
                     <p className="text-sm font-bold text-bony-text">{u.name}</p>
                     <p className="text-[10px] text-bony-muted">{u.role}</p>
