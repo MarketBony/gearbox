@@ -12,6 +12,107 @@ import {
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 
+// --- TEAM SECTION COMPONENT (extracted to use its own ref for fixed dropdown) ---
+interface TeamSectionProps {
+    assignedIds: string[];
+    unassignedUsers: User[];
+    allUsers: User[];
+    canEdit: boolean;
+    currentUserId: string;
+    creatorId: string;
+    showDropdown: boolean;
+    setShowDropdown: (v: boolean) => void;
+    onAdd: (userId: string) => void;
+    onRemove: (userId: string) => void;
+}
+const TeamSection: React.FC<TeamSectionProps> = ({
+    assignedIds, unassignedUsers, allUsers, canEdit, currentUserId, creatorId,
+    showDropdown, setShowDropdown, onAdd, onRemove,
+}) => {
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const [dropPos, setDropPos] = React.useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+    const handleOpenDropdown = () => {
+        if (!showDropdown && btnRef.current) {
+            const r = btnRef.current.getBoundingClientRect();
+            setDropPos({ top: r.bottom + 6, left: r.left });
+        }
+        setShowDropdown(!showDropdown);
+    };
+
+    return (
+        <div className="pt-2">
+            <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-3">Équipe projet</label>
+            <div className="flex items-center gap-2 flex-wrap">
+                {assignedIds.map(uid => {
+                    const u = allUsers.find(x => x.id === uid);
+                    if (!u) return null;
+                    // Hide remove button for the connected user if they are the creator
+                    const isCreatorSelf = uid === creatorId && uid === currentUserId;
+                    const canRemove = canEdit && !isCreatorSelf;
+                    return (
+                        <div key={uid} className="relative group/av">
+                            <Avatar userId={u.id} name={u.name} color={u.avatarColor} size={34} />
+                            {/* Tooltip */}
+                            <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover/av:opacity-100 pointer-events-none z-20 shadow-lg">
+                                {u.name}<br /><span className="text-slate-400">{u.role}</span>
+                            </div>
+                            {canRemove && (
+                                <button
+                                    onClick={() => onRemove(u.id)}
+                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/av:opacity-100 transition shadow"
+                                >
+                                    <X size={8} className="text-white" />
+                                </button>
+                            )}
+                        </div>
+                    );
+                })}
+
+                {canEdit && unassignedUsers.length > 0 && (
+                    <>
+                        {showDropdown && (
+                            <div className="fixed inset-0 z-[9990]" onClick={() => setShowDropdown(false)} />
+                        )}
+                        <button
+                            ref={btnRef}
+                            onClick={handleOpenDropdown}
+                            className="w-[34px] h-[34px] rounded-full border-2 border-dashed border-bony-border text-slate-400 hover:border-bony-orange hover:text-bony-orange transition flex items-center justify-center"
+                            title="Ajouter un membre"
+                        >
+                            <Plus size={14} />
+                        </button>
+                        {showDropdown && (
+                            <div
+                                className="fixed z-[9999] bg-white dark:bg-bony-panel border border-bony-border rounded-xl shadow-2xl min-w-[180px] overflow-hidden"
+                                style={{ top: dropPos.top, left: dropPos.left }}
+                            >
+                                {unassignedUsers.map(u => (
+                                    <button
+                                        key={u.id}
+                                        onClick={() => onAdd(u.id)}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
+                                    >
+                                        <Avatar userId={u.id} name={u.name} color={u.avatarColor} size={26} />
+                                        <div>
+                                            <p className="text-xs font-bold text-bony-text leading-tight">{u.name}</p>
+                                            <p className="text-[9px] text-bony-muted">{u.role}</p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {assignedIds.length === 0 && (
+                    <span className="text-xs text-slate-400 italic">Aucun membre assigné</span>
+                )}
+            </div>
+        </div>
+    );
+};
+
 interface ProjectsProps {
     viewMode?: 'current' | 'archived';
 }
@@ -319,8 +420,9 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const removeAssignedUser = (userId: string) => {
       if (!selectedProject || !canEdit) return;
       const current = selectedProject.assignedUsers || [];
-      if (current.length <= 1) return;
-      if (!confirm('Retirer cet utilisateur du projet ?')) return;
+      if (current.length <= 1) {
+          if (!confirm('Cet utilisateur est le seul membre du projet. Le retirer quand même ?')) return;
+      }
       handleUpdateProject({ ...selectedProject, assignedUsers: current.filter(id => id !== userId) });
   };
 
@@ -851,67 +953,21 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                             {(() => {
                                 const assignedIds = selectedProject.assignedUsers || [];
                                 const unassignedUsers = users.filter(u => !assignedIds.includes(u.id));
+                                // creator = first assigned user (set at creation time)
+                                const creatorId = assignedIds[0];
                                 return (
-                                    <div className="pt-2">
-                                        <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-3">Équipe projet</label>
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            {assignedIds.map(uid => {
-                                                const u = users.find(x => x.id === uid);
-                                                if (!u) return null;
-                                                return (
-                                                    <div key={uid} className="relative group/av">
-                                                        <Avatar userId={u.id} name={u.name} color={u.avatarColor} size={34} />
-                                                        {/* Tooltip */}
-                                                        <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover/av:opacity-100 pointer-events-none z-20 shadow-lg">
-                                                            {u.name}<br/><span className="text-slate-400">{u.role}</span>
-                                                        </div>
-                                                        {canEdit && assignedIds.length > 1 && (
-                                                            <button
-                                                                onClick={() => removeAssignedUser(u.id)}
-                                                                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/av:opacity-100 transition shadow"
-                                                            >
-                                                                <X size={8} className="text-white" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                            {canEdit && unassignedUsers.length > 0 && (
-                                                <div className="relative">
-                                                    {showTeamDropdown && (
-                                                        <div className="fixed inset-0 z-[90]" onClick={() => setShowTeamDropdown(false)} />
-                                                    )}
-                                                    <button
-                                                        onClick={() => setShowTeamDropdown(v => !v)}
-                                                        className="w-[34px] h-[34px] rounded-full border-2 border-dashed border-bony-border text-slate-400 hover:border-bony-orange hover:text-bony-orange transition flex items-center justify-center"
-                                                        title="Ajouter un membre"
-                                                    >
-                                                        <Plus size={14} />
-                                                    </button>
-                                                    {showTeamDropdown && (
-                                                        <div className="absolute top-full left-0 mt-1.5 bg-white dark:bg-bony-panel border border-bony-border rounded-xl shadow-2xl z-[100] min-w-[180px] overflow-hidden">
-                                                            {unassignedUsers.map(u => (
-                                                                <button
-                                                                    key={u.id}
-                                                                    onClick={() => addAssignedUser(u.id)}
-                                                                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
-                                                                >
-                                                                    <Avatar userId={u.id} name={u.name} color={u.avatarColor} size={26} />
-                                                                    <div>
-                                                                        <p className="text-xs font-bold text-bony-text leading-tight">{u.name}</p>
-                                                                        <p className="text-[9px] text-bony-muted">{u.role}</p>
-                                                                    </div>
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                            {assignedIds.length === 0 && (
-                                                <span className="text-xs text-slate-400 italic">Aucun membre assigné</span>
-                                            )}
-                                        </div>
-                                    </div>
+                                    <TeamSection
+                                        assignedIds={assignedIds}
+                                        unassignedUsers={unassignedUsers}
+                                        allUsers={users}
+                                        canEdit={canEdit}
+                                        currentUserId={user?.id ?? ''}
+                                        creatorId={creatorId}
+                                        showDropdown={showTeamDropdown}
+                                        setShowDropdown={setShowTeamDropdown}
+                                        onAdd={addAssignedUser}
+                                        onRemove={removeAssignedUser}
+                                    />
                                 );
                             })()}
 
