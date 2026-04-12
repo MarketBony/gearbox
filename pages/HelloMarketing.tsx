@@ -17,17 +17,18 @@ import { User } from '../types';
 // 3. Allez dans "My API Keys" dans votre profil
 // 4. Copiez votre clé API et remplacez la valeur ci-dessous
 // =============================================================================
-const OPENWEATHER_API_KEY = 'REMPLACER_PAR_CLE';
+const OPENWEATHER_API_KEY = '6d5fe29fdd1253aae4c3b5fe1b7f1dcc';
 
-const ALLORIGINS = (url: string) =>
-  `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+const CORSPROXY = (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`;
 
 const RSS_FEEDS = [
-  { name: "L'Argus",     url: 'https://www.largus.fr/rss/actualites.xml' },
-  { name: 'Caradisiac',  url: 'https://www.caradisiac.com/rss/actualites.xml' },
-  { name: 'AutoPlus',    url: 'https://www.autoplus.fr/feed' },
-  { name: 'AutoMoto',    url: 'https://www.auto-moto.com/feed' },
+  { name: "L'Argus",    url: 'https://www.largus.fr/rss/actualites.xml' },
+  { name: 'Caradisiac', url: 'https://www.caradisiac.com/rss/actualites.xml' },
+  { name: 'AutoPlus',   url: 'https://www.autoplus.fr/feed' },
+  { name: 'AutoMoto',   url: 'https://www.auto-moto.com/feed' },
 ];
+
+const DEFAULT_WEATHER_CITY = 'Clermont-Ferrand';
 
 const RSS_CACHE_KEY    = 'gearbox_rss_cache';
 const DEEZER_CACHE_KEY = 'gearbox_deezer_cache';
@@ -209,14 +210,21 @@ const NewsSection: React.FC = () => {
         }
       }
 
-      const results = await Promise.allSettled(
-        RSS_FEEDS.map(feed =>
-          fetch(ALLORIGINS(feed.url))
-            .then(r => r.json())
-            .then(d => parseRss(d.contents || '', feed.name))
-            .catch(() => [] as RssArticle[])
-        )
-      );
+      const fetchFeed = async (feed: { name: string; url: string }): Promise<RssArticle[]> => {
+        try {
+          const res = await fetch(CORSPROXY(feed.url));
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const xml = await res.text();
+          const parsed = parseRss(xml, feed.name);
+          console.log(`[RSS] ${feed.name} : ${parsed.length} articles`);
+          return parsed;
+        } catch (e) {
+          console.warn(`[RSS] ${feed.name} échoué :`, e);
+          return [];
+        }
+      };
+
+      const results = await Promise.allSettled(RSS_FEEDS.map(fetchFeed));
 
       const all: RssArticle[] = [];
       results.forEach(r => { if (r.status === 'fulfilled') all.push(...r.value); });
@@ -236,7 +244,11 @@ const NewsSection: React.FC = () => {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    // Vider le cache pour forcer un rechargement frais avec le nouveau proxy
+    localStorage.removeItem(RSS_CACHE_KEY);
+    load();
+  }, []);
 
   return (
     <SectionCard
@@ -332,12 +344,6 @@ const WeatherSection: React.FC<{ userId: string }> = ({ userId }) => {
         }
       }
 
-      if (OPENWEATHER_API_KEY === 'REMPLACER_PAR_CLE') {
-        setError('Clé API non configurée — remplacez OPENWEATHER_API_KEY en haut de HelloMarketing.tsx.');
-        setLoading(false);
-        return;
-      }
-
       const res = await fetch(
         `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=fr`
       );
@@ -365,9 +371,9 @@ const WeatherSection: React.FC<{ userId: string }> = ({ userId }) => {
   useEffect(() => {
     const prefs = localStorage.getItem(USER_PREFS_KEY(userId));
     const c = prefs ? (JSON.parse(prefs).city || '') : '';
-    setCity(c);
-    if (c) load(c);
-    else setLoading(false);
+    const effective = c || DEFAULT_WEATHER_CITY;
+    setCity(effective);
+    load(effective);
   }, [userId]);
 
   return (
@@ -377,15 +383,7 @@ const WeatherSection: React.FC<{ userId: string }> = ({ userId }) => {
       title="Météo de ma Concession"
     >
       <div className="p-5">
-        {!city ? (
-          <div className="flex flex-col items-center justify-center py-4 gap-2 text-slate-400 text-center">
-            <MapPin size={28} strokeWidth={1} className="text-blue-400" />
-            <p className="text-sm">Aucune ville configurée.</p>
-            <p className="text-[11px] text-slate-400">
-              Allez dans <span className="text-bony-orange font-bold">Paramètres → Mon profil</span> pour définir votre ville.
-            </p>
-          </div>
-        ) : loading ? (
+        {loading ? (
           <Spinner label="Chargement météo..." />
         ) : error ? (
           <div className="py-4 text-center space-y-1">
@@ -463,16 +461,40 @@ const MusicSection: React.FC = () => {
         }
       }
 
-      const res = await fetch(ALLORIGINS('https://api.deezer.com/playlist/15169024043'));
-      const json = await res.json();
-      const playlist = JSON.parse(json.contents);
-      const tracks: DeezerTrack[] = playlist?.tracks?.data || [];
-      if (tracks.length === 0) throw new Error('Playlist vide.');
+      const DEEZER_URL = 'https://api.deezer.com/playlist/15169024043/tracks?limit=100';
+      let tracks: DeezerTrack[] = [];
+
+      // Essai 1 : corsproxy.io
+      try {
+        console.log('[Deezer] Tentative via corsproxy.io...');
+        const res = await fetch(CORSPROXY(DEEZER_URL));
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        tracks = data?.data || [];
+        console.log('[Deezer] corsproxy.io OK, pistes :', tracks.length);
+      } catch (e1) {
+        console.warn('[Deezer] corsproxy.io échoué :', e1, '— tentative directe...');
+        // Essai 2 : direct (peut fonctionner selon les navigateurs)
+        try {
+          const res = await fetch(DEEZER_URL);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          tracks = data?.data || [];
+          console.log('[Deezer] Appel direct OK, pistes :', tracks.length);
+        } catch (e2) {
+          console.error('[Deezer] Tous les essais ont échoué :', e2);
+          throw new Error('Impossible de joindre l\'API Deezer.');
+        }
+      }
+
+      if (tracks.length === 0) throw new Error('Playlist vide ou inaccessible.');
 
       const picked = tracks[getDayOfYear() % tracks.length];
+      console.log('[Deezer] Piste du jour :', picked.title, '—', picked.artist.name);
       localStorage.setItem(DEEZER_CACHE_KEY, JSON.stringify({ data: picked, timestamp: Date.now() }));
       setTrack(picked);
-    } catch {
+    } catch (err) {
+      console.error('[Deezer] Erreur finale :', err);
       setError('Impossible de charger la musique du jour.');
     }
     setLoading(false);
@@ -593,14 +615,12 @@ const BirthdaysSection: React.FC = () => {
         if (next < today) next.setFullYear(today.getFullYear() + 1);
 
         const daysUntil = Math.round((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysUntil > 30) continue;
-
         const age = next.getFullYear() - bday.getFullYear();
         result.push({ user: u, daysUntil, age });
       }
 
       result.sort((a, b) => a.daysUntil - b.daysUntil);
-      setEntries(result);
+      setEntries(result.slice(0, 5));
       setLoading(false);
     })();
   }, []);
@@ -617,7 +637,7 @@ const BirthdaysSection: React.FC = () => {
         ) : entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 gap-2 text-slate-400">
             <Cake size={28} strokeWidth={1} />
-            <p className="text-sm">Aucun anniversaire dans les 30 prochains jours.</p>
+            <p className="text-sm">Aucun anniversaire renseigné dans l'équipe.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
