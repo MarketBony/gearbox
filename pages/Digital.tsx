@@ -370,7 +370,9 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, up
 interface EditoRowProps {
     post: SocialPost;
     onUpdate: (updatedPost: SocialPost) => void;
+    onDelete: (post: SocialPost) => void;
     canEdit: boolean;
+    canDelete: boolean;
     isArchivedView?: boolean;
     networkOptions: string[];
     co2Options: string[];
@@ -378,8 +380,9 @@ interface EditoRowProps {
     onOpenMedia: (postId: string) => void;
 }
 
-const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, canEdit, isArchivedView, networkOptions, co2Options, mediaCount, onOpenMedia }) => {
+const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, canDelete, isArchivedView, networkOptions, co2Options, mediaCount, onOpenMedia }) => {
     const [isWordingFocused, setIsWordingFocused] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
     
     // Status Color Strip
     const statusColorClass = SOCIAL_STATUS_COLORS[post.status] || 'bg-slate-500';
@@ -561,7 +564,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, canEdit, isArchived
 
                 <div className="flex-1"></div>
 
-                <button 
+                <button
                     disabled={!canEdit}
                     onClick={handleArchiveToggle}
                     className={`p-2 rounded-lg transition-colors ${post.archived ? 'text-bony-orange bg-bony-orange/10' : 'text-slate-400 dark:text-slate-600 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/5'}`}
@@ -569,6 +572,28 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, canEdit, isArchived
                 >
                     {post.archived ? <CheckSquare size={18}/> : <Square size={18}/>}
                 </button>
+
+                {canDelete && (
+                    confirmDelete ? (
+                        <button
+                            onClick={e => { e.stopPropagation(); onDelete(post); }}
+                            onBlur={() => setConfirmDelete(false)}
+                            autoFocus
+                            className="px-2 py-1 rounded-lg text-[10px] font-bold bg-red-500 text-white animate-pulse"
+                            title="Confirmer la suppression"
+                        >
+                            SUPPR ?
+                        </button>
+                    ) : (
+                        <button
+                            onClick={e => { e.stopPropagation(); setConfirmDelete(true); }}
+                            className="p-2 rounded-lg text-slate-400 dark:text-slate-600 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                            title="Supprimer définitivement"
+                        >
+                            <Trash2 size={18}/>
+                        </button>
+                    )
+                )}
             </div>
         </div>
     );
@@ -816,6 +841,7 @@ const Digital: React.FC = () => {
 
   // Permissions
   const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Digital Manager';
+  const canDelete = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Digital Manager';
 
   useEffect(() => {
       loadData();
@@ -851,6 +877,15 @@ const Digital: React.FC = () => {
       await db.saveSocialPosts(newPosts);
       if (isArchiving && user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a archivé la publication', entity: 'post', entityName: updatedPost.title || '(sans titre)', timestamp: new Date().toISOString() });
       setTimeout(() => setSaving(false), 500);
+  };
+
+  const handleDeletePost = async (post: SocialPost) => {
+      localStorage.removeItem(mediaKey(post.id));
+      setMediaCounts(prev => { const next = { ...prev }; delete next[post.id]; return next; });
+      const newPosts = posts.filter(p => p.id !== post.id);
+      setPosts(newPosts);
+      await db.saveSocialPosts(newPosts);
+      if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé la publication', entity: 'post', entityName: post.title || '(sans titre)', entityId: post.id, timestamp: new Date().toISOString() });
   };
 
   const handleMediaCountChange = (postId: string, count: number) => {
@@ -1259,7 +1294,9 @@ const Digital: React.FC = () => {
                             key={post.id}
                             post={post}
                             onUpdate={handleUpdatePost}
+                            onDelete={handleDeletePost}
                             canEdit={canEdit}
+                            canDelete={canDelete}
                             isArchivedView={isArchivedView}
                             networkOptions={tags.networks}
                             co2Options={tags.co2}
