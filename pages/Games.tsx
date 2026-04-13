@@ -16,7 +16,7 @@ import Battleship from '../components/games/Battleship';
 // ---- Constants ----
 const CHALLENGES_KEY = 'gearbox_game_challenges';
 const SESSIONS_KEY = 'gearbox_game_sessions';
-const GAMES_ALLOWED_ROLES = ['Master', 'Coordinator', 'Digital Manager'];
+const GAMES_ALLOWED_ROLES = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'];
 
 const GAME_LABELS: Record<GameType, string> = {
   morpion: 'Morpion',

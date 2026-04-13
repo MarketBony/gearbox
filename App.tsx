@@ -45,7 +45,7 @@ const InnerApp: React.FC = () => {
   }
 
   const EXTERNAL_ALLOWED_TABS = ['digital', 'chat', 'hello-marketing', 'games'];
-  const GAMES_ALLOWED_ROLES = ['Master', 'Coordinator', 'Digital Manager'];
+  const GAMES_ALLOWED_ROLES = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'];
 
   const renderContent = () => {
     const isExternal = user?.role === 'External';

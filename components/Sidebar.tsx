@@ -144,7 +144,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   ).length;
 
   const isExternal = user?.role === 'External';
-  const canAccessGames = user?.role === 'Master' || user?.role === 'Coordinator' || user?.role === 'Digital Manager';
+  const canAccessGames = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Coordinator' || user?.role === 'Digital Manager';
 
   const allMainItems = [
     { id: 'hello-marketing', icon: Sparkles, label: 'Hello Marketing' },
