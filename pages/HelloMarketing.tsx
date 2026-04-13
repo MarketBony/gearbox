@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles, RefreshCw, MapPin, Music, Cake, Play, Pause,
-  Droplets, Wind, Cloud, ExternalLink, Loader2
+  Droplets, Wind, Cloud, ExternalLink, Loader2, ArrowUpRight
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
@@ -15,29 +15,64 @@ import { User } from '../types';
 // 1. Rendez-vous sur https://openweathermap.org/
 // 2. Créez un compte (gratuit)
 // 3. Allez dans "My API Keys" dans votre profil
-// 4. Copiez votre clé API et remplacez la valeur ci-dessous
 // =============================================================================
 const OPENWEATHER_API_KEY = '6d5fe29fdd1253aae4c3b5fe1b7f1dcc';
+
+// Mapping noms sites Bony → noms compatibles OpenWeatherMap
+const CITY_MAPPING: Record<string, string> = {
+  'Clermont':         'Clermont-Ferrand',
+  'Mozac':            'Clermont-Ferrand',
+  'Massagettes':      'Clermont-Ferrand',
+  'Vichy':            'Vichy',
+  'Moulins':          'Moulins',
+  'Ussel':            'Ussel',
+  'Issoire':          'Issoire',
+  'Brioude':          'Brioude',
+  'Le Puy-en-Velay':  'Le Puy-en-Velay',
+  'Mende':            'Mende',
+  'Albi':             'Albi',
+  'Rodez':            'Rodez',
+  'Millau':           'Millau',
+  'Aurillac':         'Aurillac',
+  'Figeac':           'Figeac',
+  'Gaillac':          'Gaillac',
+  'Villefranche':     'Villefranche-de-Rouergue',
+  'Carmaux':          'Carmaux',
+  'Lavaur':           'Lavaur',
+  'Ricoux':           'Thiers',
+  'Thiers':           'Thiers',
+  'Ambert':           'Ambert',
+  'Alpine':           'Clermont-Ferrand',
+  'Nissan':           'Clermont-Ferrand',
+  'Saint-Etienne':    'Saint-Etienne',
+  'Montluçon':        'Montlucon',
+};
 
 const CORSPROXY = (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`;
 
 const RSS_FEEDS = [
-  { name: "L'Argus",    url: 'https://www.largus.fr/rss/actualites.xml' },
-  { name: 'Caradisiac', url: 'https://www.caradisiac.com/rss/actualites.xml' },
-  { name: 'AutoPlus',   url: 'https://www.autoplus.fr/feed' },
-  { name: 'AutoMoto',   url: 'https://www.auto-moto.com/feed' },
+  { name: "L'Argus",    url: 'https://www.largus.fr/rss/actualites.xml',          color: 'bg-red-500' },
+  { name: 'Caradisiac', url: 'https://www.caradisiac.com/rss/actualites.xml',      color: 'bg-blue-600' },
+  { name: 'AutoPlus',   url: 'https://www.autoplus.fr/feed',                       color: 'bg-emerald-600' },
+  { name: 'AutoMoto',   url: 'https://www.auto-moto.com/feed',                     color: 'bg-purple-600' },
 ];
+
+const SOURCE_COLOR: Record<string, string> = Object.fromEntries(
+  RSS_FEEDS.map(f => [f.name, f.color])
+);
 
 const DEFAULT_WEATHER_CITY = 'Clermont-Ferrand';
 
-const RSS_CACHE_KEY    = 'gearbox_rss_cache';
-const DEEZER_CACHE_KEY = 'gearbox_deezer_cache';
-const USER_PREFS_KEY   = (id: string) => `gearbox_user_prefs_${id}`;
+const RSS_CACHE_KEY     = 'gearbox_rss_cache';
+const DEEZER_CACHE_KEY  = 'gearbox_deezer_cache';
+const USER_PREFS_KEY    = (id: string) => `gearbox_user_prefs_${id}`;
 const WEATHER_CACHE_KEY = (city: string) =>
   `gearbox_weather_cache_${city.toLowerCase().replace(/\s+/g, '_')}`;
 
 const CACHE_24H = 24 * 60 * 60 * 1000;
 const CACHE_30M = 30 * 60 * 1000;
+
+// ─── Interfaces ───────────────────────────────────────────────────────────────
 
 interface RssArticle {
   title: string;
@@ -125,7 +160,7 @@ const parseRss = (xml: string, source: string): RssArticle[] => {
         link,
         source,
         pubDate: getText(it, 'pubDate'),
-        description: rawDesc.slice(0, 200),
+        description: rawDesc.slice(0, 180),
         thumbnail: getThumbnail(it),
       });
     }
@@ -135,12 +170,19 @@ const parseRss = (xml: string, source: string): RssArticle[] => {
   }
 };
 
-const fmtDate = (dateStr: string): string => {
+const relativeDate = (dateStr: string): string => {
   if (!dateStr) return '';
   try {
-    return new Date(dateStr).toLocaleDateString('fr-FR', {
-      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-    });
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "à l'instant";
+    if (mins < 60) return `il y a ${mins} min`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `il y a ${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days === 1) return 'hier';
+    if (days < 7) return `il y a ${days}j`;
+    return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   } catch { return ''; }
 };
 
@@ -151,38 +193,9 @@ const fmtTime = (s: number): string => {
 
 const capitalizeFirst = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
 
-// ─── Section card wrapper ─────────────────────────────────────────────────────
-
-const SectionCard: React.FC<{
-  icon: React.ReactNode;
-  iconBg: string;
-  title: string;
-  subtitle?: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}> = ({ icon, iconBg, title, subtitle, action, children }) => (
-  <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-xl overflow-hidden shadow-sm dark:shadow-lg">
-    <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-bony-border">
-      <div className="flex items-center gap-3">
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconBg}`}>
-          {icon}
-        </div>
-        <div>
-          <h3 className="font-title text-sm font-bold text-slate-900 dark:text-bony-text tracking-widest uppercase">
-            {title}
-          </h3>
-          {subtitle && <p className="text-[10px] text-slate-400 mt-0.5">{subtitle}</p>}
-        </div>
-      </div>
-      {action}
-    </div>
-    {children}
-  </div>
-);
-
 const Spinner: React.FC<{ label?: string }> = ({ label }) => (
-  <div className="flex items-center justify-center py-12 gap-3 text-slate-400">
-    <Loader2 size={20} className="animate-spin" />
+  <div className="flex items-center justify-center py-10 gap-3 text-slate-400">
+    <Loader2 size={18} className="animate-spin" />
     {label && <span className="text-sm">{label}</span>}
   </div>
 );
@@ -190,8 +203,8 @@ const Spinner: React.FC<{ label?: string }> = ({ label }) => (
 // ─── 1. Newsletter RSS ────────────────────────────────────────────────────────
 
 const NewsSection: React.FC = () => {
-  const [articles, setArticles] = useState<RssArticle[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [articles,  setArticles]  = useState<RssArticle[]>([]);
+  const [loading,   setLoading]   = useState(true);
   const [lastFetch, setLastFetch] = useState('');
 
   const load = async (force = false) => {
@@ -210,7 +223,7 @@ const NewsSection: React.FC = () => {
         }
       }
 
-      const fetchFeed = async (feed: { name: string; url: string }): Promise<RssArticle[]> => {
+      const fetchFeed = async (feed: typeof RSS_FEEDS[0]): Promise<RssArticle[]> => {
         try {
           const res = await fetch(CORSPROXY(feed.url));
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -225,7 +238,6 @@ const NewsSection: React.FC = () => {
       };
 
       const results = await Promise.allSettled(RSS_FEEDS.map(fetchFeed));
-
       const all: RssArticle[] = [];
       results.forEach(r => { if (r.status === 'fulfilled') all.push(...r.value); });
 
@@ -245,78 +257,99 @@ const NewsSection: React.FC = () => {
   };
 
   useEffect(() => {
-    // Vider le cache pour forcer un rechargement frais avec le nouveau proxy
     localStorage.removeItem(RSS_CACHE_KEY);
     load();
   }, []);
 
   return (
-    <SectionCard
-      icon={<ExternalLink size={16} className="text-bony-orange" />}
-      iconBg="bg-bony-orange/10"
-      title="Newsletter Auto du Jour"
-      subtitle={lastFetch ? `Mis à jour à ${lastFetch}` : undefined}
-      action={
+    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm dark:shadow-xl flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-bony-border">
+        <div>
+          <h3 className="font-bold text-slate-900 dark:text-white text-sm tracking-wide flex items-center gap-2">
+            <ExternalLink size={14} className="text-bony-orange" />
+            Actu Auto du Jour
+          </h3>
+          {lastFetch && (
+            <p className="text-[10px] text-slate-400 mt-0.5">Mis à jour à {lastFetch}</p>
+          )}
+        </div>
         <button
           onClick={() => load(true)}
           disabled={loading}
-          className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-400 hover:text-bony-orange transition disabled:opacity-40"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-bony-orange hover:bg-slate-100 dark:hover:bg-white/5 transition disabled:opacity-40"
           title="Rafraîchir"
         >
-          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
-      }
-    >
-      {loading ? (
-        <Spinner label="Chargement des flux RSS..." />
-      ) : articles.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-400">
-          <Cloud size={32} strokeWidth={1} />
-          <p className="text-sm">Aucun article disponible.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-          {articles.map((art, i) => (
-            <a
-              key={i}
-              href={art.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex gap-3 p-4 hover:bg-slate-50 dark:hover:bg-white/3 transition group border-b border-slate-100 dark:border-white/5 last:border-b-0"
-            >
-              {art.thumbnail ? (
-                <img
-                  src={art.thumbnail}
-                  alt=""
-                  className="w-16 h-16 rounded-lg object-cover shrink-0 bg-slate-100"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-lg bg-bony-orange/10 shrink-0 flex items-center justify-center font-bold text-bony-orange text-xl">
-                  {art.source.charAt(0)}
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[9px] font-bold uppercase text-bony-orange tracking-wider">{art.source}</span>
-                  {art.pubDate && (
-                    <span className="text-[9px] text-slate-400">· {fmtDate(art.pubDate)}</span>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        {loading ? (
+          <Spinner label="Chargement des flux RSS..." />
+        ) : articles.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
+            <Cloud size={36} strokeWidth={1} />
+            <p className="text-sm">Aucun article disponible.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y divide-slate-100 dark:divide-white/5 sm:divide-y-0">
+            {articles.map((art, i) => (
+              <a
+                key={i}
+                href={art.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex flex-col border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-all duration-200 sm:hover:shadow-md"
+              >
+                {/* Thumbnail */}
+                <div className="relative overflow-hidden" style={{ height: 160 }}>
+                  {art.thumbnail ? (
+                    <img
+                      src={art.thumbnail}
+                      alt=""
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={e => {
+                        const el = e.target as HTMLImageElement;
+                        el.parentElement!.style.background = 'linear-gradient(135deg, #f97316 0%, #8b5cf6 100%)';
+                        el.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-bony-orange/20 to-bony-violet/20 flex items-center justify-center text-4xl font-bold text-bony-orange/40">
+                      {art.source.charAt(0)}
+                    </div>
                   )}
+                  {/* Source badge */}
+                  <span className={`absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md text-[9px] font-bold text-white tracking-wider ${SOURCE_COLOR[art.source] || 'bg-slate-600'}`}>
+                    {art.source.toUpperCase()}
+                  </span>
                 </div>
-                <p className="text-xs font-bold text-slate-900 dark:text-bony-text leading-snug line-clamp-2 group-hover:text-bony-orange transition-colors">
-                  {art.title}
-                </p>
-                {art.description && (
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
-                    {art.description}
+
+                {/* Body */}
+                <div className="flex flex-col flex-1 p-4 gap-2">
+                  <p className="text-[15px] font-semibold text-slate-900 dark:text-white leading-snug line-clamp-2 group-hover:text-bony-orange transition-colors">
+                    {art.title}
                   </p>
-                )}
-              </div>
-            </a>
-          ))}
-        </div>
-      )}
-    </SectionCard>
+                  {art.description && (
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed flex-1">
+                      {art.description}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between mt-1 pt-2 border-t border-slate-100 dark:border-white/5">
+                    <span className="text-[10px] text-slate-400">{relativeDate(art.pubDate)}</span>
+                    <span className="text-[10px] font-semibold text-bony-orange flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      Voir l'article <ArrowUpRight size={10} />
+                    </span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -331,9 +364,10 @@ const WeatherSection: React.FC<{ userId: string }> = ({ userId }) => {
   const load = async (cityName: string, force = false) => {
     setLoading(true);
     setError('');
+    const mapped = CITY_MAPPING[cityName] || cityName;
     try {
       if (!force) {
-        const cached = localStorage.getItem(WEATHER_CACHE_KEY(cityName));
+        const cached = localStorage.getItem(WEATHER_CACHE_KEY(mapped));
         if (cached) {
           const { data, timestamp } = JSON.parse(cached);
           if (Date.now() - timestamp < CACHE_30M) {
@@ -345,9 +379,9 @@ const WeatherSection: React.FC<{ userId: string }> = ({ userId }) => {
       }
 
       const res = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(cityName)}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=fr`
+        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(mapped)}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=fr`
       );
-      if (!res.ok) throw new Error('Ville introuvable ou clé invalide.');
+      if (!res.ok) throw new Error(`Erreur ${res.status} — ville : ${mapped}`);
       const d = await res.json();
 
       const wd: WeatherData = {
@@ -360,7 +394,7 @@ const WeatherSection: React.FC<{ userId: string }> = ({ userId }) => {
         wind:        Math.round((d.wind.speed ?? 0) * 3.6),
       };
 
-      localStorage.setItem(WEATHER_CACHE_KEY(cityName), JSON.stringify({ data: wd, timestamp: Date.now() }));
+      localStorage.setItem(WEATHER_CACHE_KEY(mapped), JSON.stringify({ data: wd, timestamp: Date.now() }));
       setWeather(wd);
     } catch (e: any) {
       setError(e.message || 'Erreur météo.');
@@ -377,60 +411,67 @@ const WeatherSection: React.FC<{ userId: string }> = ({ userId }) => {
   }, [userId]);
 
   return (
-    <SectionCard
-      icon={<MapPin size={16} className="text-blue-500" />}
-      iconBg="bg-blue-500/10"
-      title="Météo de ma Concession"
-    >
+    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm dark:shadow-xl">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-bony-border">
+        <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+          <MapPin size={14} className="text-blue-500" /> Météo
+        </h3>
+        {weather && (
+          <button
+            onClick={() => load(city, true)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-bony-orange hover:bg-slate-100 dark:hover:bg-white/5 transition"
+            title="Rafraîchir"
+          >
+            <RefreshCw size={13} />
+          </button>
+        )}
+      </div>
+
       <div className="p-5">
         {loading ? (
           <Spinner label="Chargement météo..." />
         ) : error ? (
-          <div className="py-4 text-center space-y-1">
-            <p className="text-sm text-red-500 font-bold">{error}</p>
-            <p className="text-[11px] text-slate-400">Ville : {city}</p>
+          <div className="py-3 text-center">
+            <p className="text-xs text-red-500 font-bold">{error}</p>
           </div>
         ) : weather ? (
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-3 flex-1">
+          <div>
+            {/* Température centrale */}
+            <div className="flex items-center gap-4 mb-4">
               {weather.icon && (
                 <img
                   src={`https://openweathermap.org/img/wn/${weather.icon}@2x.png`}
                   alt={weather.description}
-                  className="w-14 h-14 shrink-0"
+                  className="w-16 h-16 shrink-0 drop-shadow-sm"
                 />
               )}
               <div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-slate-900 dark:text-white">{weather.temp}°C</span>
+                <div className="text-5xl font-bold text-slate-900 dark:text-white leading-none">
+                  {weather.temp}°
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">{weather.description} · Ressenti {weather.feelsLike}°</p>
-                <p className="text-[10px] text-bony-orange font-bold mt-0.5 flex items-center gap-1">
-                  <MapPin size={9} /> {weather.city}
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 capitalize">
+                  {weather.description}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Ressenti {weather.feelsLike}° · {weather.city}
                 </p>
               </div>
             </div>
-            <div className="flex flex-col gap-2 text-sm shrink-0">
-              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                <Droplets size={14} className="text-blue-400" />
-                <span><span className="font-bold text-slate-900 dark:text-white">{weather.humidity}%</span> humidité</span>
+            {/* Stats row */}
+            <div className="flex items-center gap-4 pt-3 border-t border-slate-100 dark:border-white/5">
+              <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-xs">
+                <Droplets size={12} className="text-blue-400" />
+                <span>{weather.humidity}%</span>
               </div>
-              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                <Wind size={14} className="text-slate-400" />
-                <span><span className="font-bold text-slate-900 dark:text-white">{weather.wind} km/h</span> vent</span>
+              <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-xs">
+                <Wind size={12} className="text-slate-400" />
+                <span>{weather.wind} km/h</span>
               </div>
             </div>
-            <button
-              onClick={() => load(city, true)}
-              className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-400 hover:text-bony-orange transition"
-              title="Rafraîchir"
-            >
-              <RefreshCw size={13} />
-            </button>
           </div>
         ) : null}
       </div>
-    </SectionCard>
+    </div>
   );
 };
 
@@ -464,7 +505,6 @@ const MusicSection: React.FC = () => {
       const DEEZER_URL = 'https://api.deezer.com/playlist/15169024043/tracks?limit=100';
       let tracks: DeezerTrack[] = [];
 
-      // Essai 1 : corsproxy.io
       try {
         console.log('[Deezer] Tentative via corsproxy.io...');
         const res = await fetch(CORSPROXY(DEEZER_URL));
@@ -474,7 +514,6 @@ const MusicSection: React.FC = () => {
         console.log('[Deezer] corsproxy.io OK, pistes :', tracks.length);
       } catch (e1) {
         console.warn('[Deezer] corsproxy.io échoué :', e1, '— tentative directe...');
-        // Essai 2 : direct (peut fonctionner selon les navigateurs)
         try {
           const res = await fetch(DEEZER_URL);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -483,12 +522,11 @@ const MusicSection: React.FC = () => {
           console.log('[Deezer] Appel direct OK, pistes :', tracks.length);
         } catch (e2) {
           console.error('[Deezer] Tous les essais ont échoué :', e2);
-          throw new Error('Impossible de joindre l\'API Deezer.');
+          throw new Error("Impossible de joindre l'API Deezer.");
         }
       }
 
       if (tracks.length === 0) throw new Error('Playlist vide ou inaccessible.');
-
       const picked = tracks[getDayOfYear() % tracks.length];
       console.log('[Deezer] Piste du jour :', picked.title, '—', picked.artist.name);
       localStorage.setItem(DEEZER_CACHE_KEY, JSON.stringify({ data: picked, timestamp: Date.now() }));
@@ -516,40 +554,44 @@ const MusicSection: React.FC = () => {
     setProgress(Number(e.target.value));
   };
 
+  const pct = duration > 0 ? (progress / duration) * 100 : 0;
+
   return (
-    <SectionCard
-      icon={<Music size={16} className="text-purple-500" />}
-      iconBg="bg-purple-500/10"
-      title="Musique du Jour"
-    >
+    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm dark:shadow-xl">
+      <div className="px-5 py-3.5 border-b border-slate-100 dark:border-bony-border">
+        <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+          <Music size={14} className="text-purple-500" /> Musique du Jour
+        </h3>
+      </div>
+
       <div className="p-5">
         {loading ? (
           <Spinner />
         ) : error ? (
-          <p className="text-sm text-red-500 font-bold text-center py-4">{error}</p>
+          <p className="text-xs text-red-500 font-bold text-center py-3">{error}</p>
         ) : track ? (
-          <div className="flex items-center gap-4">
+          <div className="flex items-start gap-4">
+            {/* Cover */}
             <img
               src={track.album.cover_medium}
               alt={track.album.title}
-              className="w-16 h-16 rounded-xl object-cover shrink-0 shadow-md"
+              className="w-20 h-20 rounded-xl object-cover shrink-0 shadow-md"
             />
+            {/* Info + player */}
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-slate-900 dark:text-white text-sm truncate">{track.title}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{track.artist.name}</p>
-              <p className="text-[10px] text-slate-400 truncate">{track.album.title}</p>
+              <p className="font-semibold text-slate-900 dark:text-white text-sm truncate leading-tight">{track.title}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{track.artist.name}</p>
 
               {track.preview ? (
-                <div className="mt-2.5 flex items-center gap-2.5">
-                  <button
-                    onClick={togglePlay}
-                    className="w-8 h-8 rounded-full bg-bony-gradient flex items-center justify-center text-white shadow hover:opacity-90 transition shrink-0"
-                  >
-                    {playing
-                      ? <Pause size={13} />
-                      : <Play size={13} className="ml-0.5" />}
-                  </button>
-                  <div className="flex-1">
+                <div className="mt-3">
+                  {/* Barre de progression fine */}
+                  <div className="relative mb-2.5">
+                    <div className="h-1 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-bony-gradient transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                     <input
                       type="range"
                       min={0}
@@ -557,9 +599,18 @@ const MusicSection: React.FC = () => {
                       step={0.1}
                       value={progress}
                       onChange={handleSeek}
-                      className="w-full accent-bony-orange"
+                      className="absolute inset-0 w-full opacity-0 cursor-pointer"
                     />
-                    <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+                  </div>
+                  {/* Contrôles */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={togglePlay}
+                      className="w-8 h-8 rounded-full bg-bony-gradient flex items-center justify-center text-white shadow-md hover:opacity-90 transition shrink-0"
+                    >
+                      {playing ? <Pause size={13} /> : <Play size={13} className="ml-0.5" />}
+                    </button>
+                    <div className="flex justify-between flex-1 text-[9px] text-slate-400">
                       <span>{fmtTime(progress)}</span>
                       <span>{fmtTime(duration)}</span>
                     </div>
@@ -574,29 +625,23 @@ const MusicSection: React.FC = () => {
               <audio
                 ref={audioRef}
                 src={track.preview}
-                onTimeUpdate={() => {
-                  const a = audioRef.current;
-                  if (a) setProgress(a.currentTime);
-                }}
-                onLoadedMetadata={() => {
-                  const a = audioRef.current;
-                  if (a && a.duration) setDuration(a.duration);
-                }}
+                onTimeUpdate={() => { const a = audioRef.current; if (a) setProgress(a.currentTime); }}
+                onLoadedMetadata={() => { const a = audioRef.current; if (a && a.duration) setDuration(a.duration); }}
                 onEnded={() => setPlaying(false)}
               />
             )}
           </div>
         ) : null}
       </div>
-    </SectionCard>
+    </div>
   );
 };
 
 // ─── 4. Anniversaires ─────────────────────────────────────────────────────────
 
 const BirthdaysSection: React.FC = () => {
-  const [entries,  setEntries]  = useState<BirthdayEntry[]>([]);
-  const [loading,  setLoading]  = useState(true);
+  const [entries, setEntries] = useState<BirthdayEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -626,48 +671,52 @@ const BirthdaysSection: React.FC = () => {
   }, []);
 
   return (
-    <SectionCard
-      icon={<Cake size={16} className="text-pink-500" />}
-      iconBg="bg-pink-500/10"
-      title="Anniversaires de l'Équipe"
-    >
-      <div className="p-5">
+    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm dark:shadow-xl">
+      <div className="px-5 py-3.5 border-b border-slate-100 dark:border-bony-border">
+        <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+          <Cake size={14} className="text-pink-500" /> Anniversaires
+        </h3>
+      </div>
+
+      <div className="p-4">
         {loading ? (
           <Spinner />
         ) : entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-6 gap-2 text-slate-400">
-            <Cake size={28} strokeWidth={1} />
-            <p className="text-sm">Aucun anniversaire renseigné dans l'équipe.</p>
+          <div className="flex flex-col items-center justify-center py-5 gap-2 text-slate-400">
+            <Cake size={24} strokeWidth={1} />
+            <p className="text-xs">Aucun anniversaire renseigné dans l'équipe.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="space-y-2">
             {entries.map(({ user, daysUntil, age }) => (
               <div
                 key={user.id}
-                className={`flex items-center gap-3 p-3 rounded-xl border transition ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${
                   daysUntil === 0
-                    ? 'bg-pink-50 dark:bg-pink-500/10 border-pink-200 dark:border-pink-500/30'
-                    : 'border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/3'
+                    ? 'bg-pink-50 dark:bg-pink-500/10 border border-pink-200 dark:border-pink-500/20'
+                    : 'hover:bg-slate-50 dark:hover:bg-white/3'
                 }`}
               >
-                <Avatar userId={user.id} name={user.name} color={user.avatarColor} size={38} />
+                <Avatar userId={user.id} name={user.name} color={user.avatarColor} size={34} />
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-slate-900 dark:text-white text-xs truncate">{user.name}</p>
+                  <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">{user.name}</p>
                   <p className="text-[10px] text-slate-400">{age} ans</p>
                 </div>
                 {daysUntil === 0 ? (
-                  <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-pink-500 text-white text-[9px] font-bold animate-pulse shadow shadow-pink-500/30 shrink-0">
-                    <Cake size={10} /> Auj.
+                  <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-pink-500 text-white text-[9px] font-bold animate-pulse shadow-sm shadow-pink-500/40 shrink-0">
+                    <Cake size={9} /> Aujourd'hui !
                   </span>
                 ) : (
-                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300 shrink-0">{daysUntil}j</span>
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                    {daysUntil === 1 ? 'demain' : `dans ${daysUntil}j`}
+                  </span>
                 )}
               </div>
             ))}
           </div>
         )}
       </div>
-    </SectionCard>
+    </div>
   );
 };
 
@@ -684,28 +733,37 @@ const HelloMarketing: React.FC = () => {
   );
 
   return (
-    <div className="p-3 md:p-8 h-screen overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-bony-dark animate-fade-in pb-20">
-      <div className="flex items-center gap-3 mb-8">
-        <Sparkles className="text-bony-orange" size={32} />
-        <div>
-          <h2 className="text-xl md:text-3xl text-slate-900 dark:text-white font-title">Hello Marketing</h2>
-          <p className="text-xs text-slate-400 mt-0.5">{today}</p>
+    <div className="h-screen overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-bony-dark pb-20">
+      {/* Header */}
+      <div className="px-5 md:px-8 pt-6 pb-5 border-b border-slate-200 dark:border-bony-border bg-white dark:bg-bony-panel">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-title text-slate-900 dark:text-white flex items-center gap-2.5">
+              <Sparkles size={28} className="text-bony-orange" />
+              Hello Marketing
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">{today}</p>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Grille principale : News (2/3) + colonne droite (1/3) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+      {/* Layout : 60 / 40 sur grand écran, 50/50 sur tablette, 1 col sur mobile */}
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 items-start">
+
+          {/* Colonne gauche — Newsletter (60%) */}
+          <div className="lg:col-span-3 md:col-span-1">
             <NewsSection />
           </div>
-          <div className="flex flex-col gap-6">
+
+          {/* Colonne droite — Météo + Musique + Anniversaires (40%) */}
+          <div className="lg:col-span-2 md:col-span-1 flex flex-col gap-5">
             <WeatherSection userId={user.id} />
             <MusicSection />
+            <BirthdaysSection />
           </div>
-        </div>
 
-        <BirthdaysSection />
+        </div>
       </div>
     </div>
   );
