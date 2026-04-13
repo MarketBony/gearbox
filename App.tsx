@@ -14,6 +14,7 @@ import Login from './pages/Login';
 import Settings from './pages/Settings';
 import HelloMarketing from './pages/HelloMarketing';
 import Games from './pages/Games';
+import TodoList from './pages/TodoList';
 import { db } from './services/dataService';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -56,6 +57,7 @@ const InnerApp: React.FC = () => {
     switch (tab) {
       case 'hello-marketing': return <HelloMarketing />;
       case 'games': return <Games />;
+      case 'todo': return <TodoList />;
       case 'dashboard': return <Dashboard />;
       case 'projects': return <Projects viewMode="current" />;
       case 'digital': return <Digital />;

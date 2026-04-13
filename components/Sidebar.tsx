@@ -24,7 +24,8 @@ import {
   MessageSquare,
   Bell,
   Sparkles,
-  Gamepad2
+  Gamepad2,
+  CheckSquare
 } from 'lucide-react';
 
 const relativeTime = (iso: string): string => {
@@ -151,6 +152,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     ...(canAccessGames ? [{ id: 'games', icon: Gamepad2, label: 'Jeux' }] : []),
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'projects', icon: FolderKanban, label: 'Projets' },
+    ...(!isExternal ? [{ id: 'todo', icon: CheckSquare, label: 'To-do' }] : []),
     { id: 'digital', icon: Globe, label: 'Digital' },
     { id: 'chat', icon: MessageSquare, label: 'Chat' },
     { id: 'campaigns', icon: Megaphone, label: 'Campagnes' },
