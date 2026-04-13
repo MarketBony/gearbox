@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles, RefreshCw, MapPin, Music, Cake, Play, Pause,
-  Cloud, ExternalLink, Loader2, ArrowUpRight, CalendarDays, Cookie
+  Cloud, ExternalLink, Loader2, ArrowUpRight, CalendarDays, Cookie, Car, Lightbulb
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
@@ -57,6 +57,19 @@ const RSS_FEEDS = [
 const SOURCE_COLOR: Record<string, string> = Object.fromEntries(
   RSS_FEEDS.map(f => [f.name, f.color])
 );
+
+const RSS_FEEDS_MARKETING = [
+  { name: 'Influencia',     url: 'https://www.influencia.net/fr/rss',         color: 'bg-pink-600' },
+  { name: 'BDM',            url: 'https://www.blogdumoderateur.com/feed/',     color: 'bg-blue-500' },
+  { name: 'JDN',            url: 'https://www.journaldunet.com/rss/',          color: 'bg-indigo-600' },
+  { name: 'Usine Digitale', url: 'https://www.usine-digitale.fr/rss',          color: 'bg-cyan-700' },
+];
+
+const SOURCE_COLOR_MARKETING: Record<string, string> = Object.fromEntries(
+  RSS_FEEDS_MARKETING.map(f => [f.name, f.color])
+);
+
+const RSS_MARKETING_CACHE_KEY = 'gearbox_rss_marketing_cache';
 
 const DEFAULT_WEATHER_CITY = 'Clermont-Ferrand';
 
@@ -277,7 +290,7 @@ const NewsSection: React.FC = () => {
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-bony-border shrink-0">
         <div>
           <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
-            <ExternalLink size={14} className="text-bony-orange" /> Actu Auto du Jour
+            <Car size={14} className="text-bony-orange" /> Actu Auto
           </h3>
           {lastFetch && <p className="text-[10px] text-slate-400 mt-0.5">Mis à jour à {lastFetch}</p>}
         </div>
@@ -299,7 +312,7 @@ const NewsSection: React.FC = () => {
           <p className="text-sm">Aucun article disponible.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {articles.map((art, i) => (
             <a
               key={i}
@@ -344,6 +357,147 @@ const NewsSection: React.FC = () => {
                 <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-white/5 mt-auto">
                   <span className="text-[9px] text-slate-400">{relativeDate(art.pubDate)}</span>
                   <span className="text-[9px] font-semibold text-bony-orange flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Voir <ArrowUpRight size={9} />
+                  </span>
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── 1b. Newsletter Marketing & Tech ─────────────────────────────────────────
+
+const MarketingNewsSection: React.FC = () => {
+  const [articles,  setArticles]  = useState<RssArticle[]>([]);
+  const [loading,   setLoading]   = useState(true);
+  const [lastFetch, setLastFetch] = useState('');
+
+  const load = async (force = false) => {
+    setLoading(true);
+    try {
+      if (!force) {
+        const cached = localStorage.getItem(RSS_MARKETING_CACHE_KEY);
+        if (cached) {
+          const { data, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < CACHE_24H) {
+            setArticles(data);
+            setLastFetch(new Date(timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      const fetchFeed = async (feed: typeof RSS_FEEDS_MARKETING[0]): Promise<RssArticle[]> => {
+        try {
+          const res = await fetch(CORSPROXY(feed.url));
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const xml = await res.text();
+          const parsed = parseRss(xml, feed.name);
+          console.log(`[RSS Marketing] ${feed.name} : ${parsed.length} articles`);
+          return parsed;
+        } catch (e) {
+          console.warn(`[RSS Marketing] ${feed.name} échoué :`, e);
+          return [];
+        }
+      };
+
+      const results = await Promise.allSettled(RSS_FEEDS_MARKETING.map(fetchFeed));
+      const all: RssArticle[] = [];
+      results.forEach(r => { if (r.status === 'fulfilled') all.push(...r.value); });
+      all.sort((a, b) => {
+        const ta = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+        const tb = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+        return tb - ta;
+      });
+
+      const top12 = all.slice(0, 12);
+      const now = Date.now();
+      localStorage.setItem(RSS_MARKETING_CACHE_KEY, JSON.stringify({ data: top12, timestamp: now }));
+      setArticles(top12);
+      setLastFetch(new Date(now).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm dark:shadow-xl flex flex-col">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-bony-border shrink-0">
+        <div>
+          <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+            <Lightbulb size={14} className="text-bony-violet" /> Marketing & Tech
+          </h3>
+          {lastFetch && <p className="text-[10px] text-slate-400 mt-0.5">Mis à jour à {lastFetch}</p>}
+        </div>
+        <button
+          onClick={() => load(true)}
+          disabled={loading}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-bony-violet hover:bg-slate-100 dark:hover:bg-white/5 transition disabled:opacity-40"
+          title="Rafraîchir"
+        >
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+
+      {loading ? (
+        <Spinner label="Chargement des flux RSS..." />
+      ) : articles.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
+          <Cloud size={36} strokeWidth={1} />
+          <p className="text-sm">Aucun article disponible.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {articles.map((art, i) => (
+            <a
+              key={i}
+              href={art.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex flex-col border-b border-r border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-all duration-200"
+            >
+              {/* Thumbnail */}
+              <div className="relative overflow-hidden" style={{ height: 140 }}>
+                {art.thumbnail ? (
+                  <img
+                    src={art.thumbnail}
+                    alt=""
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    onError={e => {
+                      const el = e.target as HTMLImageElement;
+                      el.parentElement!.style.background = 'linear-gradient(135deg,#7c3aed40,#0ea5e940)';
+                      el.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-bony-violet/20 to-bony-blue/20 flex items-center justify-center text-3xl font-bold text-bony-violet/30">
+                    {art.source.charAt(0)}
+                  </div>
+                )}
+                <span className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold text-white tracking-wider ${SOURCE_COLOR_MARKETING[art.source] || 'bg-slate-600'}`}>
+                  {art.source.toUpperCase()}
+                </span>
+              </div>
+
+              {/* Body */}
+              <div className="flex flex-col flex-1 p-3 gap-1.5">
+                <p className="text-[13px] font-semibold text-slate-900 dark:text-white leading-snug line-clamp-2 group-hover:text-bony-violet transition-colors">
+                  {art.title}
+                </p>
+                {art.description && (
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed flex-1">
+                    {art.description}
+                  </p>
+                )}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-white/5 mt-auto">
+                  <span className="text-[9px] text-slate-400">{relativeDate(art.pubDate)}</span>
+                  <span className="text-[9px] font-semibold text-bony-violet flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     Voir <ArrowUpRight size={9} />
                   </span>
                 </div>
@@ -1091,8 +1245,11 @@ const HelloMarketing: React.FC = () => {
 
         </div>
 
-        {/* ── Zone basse — Newsletter pleine largeur ─────────────────────── */}
-        <NewsSection />
+        {/* ── Zone basse — Newsletters en deux colonnes ──────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <NewsSection />
+          <MarketingNewsSection />
+        </div>
 
       </div>
     </div>
