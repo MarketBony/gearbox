@@ -834,7 +834,8 @@ const Digital: React.FC = () => {
   // Planning View State
   const [calendarView, setCalendarView] = useSessionState<CalendarView>('digital_calendarView', 'Mois');
   const [planningDate, setPlanningDate] = useState(new Date());
-  
+  const [mobileCalendarView, setMobileCalendarView] = useState<'Liste' | 'Calendrier'>('Liste');
+
   // Tooltip State
   const [hoveredPostId, setHoveredPostId] = useState<string | null>(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
@@ -842,6 +843,9 @@ const Digital: React.FC = () => {
   // Permissions
   const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Digital Manager';
   const canDelete = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Digital Manager';
+  // External role can edit in Calendrier Editorial only (create, modify, status, media)
+  const canEditCalendar = canEdit || user?.role === 'External';
+  const isExternal = user?.role === 'External';
 
   useEffect(() => {
       loadData();
@@ -863,7 +867,7 @@ const Digital: React.FC = () => {
   };
 
   const handleUpdatePost = async (updatedPost: SocialPost) => {
-      if (!canEdit) return;
+      if (!canEditCalendar) return;
       // Suppression automatique des médias lors de l'archivage
       const oldPost = posts.find(p => p.id === updatedPost.id);
       const isArchiving = oldPost && !oldPost.archived && updatedPost.archived;
@@ -901,7 +905,7 @@ const Digital: React.FC = () => {
   };
 
   const openCreatePostModal = () => {
-      if (!canEdit) return;
+      if (!canEditCalendar) return;
       setNewPostTitle('');
       setShowCreatePostModal(true);
   };
@@ -1079,37 +1083,33 @@ const Digital: React.FC = () => {
           return (
               <div className="grid grid-cols-7 gap-2 auto-rows-fr pb-4">
                   {days.map((day, idx) => {
-                      if (!day) return <div key={`empty-${idx}`} className="min-h-[120px]"></div>;
+                      if (!day) return <div key={`empty-${idx}`} className="min-h-[60px] lg:min-h-[120px]"></div>;
                       const isToday = day.toDateString() === new Date().toDateString();
                       const dayPosts = getPostsForDay(day);
 
                       return (
                           <div 
                               key={day.toISOString()} 
-                              className={`min-h-[140px] bg-white dark:bg-bony-panel border rounded-lg p-2 flex flex-col gap-1 transition-all ${isToday ? 'border-bony-orange/50 ring-1 ring-bony-orange/20' : 'border-bony-border'}`}
+                              className={`min-h-[80px] lg:min-h-[140px] bg-white dark:bg-bony-panel border rounded-lg p-1 lg:p-2 flex flex-col gap-0.5 lg:gap-1 transition-all ${isToday ? 'border-bony-orange/50 ring-1 ring-bony-orange/20' : 'border-bony-border'}`}
                           >
-                              <div className={`text-right text-xs font-bold mb-1 ${isToday ? 'text-bony-orange' : 'text-slate-400'}`}>
+                              <div className={`text-right text-[10px] font-bold mb-0.5 ${isToday ? 'text-bony-orange' : 'text-slate-400'}`}>
                                   {day.getDate()}
                               </div>
-                              <div className="flex-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar pr-1">
+                              <div className="flex-1 flex flex-col gap-0.5 lg:gap-1 overflow-y-auto custom-scrollbar pr-0.5">
                                   {dayPosts.map(post => {
                                       const statusColor = SOCIAL_STATUS_COLORS[post.status] || 'border-slate-500';
                                       const borderColor = statusColor.match(/border-([\w-]+)/)?.[1] || 'slate-500';
                                       return (
-                                          <div 
+                                          <div
                                               key={post.id}
                                               onMouseEnter={(e) => handlePostHover(e, post.id)}
                                               onMouseLeave={(e) => handlePostHover(e, null)}
-                                              className="group relative p-1.5 rounded border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/20 hover:border-bony-violet transition cursor-pointer flex items-start gap-2 overflow-hidden"
+                                              className="group relative p-1 rounded border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/20 hover:border-bony-violet transition cursor-pointer flex items-start gap-1 overflow-hidden"
                                           >
                                               <div className={`absolute left-0 top-0 bottom-0 w-0.5 bg-${borderColor}`}></div>
-                                              <div className="mt-0.5 shrink-0">{post.networks.length > 0 ? getSocialIcon(post.networks[0], 12) : <Globe size={12} className="text-slate-400"/>}</div>
+                                              <div className="hidden lg:block mt-0.5 shrink-0">{post.networks.length > 0 ? getSocialIcon(post.networks[0], 12) : <Globe size={12} className="text-slate-400"/>}</div>
                                               <div className="min-w-0">
-                                                  <div className="text-[10px] font-bold text-slate-800 dark:text-slate-200 truncate leading-tight">{post.title || "Sans titre"}</div>
-                                                  <div className="flex items-center gap-1 mt-0.5">
-                                                      {post.brands.length > 0 && <div className={`w-1.5 h-1.5 rounded-full ${BRAND_COLORS[post.brands[0]]?.split(' ')[0]}`}></div>}
-                                                      <span className="text-[8px] text-slate-500 truncate">{post.status}</span>
-                                                  </div>
+                                                  <div className="text-[8px] lg:text-[10px] font-bold text-slate-800 dark:text-slate-200 truncate leading-tight line-clamp-1">{post.title || "Sans titre"}</div>
                                               </div>
                                           </div>
                                       );
@@ -1185,21 +1185,21 @@ const Digital: React.FC = () => {
               {renderTooltip()}
               
               {/* Controls */}
-              <div className="flex justify-between items-center px-6 py-4 border-b border-bony-border bg-white dark:bg-bony-panel shrink-0">
-                  <div className="flex items-center gap-4">
-                      <h3 className="text-xl font-title text-slate-900 dark:text-white capitalize min-w-[200px]">
+              <div className="flex flex-wrap justify-between items-center gap-2 px-3 md:px-6 py-3 md:py-4 border-b border-bony-border bg-white dark:bg-bony-panel shrink-0">
+                  <div className="flex items-center gap-2 md:gap-4 flex-wrap">
+                      <h3 className="text-sm md:text-xl font-title text-slate-900 dark:text-white capitalize md:min-w-[200px]">
                           {titleLabel}
                       </h3>
                       <div className="flex bg-slate-100 dark:bg-black/30 rounded-lg p-1 border border-bony-border">
                           <button onClick={handlePrev} className="p-1 hover:text-bony-orange text-slate-500 transition"><ChevronLeft size={18}/></button>
-                          <button onClick={handleToday} className="px-3 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase hover:text-slate-900 dark:hover:text-white transition">Aujourd'hui</button>
+                          <button onClick={handleToday} className="px-2 md:px-3 text-xs font-bold text-slate-600 dark:text-slate-300 uppercase hover:text-slate-900 dark:hover:text-white transition">Auj.</button>
                           <button onClick={handleNext} className="p-1 hover:text-bony-orange text-slate-500 transition"><ChevronRight size={18}/></button>
                       </div>
-                      
+
                       {/* View Switcher */}
-                      <div className="flex bg-slate-100 dark:bg-black/30 rounded-lg p-1 border border-bony-border ml-2">
-                          <button onClick={() => setCalendarView('Mois')} className={`px-3 py-1 rounded text-xs font-bold uppercase transition ${calendarView === 'Mois' ? 'bg-white dark:bg-bony-panel text-bony-orange shadow' : 'text-slate-500'}`}>Mois</button>
-                          <button onClick={() => setCalendarView('Semaine')} className={`px-3 py-1 rounded text-xs font-bold uppercase transition ${calendarView === 'Semaine' ? 'bg-white dark:bg-bony-panel text-bony-orange shadow' : 'text-slate-500'}`}>Semaine</button>
+                      <div className="flex bg-slate-100 dark:bg-black/30 rounded-lg p-1 border border-bony-border">
+                          <button onClick={() => setCalendarView('Mois')} className={`px-2 md:px-3 py-1 rounded text-xs font-bold uppercase transition ${calendarView === 'Mois' ? 'bg-white dark:bg-bony-panel text-bony-orange shadow' : 'text-slate-500'}`}>Mois</button>
+                          <button onClick={() => setCalendarView('Semaine')} className={`px-2 md:px-3 py-1 rounded text-xs font-bold uppercase transition ${calendarView === 'Semaine' ? 'bg-white dark:bg-bony-panel text-bony-orange shadow' : 'text-slate-500'}`}>Sem.</button>
                       </div>
                   </div>
 
@@ -1214,36 +1214,104 @@ const Digital: React.FC = () => {
                               </optgroup>
                           ))}
                       </select>
-                      <div className="text-xs text-slate-500 font-sans border-l border-bony-border pl-2 ml-2">
+                      <div className="hidden md:block text-xs text-slate-500 font-sans border-l border-bony-border pl-2 ml-2">
                           {filteredPosts.length} posts
                       </div>
                   </div>
               </div>
 
-              {/* Mobile: list of upcoming posts instead of calendar grid */}
-              <div className="md:hidden overflow-y-auto flex-1 p-3 space-y-2">
-                  {filteredPosts.length > 0 ? (
-                      filteredPosts
+              {/* Mobile: toggle button Liste / Calendrier */}
+              <div className="md:hidden flex items-center justify-between px-4 py-2 border-b border-bony-border bg-bony-panel shrink-0">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                      {filteredPosts.length} publication{filteredPosts.length !== 1 ? 's' : ''}
+                  </span>
+                  <button
+                      onClick={() => setMobileCalendarView(v => v === 'Liste' ? 'Calendrier' : 'Liste')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-100 dark:bg-black/30 border border-bony-border text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-black/40 transition"
+                  >
+                      {mobileCalendarView === 'Liste'
+                          ? <><Calendar size={12}/> Vue Calendrier</>
+                          : <><LayoutList size={12}/> Vue Liste</>
+                      }
+                  </button>
+              </div>
+
+              {/* Mobile: liste chronologique */}
+              {mobileCalendarView === 'Liste' && (
+                  <div className="md:hidden overflow-y-auto flex-1 p-3 space-y-2">
+                      {filteredPosts.length > 0 ? filteredPosts
                           .slice()
                           .sort((a, b) => a.date.localeCompare(b.date))
-                          .map(post => (
-                              <div key={post.id} className="bg-bony-panel border border-bony-border rounded-lg p-3 space-y-1">
-                                  <div className="flex items-center justify-between">
-                                      <span className="text-xs font-bold text-bony-orange">{parseLocalDate(post.date).toLocaleDateString('fr-FR')}</span>
-                                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border border-bony-border text-slate-500">{post.status}</span>
+                          .map(post => {
+                              const sc = SOCIAL_STATUS_COLORS[post.status] || '';
+                              return (
+                                  <div key={post.id} className="bg-white dark:bg-bony-panel border border-bony-border rounded-xl p-3 space-y-2">
+                                      <div className="flex items-center justify-between">
+                                          <span className="text-xs font-bold text-bony-orange">
+                                              {parseLocalDate(post.date).toLocaleDateString('fr-FR')}
+                                          </span>
+                                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${sc}`}>{post.status}</span>
+                                      </div>
+                                      <p className="text-sm font-bold text-bony-text leading-tight line-clamp-2">{post.title || 'Sans titre'}</p>
+                                      <div className="flex items-center justify-between">
+                                          <div className="flex gap-1.5">
+                                              {post.networks.slice(0, 4).map(n => <div key={n}>{getSocialIcon(n, 14)}</div>)}
+                                          </div>
+                                          <div className="flex flex-wrap gap-1 justify-end">
+                                              {post.brands.slice(0, 3).map(b => (
+                                                  <span key={b} className={`text-[8px] px-1.5 py-0.5 rounded border uppercase font-bold ${BRAND_COLORS[b]}`}>{b}</span>
+                                              ))}
+                                          </div>
+                                      </div>
                                   </div>
-                                  <p className="text-sm font-medium text-bony-text truncate">{post.title || 'Sans titre'}</p>
-                                  <p className="text-xs text-slate-500 truncate">{post.concessions?.slice(0,2).join(', ')}</p>
+                              );
+                          })
+                      : (
+                          <div className="text-center py-10 text-slate-500 text-sm">Aucune publication</div>
+                      )}
+                  </div>
+              )}
+
+              {/* Mobile: vue calendrier (quand togglée) */}
+              {mobileCalendarView === 'Calendrier' && (
+                  <div className="md:hidden flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-2">
+                      {calendarView === 'Mois' && (
+                          <div className="grid grid-cols-7 mb-1 shrink-0">
+                              {weekDays.map(d => (
+                                  <div key={d} className="text-center text-[8px] font-bold text-slate-400 uppercase">{d[0]}</div>
+                              ))}
+                          </div>
+                      )}
+                      {calendarView === 'Mois' ? renderMonthGrid() : (
+                          <div className="overflow-x-auto custom-scrollbar">
+                              <div className="min-w-[480px]">
+                                  {renderWeekGrid()}
                               </div>
-                          ))
-                  ) : (
-                      <div className="text-center py-10 text-slate-500 text-sm">Aucune publication</div>
+                          </div>
+                      )}
+                  </div>
+              )}
+
+              {/* Tablette (md → lg) : calendrier avec scroll horizontal contrôlé sur vue Semaine */}
+              <div className="hidden md:flex lg:hidden flex-col flex-1 min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-3">
+                  {calendarView === 'Mois' && (
+                      <div className="grid grid-cols-7 mb-2 shrink-0">
+                          {weekDays.map(d => (
+                              <div key={d} className="text-center text-[9px] font-bold text-slate-400 uppercase tracking-wide">{d}</div>
+                          ))}
+                      </div>
+                  )}
+                  {calendarView === 'Mois' ? renderMonthGrid() : (
+                      <div className="overflow-x-auto custom-scrollbar">
+                          <div className="min-w-[640px] h-full">
+                              {renderWeekGrid()}
+                          </div>
+                      </div>
                   )}
               </div>
 
-              {/* Desktop: calendar grid */}
-              <div className="hidden md:flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-4">
-                  {/* Header Row (Only needed for Month View here, Week view has headers inside columns) */}
+              {/* Desktop (lg+) : grille calendrier inchangée */}
+              <div className="hidden lg:flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-4">
                   {calendarView === 'Mois' && (
                       <div className="grid grid-cols-7 mb-2 shrink-0">
                           {weekDays.map(d => (
@@ -1253,7 +1321,6 @@ const Digital: React.FC = () => {
                           ))}
                       </div>
                   )}
-
                   {calendarView === 'Mois' ? renderMonthGrid() : renderWeekGrid()}
               </div>
           </div>
@@ -1295,7 +1362,7 @@ const Digital: React.FC = () => {
                             post={post}
                             onUpdate={handleUpdatePost}
                             onDelete={handleDeletePost}
-                            canEdit={canEdit}
+                            canEdit={canEditCalendar}
                             canDelete={canDelete}
                             isArchivedView={isArchivedView}
                             networkOptions={tags.networks}
@@ -1366,14 +1433,14 @@ const Digital: React.FC = () => {
                 </div>
                 
                 <div className="flex items-center gap-4">
-                    {!canEdit && (
+                    {!canEditCalendar && (
                         <div className="flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-xs font-bold uppercase">
                             <Lock size={12}/> Lecture Seule
                         </div>
                     )}
                     {/* Tabs */}
                     <div className="bg-slate-100 dark:bg-black/30 p-1 rounded-lg border border-bony-border flex flex-wrap gap-1">
-                        {(['Calendrier Editorial', 'Planning Digital', 'Archives', 'Gestion des TAGS'] as Tab[]).map(tab => (
+                        {(['Calendrier Editorial', 'Planning Digital', 'Archives', 'Gestion des TAGS'] as Tab[]).filter(tab => !isExternal || tab === 'Calendrier Editorial').map(tab => (
                             <button 
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
@@ -1429,7 +1496,7 @@ const Digital: React.FC = () => {
                     <div className="flex-1"></div>
 
                     {/* Add Button */}
-                    {canEdit && activeTab === 'Calendrier Editorial' && (
+                    {canEditCalendar && activeTab === 'Calendrier Editorial' && (
                         <button
                             onClick={openCreatePostModal}
                             className="flex items-center gap-2 px-6 py-2 bg-bony-gradient hover:opacity-90 text-white rounded-lg transition shadow-lg shadow-bony-violet/20"
@@ -1452,7 +1519,7 @@ const Digital: React.FC = () => {
             return (
                 <MediaManagerModal
                     post={post}
-                    canEdit={canEdit && !post.archived}
+                    canEdit={canEditCalendar && !post.archived}
                     uploaderName={user?.name ?? 'Utilisateur'}
                     onClose={() => setMediaModalPostId(null)}
                     onCountChange={handleMediaCountChange}
