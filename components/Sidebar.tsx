@@ -213,21 +213,20 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             ? [{ label: '', items: mainItems }]
             : [
                 {
-                  label: 'PRINCIPAL',
+                  label: '',
                   items: [{ id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' }],
                 },
                 {
-                  label: 'PROJETS',
+                  label: 'GESTION DE PROJETS',
                   items: [
                     { id: 'projects', icon: FolderKanban, label: 'Projets' },
                     { id: 'todo', icon: CheckSquare, label: 'To-do' },
                   ],
                 },
                 {
-                  label: 'DIGITAL',
+                  label: 'COM DIGITALE',
                   items: [
                     { id: 'digital', icon: Globe, label: 'Digital' },
-                    { id: 'chat', icon: MessageSquare, label: 'Chat' },
                     { id: 'campaigns', icon: Megaphone, label: 'Campagnes' },
                   ],
                 },
@@ -236,6 +235,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                   items: [
                     { id: 'hello-marketing', icon: Sparkles, label: 'Hello Marketing' },
                     ...(canAccessGames ? [{ id: 'games', icon: Gamepad2, label: 'Jeux' }] : []),
+                    { id: 'chat', icon: MessageSquare, label: 'Chat' },
                   ],
                 },
                 {
@@ -353,66 +353,44 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
         <div className="border-t border-bony-border bg-bony-dark shrink-0">
 
           {/* Desktop lg: compact user card + actions */}
-          <div className="hidden lg:flex flex-col gap-1 p-3">
-            {/* User info row */}
-            <div className="flex items-center gap-2 mb-0.5">
+          <div className="hidden lg:flex flex-col p-3 gap-2">
+            {/* Row 1: user info + settings */}
+            <div className="flex items-center gap-2">
               {user && <Avatar userId={user.id} name={user.name} color={user.avatarColor} size={28} />}
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-bold text-bony-text truncate leading-tight">{user?.name}</p>
-                <p className="text-[10px] text-bony-muted truncate leading-tight flex items-center gap-1">
-                  {user?.role}
-                  {user?.role === 'Digital Manager' && <Globe size={9} className="text-bony-violet shrink-0" />}
-                  {user?.role === 'External' && <span className="text-[8px] font-bold text-cyan-500 border border-cyan-500/40 rounded px-0.5">EXT</span>}
-                </p>
+                <p className="text-[12px] font-semibold text-bony-text truncate leading-tight">{user?.name}</p>
+                <p className="text-[10px] text-bony-muted truncate leading-tight">{user?.role}</p>
               </div>
               {!isExternal && (
                 <button
-                  onClick={openActivity}
-                  className="relative p-1.5 rounded hover:bg-white/10 text-bony-text/40 hover:text-bony-orange transition-colors shrink-0"
-                  title="Fil d'actualité"
+                  onClick={() => setActiveTab('settings')}
+                  className="p-1 rounded hover:bg-white/5 text-bony-text/40 hover:text-bony-text transition-colors shrink-0"
                 >
-                  <Bell size={14} />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-bony-orange text-white text-[8px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
+                  <Settings size={14} />
                 </button>
               )}
             </div>
 
-            {/* Actions row 1: theme + settings */}
-            <div className="flex gap-1">
+            {/* Separator */}
+            <div className="border-t border-bony-border/40" />
+
+            {/* Row 2: theme + logout */}
+            <div className="flex items-center justify-between">
               <button
                 onClick={toggleTheme}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1 rounded hover:bg-white/10 text-bony-text/50 hover:text-bony-text transition-colors"
+                className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 text-bony-text/50 hover:text-bony-text transition-colors"
               >
-                {theme === 'dark' ? <Sun size={12} className="text-yellow-400" /> : <Moon size={12} className="text-blue-500" />}
-                <span className="text-[11px]">{theme === 'dark' ? 'Mode Clair' : 'Sombre'}</span>
+                {theme === 'dark' ? <Sun size={15} className="text-yellow-400" /> : <Moon size={15} className="text-blue-500" />}
+                <span className="text-[11px]">{theme === 'dark' ? 'Clair' : 'Sombre'}</span>
               </button>
-              {!isExternal && (
-                <button
-                  onClick={() => setActiveTab('settings')}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-1 rounded transition-colors ${
-                    activeTab === 'settings'
-                      ? 'text-bony-text bg-white/10'
-                      : 'text-bony-text/50 hover:bg-white/10 hover:text-bony-text'
-                  }`}
-                >
-                  <Settings size={12} />
-                  <span className="text-[11px]">Paramètres</span>
-                </button>
-              )}
+              <button
+                onClick={logout}
+                className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 text-red-400 hover:text-red-300 transition-colors"
+              >
+                <LogOut size={15} />
+                <span className="text-[11px]">Déconnexion</span>
+              </button>
             </div>
-
-            {/* Actions row 2: logout */}
-            <button
-              onClick={logout}
-              className="w-full flex items-center justify-center gap-1.5 py-1 rounded hover:bg-red-500/10 text-bony-text/40 hover:text-red-400 transition-colors"
-            >
-              <LogOut size={12} />
-              <span className="text-[11px]">Déconnecter</span>
-            </button>
           </div>
 
           {/* Tablet md: icon buttons */}
