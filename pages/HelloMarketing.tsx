@@ -794,7 +794,7 @@ const NextEventSection: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1">
+    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm h-full flex flex-col">
       <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border shrink-0">
         <h3 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
           <CalendarDays size={13} className="text-bony-orange" /> Prochains Événements
@@ -897,7 +897,7 @@ const ViennoiseriesSection: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm h-full flex flex-col">
+    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1">
       <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border shrink-0 flex items-center justify-between">
         <h3 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
           <Cookie size={13} className="text-amber-500" /> 🥐 Viennoiseries de la semaine
