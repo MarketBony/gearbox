@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles, RefreshCw, MapPin, Music, Cake, Play, Pause,
-  Cloud, ExternalLink, Loader2, ArrowUpRight, CalendarDays
+  Cloud, ExternalLink, Loader2, ArrowUpRight, CalendarDays, Cookie
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
@@ -682,51 +682,52 @@ const BirthdaysSection: React.FC = () => {
         const bday = new Date(birthdate);
         const next = new Date(today.getFullYear(), bday.getMonth(), bday.getDate());
         if (next < today) next.setFullYear(today.getFullYear() + 1);
-        const daysUntil = Math.round((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        const daysUntil = Math.ceil((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         result.push({ user: u, daysUntil, age: next.getFullYear() - bday.getFullYear() });
       }
 
       result.sort((a, b) => a.daysUntil - b.daysUntil);
-      setEntries(result.slice(0, 5));
+      setEntries(result);
       setLoading(false);
     })();
   }, []);
 
   return (
-    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm">
-      <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border">
+    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm h-48 flex flex-col">
+      <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border shrink-0">
         <h3 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
           <Cake size={13} className="text-pink-500" /> Anniversaires
         </h3>
       </div>
-      <div className="p-3">
+      <div className="p-3 overflow-hidden flex-1 flex items-center">
         {loading ? <Spinner small /> : entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-4 gap-1.5 text-slate-400">
+          <div className="flex flex-col items-center justify-center w-full gap-1.5 text-slate-400">
             <Cake size={20} strokeWidth={1} />
             <p className="text-[10px]">Aucun anniversaire renseigné.</p>
           </div>
         ) : (
-          <div className="space-y-1.5">
+          <div className="flex flex-row gap-3 overflow-x-auto w-full pb-1 custom-scrollbar">
             {entries.map(({ user, daysUntil, age }) => (
-              <div key={user.id}
-                className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition ${
-                  daysUntil === 0
-                    ? 'bg-pink-50 dark:bg-pink-500/10 border border-pink-200 dark:border-pink-500/20'
-                    : 'hover:bg-slate-50 dark:hover:bg-white/3'
-                }`}
-              >
-                <Avatar userId={user.id} name={user.name} color={user.avatarColor} size={30} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-semibold text-slate-900 dark:text-white truncate">{user.name}</p>
-                  <p className="text-[9px] text-slate-400">{age} ans</p>
+              <div key={user.id} className="flex flex-col items-center gap-1 min-w-[72px] shrink-0">
+                {/* Avatar avec badge si aujourd'hui */}
+                <div className="relative">
+                  <Avatar userId={user.id} name={user.name} color={user.avatarColor} size={36} />
+                  {daysUntil === 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-pink-500 rounded-full flex items-center justify-center shadow">
+                      <Cake size={8} className="text-white" />
+                    </span>
+                  )}
                 </div>
+                {/* Prénom seulement */}
+                <p className="text-[10px] font-semibold text-slate-900 dark:text-white text-center truncate w-full leading-tight">
+                  {user.name.split(' ')[0]}
+                </p>
+                <p className="text-[9px] text-slate-400 leading-none">{age} ans</p>
                 {daysUntil === 0 ? (
-                  <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-pink-500 text-white text-[8px] font-bold animate-pulse shadow-sm shadow-pink-500/40 shrink-0">
-                    <Cake size={8} /> Auj. !
-                  </span>
+                  <span className="text-[8px] font-bold text-pink-500 animate-pulse">Auj. !</span>
                 ) : (
-                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
-                    {daysUntil === 1 ? 'demain' : `${daysUntil}j`}
+                  <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">
+                    {daysUntil === 1 ? 'demain' : `dans ${daysUntil}j`}
                   </span>
                 )}
               </div>
@@ -750,54 +751,60 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
 };
 
 const NextEventSection: React.FC = () => {
-  const [project,   setProject]   = useState<Project | null>(null);
-  const [daysUntil, setDaysUntil] = useState(0);
-  const [loading,   setLoading]   = useState(true);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [, setTick] = useState(0); // force re-render pour compteur live
 
   const computeDays = (startDate: string): number => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return Math.ceil((new Date(startDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    return Math.ceil((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   };
 
   useEffect(() => {
     (async () => {
-      const projects = await db.getProjects();
+      const all = await db.getProjects();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const upcoming = projects
-        .filter(p =>
-          (p.status === 'Active' || p.status === 'Draft') &&
-          EVENT_PROJECT_TYPES.includes(p.projectType) &&
-          new Date(p.startDate) >= today
-        )
-        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+      const upcoming = all
+        .filter(p => {
+          const start = new Date(p.startDate);
+          start.setHours(0, 0, 0, 0);
+          return (
+            (p.status === 'Active' || p.status === 'Draft') &&
+            EVENT_PROJECT_TYPES.includes(p.projectType) &&
+            start.getTime() >= today.getTime()
+          );
+        })
+        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+        .slice(0, 3);
 
-      const next = upcoming[0] || null;
-      setProject(next);
-      if (next) setDaysUntil(computeDays(next.startDate));
+      setProjects(upcoming);
       setLoading(false);
     })();
   }, []);
 
   // Rafraîchit le compteur chaque minute
   useEffect(() => {
-    if (!project) return;
-    const id = setInterval(() => setDaysUntil(computeDays(project.startDate)), 60000);
+    const id = setInterval(() => setTick(t => t + 1), 60000);
     return () => clearInterval(id);
-  }, [project]);
+  }, []);
 
   return (
     <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1">
       <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border shrink-0">
         <h3 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-          <CalendarDays size={13} className="text-bony-orange" /> Prochain Événement
+          <CalendarDays size={13} className="text-bony-orange" /> Prochains Événements
         </h3>
       </div>
-      <div className="p-4 flex flex-col flex-1">
-        {loading ? <Spinner small /> : !project ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-2 text-slate-400 py-2">
+      <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/5 flex-1">
+        {loading ? (
+          <div className="p-3"><Spinner small /></div>
+        ) : projects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center flex-1 gap-2 text-slate-400 p-4">
             <CalendarDays size={22} strokeWidth={1} />
             <p className="text-[10px] text-center leading-relaxed">
               Aucun événement à venir.<br />
@@ -805,32 +812,132 @@ const NextEventSection: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col flex-1">
-            {/* Compteur J- */}
-            <div className="flex items-baseline gap-1 mb-3">
-              <span className="text-4xl font-bold text-bony-orange leading-none">
-                {daysUntil === 0 ? 'Auj.' : `J-${daysUntil}`}
-              </span>
-              {daysUntil > 0 && <span className="text-[10px] text-slate-400 ml-1">jours</span>}
-            </div>
+          projects.map(project => {
+            const days = computeDays(project.startDate);
+            return (
+              <div key={project.id} className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition flex-1">
+                {/* Compteur J- */}
+                <div className="shrink-0 w-9 text-center pt-0.5">
+                  <div className="text-sm font-bold text-bony-orange leading-none">
+                    {days === 0 ? 'Auj.' : `J-${days}`}
+                  </div>
+                  {days > 0 && <div className="text-[8px] text-slate-400 mt-0.5">jours</div>}
+                </div>
+                {/* Infos */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-bold text-slate-900 dark:text-white leading-snug truncate">{project.name}</p>
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-bold ${EVENT_TYPE_COLORS[project.projectType] || 'bg-slate-100 dark:bg-white/10 text-slate-600'}`}>
+                      {project.projectType}
+                    </span>
+                    <span className="text-[9px] text-slate-400 flex items-center gap-0.5">
+                      <MapPin size={8} className="shrink-0" />{project.site}
+                    </span>
+                  </div>
+                  <p className="text-[9px] text-slate-400 mt-1">
+                    {capitalizeFirst(new Date(project.startDate + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }))}
+                  </p>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+};
 
-            {/* Infos projet — poussées en bas */}
-            <div className="flex flex-col gap-2 mt-auto">
-              <p className="text-xs font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
-                {project.name}
-              </p>
-              <span className={`self-start px-2 py-0.5 rounded-full text-[9px] font-bold ${EVENT_TYPE_COLORS[project.projectType] || 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300'}`}>
-                {project.projectType}
-              </span>
-              <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
-                <MapPin size={10} className="shrink-0" />
-                <span className="truncate">{project.site}</span>
+// ─── 6. Viennoiseries de la semaine ──────────────────────────────────────────
+
+const VIENNOISERIES_ROLES = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'];
+
+/** Numéro de semaine ISO 8601 */
+const getWeekNumber = (date: Date): number => {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+};
+
+const ViennoiseriesSection: React.FC = () => {
+  const [designated, setDesignated] = useState<User | null>(null);
+  const [history,    setHistory]    = useState<{ label: string; user: User }[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const users = await db.getUsers();
+      const eligible = users.filter(u => VIENNOISERIES_ROLES.includes(u.role));
+      if (eligible.length === 0) { setLoading(false); return; }
+
+      const pick = (week: number, year: number): User => {
+        const seed = year * 100 + week;
+        return eligible[((seed % eligible.length) + eligible.length) % eligible.length];
+      };
+
+      const now = new Date();
+      const currentWeek = getWeekNumber(now);
+      const year = now.getFullYear();
+
+      setDesignated(pick(currentWeek, year));
+
+      // 4 semaines précédentes
+      const hist: { label: string; user: User }[] = [];
+      for (let i = 1; i <= 4; i++) {
+        let w = currentWeek - i;
+        let y = year;
+        if (w <= 0) { w += 52; y -= 1; }
+        hist.push({ label: `Semaine ${w}`, user: pick(w, y) });
+      }
+      setHistory(hist);
+      setLoading(false);
+    })();
+  }, []);
+
+  return (
+    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm h-full flex flex-col">
+      <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border shrink-0 flex items-center justify-between">
+        <h3 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
+          <Cookie size={13} className="text-amber-500" /> 🥐 Viennoiseries de la semaine
+        </h3>
+        <button
+          onClick={() => setShowHistory(v => !v)}
+          className="text-[10px] text-slate-400 hover:text-bony-orange transition font-medium"
+        >
+          {showHistory ? 'Fermer' : 'Historique'}
+        </button>
+      </div>
+
+      <div className="p-4 flex flex-col flex-1">
+        {loading ? <Spinner small /> : !designated ? (
+          <div className="flex items-center justify-center flex-1 text-slate-400">
+            <p className="text-[10px]">Aucun utilisateur éligible.</p>
+          </div>
+        ) : showHistory ? (
+          /* Historique 4 semaines */
+          <div className="flex flex-col gap-2">
+            {history.map(({ label, user }) => (
+              <div key={label} className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-white/[0.03] transition">
+                <Avatar userId={user.id} name={user.name} color={user.avatarColor} size={26} />
+                <span className="text-[11px] text-slate-800 dark:text-slate-200 flex-1 truncate font-medium">{user.name}</span>
+                <span className="text-[9px] text-slate-400 shrink-0">{label}</span>
               </div>
-              <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
-                <CalendarDays size={10} className="shrink-0" />
-                <span>{capitalizeFirst(new Date(project.startDate + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span>
-              </div>
+            ))}
+          </div>
+        ) : (
+          /* Désigné de la semaine */
+          <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center">
+            <div className="relative">
+              <Avatar userId={designated.id} name={designated.name} color={designated.avatarColor} size={60} />
+              <span className="absolute -bottom-1 -right-1 text-xl">🥐</span>
             </div>
+            <div>
+              <p className="text-base font-bold text-slate-900 dark:text-white">{designated.name}</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">{designated.role}</p>
+            </div>
+            <p className="text-[11px] text-bony-orange font-semibold">C'est son tour cette semaine !</p>
           </div>
         )}
       </div>
@@ -896,12 +1003,12 @@ const HelloMarketing: React.FC = () => {
             )}
           </div>
 
-          {/* Bas gauche — Musique du jour */}
+          {/* Bas gauche — Viennoiseries de la semaine */}
           <div className="flex flex-col">
-            <MusicSection />
+            <ViennoiseriesSection />
           </div>
 
-          {/* Bas droite — Anniversaires + Prochain événement */}
+          {/* Bas droite — Anniversaires + Prochains événements */}
           <div className="flex flex-col gap-3 h-full">
             <BirthdaysSection />
             <NextEventSection />
