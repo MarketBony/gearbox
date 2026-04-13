@@ -27,8 +27,8 @@ import {
   Search,
 } from 'lucide-react';
 import { 
-  BarChart, LabelList, ResponsiveContainer, Tooltip,
-  ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Legend, Area, Cell
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
+  ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Area
 } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -834,47 +834,46 @@ const Dashboard: React.FC = () => {
 
               {/* RIGHT: MIX SERVICE (1/3) */}
               <div className="bg-bony-panel border border-bony-border rounded-xl p-5 flex flex-col shadow-sm">
-                   <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-4 flex items-center gap-2">
+                   <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-2 flex items-center gap-2">
                       <Target size={16} className="text-bony-violet"/> Mix Activité
                    </h3>
                    {stats.serviceChartData.length === 0 ? (
                        <div className="flex-1 flex items-center justify-center text-slate-500 text-xs italic">Aucune donnée</div>
-                   ) : (() => {
-                       const total = stats.serviceChartData.reduce((s, d) => s + d.value, 0);
-                       return (
-                           <ResponsiveContainer width="100%" height={180}>
-                               <BarChart
-                                   layout="vertical"
+                   ) : (
+                       <ResponsiveContainer width="100%" height={220} minHeight={220}>
+                           <PieChart>
+                               <Pie
                                    data={stats.serviceChartData}
-                                   margin={{ top: 0, right: 140, left: 8, bottom: 0 }}
+                                   cx="50%"
+                                   cy="45%"
+                                   outerRadius={70}
+                                   paddingAngle={2}
+                                   dataKey="value"
+                                   stroke="none"
+                                   label={({ name, percent }: { name: string; percent: number }) => `${name}: ${Math.round(percent * 100)}%`}
+                                   labelLine={false}
                                >
-                                   <XAxis type="number" hide />
-                                   <YAxis
-                                       type="category"
-                                       dataKey="name"
-                                       width={36}
-                                       tick={{ fontSize: 12, fontWeight: 700, fill: theme === 'dark' ? '#cbd5e1' : '#334155' }}
-                                       axisLine={false}
-                                       tickLine={false}
-                                   />
-                                   <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={22}>
-                                       {stats.serviceChartData.map(entry => (
-                                           <Cell key={entry.name} fill={PIE_COLORS[entry.name] || COLORS.slate} />
-                                       ))}
-                                       <LabelList
-                                           dataKey="value"
-                                           position="right"
-                                           formatter={(v: number) => {
-                                               const pct = total > 0 ? Math.round(v / total * 100) : 0;
-                                               return `${pct}% · ${formatCurrency(v)}`;
-                                           }}
-                                           style={{ fontSize: 11, fill: theme === 'dark' ? '#94a3b8' : '#475569', fontWeight: 500 }}
-                                       />
-                                   </Bar>
-                               </BarChart>
-                           </ResponsiveContainer>
-                       );
-                   })()}
+                                   {stats.serviceChartData.map(entry => (
+                                       <Cell key={entry.name} fill={PIE_COLORS[entry.name] || COLORS.slate} />
+                                   ))}
+                               </Pie>
+                               <Tooltip
+                                   contentStyle={{
+                                       backgroundColor: theme === 'dark' ? '#1e1e1e' : '#ffffff',
+                                       borderRadius: '8px',
+                                       borderColor: theme === 'dark' ? '#333' : '#e2e8f0',
+                                       color: theme === 'dark' ? '#fff' : '#0f172a'
+                                   }}
+                                   formatter={(value: number) => formatCurrency(value)}
+                               />
+                               <Legend
+                                   iconType="circle"
+                                   iconSize={8}
+                                   wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
+                               />
+                           </PieChart>
+                       </ResponsiveContainer>
+                   )}
               </div>
           </div>
 
