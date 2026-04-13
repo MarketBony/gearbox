@@ -840,18 +840,29 @@ const Dashboard: React.FC = () => {
                    {stats.serviceChartData.length === 0 ? (
                        <div className="flex-1 flex items-center justify-center text-slate-500 text-xs italic">Aucune donnée</div>
                    ) : (
-                       <ResponsiveContainer width="100%" height={220} minHeight={220}>
+                       <ResponsiveContainer width="100%" height={260}>
                            <PieChart>
                                <Pie
                                    data={stats.serviceChartData}
                                    cx="50%"
-                                   cy="45%"
-                                   outerRadius={70}
-                                   paddingAngle={2}
+                                   cy="50%"
+                                   outerRadius={90}
                                    dataKey="value"
                                    stroke="none"
-                                   label={({ name, percent }: { name: string; percent: number }) => `${name}: ${Math.round(percent * 100)}%`}
                                    labelLine={false}
+                                   label={({ percent, x, y, fill }: { percent: number; x: number; y: number; fill: string }) => {
+                                       if (percent < 0.05) return null;
+                                       return (
+                                           <text
+                                               x={x} y={y}
+                                               textAnchor="middle"
+                                               dominantBaseline="central"
+                                               style={{ fontWeight: 600, fontSize: 13, fill: theme === 'dark' ? '#f1f5f9' : '#1e293b' }}
+                                           >
+                                               {`${Math.round(percent * 100)}%`}
+                                           </text>
+                                       );
+                                   }}
                                >
                                    {stats.serviceChartData.map(entry => (
                                        <Cell key={entry.name} fill={PIE_COLORS[entry.name] || COLORS.slate} />
@@ -867,9 +878,12 @@ const Dashboard: React.FC = () => {
                                    formatter={(value: number) => formatCurrency(value)}
                                />
                                <Legend
+                                   layout="horizontal"
+                                   verticalAlign="bottom"
+                                   align="center"
                                    iconType="circle"
-                                   iconSize={8}
-                                   wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
+                                   iconSize={10}
+                                   wrapperStyle={{ fontSize: '12px', paddingTop: '4px' }}
                                />
                            </PieChart>
                        </ResponsiveContainer>
