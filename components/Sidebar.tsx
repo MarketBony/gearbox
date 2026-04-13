@@ -371,6 +371,25 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
               )}
             </div>
 
+            {/* Fil d'actualité */}
+            {!isExternal && (
+              <button
+                onClick={openActivity}
+                className="relative flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 text-bony-text/50 hover:text-bony-orange transition-colors w-full"
+              >
+                <div className="relative shrink-0">
+                  <Bell size={15} />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[13px] h-[13px] bg-bony-orange text-white text-[8px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[12px]">Fil d'actualité</span>
+                {unreadCount > 0 && <span className="ml-auto text-[10px] text-bony-orange font-semibold">{unreadCount} non lu{unreadCount > 1 ? 's' : ''}</span>}
+              </button>
+            )}
+
             {/* Separator */}
             <div className="border-t border-bony-border/40" />
 
