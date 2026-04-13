@@ -269,6 +269,12 @@ class DataService {
   }
 
   logActivity(entry: ActivityLog) {
+    // Actions du Master invisibles dans le fil d'actualité
+    try {
+      const users: User[] = JSON.parse(localStorage.getItem('gearbox_users') || '[]');
+      const actor = users.find(u => u.id === entry.userId);
+      if (actor?.role === 'Master') return;
+    } catch { /* ignore */ }
     const log = this.getActivityLog();
     const updated = [entry, ...log].slice(0, 200);
     localStorage.setItem('gearbox_activity_log', JSON.stringify(updated));
