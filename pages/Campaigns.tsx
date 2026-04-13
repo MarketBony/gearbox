@@ -65,7 +65,7 @@ const Campaigns: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Coordinator';
+  const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Coordinator';
 
   // --- GLOBAL CHART FILTERS ---
   const currentYear = new Date().getFullYear();

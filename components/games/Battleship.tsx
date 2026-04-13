@@ -65,27 +65,27 @@ const GridDisplay: React.FC<{
   onLeave?: () => void;
 }> = ({ grid, shots, interactive, onShoot, showShips, hoverCell, onHover, onLeave }) => {
   return (
-    <div className="inline-block border border-white/10 rounded-lg overflow-hidden" onMouseLeave={onLeave}>
+    <div className="inline-block border border-slate-300 dark:border-white/10 rounded-lg overflow-hidden" onMouseLeave={onLeave}>
       {Array.from({ length: GRID }, (_, r) => (
         <div key={r} className="flex">
           {Array.from({ length: GRID }, (_, c) => {
             const cell = grid[r][c];
             const shot = shots?.[r]?.[c];
             const isHover = hoverCell?.[0] === r && hoverCell?.[1] === c;
-            let bg = 'bg-[#0f1929]';
-            if (showShips && cell === 'ship') bg = 'bg-white/20';
+            let bg = 'bg-slate-100 dark:bg-[#0f1929]';
+            if (showShips && cell === 'ship') bg = 'bg-slate-400 dark:bg-white/20';
             if (shot === 'hit') bg = 'bg-red-500';
-            if (shot === 'miss') bg = 'bg-blue-900';
-            if (interactive && !shot && isHover) bg = 'bg-white/10';
+            if (shot === 'miss') bg = 'bg-blue-400 dark:bg-blue-900';
+            if (interactive && !shot && isHover) bg = 'bg-slate-300 dark:bg-white/10';
             return (
               <div
                 key={c}
-                className={`w-7 h-7 border border-white/5 flex items-center justify-center text-xs cursor-pointer transition-colors ${bg}`}
+                className={`w-7 h-7 border border-slate-200 dark:border-white/5 flex items-center justify-center text-xs cursor-pointer transition-colors ${bg}`}
                 onClick={() => interactive && !shot && onShoot?.(r, c)}
                 onMouseEnter={() => onHover?.(r, c)}
               >
-                {shot === 'hit' && <span className="text-red-200 font-bold">✕</span>}
-                {shot === 'miss' && <span className="text-blue-300">·</span>}
+                {shot === 'hit' && <span className="text-white font-bold text-[10px]">✕</span>}
+                {shot === 'miss' && <span className="text-white font-bold text-[10px]">·</span>}
               </div>
             );
           })}
@@ -171,11 +171,11 @@ const Battleship: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
         </p>
         <div className="flex gap-8 flex-wrap justify-center">
           <div>
-            <p className="text-xs text-bony-text/50 mb-2 text-center">Votre grille</p>
+            <p className="text-xs text-slate-500 dark:text-bony-text/50 mb-2 text-center">Votre grille</p>
             <GridDisplay grid={board[myKey].grid} shots={isP1 ? board.p2Shots : board.p1Shots} showShips />
           </div>
           <div>
-            <p className="text-xs text-bony-text/50 mb-2 text-center">Grille adverse</p>
+            <p className="text-xs text-slate-500 dark:text-bony-text/50 mb-2 text-center">Grille adverse</p>
             <GridDisplay grid={oppGrid} shots={myShots} showShips />
           </div>
         </div>
@@ -192,7 +192,7 @@ const Battleship: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
         <div className="text-center">
           <p className="font-semibold text-bony-orange mb-1">Phase de placement</p>
           {shipsDone < SHIP_SIZES.length ? (
-            <p className="text-sm text-bony-text/70">
+            <p className="text-sm text-slate-700 dark:text-bony-text/70">
               Placez <strong>{SHIP_NAMES[shipsDone]}</strong> ({currentShipSize} cases) —{' '}
               <button
                 onClick={() => setDirection(d => d === 'H' ? 'V' : 'H')}
@@ -207,7 +207,7 @@ const Battleship: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
         </div>
 
         <div
-          className="inline-block border border-white/10 rounded-lg overflow-hidden"
+          className="inline-block border border-slate-300 dark:border-white/10 rounded-lg overflow-hidden"
           onMouseLeave={() => setHoverCell(null)}
         >
           {Array.from({ length: GRID }, (_, r) => (
@@ -215,13 +215,13 @@ const Battleship: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
               {Array.from({ length: GRID }, (_, c) => {
                 const cell = myGrid[r][c];
                 const isHovered = hoverCells.some(([hr, hc]) => hr === r && hc === c);
-                let bg = 'bg-[#0f1929]';
-                if (cell === 'ship') bg = 'bg-white/25';
+                let bg = 'bg-slate-100 dark:bg-[#0f1929]';
+                if (cell === 'ship') bg = 'bg-slate-400 dark:bg-white/25';
                 else if (isHovered) bg = valid ? 'bg-bony-orange/40' : 'bg-red-500/40';
                 return (
                   <div
                     key={c}
-                    className={`w-7 h-7 border border-white/5 cursor-pointer transition-colors ${bg}`}
+                    className={`w-7 h-7 border border-slate-200 dark:border-white/5 cursor-pointer transition-colors ${bg}`}
                     onClick={() => handlePlaceClick(r, c)}
                     onMouseEnter={() => setHoverCell([r, c])}
                   />
@@ -249,7 +249,7 @@ const Battleship: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
   if (!bothReady) {
     return (
       <div className="flex flex-col items-center gap-4">
-        <p className="text-bony-text/70">Vous êtes prêt. En attente de l'adversaire…</p>
+        <p className="text-slate-700 dark:text-bony-text/70">Vous êtes prêt. En attente de l'adversaire…</p>
         <GridDisplay grid={board[myKey].grid} showShips />
       </div>
     );
@@ -261,13 +261,13 @@ const Battleship: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
       <div className="text-center">
         {isMyTurn
           ? <p className="text-bony-orange font-semibold">Votre tour — cliquez sur la grille adverse !</p>
-          : <p className="text-bony-text/70 text-sm">En attente du tir adverse…</p>
+          : <p className="text-slate-700 dark:text-bony-text/70 text-sm">En attente du tir adverse…</p>
         }
       </div>
 
       <div className="flex gap-6 flex-wrap justify-center">
         <div>
-          <p className="text-xs text-bony-text/50 mb-2 text-center">Votre flotte</p>
+          <p className="text-xs text-slate-500 dark:text-bony-text/50 mb-2 text-center">Votre flotte</p>
           <GridDisplay
             grid={board[myKey].grid}
             shots={isP1 ? board.p2Shots : board.p1Shots}
@@ -275,7 +275,7 @@ const Battleship: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
           />
         </div>
         <div>
-          <p className="text-xs text-bony-text/50 mb-2 text-center">
+          <p className="text-xs text-slate-500 dark:text-bony-text/50 mb-2 text-center">
             Grille adverse {isMyTurn && <span className="text-bony-orange">(cliquez !)</span>}
           </p>
           <GridDisplay

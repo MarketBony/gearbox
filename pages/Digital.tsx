@@ -841,8 +841,8 @@ const Digital: React.FC = () => {
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
   // Permissions
-  const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Digital Manager';
-  const canDelete = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Digital Manager';
+  const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Digital Manager';
+  const canDelete = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Digital Manager';
   // External role can edit in Calendrier Editorial only (create, modify, status, media)
   const canEditCalendar = canEdit || user?.role === 'External';
   const isExternal = user?.role === 'External';

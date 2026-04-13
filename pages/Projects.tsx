@@ -289,7 +289,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const [newProjectName, setNewProjectName] = useState('');
 
   // --- PERMISSIONS ---
-  const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Coordinator';
+  const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Coordinator';
 
   // --- ARCHIVE MODAL STATE ---
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);

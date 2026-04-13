@@ -16,6 +16,7 @@ import Battleship from '../components/games/Battleship';
 // ---- Constants ----
 const CHALLENGES_KEY = 'gearbox_game_challenges';
 const SESSIONS_KEY = 'gearbox_game_sessions';
+const GAMES_ALLOWED_ROLES = ['Master', 'Coordinator', 'Digital Manager'];
 
 const GAME_LABELS: Record<GameType, string> = {
   morpion: 'Morpion',
@@ -706,6 +707,14 @@ const Games: React.FC = () => {
   const [pageTab, setPageTab] = useState<PageTab>('lobby');
 
   const myId = user?.id ?? '';
+  const canAccessGames = GAMES_ALLOWED_ROLES.includes(user?.role ?? '');
+
+  // Redirect unauthorised users immediately
+  useEffect(() => {
+    if (user && !canAccessGames) {
+      window.dispatchEvent(new CustomEvent('gearbox-navigate', { detail: { tab: 'dashboard' } }));
+    }
+  }, [user, canAccessGames]);
 
   const refresh = useCallback(() => {
     setChallenges(loadChallenges());
@@ -713,7 +722,7 @@ const Games: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    db.getUsers().then(setUsers);
+    db.getUsers().then(all => setUsers(all.filter(u => GAMES_ALLOWED_ROLES.includes(u.role))));
     refresh();
     const interval = setInterval(refresh, 3000);
     return () => clearInterval(interval);

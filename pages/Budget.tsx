@@ -32,7 +32,7 @@ const Budget: React.FC = () => {
   const setExpandedSites = useCallback((s: Set<string>) => setExpandedSitesArr([...s]), [setExpandedSitesArr]);
 
   // Permissions
-  const canEditProvisions = user?.role === 'Master' || user?.role === 'Administrator';
+  const canEditProvisions = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director';
 
   // --- FILTERS ---
   const [filterPlaque, setFilterPlaque] = useSessionState<string>('budget_filterPlaque', 'All');

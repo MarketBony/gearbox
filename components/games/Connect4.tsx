@@ -86,7 +86,7 @@ const Connect4: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
             {isDraw ? 'Match nul !' : iWon ? 'Vous avez gagné !' : 'Vous avez perdu !'}
           </p>
         ) : (
-          <p className="text-bony-text/70 text-sm">
+          <p className="text-slate-700 dark:text-bony-text/70 text-sm">
             {isMyTurn
               ? <span className="text-bony-orange font-semibold">Votre tour</span>
               : <span>En attente de l'adversaire…</span>
@@ -108,7 +108,7 @@ const Connect4: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
 
       {/* Grid */}
       <div
-        className="rounded-xl overflow-hidden border border-white/10"
+        className="rounded-xl overflow-hidden border border-slate-300 dark:border-white/10"
         onMouseLeave={() => setHoverCol(null)}
       >
         {board.map((row, r) => (
@@ -121,7 +121,7 @@ const Connect4: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
               return (
                 <div
                   key={c}
-                  className="w-10 h-10 p-1 bg-[#1a2540] cursor-pointer"
+                  className="w-10 h-10 p-1 bg-slate-200 dark:bg-[#1a2540] cursor-pointer"
                   onClick={() => handleColClick(c)}
                   onMouseEnter={() => setHoverCol(c)}
                 >
@@ -132,8 +132,8 @@ const Connect4: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
                           ? `${isWin ? 'bg-yellow-400' : 'bg-bony-orange'}`
                           : `${isWin ? 'bg-yellow-400' : 'bg-bony-violet'}`)
                       : isPreview
-                        ? (isP1 ? 'bg-bony-orange/30' : 'bg-bony-violet/30')
-                        : 'bg-[#0f1929]'
+                        ? (isP1 ? 'bg-bony-orange/40' : 'bg-bony-violet/40')
+                        : 'bg-slate-100 dark:bg-[#0f1929]'
                     }
                   `} />
                 </div>
@@ -143,7 +143,7 @@ const Connect4: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
         ))}
       </div>
 
-      <div className="flex gap-8 text-sm text-bony-text/60">
+      <div className="flex gap-8 text-sm text-slate-600 dark:text-bony-text/60">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded-full bg-bony-orange" />
           <span>{session.player1Name}</span>

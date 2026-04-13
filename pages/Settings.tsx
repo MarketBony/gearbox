@@ -207,13 +207,15 @@ const RoleBadge: React.FC<{ role: string }> = ({ role }) => {
       ? 'border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10'
       : role === 'Administrator'
         ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10'
-        : role === 'Digital Manager'
-          ? 'border-violet-500 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10'
-          : role === 'Guest'
-            ? 'border-slate-400 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-500/10'
-            : role === 'External'
-              ? 'border-cyan-500 text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10'
-              : 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10';
+        : role === 'Director'
+          ? 'border-teal-500 text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10'
+          : role === 'Digital Manager'
+            ? 'border-violet-500 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10'
+            : role === 'Guest'
+              ? 'border-slate-400 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-500/10'
+              : role === 'External'
+                ? 'border-cyan-500 text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10'
+                : 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10';
   return (
     <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${cls}`}>{role}</span>
   );
@@ -491,6 +493,7 @@ const Settings: React.FC = () => {
                       <select className={tableInputCls} value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value as UserRole })}>
                         <option value="Master">Master</option>
                         <option value="Administrator">Administrator</option>
+                        <option value="Director">Director</option>
                         <option value="Coordinator">Coordinator</option>
                         <option value="Digital Manager">Digital Manager</option>
                         <option value="Guest">Guest</option>
@@ -537,6 +540,7 @@ const Settings: React.FC = () => {
                           <select className={editInputCls} value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value as UserRole })}>
                             <option value="Master">Master</option>
                             <option value="Administrator">Administrator</option>
+                            <option value="Director">Director</option>
                             <option value="Coordinator">Coordinator</option>
                             <option value="Digital Manager">Digital Manager</option>
                             <option value="Guest">Guest</option>

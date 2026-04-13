@@ -54,7 +54,7 @@ const Morpion: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
             {isDraw ? 'Match nul !' : winner}
           </p>
         ) : (
-          <p className="text-bony-text/70 text-sm">
+          <p className="text-slate-700 dark:text-bony-text/70 text-sm">
             {isMyTurn
               ? <span className="text-bony-orange font-semibold">Votre tour — vous jouez <span className={myColor}>{mySymbol}</span></span>
               : <span>En attente de l'adversaire…</span>
@@ -76,8 +76,12 @@ const Morpion: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
               disabled={!!cell || !isMyTurn || isFinished}
               className={`
                 w-20 h-20 rounded-xl border-2 flex items-center justify-center text-3xl font-bold transition-all duration-150
-                ${isWinCell ? 'border-yellow-400 bg-yellow-400/10' : 'border-white/10 bg-white/5'}
-                ${!cell && isMyTurn && !isFinished ? 'hover:border-bony-orange/40 hover:bg-white/10 cursor-pointer' : 'cursor-default'}
+                ${isWinCell
+                  ? 'border-yellow-400 bg-yellow-100 dark:bg-yellow-400/10'
+                  : 'border-slate-300 dark:border-white/10 bg-slate-100 dark:bg-white/5'}
+                ${!cell && isMyTurn && !isFinished
+                  ? 'hover:border-bony-orange/60 hover:bg-slate-200 dark:hover:bg-white/10 cursor-pointer'
+                  : 'cursor-default'}
                 ${color}
               `}
             >
@@ -87,7 +91,7 @@ const Morpion: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
         })}
       </div>
 
-      <div className="flex gap-8 text-sm text-bony-text/60">
+      <div className="flex gap-8 text-sm text-slate-600 dark:text-bony-text/60">
         <div className="flex items-center gap-2">
           <span className="text-bony-orange font-bold">✕</span>
           <span>{session.player1Name}</span>

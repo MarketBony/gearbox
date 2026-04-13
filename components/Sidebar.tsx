@@ -144,10 +144,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   ).length;
 
   const isExternal = user?.role === 'External';
+  const canAccessGames = user?.role === 'Master' || user?.role === 'Coordinator' || user?.role === 'Digital Manager';
 
   const allMainItems = [
     { id: 'hello-marketing', icon: Sparkles, label: 'Hello Marketing' },
-    { id: 'games', icon: Gamepad2, label: 'Jeux' },
+    ...(canAccessGames ? [{ id: 'games', icon: Gamepad2, label: 'Jeux' }] : []),
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'projects', icon: FolderKanban, label: 'Projets' },
     { id: 'digital', icon: Globe, label: 'Digital' },

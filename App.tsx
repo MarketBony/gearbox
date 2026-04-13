@@ -45,10 +45,13 @@ const InnerApp: React.FC = () => {
   }
 
   const EXTERNAL_ALLOWED_TABS = ['digital', 'chat', 'hello-marketing', 'games'];
+  const GAMES_ALLOWED_ROLES = ['Master', 'Coordinator', 'Digital Manager'];
 
   const renderContent = () => {
     const isExternal = user?.role === 'External';
-    const tab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(activeTab)) ? 'digital' : activeTab;
+    const canAccessGames = GAMES_ALLOWED_ROLES.includes(user?.role ?? '');
+    let tab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(activeTab)) ? 'digital' : activeTab;
+    if (tab === 'games' && !canAccessGames) tab = 'dashboard';
 
     switch (tab) {
       case 'hello-marketing': return <HelloMarketing />;
