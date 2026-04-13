@@ -834,7 +834,7 @@ const Digital: React.FC = () => {
   // Planning View State
   const [calendarView, setCalendarView] = useSessionState<CalendarView>('digital_calendarView', 'Mois');
   const [planningDate, setPlanningDate] = useState(new Date());
-  const [mobileCalendarView, setMobileCalendarView] = useState<'Liste' | 'Calendrier'>('Liste');
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
   // Tooltip State
   const [hoveredPostId, setHoveredPostId] = useState<string | null>(null);
@@ -849,6 +849,12 @@ const Digital: React.FC = () => {
 
   useEffect(() => {
       loadData();
+  }, []);
+
+  useEffect(() => {
+      const checkMobile = () => setIsMobile(window.innerWidth < 768);
+      window.addEventListener('resize', checkMobile);
+      return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   const loadData = async () => {
@@ -1181,7 +1187,7 @@ const Digital: React.FC = () => {
         : `Semaine du ${getStartOfWeek(planningDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
 
       return (
-          <div className="flex flex-col flex-1 min-h-0 bg-bony-dark relative">
+          <div className="flex flex-col flex-1 min-h-0 bg-bony-dark relative max-w-full overflow-x-hidden">
               {renderTooltip()}
               
               {/* Controls */}
@@ -1196,8 +1202,8 @@ const Digital: React.FC = () => {
                           <button onClick={handleNext} className="p-1 hover:text-bony-orange text-slate-500 transition"><ChevronRight size={18}/></button>
                       </div>
 
-                      {/* View Switcher */}
-                      <div className="flex bg-slate-100 dark:bg-black/30 rounded-lg p-1 border border-bony-border">
+                      {/* View Switcher — masqué sur mobile */}
+                      <div className="hidden md:flex bg-slate-100 dark:bg-black/30 rounded-lg p-1 border border-bony-border">
                           <button onClick={() => setCalendarView('Mois')} className={`px-2 md:px-3 py-1 rounded text-xs font-bold uppercase transition ${calendarView === 'Mois' ? 'bg-white dark:bg-bony-panel text-bony-orange shadow' : 'text-slate-500'}`}>Mois</button>
                           <button onClick={() => setCalendarView('Semaine')} className={`px-2 md:px-3 py-1 rounded text-xs font-bold uppercase transition ${calendarView === 'Semaine' ? 'bg-white dark:bg-bony-panel text-bony-orange shadow' : 'text-slate-500'}`}>Sem.</button>
                       </div>
@@ -1220,32 +1226,21 @@ const Digital: React.FC = () => {
                   </div>
               </div>
 
-              {/* Mobile: toggle button Liste / Calendrier */}
-              <div className="md:hidden flex items-center justify-between px-4 py-2 border-b border-bony-border bg-bony-panel shrink-0">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                      {filteredPosts.length} publication{filteredPosts.length !== 1 ? 's' : ''}
-                  </span>
-                  <button
-                      onClick={() => setMobileCalendarView(v => v === 'Liste' ? 'Calendrier' : 'Liste')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-100 dark:bg-black/30 border border-bony-border text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-black/40 transition"
-                  >
-                      {mobileCalendarView === 'Liste'
-                          ? <><Calendar size={12}/> Vue Calendrier</>
-                          : <><LayoutList size={12}/> Vue Liste</>
-                      }
-                  </button>
-              </div>
-
-              {/* Mobile: liste chronologique */}
-              {mobileCalendarView === 'Liste' && (
-                  <div className="md:hidden overflow-y-auto flex-1 p-3 space-y-2">
+              {/* Mobile: liste chronologique uniquement — jamais de grille calendrier */}
+              {isMobile && (
+                  <div className="overflow-y-auto overflow-x-hidden flex-1 p-3 space-y-2 w-full max-w-full">
+                      <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                              {filteredPosts.length} publication{filteredPosts.length !== 1 ? 's' : ''}
+                          </span>
+                      </div>
                       {filteredPosts.length > 0 ? filteredPosts
                           .slice()
                           .sort((a, b) => a.date.localeCompare(b.date))
                           .map(post => {
                               const sc = SOCIAL_STATUS_COLORS[post.status] || '';
                               return (
-                                  <div key={post.id} className="bg-white dark:bg-bony-panel border border-bony-border rounded-xl p-3 space-y-2">
+                                  <div key={post.id} className="w-full bg-white dark:bg-bony-panel border border-bony-border rounded-xl p-3 space-y-2">
                                       <div className="flex items-center justify-between">
                                           <span className="text-xs font-bold text-bony-orange">
                                               {parseLocalDate(post.date).toLocaleDateString('fr-FR')}
@@ -1272,57 +1267,42 @@ const Digital: React.FC = () => {
                   </div>
               )}
 
-              {/* Mobile: vue calendrier (quand togglée) */}
-              {mobileCalendarView === 'Calendrier' && (
-                  <div className="md:hidden flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-2">
-                      {calendarView === 'Mois' && (
-                          <div className="grid grid-cols-7 mb-1 shrink-0">
-                              {weekDays.map(d => (
-                                  <div key={d} className="text-center text-[8px] font-bold text-slate-400 uppercase">{d[0]}</div>
-                              ))}
-                          </div>
-                      )}
-                      {calendarView === 'Mois' ? renderMonthGrid() : (
-                          <div className="overflow-x-auto custom-scrollbar">
-                              <div className="min-w-[480px]">
-                                  {renderWeekGrid()}
+              {/* Tablette + Desktop : calendrier (jamais rendu sur mobile) */}
+              {!isMobile && (
+                  <>
+                      {/* Tablette (md → lg) : scroll horizontal contrôlé sur vue Semaine */}
+                      <div className="hidden md:flex lg:hidden flex-col flex-1 min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-3 max-w-full overflow-x-hidden">
+                          {calendarView === 'Mois' && (
+                              <div className="grid grid-cols-7 mb-2 shrink-0">
+                                  {weekDays.map(d => (
+                                      <div key={d} className="text-center text-[9px] font-bold text-slate-400 uppercase tracking-wide">{d}</div>
+                                  ))}
                               </div>
-                          </div>
-                      )}
-                  </div>
+                          )}
+                          {calendarView === 'Mois' ? renderMonthGrid() : (
+                              <div className="overflow-x-auto custom-scrollbar">
+                                  <div className="min-w-[640px] h-full">
+                                      {renderWeekGrid()}
+                                  </div>
+                              </div>
+                          )}
+                      </div>
+
+                      {/* Desktop (lg+) : grille calendrier inchangée */}
+                      <div className="hidden lg:flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-4 max-w-full overflow-x-hidden">
+                          {calendarView === 'Mois' && (
+                              <div className="grid grid-cols-7 mb-2 shrink-0">
+                                  {weekDays.map(d => (
+                                      <div key={d} className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                          {d}
+                                      </div>
+                                  ))}
+                              </div>
+                          )}
+                          {calendarView === 'Mois' ? renderMonthGrid() : renderWeekGrid()}
+                      </div>
+                  </>
               )}
-
-              {/* Tablette (md → lg) : calendrier avec scroll horizontal contrôlé sur vue Semaine */}
-              <div className="hidden md:flex lg:hidden flex-col flex-1 min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-3">
-                  {calendarView === 'Mois' && (
-                      <div className="grid grid-cols-7 mb-2 shrink-0">
-                          {weekDays.map(d => (
-                              <div key={d} className="text-center text-[9px] font-bold text-slate-400 uppercase tracking-wide">{d}</div>
-                          ))}
-                      </div>
-                  )}
-                  {calendarView === 'Mois' ? renderMonthGrid() : (
-                      <div className="overflow-x-auto custom-scrollbar">
-                          <div className="min-w-[640px] h-full">
-                              {renderWeekGrid()}
-                          </div>
-                      </div>
-                  )}
-              </div>
-
-              {/* Desktop (lg+) : grille calendrier inchangée */}
-              <div className="hidden lg:flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-4">
-                  {calendarView === 'Mois' && (
-                      <div className="grid grid-cols-7 mb-2 shrink-0">
-                          {weekDays.map(d => (
-                              <div key={d} className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                  {d}
-                              </div>
-                          ))}
-                      </div>
-                  )}
-                  {calendarView === 'Mois' ? renderMonthGrid() : renderWeekGrid()}
-              </div>
           </div>
       );
   };
@@ -1383,7 +1363,7 @@ const Digital: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-bony-dark animate-fade-in transition-colors relative">
+    <div className="flex flex-col h-full overflow-hidden bg-bony-dark animate-fade-in transition-colors relative max-w-full">
 
         {/* Create Post Modal */}
         {showCreatePostModal && (
@@ -1458,12 +1438,12 @@ const Digital: React.FC = () => {
 
             {/* Toolbar (Only for Calendar & Archives) */}
             {activeTab !== 'Planning Digital' && activeTab !== 'Gestion des TAGS' && (
-                <div className="flex flex-wrap items-center gap-2">
-                    {/* Search */}
-                    <div className="relative flex-1 max-w-md">
+                <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2">
+                    {/* Search — pleine largeur sur mobile */}
+                    <div className="relative w-full md:flex-1 md:max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                             placeholder="Rechercher..."
@@ -1471,35 +1451,35 @@ const Digital: React.FC = () => {
                         />
                     </div>
 
-                    <div className="w-px h-6 bg-bony-border"></div>
+                    <div className="hidden md:block w-px h-6 bg-bony-border"></div>
 
-                    {/* Filters */}
-                    <div className="flex gap-2">
-                        <select 
-                            value={filterBrand} 
+                    {/* Filters — colonne sur mobile */}
+                    <div className="flex flex-col md:flex-row gap-2">
+                        <select
+                            value={filterBrand}
                             onChange={e => setFilterBrand(e.target.value as any)}
-                            className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-3 py-1.5 text-xs text-slate-900 dark:text-bony-text outline-none focus:border-bony-violet"
+                            className="w-full md:w-auto bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-3 py-2 text-xs text-slate-900 dark:text-bony-text outline-none focus:border-bony-violet"
                         >
                             <option value="All" className="bg-white dark:bg-gray-900">Toutes Marques</option>
                             {BRANDS.map(b => <option key={b} value={b} className="bg-white dark:bg-gray-900">{b}</option>)}
                         </select>
-                        <select 
-                            value={filterService} 
+                        <select
+                            value={filterService}
                             onChange={e => setFilterService(e.target.value as any)}
-                            className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-3 py-1.5 text-xs text-slate-900 dark:text-bony-text outline-none focus:border-bony-violet"
+                            className="w-full md:w-auto bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-3 py-2 text-xs text-slate-900 dark:text-bony-text outline-none focus:border-bony-violet"
                         >
                             <option value="All" className="bg-white dark:bg-gray-900">Tous Services</option>
                             {SERVICES.map(s => <option key={s} value={s} className="bg-white dark:bg-gray-900">{s}</option>)}
                         </select>
                     </div>
 
-                    <div className="flex-1"></div>
+                    <div className="hidden md:flex flex-1"></div>
 
-                    {/* Add Button */}
+                    {/* Add Button — pleine largeur sur mobile */}
                     {canEditCalendar && activeTab === 'Calendrier Editorial' && (
                         <button
                             onClick={openCreatePostModal}
-                            className="flex items-center gap-2 px-6 py-2 bg-bony-gradient hover:opacity-90 text-white rounded-lg transition shadow-lg shadow-bony-violet/20"
+                            className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-2 bg-bony-gradient hover:opacity-90 text-white rounded-lg transition shadow-lg shadow-bony-violet/20"
                         >
                             <Plus size={18} />
                             <span className="font-bold text-xs uppercase">Ajouter</span>
