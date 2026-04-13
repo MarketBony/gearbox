@@ -23,7 +23,8 @@ import {
   X,
   MessageSquare,
   Bell,
-  Sparkles
+  Sparkles,
+  Gamepad2
 } from 'lucide-react';
 
 const relativeTime = (iso: string): string => {
@@ -49,6 +50,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const [activityLog, setActivityLog] = useState<ActivityLog[]>([]);
   const [lastReadTs, setLastReadTs] = useState<string | null>(null);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [gamesChallengeCount, setGamesChallengeCount] = useState(0);
 
   const loadActivity = () => {
     setActivityLog(db.getActivityLog());
@@ -63,16 +65,29 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     setChatUnreadCount(total);
   };
 
+  const loadGamesChallenges = () => {
+    if (!user) return;
+    try {
+      const data = localStorage.getItem('gearbox_game_challenges');
+      const challenges: any[] = data ? JSON.parse(data) : [];
+      const count = challenges.filter(c => c.toUserId === user.id && c.status === 'pending').length;
+      setGamesChallengeCount(count);
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => {
     loadActivity();
     loadChatUnread();
+    loadGamesChallenges();
     const actHandler = () => loadActivity();
     const chatHandler = () => loadChatUnread();
     window.addEventListener('gearbox-activity-updated', actHandler);
     window.addEventListener('gearbox-chat-unread-updated', chatHandler);
+    const gamesInterval = setInterval(loadGamesChallenges, 3000);
     return () => {
       window.removeEventListener('gearbox-activity-updated', actHandler);
       window.removeEventListener('gearbox-chat-unread-updated', chatHandler);
+      clearInterval(gamesInterval);
     };
   }, []);
 
@@ -132,6 +147,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
 
   const allMainItems = [
     { id: 'hello-marketing', icon: Sparkles, label: 'Hello Marketing' },
+    { id: 'games', icon: Gamepad2, label: 'Jeux' },
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'projects', icon: FolderKanban, label: 'Projets' },
     { id: 'digital', icon: Globe, label: 'Digital' },
@@ -210,6 +226,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                     {item.id === 'chat' && chatUnreadCount > 0 && (
                       <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-bony-orange text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
                         {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                      </span>
+                    )}
+                    {item.id === 'games' && gamesChallengeCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-bony-violet text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
+                        {gamesChallengeCount > 9 ? '9+' : gamesChallengeCount}
                       </span>
                     )}
                   </div>
@@ -331,6 +352,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                 {item.id === 'chat' && chatUnreadCount > 0 && (
                   <span className="absolute -top-1.5 -right-2 min-w-[14px] h-3.5 bg-bony-orange text-white text-[8px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
                     {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                  </span>
+                )}
+                {item.id === 'games' && gamesChallengeCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[14px] h-3.5 bg-bony-violet text-white text-[8px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
+                    {gamesChallengeCount > 9 ? '9+' : gamesChallengeCount}
                   </span>
                 )}
               </div>
