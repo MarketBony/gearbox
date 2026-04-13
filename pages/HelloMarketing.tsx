@@ -2,12 +2,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles, RefreshCw, MapPin, Music, Cake, Play, Pause,
-  Droplets, Wind, Cloud, ExternalLink, Loader2, ArrowUpRight, Gauge
+  Droplets, Wind, Cloud, ExternalLink, Loader2, ArrowUpRight, Gauge, CalendarDays
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
 import Avatar from '../components/Avatar';
-import { User } from '../types';
+import { User, Project } from '../types';
 
 // =============================================================================
 // OPENWEATHER API KEY
@@ -469,7 +469,7 @@ const WeatherTodayCard: React.FC<{
     new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
   );
   return (
-    <div className={`relative rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br ${bg} text-white`}>
+    <div className={`relative rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br ${bg} text-white h-full flex flex-col`}>
       <button
         onClick={onRefresh}
         className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition text-white"
@@ -477,13 +477,15 @@ const WeatherTodayCard: React.FC<{
       >
         <RefreshCw size={13} />
       </button>
-      <div className="p-5">
-        <div className="flex items-center gap-1.5 mb-3">
-          <MapPin size={12} className="opacity-80" />
-          <span className="text-sm font-bold opacity-90">{current.city}</span>
-          <span className="text-[10px] opacity-60 ml-1">· {todayLabel}</span>
+      <div className="p-5 flex flex-col flex-1">
+        {/* Ville + date */}
+        <div className="flex items-center gap-1.5 mb-4">
+          <MapPin size={12} className="opacity-80 shrink-0" />
+          <span className="text-sm font-bold opacity-90 truncate">{current.city}</span>
+          <span className="text-[10px] opacity-60 ml-1 shrink-0">· {todayLabel}</span>
         </div>
-        <div className="flex items-center gap-3 mb-3">
+        {/* Température + icône */}
+        <div className="flex items-center gap-2 mb-2">
           <div className="text-[64px] font-bold leading-none drop-shadow-sm">{current.temp}°</div>
           {current.icon && (
             <img
@@ -493,9 +495,11 @@ const WeatherTodayCard: React.FC<{
             />
           )}
         </div>
-        <p className="text-sm font-medium capitalize opacity-90 mb-1">{current.description}</p>
-        <p className="text-[11px] opacity-70">Ressenti {current.feelsLike}°</p>
-        <div className="flex items-center gap-4 mt-4 pt-3 border-t border-white/20">
+        {/* Description + ressenti */}
+        <p className="text-sm font-medium capitalize opacity-90">{current.description}</p>
+        <p className="text-[11px] opacity-70 mt-0.5">Ressenti {current.feelsLike}°</p>
+        {/* Stats — poussées en bas */}
+        <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/20">
           <div className="flex items-center gap-1.5 text-xs opacity-80">
             <Droplets size={12} />
             <span>{current.humidity}%</span>
@@ -519,18 +523,20 @@ const WeatherTodayCard: React.FC<{
 const WeatherForecastCard: React.FC<{ forecast: ForecastDay[] }> = ({ forecast }) => {
   if (forecast.length === 0) return null;
   return (
-    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl shadow-sm overflow-hidden h-full">
-      <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border">
+    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl shadow-sm overflow-hidden h-full flex flex-col">
+      <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border shrink-0">
         <h3 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
           <Cloud size={13} className="text-sky-500" /> Prévisions 5 jours
         </h3>
       </div>
-      <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/5">
+      <div className="flex flex-col divide-y divide-slate-100 dark:divide-white/5 flex-1">
         {forecast.map((day, i) => (
-          <div key={i} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition">
+          <div key={i} className="flex items-center justify-between px-4 flex-1 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition">
             <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-10 shrink-0">{day.day}</span>
-            <img src={`https://openweathermap.org/img/wn/${day.icon}.png`} alt="" className="w-9 h-9 shrink-0" />
-            <div className="flex items-baseline gap-2 ml-auto">
+            <div className="flex-1 flex justify-center">
+              <img src={`https://openweathermap.org/img/wn/${day.icon}.png`} alt="" className="w-9 h-9" />
+            </div>
+            <div className="flex items-baseline gap-2 shrink-0">
               <span className="text-sm font-bold text-slate-900 dark:text-white">{day.tempMax}°</span>
               <span className="text-xs text-slate-400">{day.tempMin}°</span>
             </div>
@@ -745,6 +751,106 @@ const BirthdaysSection: React.FC = () => {
   );
 };
 
+// ─── 5. Prochain événement ────────────────────────────────────────────────────
+
+const EVENT_PROJECT_TYPES = ['Expo/Salon', 'Animation Co', 'OP Clients', 'Collaborateurs'];
+
+const EVENT_TYPE_COLORS: Record<string, string> = {
+  'Expo/Salon':    'bg-orange-500/10 text-orange-600 dark:text-orange-400',
+  'Animation Co':  'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  'OP Clients':    'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  'Collaborateurs':'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+};
+
+const NextEventSection: React.FC = () => {
+  const [project,   setProject]   = useState<Project | null>(null);
+  const [daysUntil, setDaysUntil] = useState(0);
+  const [loading,   setLoading]   = useState(true);
+
+  const computeDays = (startDate: string): number => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.ceil((new Date(startDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  useEffect(() => {
+    (async () => {
+      const projects = await db.getProjects();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const upcoming = projects
+        .filter(p =>
+          (p.status === 'Active' || p.status === 'Draft') &&
+          EVENT_PROJECT_TYPES.includes(p.projectType) &&
+          new Date(p.startDate) >= today
+        )
+        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+
+      const next = upcoming[0] || null;
+      setProject(next);
+      if (next) setDaysUntil(computeDays(next.startDate));
+      setLoading(false);
+    })();
+  }, []);
+
+  // Rafraîchit le compteur chaque minute
+  useEffect(() => {
+    if (!project) return;
+    const id = setInterval(() => setDaysUntil(computeDays(project.startDate)), 60000);
+    return () => clearInterval(id);
+  }, [project]);
+
+  return (
+    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1">
+      <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border shrink-0">
+        <h3 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
+          <CalendarDays size={13} className="text-bony-orange" /> Prochain Événement
+        </h3>
+      </div>
+      <div className="p-4 flex flex-col flex-1">
+        {loading ? <Spinner small /> : !project ? (
+          <div className="flex flex-col items-center justify-center flex-1 gap-2 text-slate-400 py-2">
+            <CalendarDays size={22} strokeWidth={1} />
+            <p className="text-[10px] text-center leading-relaxed">
+              Aucun événement à venir.<br />
+              <span className="opacity-70">Créez un projet pour commencer.</span>
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col flex-1">
+            {/* Compteur J- */}
+            <div className="flex items-baseline gap-1 mb-3">
+              <span className="text-4xl font-bold text-bony-orange leading-none">
+                {daysUntil === 0 ? 'Auj.' : `J-${daysUntil}`}
+              </span>
+              {daysUntil > 0 && <span className="text-[10px] text-slate-400 ml-1">jours</span>}
+            </div>
+
+            {/* Infos projet — poussées en bas */}
+            <div className="flex flex-col gap-2 mt-auto">
+              <p className="text-xs font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
+                {project.name}
+              </p>
+              <span className={`self-start px-2 py-0.5 rounded-full text-[9px] font-bold ${EVENT_TYPE_COLORS[project.projectType] || 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300'}`}>
+                {project.projectType}
+              </span>
+              <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+                <MapPin size={10} className="shrink-0" />
+                <span className="truncate">{project.site}</span>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+                <CalendarDays size={10} className="shrink-0" />
+                <span>{capitalizeFirst(new Date(project.startDate + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 const WeatherSkeleton: React.FC = () => (
@@ -781,15 +887,16 @@ const HelloMarketing: React.FC = () => {
         {/* ── Zone haute (hero) — 3 colonnes desktop ─────────────────────── */}
         {/*
           • Mobile   : tout empilé verticalement
-          • Tablette : météo | prévisions côte à côte, puis musique+anniv en dessous
-          • Desktop  : météo (lg:col-span-3 ≈40%) | prévisions (lg:col-span-3 ≈35%) | musique+anniv (lg:col-span-2 ≈25%)
+          • Tablette : météo | prévisions côte à côte, puis widgets en dessous
+          • Desktop  : météo (lg:col-span-3) | prévisions (lg:col-span-3) | widgets (lg:col-span-2)
+          items-stretch : toutes les colonnes ont la même hauteur
         */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-8 gap-5 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-8 gap-4 items-stretch">
 
           {/* Météo du jour — ~40% */}
-          <div className="md:col-span-1 lg:col-span-3">
+          <div className="md:col-span-1 lg:col-span-3 flex flex-col">
             {weather.loading ? <WeatherSkeleton /> : weather.error || !weather.current ? (
-              <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl p-5 shadow-sm">
+              <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl p-5 shadow-sm flex-1">
                 <p className="text-xs text-red-500 font-bold text-center">{weather.error || 'Données météo indisponibles.'}</p>
               </div>
             ) : (
@@ -798,16 +905,17 @@ const HelloMarketing: React.FC = () => {
           </div>
 
           {/* Prévisions 5 jours — ~35% */}
-          <div className="md:col-span-1 lg:col-span-3">
+          <div className="md:col-span-1 lg:col-span-3 flex flex-col">
             {weather.loading ? <WeatherSkeleton /> : (
               <WeatherForecastCard forecast={weather.forecast} />
             )}
           </div>
 
-          {/* Musique + Anniversaires — ~25% */}
-          <div className="md:col-span-2 lg:col-span-2 flex flex-col gap-5">
+          {/* Musique + Anniversaires + Prochain événement — ~25% */}
+          <div className="md:col-span-2 lg:col-span-2 flex flex-col gap-4 h-full">
             <MusicSection />
             <BirthdaysSection />
+            <NextEventSection />
           </div>
 
         </div>
