@@ -1075,15 +1075,18 @@ const HelloMarketing: React.FC = () => {
             )}
           </div>
 
-          {/* Bas gauche — Anniversaires + Prochains événements */}
+          {/* Bas gauche — Musique du jour + Viennoiseries de la semaine */}
+          <div className="flex flex-col gap-4 h-full">
+            <div className="h-40 shrink-0">
+              <MusicSection />
+            </div>
+            <ViennoiseriesSection />
+          </div>
+
+          {/* Bas droite — Anniversaires + Prochains événements */}
           <div className="flex flex-col gap-3 h-full">
             <BirthdaysSection />
             <NextEventSection />
-          </div>
-
-          {/* Bas droite — Viennoiseries de la semaine */}
-          <div className="flex flex-col">
-            <ViennoiseriesSection />
           </div>
 
         </div>
