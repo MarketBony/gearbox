@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles, RefreshCw, MapPin, Music, Cake, Play, Pause,
-  Droplets, Wind, Cloud, ExternalLink, Loader2, ArrowUpRight, Gauge, CalendarDays
+  Cloud, ExternalLink, Loader2, ArrowUpRight, CalendarDays
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
@@ -458,7 +458,7 @@ const useWeatherData = (userId: string) => {
   return { current, forecast, loading, error, city, refresh: () => load(cityRef.current, true) };
 };
 
-// ── Météo du jour (grande card dégradée) ──────────────────────────────────────
+// ── Météo du jour (card compacte, contenu centré) ─────────────────────────────
 
 const WeatherTodayCard: React.FC<{
   current: WeatherData;
@@ -477,41 +477,28 @@ const WeatherTodayCard: React.FC<{
       >
         <RefreshCw size={13} />
       </button>
-      <div className="p-5 flex flex-col flex-1">
+      <div className="p-5 flex flex-col flex-1 justify-center gap-3">
         {/* Ville + date */}
-        <div className="flex items-center gap-1.5 mb-4">
+        <div className="flex items-center gap-1.5">
           <MapPin size={12} className="opacity-80 shrink-0" />
           <span className="text-sm font-bold opacity-90 truncate">{current.city}</span>
           <span className="text-[10px] opacity-60 ml-1 shrink-0">· {todayLabel}</span>
         </div>
         {/* Température + icône */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="text-[64px] font-bold leading-none drop-shadow-sm">{current.temp}°</div>
+        <div className="flex items-center gap-3">
+          <div className="text-[36px] font-bold leading-none drop-shadow-sm">{current.temp}°</div>
           {current.icon && (
             <img
               src={`https://openweathermap.org/img/wn/${current.icon}@2x.png`}
               alt={current.description}
-              className="w-20 h-20 drop-shadow-md"
+              className="w-16 h-16 drop-shadow-md"
             />
           )}
         </div>
         {/* Description + ressenti */}
-        <p className="text-sm font-medium capitalize opacity-90">{current.description}</p>
-        <p className="text-[11px] opacity-70 mt-0.5">Ressenti {current.feelsLike}°</p>
-        {/* Stats — poussées en bas */}
-        <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/20">
-          <div className="flex items-center gap-1.5 text-xs opacity-80">
-            <Droplets size={12} />
-            <span>{current.humidity}%</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs opacity-80">
-            <Wind size={12} />
-            <span>{current.wind} km/h</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs opacity-80">
-            <Gauge size={12} />
-            <span>{current.pressure} hPa</span>
-          </div>
+        <div>
+          <p className="text-sm font-medium capitalize opacity-90">{current.description}</p>
+          <p className="text-[11px] opacity-70 mt-0.5">Ressenti {current.feelsLike}°</p>
         </div>
       </div>
     </div>
@@ -884,19 +871,17 @@ const HelloMarketing: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-5 space-y-5">
 
-        {/* ── Zone haute (hero) — 3 colonnes desktop ─────────────────────── */}
-        {/*
-          • Mobile   : tout empilé verticalement
-          • Tablette : météo | prévisions côte à côte, puis widgets en dessous
-          • Desktop  : météo (lg:col-span-3) | prévisions (lg:col-span-3) | widgets (lg:col-span-2)
-          items-stretch : toutes les colonnes ont la même hauteur
+        {/* ── Zone haute (hero) — grille 2×2 ────────────────────────────────
+              • Mobile  : 1 colonne, tout empilé
+              • ≥ md    : 2 colonnes, 2 lignes
+              items-stretch : cards de même hauteur par ligne
         */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-8 gap-4 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
 
-          {/* Météo du jour — ~40% */}
-          <div className="md:col-span-1 lg:col-span-3 flex flex-col">
+          {/* Haut gauche — Météo du jour (compacte) */}
+          <div className="flex flex-col">
             {weather.loading ? <WeatherSkeleton /> : weather.error || !weather.current ? (
-              <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl p-5 shadow-sm flex-1">
+              <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl p-5 shadow-sm h-full">
                 <p className="text-xs text-red-500 font-bold text-center">{weather.error || 'Données météo indisponibles.'}</p>
               </div>
             ) : (
@@ -904,16 +889,20 @@ const HelloMarketing: React.FC = () => {
             )}
           </div>
 
-          {/* Prévisions 5 jours — ~35% */}
-          <div className="md:col-span-1 lg:col-span-3 flex flex-col">
+          {/* Haut droite — Prévisions 5 jours */}
+          <div className="flex flex-col">
             {weather.loading ? <WeatherSkeleton /> : (
               <WeatherForecastCard forecast={weather.forecast} />
             )}
           </div>
 
-          {/* Musique + Anniversaires + Prochain événement — ~25% */}
-          <div className="md:col-span-2 lg:col-span-2 flex flex-col gap-4 h-full">
+          {/* Bas gauche — Musique du jour */}
+          <div className="flex flex-col">
             <MusicSection />
+          </div>
+
+          {/* Bas droite — Anniversaires + Prochain événement */}
+          <div className="flex flex-col gap-3 h-full">
             <BirthdaysSection />
             <NextEventSection />
           </div>
