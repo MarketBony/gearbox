@@ -851,6 +851,20 @@ const NextEventSection: React.FC = () => {
 
 const VIENNOISERIES_ROLES = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'];
 
+const ACCROCHE_LIST = [
+  "Et c'est...",
+  'Le grand gagnant est...',
+  'Roulement de tambour...',
+  'Cette semaine le bonheur c\'est...',
+];
+
+const BADGE_LIST = [
+  'Champion du croissant 🏆',
+  'Roi de la brioche 👑',
+  'Maître des pains au chocolat 🎖️',
+  'Légende du bureau 🌟',
+];
+
 /** Numéro de semaine ISO 8601 */
 const getWeekNumber = (date: Date): number => {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -860,11 +874,22 @@ const getWeekNumber = (date: Date): number => {
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 };
 
+const nextMondayLabel = (): string => {
+  const d = new Date();
+  const day = d.getDay();
+  const daysUntil = day === 1 ? 7 : (8 - day) % 7;
+  d.setDate(d.getDate() + daysUntil);
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+};
+
 const ViennoiseriesSection: React.FC = () => {
-  const [designated, setDesignated] = useState<User | null>(null);
-  const [history,    setHistory]    = useState<{ label: string; user: User }[]>([]);
-  const [loading,    setLoading]    = useState(true);
-  const [showHistory, setShowHistory] = useState(false);
+  const [designated,   setDesignated]   = useState<User | null>(null);
+  const [history,      setHistory]      = useState<{ label: string; user: User }[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [showHistory,  setShowHistory]  = useState(false);
+  const [bouncing,     setBouncing]     = useState(false);
+  const [weekNumber,   setWeekNumber]   = useState(0);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     (async () => {
@@ -880,7 +905,7 @@ const ViennoiseriesSection: React.FC = () => {
       const now = new Date();
       const currentWeek = getWeekNumber(now);
       const year = now.getFullYear();
-
+      setWeekNumber(currentWeek);
       setDesignated(pick(currentWeek, year));
 
       // 4 semaines précédentes
@@ -889,58 +914,105 @@ const ViennoiseriesSection: React.FC = () => {
         let w = currentWeek - i;
         let y = year;
         if (w <= 0) { w += 52; y -= 1; }
-        hist.push({ label: `Semaine ${w}`, user: pick(w, y) });
+        hist.push({ label: `S${w}`, user: pick(w, y) });
       }
       setHistory(hist);
       setLoading(false);
     })();
   }, []);
 
-  return (
-    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1">
-      <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border shrink-0 flex items-center justify-between">
-        <h3 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-          <Cookie size={13} className="text-amber-500" /> 🥐 Viennoiseries de la semaine
-        </h3>
-        <button
-          onClick={() => setShowHistory(v => !v)}
-          className="text-[10px] text-slate-400 hover:text-bony-orange transition font-medium"
-        >
-          {showHistory ? 'Fermer' : 'Historique'}
-        </button>
-      </div>
+  // Bounce à l'apparition
+  useEffect(() => {
+    if (!designated) return;
+    setBouncing(true);
+    const t = setTimeout(() => setBouncing(false), 1000);
+    return () => clearTimeout(t);
+  }, [designated]);
 
-      <div className="p-4 flex flex-col flex-1">
-        {loading ? <Spinner small /> : !designated ? (
-          <div className="flex items-center justify-center flex-1 text-slate-400">
-            <p className="text-[10px]">Aucun utilisateur éligible.</p>
+  // Ferme le dropdown au clic extérieur
+  useEffect(() => {
+    if (!showHistory) return;
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node))
+        setShowHistory(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showHistory]);
+
+  const accroche = ACCROCHE_LIST[weekNumber % ACCROCHE_LIST.length];
+  const badge    = BADGE_LIST[weekNumber % BADGE_LIST.length];
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1 border border-orange-200/60 dark:border-orange-500/20 bg-gradient-to-br from-orange-50 to-white dark:from-orange-500/10 dark:to-bony-panel">
+      {loading ? (
+        <div className="flex items-center justify-center flex-1 p-8"><Spinner /></div>
+      ) : !designated ? (
+        <div className="flex items-center justify-center flex-1 p-8 text-slate-400">
+          <p className="text-[10px]">Aucun utilisateur éligible.</p>
+        </div>
+      ) : (
+        <div className="flex flex-col flex-1 p-5">
+
+          {/* Bannière titre */}
+          <div className="flex flex-col items-center text-center mb-5">
+            <span className="text-[48px] leading-none mb-2 drop-shadow-sm">🥐</span>
+            <h3 className="font-title font-bold text-slate-900 dark:text-white text-sm leading-tight tracking-wide">
+              Viennoiseries de la semaine
+            </h3>
+            <p className="text-[10px] text-slate-400 mt-1.5 italic">{accroche}</p>
           </div>
-        ) : showHistory ? (
-          /* Historique 4 semaines */
-          <div className="flex flex-col gap-2">
-            {history.map(({ label, user }) => (
-              <div key={label} className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-white/[0.03] transition">
-                <Avatar userId={user.id} name={user.name} color={user.avatarColor} size={26} />
-                <span className="text-[11px] text-slate-800 dark:text-slate-200 flex-1 truncate font-medium">{user.name}</span>
-                <span className="text-[9px] text-slate-400 shrink-0">{label}</span>
+
+          {/* Zone principale */}
+          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center">
+            {/* Spotlight + avatar */}
+            <div className="relative flex items-center justify-center">
+              <div className="absolute w-36 h-36 rounded-full bg-orange-400/15 dark:bg-orange-400/20 blur-md" />
+              <div className="absolute w-28 h-28 rounded-full bg-orange-400/10 dark:bg-orange-400/15" />
+              <div className={`relative z-10 ${bouncing ? 'animate-bounce' : ''}`}>
+                <Avatar userId={designated.id} name={designated.name} color={designated.avatarColor} size={96} />
               </div>
-            ))}
-          </div>
-        ) : (
-          /* Désigné de la semaine */
-          <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center">
-            <div className="relative">
-              <Avatar userId={designated.id} name={designated.name} color={designated.avatarColor} size={60} />
-              <span className="absolute -bottom-1 -right-1 text-xl">🥐</span>
             </div>
-            <div>
-              <p className="text-base font-bold text-slate-900 dark:text-white">{designated.name}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">{designated.role}</p>
+
+            {/* Nom + rôle + badge */}
+            <div className="flex flex-col items-center gap-1.5">
+              <p className="text-xl font-bold text-slate-900 dark:text-white leading-tight">{designated.name}</p>
+              <p className="text-xs font-semibold text-bony-orange">{designated.role}</p>
+              <span className="mt-1 px-3 py-1 rounded-full bg-amber-500/10 dark:bg-amber-400/15 text-amber-700 dark:text-amber-300 text-[11px] font-bold border border-amber-200/50 dark:border-amber-400/20">
+                {badge}
+              </span>
             </div>
-            <p className="text-[11px] text-bony-orange font-semibold">C'est son tour cette semaine !</p>
           </div>
-        )}
-      </div>
+
+          {/* Pied de card */}
+          <div className="mt-4 pt-3 border-t border-black/5 dark:border-white/10 flex items-center justify-between gap-2">
+            <p className="text-[9px] text-slate-400 leading-tight">
+              Semaine {weekNumber} · Change le {nextMondayLabel()}
+            </p>
+            <div className="relative shrink-0" ref={dropdownRef}>
+              <button
+                onClick={() => setShowHistory(v => !v)}
+                className="text-[10px] text-slate-400 hover:text-bony-orange transition font-medium whitespace-nowrap"
+              >
+                4 sem. précédentes
+              </button>
+              {showHistory && (
+                <div className="absolute bottom-full right-0 mb-2 w-52 bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-xl shadow-xl p-2 z-20">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-1.5">Historique</p>
+                  {history.map(({ label, user }) => (
+                    <div key={label} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 transition">
+                      <Avatar userId={user.id} name={user.name} color={user.avatarColor} size={22} />
+                      <span className="text-[11px] text-slate-800 dark:text-slate-200 flex-1 truncate">{user.name}</span>
+                      <span className="text-[9px] text-slate-400 shrink-0 font-semibold">{label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+      )}
     </div>
   );
 };
