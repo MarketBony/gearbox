@@ -55,11 +55,13 @@ const FixedExpenses: React.FC = () => {
 
         let updatedExpenses = [...expenses];
         const expenseName = currentExpense.comment || currentExpense.site || 'Dépense fixe';
+        const saveBrands = currentExpense.brands || [];
+        const expenseData = { ...currentExpense, brands: saveBrands, brand: saveBrands[0] };
         if (isEditing && currentExpense.id) {
-            updatedExpenses = updatedExpenses.map(e => e.id === currentExpense.id ? currentExpense as FixedExpense : e);
+            updatedExpenses = updatedExpenses.map(e => e.id === currentExpense.id ? expenseData as FixedExpense : e);
         } else {
             const newExpense: FixedExpense = {
-                ...currentExpense as FixedExpense,
+                ...expenseData as FixedExpense,
                 id: Math.random().toString(36).substr(2, 9)
             };
             updatedExpenses = [newExpense, ...updatedExpenses];
@@ -92,7 +94,10 @@ const FixedExpenses: React.FC = () => {
 
     const openModal = (expense?: FixedExpense) => {
         if (expense) {
-            setCurrentExpense({ ...expense });
+            setCurrentExpense({
+                ...expense,
+                brands: expense.brands || (expense.brand ? [expense.brand] : [])
+            });
             setIsEditing(true);
         } else {
             setCurrentExpense({
@@ -103,7 +108,8 @@ const FixedExpenses: React.FC = () => {
                 budgetDistribution: { 'Clermont': 100 },
                 amount: 0,
                 comment: '',
-                brand: undefined
+                brand: undefined,
+                brands: []
             });
             setIsEditing(false);
         }
@@ -440,8 +446,8 @@ const FixedExpenses: React.FC = () => {
                 {/* Modal */}
                 {isModalOpen && (
                     <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                        <div className="bg-bony-panel border border-bony-border rounded-xl p-6 w-full max-w-lg md:max-w-2xl shadow-2xl space-y-6">
-                            <div className="flex justify-between items-center border-b border-bony-border pb-4">
+                        <div className="bg-bony-panel border border-bony-border rounded-xl w-full max-w-lg md:max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+                            <div className="flex justify-between items-center border-b border-bony-border p-6 pb-4 shrink-0">
                                 <h3 className="text-xl font-title text-bony-text flex items-center gap-2">
                                     {isEditing ? <Edit2 size={20} className="text-bony-blue"/> : <Plus size={20} className="text-bony-orange"/>}
                                     {isEditing ? 'Modifier la dépense' : 'Nouvelle dépense fixe'}
@@ -451,7 +457,7 @@ const FixedExpenses: React.FC = () => {
                                 </button>
                             </div>
 
-                            <div className="space-y-4">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pt-4 space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
@@ -563,42 +569,49 @@ const FixedExpenses: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* BRAND SECTION */}
+                                {/* BRAND SECTION - Multi-select chips */}
                                 {(() => {
-                                    const selectedSites = currentExpense.sites || (currentExpense.site ? [currentExpense.site] : []);
-                                    const availableBrands = getAvailableBrands(selectedSites);
-                                    const hasAlpineOrNissan = availableBrands.some(b => b === 'Alpine' || b === 'Nissan');
-                                    if (!hasAlpineOrNissan) return null;
+                                    const selectedSites = currentExpense.sites || [];
+                                    const alpineOk = selectedSites.some(s => ALPINE_SITES.includes(s as Site));
+                                    const nissanOk = selectedSites.some(s => NISSAN_SITES.includes(s as Site));
+                                    const currentBrands = currentExpense.brands || [];
                                     return (
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
-                                                Marque (routage budgétaire)
+                                                Marque(s) — routage budgétaire
                                             </label>
                                             <div className="flex flex-wrap gap-2">
-                                                <button
-                                                    onClick={() => setCurrentExpense({...currentExpense, brand: undefined})}
-                                                    className={`px-3 py-1.5 rounded text-xs font-bold border transition-all ${
-                                                        !currentExpense.brand
-                                                        ? 'bg-bony-gradient border-transparent text-white shadow'
-                                                        : 'bg-slate-100 dark:bg-black/20 border-bony-border text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                                                    }`}
-                                                >
-                                                    Aucune
-                                                </button>
-                                                {availableBrands.filter(b => b === 'Alpine' || b === 'Nissan').map(b => (
-                                                    <button
-                                                        key={b}
-                                                        onClick={() => setCurrentExpense({...currentExpense, brand: b})}
-                                                        className={`px-3 py-1.5 rounded text-xs font-bold border transition-all ${
-                                                            currentExpense.brand === b
-                                                            ? `${BRAND_COLORS[b]} shadow scale-105`
-                                                            : 'bg-slate-100 dark:bg-black/20 border-bony-border text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                                                        }`}
-                                                    >
-                                                        {b}
-                                                    </button>
-                                                ))}
+                                                {BRANDS.map(b => {
+                                                    const isAvailable = b === 'Alpine' ? alpineOk : b === 'Nissan' ? nissanOk : true;
+                                                    const isSelected = currentBrands.includes(b);
+                                                    return (
+                                                        <button
+                                                            key={b}
+                                                            disabled={!isAvailable}
+                                                            onClick={() => {
+                                                                const next = isSelected
+                                                                    ? currentBrands.filter(x => x !== b)
+                                                                    : [...currentBrands, b];
+                                                                setCurrentExpense({ ...currentExpense, brands: next, brand: next[0] });
+                                                            }}
+                                                            className={`px-3 py-1.5 rounded text-xs font-bold border transition-all ${
+                                                                isSelected
+                                                                    ? `${BRAND_COLORS[b]} shadow scale-105`
+                                                                    : isAvailable
+                                                                    ? 'bg-slate-100 dark:bg-black/20 border-bony-border text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                                                    : 'bg-slate-100 dark:bg-black/20 border-bony-border text-slate-400 opacity-40 cursor-not-allowed'
+                                                            }`}
+                                                        >
+                                                            {b}
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
+                                            {!alpineOk && !nissanOk && (
+                                                <p className="text-[10px] text-slate-400 italic mt-1">
+                                                    Sélectionnez un site Alpine ou Nissan pour activer ces marques.
+                                                </p>
+                                            )}
                                         </div>
                                     );
                                 })()}
@@ -660,14 +673,14 @@ const FixedExpenses: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-4 border-t border-bony-border">
-                                <button 
+                            <div className="flex justify-end gap-3 p-6 pt-4 border-t border-bony-border shrink-0">
+                                <button
                                     onClick={closeModal}
                                     className="px-4 py-2 rounded-lg text-sm font-bold text-slate-500 hover:text-bony-text transition"
                                 >
                                     ANNULER
                                 </button>
-                                <button 
+                                <button
                                     onClick={handleSave}
                                     className="px-4 py-2 rounded-lg text-sm font-bold bg-bony-gradient text-white hover:opacity-90 transition shadow-lg"
                                 >

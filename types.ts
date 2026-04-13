@@ -155,7 +155,8 @@ export interface FixedExpense {
   budgetDistribution?: Record<string, number>; // Site -> Percentage (0-100)
   comment: string;
   amount: number;
-  brand?: BrandType; // Pour le routage budgétaire Alpine/Nissan
+  brand?: BrandType; // Pour le routage budgétaire Alpine/Nissan (legacy — premier élément de brands)
+  brands?: BrandType[]; // Multi-sélection marques pour le routage budgétaire
 }
 
 // --- CHAT TYPES ---
