@@ -296,6 +296,45 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const [projectToArchive, setProjectToArchive] = useState<Project | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // --- LIST WIDTH (resizable) ---
+  const LIST_WIDTH_KEY = 'gearbox_projects_list_width';
+  const [listWidth, setListWidth] = useState<number>(() => {
+    const saved = localStorage.getItem(LIST_WIDTH_KEY);
+    return saved ? Math.min(480, Math.max(240, parseInt(saved, 10))) : 320;
+  });
+  const isResizing = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    startX.current = e.clientX;
+    startWidth.current = listWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMove = (ev: MouseEvent) => {
+      if (!isResizing.current) return;
+      const delta = ev.clientX - startX.current;
+      const next = Math.min(480, Math.max(240, startWidth.current + delta));
+      setListWidth(next);
+    };
+    const onUp = () => {
+      isResizing.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setListWidth(prev => {
+        localStorage.setItem(LIST_WIDTH_KEY, String(prev));
+        return prev;
+      });
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [listWidth]);
+
   // --- FILTER STATES ---
   const [showFilters, setShowFilters] = useSessionState<boolean>(`projects_${viewMode}_showFilters`, false);
   const [searchTerm, setSearchTerm] = useSessionState<string>(`projects_${viewMode}_searchTerm`, '');
@@ -733,8 +772,11 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
           </div>
       )}
 
-      {/* List Panel — full width on mobile, w-64 on desktop */}
-      <div className={`${selectedProject ? 'hidden md:flex' : 'flex'} w-full md:w-64 md:min-w-[220px] border-r border-bony-border flex-col bg-bony-panel`}>
+      {/* List Panel — full width on mobile, resizable on desktop */}
+      <div
+        className={`${selectedProject ? 'hidden md:flex' : 'flex'} flex-col bg-bony-panel border-r border-bony-border relative shrink-0`}
+        style={{ width: window.innerWidth >= 768 ? `${listWidth}px` : '100%' }}
+      >
 
         <div className="px-3 py-2.5 border-b border-bony-border space-y-2 bg-bony-panel z-20 shadow-sm">
             <div className="flex justify-between items-center">
@@ -850,7 +892,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
               <div
                 key={project.id}
                 onClick={() => { setSelectedProject(project); setShowDeleteConfirm(false); }}
-                className={`px-3 py-2 cursor-pointer transition-colors group border-l-2 ${
+                className={`px-4 py-2 cursor-pointer transition-colors group border-l-2 ${
                     isSelected
                         ? 'border-l-bony-orange bg-bony-orange/8'
                         : 'border-l-transparent hover:bg-white/4 dark:hover:bg-white/3'
@@ -913,6 +955,12 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
               </div>
           )}
         </div>
+
+        {/* Resize handle */}
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-bony-orange/50 transition-colors hidden md:block z-10"
+          onMouseDown={handleResizeStart}
+        />
       </div>
 
       {/* Detail Panel — hidden on mobile when no project selected */}
