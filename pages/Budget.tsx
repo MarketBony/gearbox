@@ -5,7 +5,7 @@ import { BudgetLine, ServiceType, BrandType, Project, PlaqueName, Site, FixedExp
 import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, ChevronDown, ChevronRight, Calculator, PieChart, TrendingUp, TrendingDown, AlertTriangle, Filter, Coins, Calendar, Lock, Search, X, Check } from 'lucide-react';
-import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES } from '../constants';
+import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES, ALPINE_BUDGET_SITES, ALPINE_BUDGET_LABELS } from '../constants';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -19,7 +19,8 @@ const YEARS = [2024, 2025, 2026];
 // ─── BUDGET FILTER PICKERS ───────────────────────────────────────────────────
 
 const BUDGET_ALL_PLAQUE_SITES = Object.values(PLAQUES_STRUCTURE).flat() as string[];
-const BUDGET_SPECIAL_SITES = ['Alpine', 'Nissan'];
+const BUDGET_ALPINE_SITES = ALPINE_BUDGET_LABELS; // ['Alpine-Clermont', 'Alpine-Vichy', 'Alpine-Le Puy']
+const BUDGET_SPECIAL_SITES = ['Nissan']; // Entités spécifiques (Alpine maintenant en groupe séparé)
 
 interface BudgetSitePickerProps { selected: string[]; onChange: (v: string[]) => void; }
 const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange }) => {
@@ -41,8 +42,13 @@ const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange 
         next.has(p) ? next.delete(p) : next.add(p);
         setExpandedPlaques(next);
     };
-    const selectAll = () => onChange([...BUDGET_ALL_PLAQUE_SITES, ...BUDGET_SPECIAL_SITES]);
+    const selectAll = () => onChange([...BUDGET_ALL_PLAQUE_SITES, ...BUDGET_ALPINE_SITES, ...BUDGET_SPECIAL_SITES]);
     const clearAll  = () => onChange([]);
+    const toggleAlpine = () => {
+        const allSel = BUDGET_ALPINE_SITES.every(s => selected.includes(s));
+        if (allSel) onChange(selected.filter(s => !BUDGET_ALPINE_SITES.includes(s)));
+        else onChange([...selected.filter(s => !BUDGET_ALPINE_SITES.includes(s)), ...BUDGET_ALPINE_SITES]);
+    };
     const isAll = selected.length === 0;
 
     const handleOpen = () => {
@@ -120,15 +126,41 @@ const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange 
                                                 </div>
                                             );
                                         })}
-                                        <div>
-                                            <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Entités Spécifiques</div>
-                                            {BUDGET_SPECIAL_SITES.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
-                                                <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
-                                                    <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
-                                                    {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
-                                                </button>
-                                            ))}
-                                        </div>
+                                        {/* ALPINE group */}
+                                        {(!search || BUDGET_ALPINE_SITES.some(s => s.toLowerCase().includes(search.toLowerCase()))) && (
+                                            <div>
+                                                <div className="flex items-center px-2 py-1">
+                                                    <button onClick={() => toggleExpandPlaque('ALPINE')} className="flex items-center gap-1 flex-1 text-[9px] font-bold text-[#0055a4] uppercase tracking-widest hover:text-bony-text transition">
+                                                        <ChevronRight size={11} className={`transition-transform ${expandedPlaques.has('ALPINE') ? 'rotate-90' : ''}`} />
+                                                        Alpine
+                                                    </button>
+                                                    <button onClick={toggleAlpine} className={`w-4 h-4 rounded border flex items-center justify-center transition ${
+                                                        BUDGET_ALPINE_SITES.every(s => selected.includes(s)) ? 'bg-bony-orange border-bony-orange' :
+                                                        BUDGET_ALPINE_SITES.some(s => selected.includes(s)) ? 'bg-bony-orange/30 border-bony-orange/50' :
+                                                        'border-bony-border hover:border-bony-orange/50'}`}>
+                                                        {BUDGET_ALPINE_SITES.some(s => selected.includes(s)) && <Check size={10} className="text-white" />}
+                                                    </button>
+                                                </div>
+                                                {(expandedPlaques.has('ALPINE') || search) && BUDGET_ALPINE_SITES.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
+                                                    <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                                                        <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
+                                                        {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {/* Entités Spécifiques (Nissan only) */}
+                                        {(!search || BUDGET_SPECIAL_SITES.some(s => s.toLowerCase().includes(search.toLowerCase()))) && (
+                                            <div>
+                                                <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Entités Spécifiques</div>
+                                                {BUDGET_SPECIAL_SITES.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
+                                                    <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                                                        <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
+                                                        {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </>
                             );
@@ -150,7 +182,7 @@ const BUDGET_BRAND_CHIPS: BrandType[] = ['Renault', 'Dacia', 'Alpine', 'Nissan',
 interface BudgetBrandPickerProps { selected: BrandType[]; onChange: (v: BrandType[]) => void; filterSites: string[]; }
 const BudgetBrandPicker: React.FC<BudgetBrandPickerProps> = ({ selected, onChange, filterSites }) => {
     const isAll = selected.length === 0;
-    const alpineAvail = filterSites.length === 0 || filterSites.some(s => (ALPINE_SITES as string[]).includes(s)) || filterSites.includes('Alpine');
+    const alpineAvail = filterSites.length === 0 || filterSites.some(s => (ALPINE_SITES as string[]).includes(s)) || BUDGET_ALPINE_SITES.some(l => filterSites.includes(l));
     const nissanAvail = filterSites.length === 0 || filterSites.some(s => (NISSAN_SITES as string[]).includes(s)) || filterSites.includes('Nissan');
     const isUnavail = (b: BrandType) => (b === 'Alpine' && !alpineAvail) || (b === 'Nissan' && !nissanAvail);
     const toggle = (b: BrandType) => {
@@ -250,12 +282,23 @@ const Budget: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
-    const [budgetData, projectData, fixedExpensesData] = await Promise.all([
+    let [budgetData, projectData, fixedExpensesData] = await Promise.all([
         db.getBudgets(),
         db.getProjects(),
         db.getFixedExpenses()
     ]);
-    
+
+    // Migration: ancien site 'Alpine' unique → 3 sites virtuels Alpine-*
+    if (budgetData.some(b => b.site === 'Alpine')) {
+        budgetData = [
+            ...budgetData.filter(b => b.site !== 'Alpine'),
+            { site: 'Alpine-Clermont', brands: ['Alpine' as BrandType], entries: { VN: Array(12).fill(5000), VO: Array(12).fill(0), PR: Array(12).fill(0), APV: Array(12).fill(0) } },
+            { site: 'Alpine-Vichy',    brands: ['Alpine' as BrandType], entries: { VN: Array(12).fill(3000), VO: Array(12).fill(0), PR: Array(12).fill(0), APV: Array(12).fill(0) } },
+            { site: 'Alpine-Le Puy',   brands: ['Alpine' as BrandType], entries: { VN: Array(12).fill(2000), VO: Array(12).fill(0), PR: Array(12).fill(0), APV: Array(12).fill(0) } },
+        ];
+        await db.saveBudgets(budgetData);
+    }
+
     // Sort by site name
     budgetData.sort((a, b) => a.site.localeCompare(b.site));
     setBudgets(budgetData);
@@ -294,6 +337,8 @@ const Budget: React.FC = () => {
   };
 
   const getPlaqueForSite = (site: string): string => {
+    if (site.startsWith('Alpine-')) return 'ALPINE';
+    if (site === 'Nissan') return 'ENTITÉS SPÉCIFIQUES';
     for (const [plaque, sites] of Object.entries(PLAQUES_STRUCTURE)) {
         if (sites.includes(site as any)) return plaque;
     }
@@ -353,14 +398,46 @@ const Budget: React.FC = () => {
 
       // 3. Process ACTUALS (Projects)
       projects.forEach(p => {
-          if (p.status === 'Draft' || p.status === 'Archived') return; 
+          if (p.status === 'Draft' || p.status === 'Archived') return;
+
+          const pBrands = p.brands || [];
+          // Groupe-only → ignoré entièrement dans le budget
+          const effectiveBrands = pBrands.filter(b => b !== 'Groupe');
+          if (effectiveBrands.length === 0) return;
+
+          // Brand Filter
+          if (filterBrands.length > 0) {
+              if (!filterBrands.some(fb => effectiveBrands.includes(fb))) return;
+          }
+
+          // Year / Month Filter
+          const pDate = new Date(p.endDate);
+          if (pDate.getFullYear() !== filterYear) return;
+          const monthIdx = pDate.getMonth();
+          if (monthIdx < filterMonthStart || monthIdx > filterMonthEnd) return;
+
+          const totalProjectCost = p.budgetActual || 0;
+          if (totalProjectCost === 0) return;
+
+          // Service Dispatch
+          const services = p.service || [];
+          let servicesToHit: string[] = [];
+          if (services.includes('Tous Services')) {
+              servicesToHit = ['VN', 'VO', 'PR', 'APV'];
+          } else {
+              servicesToHit = services.filter(s => ['VN', 'VO', 'PR', 'APV'].includes(s));
+          }
+          if (servicesToHit.length === 0) return;
+
+          const hasAlpine = effectiveBrands.includes('Alpine');
+          const hasNissan = effectiveBrands.includes('Nissan');
+          const hasRDM    = effectiveBrands.some(b => ['Renault', 'Dacia', 'Mobilize'].includes(b));
 
           // Determine Sites and Shares
           let siteShares: Record<string, number> = {};
           if (p.sites && p.sites.length > 0 && p.budgetDistribution) {
               siteShares = p.budgetDistribution;
           } else {
-              // Legacy fallback
               siteShares = { [p.site as string]: 100 };
           }
 
@@ -368,54 +445,47 @@ const Budget: React.FC = () => {
               if (sharePct <= 0) return;
 
               // Site Mapping
-              let targetSite = rawSite;
-              if (targetSite === 'Thiers' || targetSite === 'Ambert') targetSite = 'Ricoux';
-              if (targetSite === 'Riom') targetSite = 'Mozac';
+              let geographicSite = rawSite;
+              if (geographicSite === 'Thiers' || geographicSite === 'Ambert') geographicSite = 'Ricoux';
+              if (geographicSite === 'Riom') geographicSite = 'Mozac';
 
-              // Alpine/Nissan brand routing: override target to entity bucket
-              const pBrands = p.brands || [];
-              if (pBrands.includes('Alpine') && siteStats['Alpine']) {
-                  targetSite = 'Alpine';
-              } else if (pBrands.includes('Nissan') && siteStats['Nissan']) {
-                  targetSite = 'Nissan';
-              }
-
-              if (!siteStats[targetSite]) return;
-
-              // Brand Filter
-              if (filterBrands.length > 0) {
-                  if (!filterBrands.some(fb => pBrands.includes(fb)) && !pBrands.includes('Groupe')) return;
-              }
-
-              // Year Filter
-              const pDate = new Date(p.endDate);
-              if (pDate.getFullYear() !== filterYear) return;
-
-              // Cost Calculation for this Site
-              const totalProjectCost = p.budgetActual || 0;
-              if (totalProjectCost === 0) return;
-              
               const siteCost = totalProjectCost * (sharePct / 100);
 
-              // Month Mapping
-              const monthIdx = pDate.getMonth();
-              
-              // Only process if within date range
-              if (monthIdx < filterMonthStart || monthIdx > filterMonthEnd) return;
+              // Routing: liste de contributions {targetSite, factor}
+              type Contribution = { targetSite: string; factor: number };
+              const contributions: Contribution[] = [];
 
-              // Service Dispatch
-              const services = p.service || [];
-              let servicesToHit: string[] = [];
-
-              if (services.includes('Tous Services')) {
-                  servicesToHit = ['VN', 'VO', 'PR', 'APV'];
+              if (hasNissan) {
+                  // Nissan → bucket Nissan
+                  contributions.push({ targetSite: 'Nissan', factor: 1 });
+              } else if (hasAlpine && hasRDM) {
+                  // Mixte Alpine+RDM → split selon alpineShare
+                  const alpineSharePct = p.alpineShare ?? 50;
+                  const alpineFactor = alpineSharePct / 100;
+                  const rdmFactor    = 1 - alpineFactor;
+                  const alpineBudgetSite = ALPINE_BUDGET_SITES[geographicSite];
+                  if (alpineFactor > 0 && alpineBudgetSite && siteStats[alpineBudgetSite]) {
+                      contributions.push({ targetSite: alpineBudgetSite, factor: alpineFactor });
+                  }
+                  if (rdmFactor > 0 && siteStats[geographicSite]) {
+                      contributions.push({ targetSite: geographicSite, factor: rdmFactor });
+                  }
+              } else if (hasAlpine) {
+                  // Alpine-only → bucket Alpine-[site]
+                  const alpineBudgetSite = ALPINE_BUDGET_SITES[geographicSite];
+                  if (alpineBudgetSite && siteStats[alpineBudgetSite]) {
+                      contributions.push({ targetSite: alpineBudgetSite, factor: 1 });
+                  }
               } else {
-                  servicesToHit = services.filter(s => ['VN', 'VO', 'PR', 'APV'].includes(s));
+                  // RDM-only → géographique
+                  if (siteStats[geographicSite]) {
+                      contributions.push({ targetSite: geographicSite, factor: 1 });
+                  }
               }
 
-              if (servicesToHit.length > 0) {
-                  const costPerSvc = siteCost / servicesToHit.length;
-                  
+              contributions.forEach(({ targetSite, factor }) => {
+                  if (!siteStats[targetSite]) return;
+                  const costPerSvc = (siteCost * factor) / servicesToHit.length;
                   servicesToHit.forEach(svc => {
                       if (servicesToProcess.includes(svc as any)) {
                           if (siteStats[targetSite].actual[svc] !== undefined) {
@@ -424,18 +494,44 @@ const Budget: React.FC = () => {
                           siteStats[targetSite].actualMonthly[monthIdx] += costPerSvc;
                       }
                   });
-              }
+              });
           });
       });
 
       // 4. Process FIXED EXPENSES
       fixedExpenses.forEach(exp => {
+          const expBrands = exp.brands || (exp.brand ? [exp.brand] : []);
+          // Groupe-only → ignoré entièrement
+          const effectiveBrands = expBrands.filter(b => b !== 'Groupe');
+          if (effectiveBrands.length === 0) return;
+
+          // Year / Month Filter
+          const expDate = new Date(exp.date);
+          if (expDate.getFullYear() !== filterYear) return;
+          const monthIdx = expDate.getMonth();
+          if (monthIdx < filterMonthStart || monthIdx > filterMonthEnd) return;
+
+          const totalCost = exp.amount || 0;
+          if (totalCost === 0) return;
+
+          // Service Dispatch
+          let servicesToHit: string[] = [];
+          if (exp.service === 'Tous Services') {
+              servicesToHit = ['VN', 'VO', 'PR', 'APV'];
+          } else if (['VN', 'VO', 'PR', 'APV'].includes(exp.service)) {
+              servicesToHit = [exp.service];
+          }
+          if (servicesToHit.length === 0) return;
+
+          const hasAlpineExp = effectiveBrands.includes('Alpine');
+          const hasNissanExp = effectiveBrands.includes('Nissan');
+          const hasRDMExp    = effectiveBrands.some(b => ['Renault', 'Dacia', 'Mobilize'].includes(b));
+
           // Determine Sites and Shares
           let siteShares: Record<string, number> = {};
           if (exp.sites && exp.sites.length > 0 && exp.budgetDistribution) {
               siteShares = exp.budgetDistribution;
           } else {
-              // Legacy fallback
               siteShares = { [exp.site as string]: 100 };
           }
 
@@ -443,46 +539,45 @@ const Budget: React.FC = () => {
               if (sharePct <= 0) return;
 
               // Site Mapping
-              let targetSite = rawSite;
-              if (targetSite === 'Thiers' || targetSite === 'Ambert') targetSite = 'Ricoux';
-              if (targetSite === 'Riom') targetSite = 'Mozac';
+              let geographicSite = rawSite;
+              if (geographicSite === 'Thiers' || geographicSite === 'Ambert') geographicSite = 'Ricoux';
+              if (geographicSite === 'Riom') geographicSite = 'Mozac';
 
-              // Alpine/Nissan brand routing: override target to entity bucket
-              if (exp.brand === 'Alpine' && siteStats['Alpine']) {
-                  targetSite = 'Alpine';
-              } else if (exp.brand === 'Nissan' && siteStats['Nissan']) {
-                  targetSite = 'Nissan';
-              }
-
-              if (!siteStats[targetSite]) return;
-
-              // Year Filter
-              const expDate = new Date(exp.date);
-              if (expDate.getFullYear() !== filterYear) return;
-
-              // Cost Calculation for this Site
-              const totalCost = exp.amount || 0;
-              if (totalCost === 0) return;
-              
               const siteCost = totalCost * (sharePct / 100);
 
-              // Month Mapping
-              const monthIdx = expDate.getMonth();
-              
-              // Only process if within date range
-              if (monthIdx < filterMonthStart || monthIdx > filterMonthEnd) return;
+              type Contribution = { targetSite: string; factor: number };
+              const contributions: Contribution[] = [];
 
-              // Service Dispatch
-              let servicesToHit: string[] = [];
-              if (exp.service === 'Tous Services') {
-                  servicesToHit = ['VN', 'VO', 'PR', 'APV'];
-              } else if (['VN', 'VO', 'PR', 'APV'].includes(exp.service)) {
-                  servicesToHit = [exp.service];
+              if (hasNissanExp) {
+                  contributions.push({ targetSite: 'Nissan', factor: 1 });
+              } else if (hasAlpineExp && hasRDMExp) {
+                  // Mixte → split selon alpineShare
+                  const alpineSharePct = exp.alpineShare ?? 50;
+                  const alpineFactor = alpineSharePct / 100;
+                  const rdmFactor    = 1 - alpineFactor;
+                  const alpineBudgetSite = ALPINE_BUDGET_SITES[geographicSite];
+                  if (alpineFactor > 0 && alpineBudgetSite && siteStats[alpineBudgetSite]) {
+                      contributions.push({ targetSite: alpineBudgetSite, factor: alpineFactor });
+                  }
+                  if (rdmFactor > 0 && siteStats[geographicSite]) {
+                      contributions.push({ targetSite: geographicSite, factor: rdmFactor });
+                  }
+              } else if (hasAlpineExp) {
+                  // Alpine-only → bucket Alpine-[site]
+                  const alpineBudgetSite = ALPINE_BUDGET_SITES[geographicSite];
+                  if (alpineBudgetSite && siteStats[alpineBudgetSite]) {
+                      contributions.push({ targetSite: alpineBudgetSite, factor: 1 });
+                  }
+              } else {
+                  // RDM-only → géographique
+                  if (siteStats[geographicSite]) {
+                      contributions.push({ targetSite: geographicSite, factor: 1 });
+                  }
               }
 
-              if (servicesToHit.length > 0) {
-                  const costPerSvc = siteCost / servicesToHit.length;
-                  
+              contributions.forEach(({ targetSite, factor }) => {
+                  if (!siteStats[targetSite]) return;
+                  const costPerSvc = (siteCost * factor) / servicesToHit.length;
                   servicesToHit.forEach(svc => {
                       if (servicesToProcess.includes(svc as any)) {
                           if (siteStats[targetSite].actual[svc] !== undefined) {
@@ -491,7 +586,7 @@ const Budget: React.FC = () => {
                           siteStats[targetSite].actualMonthly[monthIdx] += costPerSvc;
                       }
                   });
-              }
+              });
           });
       });
 
@@ -562,6 +657,7 @@ const Budget: React.FC = () => {
       const displayBudgets = filterSites.length > 0 ? budgets.filter(b => filterSites.includes(b.site)) : budgets;
       const groupedBudgets: Record<string, BudgetLine[]> = {};
       Object.keys(PLAQUES_STRUCTURE).forEach(p => groupedBudgets[p] = []);
+      groupedBudgets['ALPINE'] = [];
       groupedBudgets['ENTITÉS SPÉCIFIQUES'] = [];
 
       displayBudgets.forEach(b => {

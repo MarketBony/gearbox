@@ -616,6 +616,32 @@ const FixedExpenses: React.FC = () => {
                                     );
                                 })()}
 
+                                {/* ALPINE SHARE — visible si marques mixtes Alpine + RDM */}
+                                {(() => {
+                                    const expBrands = currentExpense.brands || [];
+                                    const hasAlpine = expBrands.includes('Alpine');
+                                    const hasRDM = expBrands.some(b => ['Renault', 'Dacia', 'Mobilize'].includes(b));
+                                    if (!hasAlpine || !hasRDM) return null;
+                                    const share = currentExpense.alpineShare ?? 50;
+                                    return (
+                                        <div className="space-y-1 pt-3 border-t border-bony-border animate-in fade-in">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Part Alpine (%)</label>
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="100"
+                                                    value={share}
+                                                    onChange={(e) => setCurrentExpense({...currentExpense, alpineShare: Number(e.target.value)})}
+                                                    className="flex-1 accent-[#0055a4]"
+                                                />
+                                                <span className="text-sm font-bold text-bony-text w-10 text-right">{share}%</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400">{share}% → Alpine · {100 - share}% → compte RDM</p>
+                                        </div>
+                                    );
+                                })()}
+
                                 {/* BUDGET ALLOCATION SECTION */}
                                 {(currentExpense.sites && currentExpense.sites.length > 1) && (
                                     <div className="mt-4 pt-4 border-t border-bony-border animate-in fade-in">

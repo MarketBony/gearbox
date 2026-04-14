@@ -93,7 +93,9 @@ export const INITIAL_BUDGET_SCENARIO: BudgetLine[] = [
     { site: 'Massagettes', brands: ['Renault', 'Dacia', 'Mobilize'], entries: { VN: fill12(978), VO: fill12(1388), PR: fill12(144), APV: fill12(184) } },
     { site: 'Ussel', brands: ['Renault', 'Dacia', 'Mobilize'], entries: { VN: fill12(735), VO: fill12(1355), PR: fill12(111), APV: fill12(138) } },
     { site: 'Issoire', brands: ['Renault', 'Dacia', 'Mobilize'], entries: { VN: fill12(1591), VO: fill12(2251), PR: fill12(57), APV: fill12(202) } },
-    { site: 'Alpine', brands: ['Alpine'], entries: { VN: fill12(10000), VO: fill12(0), PR: fill12(0), APV: fill12(0) } },
+    { site: 'Alpine-Clermont', brands: ['Alpine'], entries: { VN: fill12(5000), VO: fill12(0), PR: fill12(0), APV: fill12(0) } },
+    { site: 'Alpine-Vichy',    brands: ['Alpine'], entries: { VN: fill12(3000), VO: fill12(0), PR: fill12(0), APV: fill12(0) } },
+    { site: 'Alpine-Le Puy',   brands: ['Alpine'], entries: { VN: fill12(2000), VO: fill12(0), PR: fill12(0), APV: fill12(0) } },
     { site: 'Le Puy-en-Velay', brands: ['Renault', 'Dacia', 'Mobilize'], entries: { VN: fill12(2335.83), VO: fill12(2155.83), PR: fill12(249.83), APV: fill12(103.83) } },
     { site: 'Mende', brands: ['Renault', 'Dacia', 'Mobilize'], entries: { VN: fill12(623.71), VO: fill12(1346.71), PR: fill12(102.71), APV: fill12(119.71) } },
     { site: 'Albi', brands: ['Renault', 'Dacia', 'Mobilize'], entries: { VN: fill12(1429), VO: fill12(1690), PR: fill12(15), APV: fill12(381) } },
@@ -112,6 +114,16 @@ export const INITIAL_BUDGET_SCENARIO: BudgetLine[] = [
     // Default 0 for Brioude (missing from user list)
     { site: 'Brioude', brands: ['Renault', 'Dacia', 'Mobilize'], entries: { VN: fill12(0), VO: fill12(0), PR: fill12(0), APV: fill12(0) } },
 ];
+
+
+// --- ALPINE VIRTUAL BUDGET SITES ---
+// Mapping site géographique → site budgétaire Alpine virtuel
+export const ALPINE_BUDGET_SITES: Record<string, string> = {
+    'Clermont':       'Alpine-Clermont',
+    'Vichy':          'Alpine-Vichy',
+    'Le Puy-en-Velay': 'Alpine-Le Puy',
+};
+export const ALPINE_BUDGET_LABELS: string[] = ['Alpine-Clermont', 'Alpine-Vichy', 'Alpine-Le Puy'];
 
 
 // --- DATA GENERATOR (DYNAMIC YEAR) ---

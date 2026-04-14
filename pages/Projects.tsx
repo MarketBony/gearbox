@@ -1317,6 +1317,34 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                      </div>
                                  </div>
 
+                                 {/* Part Alpine — visible uniquement si le projet mixte Alpine + RDM */}
+                                 {(() => {
+                                     const pb = selectedProject.brands || [];
+                                     const hasAlpine = pb.includes('Alpine');
+                                     const hasRDM = pb.some(b => ['Renault', 'Dacia', 'Mobilize'].includes(b));
+                                     if (!hasAlpine || !hasRDM) return null;
+                                     const share = selectedProject.alpineShare ?? 50;
+                                     return (
+                                         <div className="space-y-1 pt-4 border-t border-bony-border animate-in fade-in">
+                                             <label className="text-[10px] font-bold text-slate-500 uppercase">Part Alpine (%)</label>
+                                             <div className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded-lg flex items-center px-3 py-2 gap-2">
+                                                 <input
+                                                     type="number"
+                                                     min="0"
+                                                     max="100"
+                                                     disabled={!canEdit}
+                                                     value={share}
+                                                     onChange={(e) => handleUpdateProject({...selectedProject, alpineShare: Math.min(100, Math.max(0, Number(e.target.value)))})}
+                                                     className="bg-transparent text-xl font-sans font-bold text-bony-text outline-none w-16 placeholder-slate-400 disabled:opacity-50 text-center"
+                                                     placeholder="50"
+                                                 />
+                                                 <span className="text-slate-500 font-bold">%</span>
+                                             </div>
+                                             <p className="text-[10px] text-slate-400">{share}% → Alpine · {100 - share}% → compte RDM</p>
+                                         </div>
+                                     );
+                                 })()}
+
                                  <div className="pt-4 border-t border-bony-border">
                                       <div className={`flex items-center gap-2 ${isUnderBudget ? 'text-emerald-500' : 'text-red-500'}`}>
                                           {isUnderBudget ? <TrendingUp size={20}/> : <TrendingDown size={20}/>}
