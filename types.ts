@@ -72,7 +72,6 @@ export interface Project {
   progress: number;
   tasks: Task[];
   assignedUsers?: string[];
-  alpineShare?: number; // % du coût alloué à Alpine (0-100), le reste va au compte RDM géographique
 }
 
 export interface Campaign {
@@ -158,7 +157,6 @@ export interface FixedExpense {
   amount: number;
   brand?: BrandType; // Pour le routage budgétaire Alpine/Nissan (legacy — premier élément de brands)
   brands?: BrandType[]; // Multi-sélection marques pour le routage budgétaire
-  alpineShare?: number; // % du coût alloué à Alpine (0-100), le reste va au compte RDM géographique
 }
 
 // --- CHAT TYPES ---

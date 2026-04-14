@@ -286,10 +286,3 @@ export const DISTRIBUTION_GROUPE_BONY_RN: Record<string, number> = {
     'Gaillac': 35.37 * 0.14
     // Note: Villefranche, Lavaur, Carmaux, Nissan not specified for RN
 };
-
-export const ALPINE_BUDGET_SITES: Record<string, string> = {
-  'Clermont': 'Alpine-Clermont',
-  'Vichy': 'Alpine-Vichy',
-  'Le Puy-en-Velay': 'Alpine-Le Puy',
-};
-export const ALPINE_BUDGET_LABELS = ['Alpine-Clermont', 'Alpine-Vichy', 'Alpine-Le Puy'];
