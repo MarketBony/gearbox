@@ -110,6 +110,19 @@ class DataService {
     if (!localStorage.getItem('gearbox_budgets')) {
         localStorage.setItem('gearbox_budgets', JSON.stringify(INITIAL_BUDGET_SCENARIO));
     }
+    // Migrate single 'Alpine' budget entry → 3 virtual Alpine-* sites
+    {
+        const rawBudgets: any[] = JSON.parse(localStorage.getItem('gearbox_budgets') || '[]');
+        if (rawBudgets.some((b: any) => b.site === 'Alpine')) {
+            const migrated = [
+                ...rawBudgets.filter((b: any) => b.site !== 'Alpine'),
+                { site: 'Alpine-Clermont', brands: ['Alpine'], entries: { VN: Array(12).fill(5000), VO: Array(12).fill(0), PR: Array(12).fill(0), APV: Array(12).fill(0) } },
+                { site: 'Alpine-Vichy',    brands: ['Alpine'], entries: { VN: Array(12).fill(3000), VO: Array(12).fill(0), PR: Array(12).fill(0), APV: Array(12).fill(0) } },
+                { site: 'Alpine-Le Puy',   brands: ['Alpine'], entries: { VN: Array(12).fill(2000), VO: Array(12).fill(0), PR: Array(12).fill(0), APV: Array(12).fill(0) } },
+            ];
+            localStorage.setItem('gearbox_budgets', JSON.stringify(migrated));
+        }
+    }
     // Ensure Equipment exists
     if (!localStorage.getItem('gearbox_equipment')) {
         localStorage.setItem('gearbox_equipment', JSON.stringify(MOCK_EQUIPMENT));

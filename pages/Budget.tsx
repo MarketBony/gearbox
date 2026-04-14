@@ -5,7 +5,7 @@ import { BudgetLine, ServiceType, BrandType, Project, PlaqueName, Site, FixedExp
 import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, ChevronDown, ChevronRight, Calculator, PieChart, TrendingUp, TrendingDown, AlertTriangle, Filter, Coins, Calendar, Lock, Search, X, Check } from 'lucide-react';
-import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES } from '../constants';
+import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES, ALPINE_BUDGET_SITES, ALPINE_BUDGET_LABELS } from '../constants';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -19,7 +19,7 @@ const YEARS = [2024, 2025, 2026];
 // ─── BUDGET FILTER PICKERS ───────────────────────────────────────────────────
 
 const BUDGET_ALL_PLAQUE_SITES = Object.values(PLAQUES_STRUCTURE).flat() as string[];
-const BUDGET_SPECIAL_SITES = ['Alpine', 'Nissan'];
+const BUDGET_SPECIAL_SITES = [...ALPINE_BUDGET_LABELS, 'Nissan'];
 
 interface BudgetSitePickerProps { selected: string[]; onChange: (v: string[]) => void; }
 const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange }) => {
@@ -294,6 +294,7 @@ const Budget: React.FC = () => {
   };
 
   const getPlaqueForSite = (site: string): string => {
+    if (ALPINE_BUDGET_LABELS.includes(site)) return 'ALPINE';
     for (const [plaque, sites] of Object.entries(PLAQUES_STRUCTURE)) {
         if (sites.includes(site as any)) return plaque;
     }
@@ -372,13 +373,49 @@ const Budget: React.FC = () => {
               if (targetSite === 'Thiers' || targetSite === 'Ambert') targetSite = 'Ricoux';
               if (targetSite === 'Riom') targetSite = 'Mozac';
 
-              // Alpine/Nissan brand routing: override target to entity bucket
+              // Year / Month Filter
+              const pDate = new Date(p.endDate);
+              if (pDate.getFullYear() !== filterYear) return;
+              const monthIdx = pDate.getMonth();
+              if (monthIdx < filterMonthStart || monthIdx > filterMonthEnd) return;
+
+              // Cost
+              const totalProjectCost = p.budgetActual || 0;
+              if (totalProjectCost === 0) return;
+              let siteCost = totalProjectCost * (sharePct / 100);
+
+              // Brand routing
               const pBrands = p.brands || [];
-              if (pBrands.includes('Alpine') && siteStats['Alpine']) {
-                  targetSite = 'Alpine';
-              } else if (pBrands.includes('Nissan') && siteStats['Nissan']) {
+              const hasAlpine = pBrands.includes('Alpine');
+              const hasRDM    = pBrands.some(b => ['Renault', 'Dacia', 'Mobilize'].includes(b));
+              const hasNissan = pBrands.includes('Nissan');
+              const hasGroupe = pBrands.includes('Groupe');
+              if (hasGroupe && !hasAlpine && !hasNissan) return;
+              if (hasNissan && siteStats['Nissan']) {
                   targetSite = 'Nissan';
+              } else if (hasAlpine && !hasRDM) {
+                  const alpineBucket = ALPINE_BUDGET_SITES[rawSite];
+                  if (alpineBucket && siteStats[alpineBucket]) targetSite = alpineBucket;
+              } else if (hasAlpine && hasRDM) {
+                  const share = p.alpineShare ?? 50;
+                  const alpineBucket = ALPINE_BUDGET_SITES[rawSite];
+                  if (alpineBucket && siteStats[alpineBucket] && share > 0) {
+                      const alpineCost = siteCost * (share / 100);
+                      const svcs = p.service || [];
+                      const alpineSvcList = svcs.includes('Tous Services') ? ['VN', 'VO', 'PR', 'APV'] : svcs.filter(s => ['VN', 'VO', 'PR', 'APV'].includes(s));
+                      if (alpineSvcList.length > 0) {
+                          const cpSvc = alpineCost / alpineSvcList.length;
+                          alpineSvcList.forEach(svc => {
+                              if (servicesToProcess.includes(svc as any)) {
+                                  if (siteStats[alpineBucket].actual[svc] !== undefined) siteStats[alpineBucket].actual[svc] += cpSvc;
+                                  siteStats[alpineBucket].actualMonthly[monthIdx] += cpSvc;
+                              }
+                          });
+                      }
+                  }
+                  siteCost = siteCost * ((100 - (p.alpineShare ?? 50)) / 100);
               }
+              // RDM uniquement → targetSite géographique inchangé
 
               if (!siteStats[targetSite]) return;
 
@@ -387,35 +424,16 @@ const Budget: React.FC = () => {
                   if (!filterBrands.some(fb => pBrands.includes(fb)) && !pBrands.includes('Groupe')) return;
               }
 
-              // Year Filter
-              const pDate = new Date(p.endDate);
-              if (pDate.getFullYear() !== filterYear) return;
-
-              // Cost Calculation for this Site
-              const totalProjectCost = p.budgetActual || 0;
-              if (totalProjectCost === 0) return;
-              
-              const siteCost = totalProjectCost * (sharePct / 100);
-
-              // Month Mapping
-              const monthIdx = pDate.getMonth();
-              
-              // Only process if within date range
-              if (monthIdx < filterMonthStart || monthIdx > filterMonthEnd) return;
-
               // Service Dispatch
               const services = p.service || [];
               let servicesToHit: string[] = [];
-
               if (services.includes('Tous Services')) {
                   servicesToHit = ['VN', 'VO', 'PR', 'APV'];
               } else {
                   servicesToHit = services.filter(s => ['VN', 'VO', 'PR', 'APV'].includes(s));
               }
-
               if (servicesToHit.length > 0) {
                   const costPerSvc = siteCost / servicesToHit.length;
-                  
                   servicesToHit.forEach(svc => {
                       if (servicesToProcess.includes(svc as any)) {
                           if (siteStats[targetSite].actual[svc] !== undefined) {
@@ -447,30 +465,52 @@ const Budget: React.FC = () => {
               if (targetSite === 'Thiers' || targetSite === 'Ambert') targetSite = 'Ricoux';
               if (targetSite === 'Riom') targetSite = 'Mozac';
 
-              // Alpine/Nissan brand routing: override target to entity bucket
-              if (exp.brand === 'Alpine' && siteStats['Alpine']) {
-                  targetSite = 'Alpine';
-              } else if (exp.brand === 'Nissan' && siteStats['Nissan']) {
-                  targetSite = 'Nissan';
-              }
-
-              if (!siteStats[targetSite]) return;
-
-              // Year Filter
+              // Year / Month Filter
               const expDate = new Date(exp.date);
               if (expDate.getFullYear() !== filterYear) return;
+              const monthIdx = expDate.getMonth();
+              if (monthIdx < filterMonthStart || monthIdx > filterMonthEnd) return;
 
-              // Cost Calculation for this Site
+              // Cost
               const totalCost = exp.amount || 0;
               if (totalCost === 0) return;
-              
-              const siteCost = totalCost * (sharePct / 100);
+              let siteCost = totalCost * (sharePct / 100);
 
-              // Month Mapping
-              const monthIdx = expDate.getMonth();
-              
-              // Only process if within date range
-              if (monthIdx < filterMonthStart || monthIdx > filterMonthEnd) return;
+              // Brand routing
+              const expBrands = exp.brands || (exp.brand ? [exp.brand] : []);
+              const hasAlpineExp = expBrands.includes('Alpine');
+              const hasRDMExp    = expBrands.some(b => ['Renault', 'Dacia', 'Mobilize'].includes(b));
+              const hasNissanExp = expBrands.includes('Nissan');
+              const hasGroupeExp = expBrands.includes('Groupe');
+              if (hasGroupeExp && !hasAlpineExp && !hasNissanExp) return;
+              if (hasNissanExp && siteStats['Nissan']) {
+                  targetSite = 'Nissan';
+              } else if (hasAlpineExp && !hasRDMExp) {
+                  const alpineBucket = ALPINE_BUDGET_SITES[rawSite];
+                  if (alpineBucket && siteStats[alpineBucket]) targetSite = alpineBucket;
+              } else if (hasAlpineExp && hasRDMExp) {
+                  const share = exp.alpineShare ?? 50;
+                  const alpineBucket = ALPINE_BUDGET_SITES[rawSite];
+                  if (alpineBucket && siteStats[alpineBucket] && share > 0) {
+                      const alpineCost = siteCost * (share / 100);
+                      let expSvcList: string[] = [];
+                      if (exp.service === 'Tous Services') expSvcList = ['VN', 'VO', 'PR', 'APV'];
+                      else if (['VN', 'VO', 'PR', 'APV'].includes(exp.service)) expSvcList = [exp.service];
+                      if (expSvcList.length > 0) {
+                          const cpSvc = alpineCost / expSvcList.length;
+                          expSvcList.forEach(svc => {
+                              if (servicesToProcess.includes(svc as any)) {
+                                  if (siteStats[alpineBucket].actual[svc] !== undefined) siteStats[alpineBucket].actual[svc] += cpSvc;
+                                  siteStats[alpineBucket].actualMonthly[monthIdx] += cpSvc;
+                              }
+                          });
+                      }
+                  }
+                  siteCost = siteCost * ((100 - (exp.alpineShare ?? 50)) / 100);
+              }
+              // RDM uniquement → targetSite géographique inchangé
+
+              if (!siteStats[targetSite]) return;
 
               // Service Dispatch
               let servicesToHit: string[] = [];
@@ -479,10 +519,8 @@ const Budget: React.FC = () => {
               } else if (['VN', 'VO', 'PR', 'APV'].includes(exp.service)) {
                   servicesToHit = [exp.service];
               }
-
               if (servicesToHit.length > 0) {
                   const costPerSvc = siteCost / servicesToHit.length;
-                  
                   servicesToHit.forEach(svc => {
                       if (servicesToProcess.includes(svc as any)) {
                           if (siteStats[targetSite].actual[svc] !== undefined) {
@@ -569,8 +607,8 @@ const Budget: React.FC = () => {
           if (groupedBudgets[plaque]) {
               groupedBudgets[plaque].push(b);
           } else {
-              if (!groupedBudgets['ENTITÉS SPÉCIFIQUES']) groupedBudgets['ENTITÉS SPÉCIFIQUES'] = [];
-              groupedBudgets['ENTITÉS SPÉCIFIQUES'].push(b);
+              if (!groupedBudgets[plaque]) groupedBudgets[plaque] = [];
+              groupedBudgets[plaque].push(b);
           }
       });
 
