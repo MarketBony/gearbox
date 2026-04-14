@@ -4,8 +4,8 @@ import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { BudgetLine, ServiceType, BrandType, Project, PlaqueName, Site, FixedExpense } from '../types';
 import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, ChevronDown, ChevronRight, Calculator, PieChart, TrendingUp, TrendingDown, AlertTriangle, Filter, Coins, Calendar, Lock } from 'lucide-react';
-import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES } from '../constants';
+import { Save, ChevronDown, ChevronRight, Calculator, PieChart, TrendingUp, TrendingDown, AlertTriangle, Filter, Coins, Calendar, Lock, Search, X, Check } from 'lucide-react';
+import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES } from '../constants';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -15,6 +15,191 @@ type Tab = 'Provisions' | 'Suivi';
 
 const MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 const YEARS = [2024, 2025, 2026];
+
+// ─── BUDGET FILTER PICKERS ───────────────────────────────────────────────────
+
+const BUDGET_ALL_PLAQUE_SITES = Object.values(PLAQUES_STRUCTURE).flat() as string[];
+const BUDGET_SPECIAL_SITES = ['Alpine', 'Nissan'];
+
+interface BudgetSitePickerProps { selected: string[]; onChange: (v: string[]) => void; }
+const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange }) => {
+    const [open, setOpen] = React.useState(false);
+    const [search, setSearch] = React.useState('');
+    const [expandedPlaques, setExpandedPlaques] = React.useState<Set<string>>(new Set(Object.keys(PLAQUES_STRUCTURE)));
+    const [pos, setPos] = React.useState<{ top: number; left: number }>({ top: 0, left: 0 });
+    const triggerRef = React.useRef<HTMLDivElement>(null);
+
+    const toggle = (site: string) =>
+        onChange(selected.includes(site) ? selected.filter(s => s !== site) : [...selected, site]);
+    const togglePlaque = (plaqueSites: string[]) => {
+        const allSel = plaqueSites.every(s => selected.includes(s));
+        if (allSel) onChange(selected.filter(s => !plaqueSites.includes(s)));
+        else onChange([...selected.filter(s => !plaqueSites.includes(s)), ...plaqueSites]);
+    };
+    const toggleExpandPlaque = (p: string) => {
+        const next = new Set(expandedPlaques);
+        next.has(p) ? next.delete(p) : next.add(p);
+        setExpandedPlaques(next);
+    };
+    const selectAll = () => onChange([...BUDGET_ALL_PLAQUE_SITES, ...BUDGET_SPECIAL_SITES]);
+    const clearAll  = () => onChange([]);
+    const isAll = selected.length === 0;
+
+    const handleOpen = () => {
+        if (!open && triggerRef.current) {
+            const rect = triggerRef.current.getBoundingClientRect();
+            setPos({ top: rect.bottom + 8, left: rect.left });
+        }
+        setOpen(v => !v);
+    };
+
+    return (
+        <div className="flex flex-col gap-1 min-w-0">
+            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Périmètre</span>
+            <div ref={triggerRef} className="relative">
+                <div
+                    onClick={handleOpen}
+                    className="flex items-center gap-1 min-w-[130px] max-w-[220px] cursor-pointer bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-2 py-1.5 hover:border-bony-orange/50 transition"
+                >
+                    {isAll ? (
+                        <span className="text-xs text-bony-muted flex-1">Tout le réseau</span>
+                    ) : (
+                        <div className="flex flex-wrap gap-0.5 flex-1">
+                            {selected.slice(0, 2).map(s => (
+                                <span key={s} className="inline-flex items-center gap-0.5 text-[9px] bg-bony-orange/10 text-bony-orange border border-bony-orange/20 px-1.5 py-0 rounded leading-5">
+                                    {s}
+                                    <button onClick={e => { e.stopPropagation(); toggle(s); }} className="hover:text-bony-violet leading-none">×</button>
+                                </span>
+                            ))}
+                            {selected.length > 2 && <span className="text-[9px] text-bony-muted leading-5">+{selected.length - 2}</span>}
+                        </div>
+                    )}
+                    <ChevronDown size={12} className={`text-bony-muted shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </div>
+                {open && (
+                    <>
+                        <div className="fixed inset-0 z-[9990]" onClick={() => setOpen(false)} />
+                        {(() => {
+                            const inner = (
+                                <>
+                                    <div className="p-2 border-b border-bony-border shrink-0">
+                                        <div className="flex items-center gap-2 bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5">
+                                            <Search size={13} className="text-slate-500 shrink-0" />
+                                            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un site…" className="flex-1 bg-transparent text-xs text-bony-text outline-none placeholder-bony-muted" />
+                                            {search && <button onClick={() => setSearch('')}><X size={12} className="text-slate-400" /></button>}
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-1 px-2 py-1.5 border-b border-bony-border shrink-0">
+                                        <button onClick={clearAll} className={`flex-1 text-[10px] font-bold py-1 rounded transition ${isAll ? 'bg-bony-orange/20 text-bony-orange border border-bony-orange/40' : 'text-slate-500 hover:text-bony-text hover:bg-white/5'}`}>Tout le réseau</button>
+                                        <button onClick={selectAll} className="flex-1 text-[10px] font-bold py-1 rounded text-slate-500 hover:text-bony-text hover:bg-white/5 transition">Tout sélectionner</button>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar py-1">
+                                        {Object.entries(PLAQUES_STRUCTURE).map(([plaqueName, sites]) => {
+                                            const filtered = sites.filter(s => !search || s.toLowerCase().includes(search.toLowerCase()));
+                                            if (search && filtered.length === 0) return null;
+                                            const expanded = expandedPlaques.has(plaqueName);
+                                            const allSel = sites.every(s => selected.includes(s));
+                                            const someSel = sites.some(s => selected.includes(s));
+                                            return (
+                                                <div key={plaqueName}>
+                                                    <div className="flex items-center px-2 py-1">
+                                                        <button onClick={() => toggleExpandPlaque(plaqueName)} className="flex items-center gap-1 flex-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-bony-text transition">
+                                                            <ChevronRight size={11} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
+                                                            {plaqueName}
+                                                        </button>
+                                                        <button onClick={() => togglePlaque(sites as string[])} className={`w-4 h-4 rounded border flex items-center justify-center transition ${allSel ? 'bg-bony-orange border-bony-orange' : someSel ? 'bg-bony-orange/30 border-bony-orange/50' : 'border-bony-border hover:border-bony-orange/50'}`}>
+                                                            {(allSel || someSel) && <Check size={10} className="text-white" />}
+                                                        </button>
+                                                    </div>
+                                                    {(expanded || search) && (search ? filtered : sites).map(site => (
+                                                        <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                                                            <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
+                                                            {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            );
+                                        })}
+                                        <div>
+                                            <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Entités Spécifiques</div>
+                                            {BUDGET_SPECIAL_SITES.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
+                                                <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                                                    <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
+                                                    {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </>
+                            );
+                            return (
+                                <>
+                                    <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] bg-bony-panel border-t border-bony-border shadow-2xl overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">{inner}</div>
+                                    <div className="hidden sm:flex fixed z-[9999] bg-bony-panel border border-bony-border rounded-xl shadow-2xl overflow-hidden flex-col w-64 max-h-80" style={{ top: pos.top, left: pos.left }}>{inner}</div>
+                                </>
+                            );
+                        })()}
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const BUDGET_BRAND_CHIPS: BrandType[] = ['Renault', 'Dacia', 'Alpine', 'Nissan', 'Mobilize'];
+interface BudgetBrandPickerProps { selected: BrandType[]; onChange: (v: BrandType[]) => void; filterSites: string[]; }
+const BudgetBrandPicker: React.FC<BudgetBrandPickerProps> = ({ selected, onChange, filterSites }) => {
+    const isAll = selected.length === 0;
+    const alpineAvail = filterSites.length === 0 || filterSites.some(s => (ALPINE_SITES as string[]).includes(s)) || filterSites.includes('Alpine');
+    const nissanAvail = filterSites.length === 0 || filterSites.some(s => (NISSAN_SITES as string[]).includes(s)) || filterSites.includes('Nissan');
+    const isUnavail = (b: BrandType) => (b === 'Alpine' && !alpineAvail) || (b === 'Nissan' && !nissanAvail);
+    const toggle = (b: BrandType) => {
+        if (isUnavail(b)) return;
+        onChange(selected.includes(b) ? selected.filter(x => x !== b) : [...selected, b]);
+    };
+    return (
+        <div className="flex flex-col gap-1">
+            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Marque</span>
+            <div className="flex flex-wrap gap-1.5">
+                <button onClick={() => onChange([])} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${isAll ? 'bg-bony-gradient border-transparent text-white shadow' : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'}`}>Toutes</button>
+                {BUDGET_BRAND_CHIPS.map(b => {
+                    const active = selected.includes(b);
+                    const unavail = isUnavail(b);
+                    return (
+                        <button key={b} onClick={() => toggle(b)} disabled={unavail}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all
+                                ${unavail ? 'opacity-30 cursor-not-allowed border-bony-border text-slate-400' :
+                                  active  ? `${BRAND_COLORS[b]} scale-105 shadow` :
+                                  'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'}`}>
+                            {b}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+const BUDGET_SERVICE_CHIPS: ServiceType[] = ['VN', 'VO', 'APV', 'PR'];
+interface BudgetServicePickerProps { selected: ServiceType[]; onChange: (v: ServiceType[]) => void; }
+const BudgetServicePicker: React.FC<BudgetServicePickerProps> = ({ selected, onChange }) => {
+    const isAll = selected.length === 0;
+    const toggle = (s: ServiceType) => onChange(selected.includes(s) ? selected.filter(x => x !== s) : [...selected, s]);
+    return (
+        <div className="flex flex-col gap-1">
+            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Service</span>
+            <div className="flex flex-wrap gap-1.5">
+                <button onClick={() => onChange([])} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${isAll ? 'bg-bony-gradient border-transparent text-white shadow' : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'}`}>Tous</button>
+                {BUDGET_SERVICE_CHIPS.map(s => {
+                    const active = selected.includes(s);
+                    return (
+                        <button key={s} onClick={() => toggle(s)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${active ? `${SERVICE_COLORS[s]} scale-105 shadow` : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'}`}>{s}</button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
 
 const Budget: React.FC = () => {
   const { user } = useAuth();
@@ -35,12 +220,27 @@ const Budget: React.FC = () => {
   const canEditProvisions = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director';
 
   // --- FILTERS ---
-  const [filterPlaque, setFilterPlaque] = useSessionState<string>('budget_filterPlaque', 'All');
-  const [filterBrand, setFilterBrand] = useSessionState<BrandType | 'All'>('budget_filterBrand', 'All');
-  const [filterService, setFilterService] = useSessionState<ServiceType | 'All'>('budget_filterService', 'All');
+  const [filterSites, setFilterSites] = useSessionState<string[]>('budget_filterSites', []);
+  const [filterBrands, setFilterBrands] = useSessionState<BrandType[]>('budget_filterBrands', []);
+  const [filterServices, setFilterServices] = useSessionState<ServiceType[]>('budget_filterServices', []);
   const [filterYear, setFilterYear] = useSessionState<number>('budget_filterYear', new Date().getFullYear());
-  const [filterMonthStart, setFilterMonthStart] = useSessionState<number>('budget_filterMonthStart', 0); // 0 = Jan
-  const [filterMonthEnd, setFilterMonthEnd] = useSessionState<number>('budget_filterMonthEnd', 11);   // 11 = Dec
+  const [filterMonthStart, setFilterMonthStart] = useSessionState<number>('budget_filterMonthStart', 0);
+  const [filterMonthEnd, setFilterMonthEnd] = useSessionState<number>('budget_filterMonthEnd', 11);
+  const [showFilters, setShowFilters] = useSessionState<boolean>('budget_showFilters', false);
+
+  const activeFilterCount =
+      filterSites.length + filterBrands.length + filterServices.length +
+      (filterYear !== new Date().getFullYear() ? 1 : 0) +
+      (filterMonthStart !== 0 || filterMonthEnd !== 11 ? 1 : 0);
+
+  const resetFilters = () => {
+      setFilterSites([]);
+      setFilterBrands([]);
+      setFilterServices([]);
+      setFilterYear(new Date().getFullYear());
+      setFilterMonthStart(0);
+      setFilterMonthEnd(11);
+  };
 
   const scrollRef = useScrollRestore('budget', !loading);
 
@@ -123,11 +323,11 @@ const Budget: React.FC = () => {
 
       // Define which services to aggregate
       let servicesToProcess: ('VN'|'VO'|'PR'|'APV')[];
-      if (filterService === 'All' || filterService === 'Tous Services') {
+      if (filterServices.length === 0) {
           servicesToProcess = ['VN', 'VO', 'PR', 'APV'];
       } else {
-          // Explicit cast to 'VN'|'VO'|'PR'|'APV'
-          servicesToProcess = [filterService as any];
+          servicesToProcess = filterServices.filter(s => ['VN', 'VO', 'PR', 'APV'].includes(s)) as ('VN'|'VO'|'PR'|'APV')[];
+          if (servicesToProcess.length === 0) servicesToProcess = ['VN', 'VO', 'PR', 'APV'];
       }
 
       // 2. Process FORECASTS (Budgets)
@@ -135,10 +335,7 @@ const Budget: React.FC = () => {
           const s = siteStats[b.site];
           if (!s) return;
 
-          // Brand Filter
-          if (filterBrand !== 'All' && !b.brands.includes(filterBrand) && !b.brands.includes('Groupe')) {
-             // Simplification: keep budget if brand is present
-          }
+          // (Brand filter applied at site level via filterSites)
 
           servicesToProcess.forEach(svc => {
               // Iterate over months
@@ -186,8 +383,8 @@ const Budget: React.FC = () => {
               if (!siteStats[targetSite]) return;
 
               // Brand Filter
-              if (filterBrand !== 'All') {
-                  if (!pBrands.includes(filterBrand) && !pBrands.includes('Groupe')) return;
+              if (filterBrands.length > 0) {
+                  if (!filterBrands.some(fb => pBrands.includes(fb)) && !pBrands.includes('Groupe')) return;
               }
 
               // Year Filter
@@ -309,10 +506,9 @@ const Budget: React.FC = () => {
       Object.entries(siteStats).forEach(([site, stats]) => {
           const plaque = getPlaqueForSite(site);
           
-          // Filter by Plaque
-          if (filterPlaque !== 'All') {
-              const isGroup = filterPlaque === 'GROUPE BONY';
-              if (!isGroup && plaque !== filterPlaque && site !== filterPlaque) return;
+          // Filter by Site
+          if (filterSites.length > 0) {
+              if (!filterSites.includes(site)) return;
           }
           
           stats.forecastMonthly.forEach((v, i) => finalForecastMonthly[i] += v);
@@ -349,7 +545,7 @@ const Budget: React.FC = () => {
           totalForecast,
           totalActual
       };
-  }, [budgets, projects, fixedExpenses, filterPlaque, filterBrand, filterService, filterYear, filterMonthStart, filterMonthEnd]);
+  }, [budgets, projects, fixedExpenses, filterSites, filterBrands, filterServices, filterYear, filterMonthStart, filterMonthEnd]);
 
 
   // --- RENDERERS ---
@@ -362,12 +558,13 @@ const Budget: React.FC = () => {
           return acc + sumSite;
       }, 0);
 
-      // Group Budgets by Plaque
+      // Group Budgets by Plaque (filtered by selected sites)
+      const displayBudgets = filterSites.length > 0 ? budgets.filter(b => filterSites.includes(b.site)) : budgets;
       const groupedBudgets: Record<string, BudgetLine[]> = {};
       Object.keys(PLAQUES_STRUCTURE).forEach(p => groupedBudgets[p] = []);
       groupedBudgets['ENTITÉS SPÉCIFIQUES'] = [];
 
-      budgets.forEach(b => {
+      displayBudgets.forEach(b => {
           const plaque = getPlaqueForSite(b.site);
           if (groupedBudgets[plaque]) {
               groupedBudgets[plaque].push(b);
@@ -519,85 +716,6 @@ const Budget: React.FC = () => {
 
       return (
           <div className="flex-1 flex flex-col overflow-hidden">
-              
-              {/* FILTERS BAR */}
-              <div className="mb-4 flex flex-wrap gap-2 items-center bg-bony-panel p-3 rounded-xl border border-bony-border shrink-0">
-                  <div className="flex items-center gap-2">
-                       <Filter size={14} className="text-bony-orange"/>
-                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Périmètre :</span>
-                       <select 
-                            value={filterPlaque}
-                            onChange={(e) => setFilterPlaque(e.target.value)}
-                            className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1 text-xs text-slate-900 dark:text-white outline-none focus:border-bony-orange"
-                       >
-                            <option value="All">TOUT LE RÉSEAU</option>
-                            {Object.entries(PLAQUES_STRUCTURE).map(([plaque, sites]) => (
-                                <optgroup key={plaque} label={plaque}>
-                                    <option value={plaque}>★ {plaque}</option>
-                                    {sites.map(s => <option key={s} value={s}>{s}</option>)}
-                                </optgroup>
-                            ))}
-                            <option value="Alpine">Alpine</option>
-                            <option value="Nissan">Nissan</option>
-                       </select>
-                  </div>
-                  <div className="w-px h-4 bg-bony-border"></div>
-                  <div className="flex items-center gap-2">
-                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Service :</span>
-                       <select 
-                            value={filterService}
-                            onChange={(e) => setFilterService(e.target.value as any)}
-                            className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1 text-xs text-slate-900 dark:text-white outline-none focus:border-bony-orange"
-                       >
-                            <option value="All">TOUS SERVICES</option>
-                            <option value="VN">VN</option>
-                            <option value="VO">VO</option>
-                            <option value="APV">APV</option>
-                            <option value="PR">PR</option>
-                       </select>
-                  </div>
-                  <div className="w-px h-4 bg-bony-border"></div>
-                  {/* DATE FILTERS */}
-                  <div className="flex items-center gap-2">
-                       <Calendar size={14} className="text-bony-violet"/>
-                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Année :</span>
-                       <select 
-                            value={filterYear}
-                            onChange={(e) => setFilterYear(Number(e.target.value))}
-                            className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1 text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet font-sans"
-                       >
-                           {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                       </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Mois :</span>
-                       <div className="flex items-center bg-slate-100 dark:bg-black/30 border border-bony-border rounded">
-                           <select 
-                                value={filterMonthStart}
-                                onChange={(e) => {
-                                    const v = Number(e.target.value);
-                                    setFilterMonthStart(v);
-                                    if(v > filterMonthEnd) setFilterMonthEnd(v);
-                                }}
-                                className="bg-transparent px-2 py-1 text-xs text-slate-900 dark:text-white outline-none"
-                           >
-                               {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
-                           </select>
-                           <span className="text-slate-500 px-1">→</span>
-                           <select 
-                                value={filterMonthEnd}
-                                onChange={(e) => {
-                                    const v = Number(e.target.value);
-                                    setFilterMonthEnd(v);
-                                    if(v < filterMonthStart) setFilterMonthStart(v);
-                                }}
-                                className="bg-transparent px-2 py-1 text-xs text-slate-900 dark:text-white outline-none"
-                           >
-                               {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
-                           </select>
-                       </div>
-                  </div>
-              </div>
 
               {/* KPIS ROW */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4 shrink-0">
@@ -673,7 +791,7 @@ const Budget: React.FC = () => {
                                <PieChart size={14} className="text-bony-orange"/> Répartition & Performance par Site
                            </h3>
                            <p className="text-[10px] text-slate-500 mt-1">
-                               Données filtrées : {periodLabel}. Service : {filterService}.
+                               Données filtrées : {periodLabel}. {filterServices.length > 0 ? `Services : ${filterServices.join(', ')}.` : 'Tous services.'}
                            </p>
                       </div>
                       <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -706,8 +824,8 @@ const Budget: React.FC = () => {
                                               else color = 'text-emerald-500 dark:text-emerald-400';
                                           }
                                           
-                                          // If service filtered, dim non-selected cols? Or simple show.
-                                          const dimmed = filterService !== 'All' && filterService !== svc && filterService !== 'Tous Services';
+                                          // Dim service cols not in current filter
+                                          const dimmed = filterServices.length > 0 && !filterServices.includes(svc as ServiceType);
 
                                           return (
                                               <div className={`flex flex-col items-center ${dimmed ? 'opacity-20' : ''}`}>
@@ -779,6 +897,71 @@ const Budget: React.FC = () => {
           </div>
       </div>
       
+      {/* FILTER BAR — shared across both tabs */}
+      <div className="shrink-0 mb-4">
+          {/* Mobile toggle */}
+          <div className="md:hidden flex items-center justify-between mb-2">
+              <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold transition ${showFilters || activeFilterCount > 0 ? 'bg-bony-orange text-white border-bony-orange' : 'bg-bony-panel text-slate-500 border-bony-border hover:text-bony-text'}`}
+              >
+                  <Filter size={13}/>
+                  Filtres
+                  {activeFilterCount > 0 && <span className="bg-white text-bony-orange text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center ml-1">{activeFilterCount}</span>}
+              </button>
+              {activeFilterCount > 0 && <button onClick={resetFilters} className="text-[10px] text-slate-400 hover:text-bony-text transition underline">Réinitialiser</button>}
+          </div>
+
+          {/* Filter panel */}
+          <div className={`${showFilters ? 'flex' : 'hidden'} md:flex bg-bony-panel border border-bony-border rounded-xl px-4 py-3 flex-col md:flex-row flex-wrap gap-x-5 gap-y-3 items-start`}>
+              <BudgetSitePicker selected={filterSites} onChange={setFilterSites} />
+              <div className="w-px self-stretch bg-bony-border/50 hidden md:block my-0.5" />
+              <BudgetBrandPicker selected={filterBrands} onChange={setFilterBrands} filterSites={filterSites} />
+              <div className="w-px self-stretch bg-bony-border/50 hidden md:block my-0.5" />
+              <BudgetServicePicker selected={filterServices} onChange={setFilterServices} />
+              <div className="w-px self-stretch bg-bony-border/50 hidden md:block my-0.5" />
+              {/* Année */}
+              <div className="flex flex-col gap-1">
+                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Année</span>
+                  <select
+                      value={filterYear}
+                      onChange={(e) => setFilterYear(Number(e.target.value))}
+                      className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-2 py-1 text-xs text-bony-text outline-none focus:border-bony-violet font-sans"
+                  >
+                      {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+              </div>
+              <div className="w-px self-stretch bg-bony-border/50 hidden md:block my-0.5" />
+              {/* Période mensuelle */}
+              <div className="flex flex-col gap-1">
+                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Période</span>
+                  <div className="flex items-center gap-1">
+                      <select
+                          value={filterMonthStart}
+                          onChange={(e) => { const v = Number(e.target.value); setFilterMonthStart(v); if (v > filterMonthEnd) setFilterMonthEnd(v); }}
+                          className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-2 py-1 text-xs text-bony-text outline-none focus:border-bony-violet"
+                      >
+                          {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
+                      </select>
+                      <span className="text-slate-400 text-xs">→</span>
+                      <select
+                          value={filterMonthEnd}
+                          onChange={(e) => { const v = Number(e.target.value); setFilterMonthEnd(v); if (v < filterMonthStart) setFilterMonthStart(v); }}
+                          className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-2 py-1 text-xs text-bony-text outline-none focus:border-bony-violet"
+                      >
+                          {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
+                      </select>
+                  </div>
+              </div>
+              {/* Desktop reset */}
+              {activeFilterCount > 0 && (
+                  <div className="hidden md:flex items-end self-end ml-auto">
+                      <button onClick={resetFilters} className="text-[10px] text-slate-400 hover:text-bony-text transition underline pb-0.5">Réinitialiser</button>
+                  </div>
+              )}
+          </div>
+      </div>
+
       {/* Content */}
       <div className="flex-1 min-h-0 flex flex-col">
           {activeTab === 'Provisions' ? renderProvisions() : renderSuivi()}
