@@ -27,7 +27,7 @@ import {
   Search,
 } from 'lucide-react';
 import { 
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Area
 } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
@@ -839,55 +839,71 @@ const Dashboard: React.FC = () => {
                    </h3>
                    {stats.serviceChartData.length === 0 ? (
                        <div className="flex-1 flex items-center justify-center text-slate-500 text-xs italic">Aucune donnée</div>
-                   ) : (
-                       <ResponsiveContainer width="100%" height={260}>
-                           <PieChart>
-                               <Pie
-                                   data={stats.serviceChartData}
-                                   cx="50%"
-                                   cy="50%"
-                                   outerRadius={90}
-                                   dataKey="value"
-                                   stroke="none"
-                                   labelLine={false}
-                                   label={({ percent, x, y, fill }: { percent: number; x: number; y: number; fill: string }) => {
-                                       if (percent < 0.05) return null;
-                                       return (
-                                           <text
-                                               x={x} y={y}
-                                               textAnchor="middle"
-                                               dominantBaseline="central"
-                                               style={{ fontWeight: 600, fontSize: 13, fill: theme === 'dark' ? '#f1f5f9' : '#1e293b' }}
+                   ) : (() => {
+                       const total = stats.serviceChartData.reduce((s, d) => s + d.value, 0);
+                       return (
+                           <div className="flex items-center gap-2 mt-1">
+                               {/* Camembert */}
+                               <div style={{ width: '60%' }}>
+                                   <ResponsiveContainer width="100%" height={220}>
+                                       <PieChart>
+                                           <Pie
+                                               data={stats.serviceChartData}
+                                               cx="50%"
+                                               cy="50%"
+                                               outerRadius={90}
+                                               dataKey="value"
+                                               stroke="none"
+                                               labelLine={false}
+                                               label={({ percent, x, y }: { percent: number; x: number; y: number }) => {
+                                                   if (percent < 0.05) return null;
+                                                   return (
+                                                       <text
+                                                           x={x} y={y}
+                                                           textAnchor="middle"
+                                                           dominantBaseline="central"
+                                                           style={{ fontWeight: 600, fontSize: 13, fill: theme === 'dark' ? '#f1f5f9' : '#1e293b' }}
+                                                       >
+                                                           {`${Math.round(percent * 100)}%`}
+                                                       </text>
+                                                   );
+                                               }}
                                            >
-                                               {`${Math.round(percent * 100)}%`}
-                                           </text>
+                                               {stats.serviceChartData.map(entry => (
+                                                   <Cell key={entry.name} fill={PIE_COLORS[entry.name] || COLORS.slate} />
+                                               ))}
+                                           </Pie>
+                                           <Tooltip
+                                               contentStyle={{ background: theme === 'dark' ? '#1e1e1e' : '#ffffff', border: '1px solid', borderColor: theme === 'dark' ? '#333' : '#e2e8f0', color: theme === 'dark' ? '#e2e8f0' : '#0f172a', borderRadius: '8px' }}
+                                               labelStyle={{ color: theme === 'dark' ? '#e2e8f0' : '#0f172a', fontWeight: 600 }}
+                                               itemStyle={{ color: theme === 'dark' ? '#cbd5e1' : '#334155' }}
+                                               formatter={(value: number) => formatCurrency(value)}
+                                           />
+                                       </PieChart>
+                                   </ResponsiveContainer>
+                               </div>
+                               {/* Légende custom */}
+                               <div className="flex flex-col gap-2" style={{ width: '40%' }}>
+                                   {stats.serviceChartData.map(d => {
+                                       const pct = total > 0 ? Math.round(d.value / total * 100) : 0;
+                                       return (
+                                           <div key={d.name} className="flex items-start gap-1.5">
+                                               <span className="mt-0.5 shrink-0 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[d.name] || COLORS.slate }} />
+                                               <div className="min-w-0">
+                                                   <span className="text-[13px] text-bony-text">{d.name}</span>
+                                                   <div className="text-[12px]">
+                                                       <span className="font-semibold text-bony-text">{formatCurrency(d.value)}</span>
+                                                       {' '}
+                                                       <span className="text-bony-muted">{pct}%</span>
+                                                   </div>
+                                               </div>
+                                           </div>
                                        );
-                                   }}
-                               >
-                                   {stats.serviceChartData.map(entry => (
-                                       <Cell key={entry.name} fill={PIE_COLORS[entry.name] || COLORS.slate} />
-                                   ))}
-                               </Pie>
-                               <Tooltip
-                                   contentStyle={{
-                                       backgroundColor: theme === 'dark' ? '#1e1e1e' : '#ffffff',
-                                       borderRadius: '8px',
-                                       borderColor: theme === 'dark' ? '#333' : '#e2e8f0',
-                                       color: theme === 'dark' ? '#fff' : '#0f172a'
-                                   }}
-                                   formatter={(value: number) => formatCurrency(value)}
-                               />
-                               <Legend
-                                   layout="horizontal"
-                                   verticalAlign="bottom"
-                                   align="center"
-                                   iconType="circle"
-                                   iconSize={10}
-                                   wrapperStyle={{ fontSize: '12px', paddingTop: '4px' }}
-                               />
-                           </PieChart>
-                       </ResponsiveContainer>
-                   )}
+                                   })}
+                               </div>
+                           </div>
+                       );
+                   })()}
               </div>
           </div>
 
