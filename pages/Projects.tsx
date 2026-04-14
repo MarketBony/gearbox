@@ -659,10 +659,10 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
 
   const getListStatusBadge = (status: string) => {
       switch(status) {
-          case 'Draft': return <span className="text-[9px] uppercase font-bold text-slate-500 bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-2 py-0.5 rounded">Brouillon</span>;
-          case 'Active': return <span className="text-[9px] uppercase font-bold text-emerald-600 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-700/50 px-2 py-0.5 rounded">Actif</span>;
-          case 'Done': return <span className="text-[9px] uppercase font-bold text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-700/50 px-2 py-0.5 rounded">Terminé</span>;
-          case 'Archived': return <span className="text-[9px] uppercase font-bold text-slate-500 bg-slate-100 dark:bg-black border border-slate-200 dark:border-white/10 px-2 py-0.5 rounded">Archivé</span>;
+          case 'Draft': return <span className="text-[9px] uppercase font-bold text-slate-500 bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 px-1.5 py-0.5 rounded">Brouillon</span>;
+          case 'Active': return <span className="text-[9px] uppercase font-bold text-emerald-600 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-700/50 px-1.5 py-0.5 rounded">Actif</span>;
+          case 'Done': return <span className="text-[9px] uppercase font-bold text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 border border-blue-200 dark:border-blue-700/50 px-1.5 py-0.5 rounded">Terminé</span>;
+          case 'Archived': return <span className="text-[9px] uppercase font-bold text-slate-500 bg-slate-100 dark:bg-black border border-slate-200 dark:border-white/10 px-1.5 py-0.5 rounded">Archivé</span>;
           default: return null;
       }
   };
@@ -733,22 +733,22 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
           </div>
       )}
 
-      {/* List Panel — full width on mobile, 1/3 on desktop */}
-      <div className={`${selectedProject ? 'hidden md:flex' : 'flex'} w-full md:w-1/3 md:min-w-[350px] border-r border-bony-border flex-col bg-bony-panel`}>
-        
-        <div className="p-4 border-b border-bony-border space-y-3 bg-bony-panel z-20 shadow-md">
+      {/* List Panel — full width on mobile, w-64 on desktop */}
+      <div className={`${selectedProject ? 'hidden md:flex' : 'flex'} w-full md:w-64 border-r border-bony-border flex-col bg-bony-panel`}>
+
+        <div className="px-3 py-2.5 border-b border-bony-border space-y-2 bg-bony-panel z-20 shadow-md">
             <div className="flex justify-between items-center">
-                <h2 className="text-xl font-title text-bony-text flex items-center gap-2">
-                    {viewMode === 'archived' && <Archive size={24} className="text-slate-500"/>}
+                <h2 className="text-[15px] font-bold text-bony-text flex items-center gap-2">
+                    {viewMode === 'archived' && <Archive size={16} className="text-slate-500"/>}
                     {viewMode === 'archived' ? 'Archives' : 'Projets'}
                 </h2>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                     <button
                         onClick={() => setShowFilters(!showFilters)}
-                        className={`relative p-2 rounded-lg transition border ${showFilters || activeFilterCount > 0 ? 'bg-bony-orange text-white border-bony-orange' : 'bg-slate-100 dark:bg-black/30 text-slate-500 border-bony-border hover:text-bony-text'}`}
+                        className={`relative p-1.5 rounded-lg transition border ${showFilters || activeFilterCount > 0 ? 'bg-bony-orange text-white border-bony-orange' : 'bg-slate-100 dark:bg-black/30 text-slate-500 border-bony-border hover:text-bony-text'}`}
                         title="Filtres avancés"
                     >
-                        {showFilters ? <X size={20} /> : <Filter size={20} />}
+                        {showFilters ? <X size={16} /> : <Filter size={16} />}
                         {!showFilters && activeFilterCount > 0 && (
                             <span className="absolute -top-1.5 -right-1.5 bg-bony-orange text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border-2 border-bony-panel">{activeFilterCount}</span>
                         )}
@@ -756,22 +756,22 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                     {viewMode === 'current' && canEdit && (
                         <button
                             onClick={openCreateModal}
-                            className="p-2 bg-bony-gradient rounded-lg text-white hover:opacity-90 transition shadow-lg shadow-bony-orange/20"
+                            className="flex items-center gap-1 px-2.5 py-1 bg-bony-gradient rounded-lg text-white hover:opacity-90 transition shadow-lg shadow-bony-orange/20 text-[11px] font-bold"
                         >
-                            <Plus size={20} />
+                            <Plus size={13} /> Nouveau
                         </button>
                     )}
                 </div>
             </div>
-            
+
             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                <input 
-                    type="text" 
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                <input
+                    type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder={viewMode === 'archived' ? "Rechercher une archive..." : "Rechercher un projet..."}
-                    className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg pl-9 pr-3 py-2 text-sm text-bony-text outline-none focus:border-bony-orange transition-colors placeholder-slate-400"
+                    className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg pl-8 pr-3 py-1.5 text-[12px] text-bony-text outline-none focus:border-bony-orange transition-colors placeholder-slate-400"
                 />
             </div>
         </div>
@@ -784,7 +784,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Trier par date</label>
                     <button
                         onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                        className="flex items-center gap-2 text-xs font-bold text-bony-text bg-white dark:bg-black/30 px-3 py-1.5 rounded border border-bony-border hover:border-bony-orange transition"
+                        className="flex items-center gap-1.5 text-[11px] font-bold text-bony-text bg-white dark:bg-black/30 px-2.5 py-1 rounded border border-bony-border hover:border-bony-orange transition"
                     >
                         {sortOrder === 'desc' ? 'Plus récents' : 'Plus anciens'}
                         {sortOrder === 'desc' ? <ArrowDown size={12}/> : <ArrowUp size={12}/>}
@@ -813,14 +813,14 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase">Objet (Type)</label>
-                        <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="w-full bg-bony-panel border border-bony-border rounded p-2 text-[10px] text-bony-text outline-none focus:border-bony-blue">
+                        <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="w-full bg-bony-panel border border-bony-border rounded px-2 py-1 text-[11px] text-bony-text outline-none focus:border-bony-blue">
                             <option value="All">TOUS TYPES</option>
                             {PROJECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </div>
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase">Statut</label>
-                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full bg-bony-panel border border-bony-border rounded p-2 text-[10px] text-bony-text outline-none focus:border-bony-blue">
+                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full bg-bony-panel border border-bony-border rounded px-2 py-1 text-[11px] text-bony-text outline-none focus:border-bony-blue">
                             <option value="All">TOUS STATUTS</option>
                             <option value="Draft">Brouillon</option>
                             <option value="Active">Actif</option>
@@ -841,44 +841,44 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
           {filteredProjects.length > 0 ? filteredProjects.map(project => {
             const isSelected = selectedProject?.id === project.id;
             return (
-              <div 
+              <div
                 key={project.id}
                 onClick={() => { setSelectedProject(project); setShowDeleteConfirm(false); }}
-                className={`p-4 border-b border-bony-border cursor-pointer transition-all group relative ${
-                    isSelected ? 'bg-slate-100 dark:bg-white/5' : 'hover:bg-slate-50 dark:hover:bg-white/5'
+                className={`px-3 py-2.5 border-b border-bony-border/30 cursor-pointer transition-all group relative border-l-2 ${
+                    isSelected
+                        ? 'border-l-bony-orange bg-slate-100 dark:bg-white/5'
+                        : 'border-l-transparent hover:bg-slate-50 dark:hover:bg-white/5'
                 }`}
               >
-                 {isSelected && <div className="absolute left-0 top-0 bottom-0 w-1 bg-bony-gradient"></div>}
-
-                 <div className="pl-2">
-                    <div className="flex justify-between items-start mb-1 gap-2">
-                        <h3 className={`font-bold text-sm truncate leading-tight ${isSelected ? 'text-bony-text' : 'text-slate-600 dark:text-slate-300'}`}>{project.name}</h3>
+                 <div className="pl-1.5">
+                    <div className="flex justify-between items-start mb-0.5 gap-2">
+                        <h3 className={`font-semibold text-[13px] truncate leading-tight ${isSelected ? 'text-bony-text' : 'text-slate-600 dark:text-slate-300'}`}>{project.name}</h3>
                         <div className="shrink-0">{getListStatusBadge(project.status)}</div>
                     </div>
 
-                    <div className="flex justify-between items-center mb-3">
-                         <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 truncate max-w-[150px]">{project.site}</span>
-                         {project.tasks.length > 0 && (
-                            <div className="flex items-center gap-2">
-                                <div className="w-16 h-1 bg-slate-300 dark:bg-slate-700 rounded-full overflow-hidden">
-                                    <div className="h-full bg-bony-gradient" style={{width: `${project.progress}%`}}></div>
-                                </div>
-                                <span className="text-[10px] font-sans text-slate-400">{project.progress}%</span>
-                            </div>
-                         )}
+                    <div className="text-[11px] text-bony-muted truncate mb-1">
+                        {project.site}
+                        <span className="mx-1 opacity-40">·</span>
+                        {project.projectType}
                     </div>
 
-                    <div className="flex flex-wrap gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                         <span className="text-[9px] px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 bg-white dark:bg-black/20">
-                            {project.projectType}
-                         </span>
-                         
+                    {(project.tasks.length > 0 || project.budgetActual > 0) && (
+                        <div className="flex items-center gap-2 mb-1.5">
+                            <div className="flex-1 h-1 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                <div className="h-full bg-bony-gradient" style={{width: `${project.progress}%`}}></div>
+                            </div>
+                            <span className="text-[10px] text-bony-muted whitespace-nowrap">
+                                {project.progress}%{project.budgetActual > 0 ? ` · ${project.budgetActual.toLocaleString()} €` : ''}
+                            </span>
+                        </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                          {project.brands?.slice(0, 2).map(b => (
                              <span key={b} className={`text-[9px] px-1.5 py-0.5 rounded border ${BRAND_COLORS[b] || 'border-slate-300 text-slate-500'}`}>
                                  {b}
                              </span>
                          ))}
-                         
                          {project.service.length > 0 && (
                              <span className={`text-[9px] px-1.5 py-0.5 rounded border ${SERVICE_COLORS[project.service[0]]?.replace('bg-', 'bg-opacity-20 bg-') || 'border-slate-300 text-slate-500'}`}>
                                 {project.service[0]}
