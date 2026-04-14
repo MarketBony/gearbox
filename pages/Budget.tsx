@@ -358,13 +358,18 @@ const Budget: React.FC = () => {
 
       // Init
       budgets.forEach(b => {
-          siteStats[b.site] = { 
-              forecast: { VN: 0, VO: 0, PR: 0, APV: 0 }, 
+          siteStats[b.site] = {
+              forecast: { VN: 0, VO: 0, PR: 0, APV: 0 },
               actual: { VN: 0, VO: 0, PR: 0, APV: 0 },
               forecastMonthly: new Array(12).fill(0),
               actualMonthly: new Array(12).fill(0)
           };
       });
+      // [DEBUG] Vérifie que les sites virtuels Alpine-* sont bien initialisés
+      console.log('[Budget:init] sites Alpine dans siteStats:', Object.keys(siteStats).filter(k => k.startsWith('Alpine') || k === 'Nissan'));
+      if (!Object.keys(siteStats).some(k => k.startsWith('Alpine-'))) {
+          console.warn('[Budget:init] ⚠️ Aucun site Alpine-* dans siteStats — migration non effectuée ou budgets vides.');
+      }
 
       // Define which services to aggregate
       let servicesToProcess: ('VN'|'VO'|'PR'|'APV')[];
@@ -464,6 +469,8 @@ const Budget: React.FC = () => {
                   const alpineFactor = alpineSharePct / 100;
                   const rdmFactor    = 1 - alpineFactor;
                   const alpineBudgetSite = ALPINE_BUDGET_SITES[geographicSite];
+                  // [DEBUG]
+                  console.log(`[Budget:proj:mixte] "${p.name}" geo=${geographicSite} alpineSite=${alpineBudgetSite} statExists=${!!siteStats[alpineBudgetSite]} share=${alpineSharePct}% cost=${siteCost}`);
                   if (alpineFactor > 0 && alpineBudgetSite && siteStats[alpineBudgetSite]) {
                       contributions.push({ targetSite: alpineBudgetSite, factor: alpineFactor });
                   }
@@ -473,14 +480,23 @@ const Budget: React.FC = () => {
               } else if (hasAlpine) {
                   // Alpine-only → bucket Alpine-[site]
                   const alpineBudgetSite = ALPINE_BUDGET_SITES[geographicSite];
+                  // [DEBUG]
+                  console.log(`[Budget:proj:alpine] "${p.name}" geo=${geographicSite} → alpineSite=${alpineBudgetSite} statExists=${!!siteStats[alpineBudgetSite]} cost=${siteCost}`);
                   if (alpineBudgetSite && siteStats[alpineBudgetSite]) {
                       contributions.push({ targetSite: alpineBudgetSite, factor: 1 });
+                  } else if (!alpineBudgetSite) {
+                      console.warn(`[Budget:proj:alpine] ⚠️ "${p.name}" : geo="${geographicSite}" n'est pas dans ALPINE_BUDGET_SITES — pas de routage possible.`);
                   }
               } else {
                   // RDM-only → géographique
                   if (siteStats[geographicSite]) {
                       contributions.push({ targetSite: geographicSite, factor: 1 });
                   }
+              }
+
+              // [DEBUG] Trace dispatch Alpine
+              if (contributions.length > 0 && hasAlpine) {
+                  console.log(`[Budget:proj:dispatch] "${p.name}":`, contributions.map(c => `${c.targetSite}×${c.factor*100}%`).join(', '));
               }
 
               contributions.forEach(({ targetSite, factor }) => {
@@ -556,6 +572,8 @@ const Budget: React.FC = () => {
                   const alpineFactor = alpineSharePct / 100;
                   const rdmFactor    = 1 - alpineFactor;
                   const alpineBudgetSite = ALPINE_BUDGET_SITES[geographicSite];
+                  // [DEBUG]
+                  console.log(`[Budget:exp:mixte] "${exp.comment}" geo=${geographicSite} alpineSite=${alpineBudgetSite} statExists=${!!siteStats[alpineBudgetSite]} share=${alpineSharePct}% cost=${siteCost}`);
                   if (alpineFactor > 0 && alpineBudgetSite && siteStats[alpineBudgetSite]) {
                       contributions.push({ targetSite: alpineBudgetSite, factor: alpineFactor });
                   }
@@ -565,14 +583,23 @@ const Budget: React.FC = () => {
               } else if (hasAlpineExp) {
                   // Alpine-only → bucket Alpine-[site]
                   const alpineBudgetSite = ALPINE_BUDGET_SITES[geographicSite];
+                  // [DEBUG]
+                  console.log(`[Budget:exp:alpine] "${exp.comment}" geo=${geographicSite} → alpineSite=${alpineBudgetSite} statExists=${!!siteStats[alpineBudgetSite]} cost=${siteCost}`);
                   if (alpineBudgetSite && siteStats[alpineBudgetSite]) {
                       contributions.push({ targetSite: alpineBudgetSite, factor: 1 });
+                  } else if (!alpineBudgetSite) {
+                      console.warn(`[Budget:exp:alpine] ⚠️ "${exp.comment}" : geo="${geographicSite}" n'est pas dans ALPINE_BUDGET_SITES.`);
                   }
               } else {
                   // RDM-only → géographique
                   if (siteStats[geographicSite]) {
                       contributions.push({ targetSite: geographicSite, factor: 1 });
                   }
+              }
+
+              // [DEBUG] Trace dispatch Alpine
+              if (contributions.length > 0 && hasAlpineExp) {
+                  console.log(`[Budget:exp:dispatch] "${exp.comment}":`, contributions.map(c => `${c.targetSite}×${c.factor*100}%`).join(', '));
               }
 
               contributions.forEach(({ targetSite, factor }) => {
