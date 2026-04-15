@@ -245,18 +245,37 @@ const Budget: React.FC = () => {
   const scrollRef = useScrollRestore('budget', !loading);
 
   useEffect(() => {
-    console.log('[DIAG] ALPINE_SITES:', ALPINE_SITES);
     loadData();
   }, []);
 
   const loadData = async () => {
     setLoading(true);
-    const [budgetData, projectData, fixedExpensesData] = await Promise.all([
+    let [budgetData, projectData, fixedExpensesData] = await Promise.all([
         db.getBudgets(),
         db.getProjects(),
         db.getFixedExpenses()
     ]);
-    
+
+    // Migration silencieuse : ajoute les buckets Alpine/Nissan si absents
+    const missingEntities = ['Alpine', 'Nissan'].filter(entity =>
+        !budgetData.some(b => b.site === entity)
+    );
+    if (missingEntities.length > 0) {
+        const newEntries = missingEntities.map(entity => ({
+            site: entity,
+            brands: [entity as BrandType],
+            entries: {
+                VN: new Array(12).fill(0),
+                VO: new Array(12).fill(0),
+                PR: new Array(12).fill(0),
+                APV: new Array(12).fill(0)
+            }
+        }));
+        const merged = [...budgetData, ...newEntries];
+        await db.saveBudgets(merged);
+        budgetData = merged;
+    }
+
     // Sort by site name
     budgetData.sort((a, b) => a.site.localeCompare(b.site));
     setBudgets(budgetData);
@@ -321,7 +340,6 @@ const Budget: React.FC = () => {
               actualMonthly: new Array(12).fill(0)
           };
       });
-      console.log('[DIAG] siteStats keys after init:', Object.keys(siteStats));
 
       // Define which services to aggregate
       let servicesToProcess: ('VN'|'VO'|'PR'|'APV')[];
@@ -380,7 +398,6 @@ const Budget: React.FC = () => {
               const isNissanSite = (NISSAN_SITES as string[]).includes(rawSite);
 
               if (pBrands.includes('Alpine')) {
-                  console.log('[DIAG] Alpine project:', p.name, '| rawSite:', rawSite, '| isAlpineSite:', isAlpineSite, '| siteStats[Alpine]:', siteStats['Alpine'] !== undefined ? 'defined' : 'UNDEFINED');
                   if (!isAlpineSite) return; // Site non autorisé Alpine → ignorer
                   if (siteStats['Alpine']) targetSite = 'Alpine';
                   else return; // Pas de bucket Alpine configuré
