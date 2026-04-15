@@ -21,6 +21,14 @@ const YEARS = [2024, 2025, 2026];
 const BUDGET_ALL_PLAQUE_SITES = Object.values(PLAQUES_STRUCTURE).flat() as string[];
 const BUDGET_SPECIAL_SITES = ['Alpine', 'Nissan'];
 
+const ALPINE_BUCKETS: Record<string, string> = {
+    'Clermont':       'Alpine-Clermont',
+    'Vichy':          'Alpine-Vichy',
+    'Le Puy-en-Velay': 'Alpine-Le Puy',
+    'Rodez':          'Alpine-Rodez',
+};
+const NISSAN_BUCKET = 'Nissan';
+
 interface BudgetSitePickerProps { selected: string[]; onChange: (v: string[]) => void; }
 const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange }) => {
     const [open, setOpen] = React.useState(false);
@@ -256,24 +264,27 @@ const Budget: React.FC = () => {
         db.getFixedExpenses()
     ]);
 
-    // Migration silencieuse : ajoute les buckets Alpine/Nissan si absents
-    const missingEntities = ['Alpine', 'Nissan'].filter(entity =>
-        !budgetData.some(b => b.site === entity)
-    );
-    if (missingEntities.length > 0) {
-        const newEntries = missingEntities.map(entity => ({
-            site: entity,
-            brands: [entity as BrandType],
-            entries: {
-                VN: new Array(12).fill(0),
-                VO: new Array(12).fill(0),
-                PR: new Array(12).fill(0),
-                APV: new Array(12).fill(0)
-            }
-        }));
-        const merged = [...budgetData, ...newEntries];
-        await db.saveBudgets(merged);
-        budgetData = merged;
+    // Migration silencieuse : buckets Alpine distincts par site + Nissan
+    {
+        const allBuckets = [...Object.values(ALPINE_BUCKETS), NISSAN_BUCKET];
+        const missing = allBuckets.filter(bucket => !budgetData.some(b => b.site === bucket));
+        // Retire le bucket générique 'Alpine' s'il existe encore
+        const withoutGeneric = budgetData.filter(b => b.site !== 'Alpine');
+        if (missing.length > 0 || withoutGeneric.length !== budgetData.length) {
+            const newEntries = missing.map(bucket => ({
+                site: bucket,
+                brands: [bucket === NISSAN_BUCKET ? 'Nissan' : 'Alpine'] as BrandType[],
+                entries: {
+                    VN: new Array(12).fill(0),
+                    VO: new Array(12).fill(0),
+                    PR: new Array(12).fill(0),
+                    APV: new Array(12).fill(0)
+                }
+            }));
+            const merged = [...withoutGeneric, ...newEntries];
+            await db.saveBudgets(merged);
+            budgetData = merged;
+        }
     }
 
     // Sort by site name
@@ -394,17 +405,16 @@ const Budget: React.FC = () => {
 
               // Alpine/Nissan brand routing: override target to entity bucket
               const pBrands = p.brands || [];
-              const isAlpineSite = (ALPINE_SITES as string[]).includes(rawSite);
-              const isNissanSite = (NISSAN_SITES as string[]).includes(rawSite);
 
               if (pBrands.includes('Alpine')) {
-                  if (!isAlpineSite) return; // Site non autorisé Alpine → ignorer
-                  if (siteStats['Alpine']) targetSite = 'Alpine';
-                  else return; // Pas de bucket Alpine configuré
+                  const bucket = ALPINE_BUCKETS[rawSite];
+                  if (!bucket) return; // Site non autorisé Alpine
+                  if (siteStats[bucket]) targetSite = bucket;
+                  else return; // Bucket non configuré
               } else if (pBrands.includes('Nissan')) {
-                  if (!isNissanSite) return; // Site non autorisé Nissan → ignorer
-                  if (siteStats['Nissan']) targetSite = 'Nissan';
-                  else return; // Pas de bucket Nissan configuré
+                  if (!(NISSAN_SITES as string[]).includes(rawSite)) return;
+                  if (siteStats[NISSAN_BUCKET]) targetSite = NISSAN_BUCKET;
+                  else return;
               }
 
               if (!siteStats[targetSite]) return;
@@ -475,16 +485,14 @@ const Budget: React.FC = () => {
               if (targetSite === 'Riom') targetSite = 'Mozac';
 
               // Alpine/Nissan brand routing: override target to entity bucket
-              const isAlpineSite = (ALPINE_SITES as string[]).includes(rawSite);
-              const isNissanSite = (NISSAN_SITES as string[]).includes(rawSite);
-
               if (exp.brand === 'Alpine') {
-                  if (!isAlpineSite) return;
-                  if (siteStats['Alpine']) targetSite = 'Alpine';
+                  const bucket = ALPINE_BUCKETS[rawSite];
+                  if (!bucket) return;
+                  if (siteStats[bucket]) targetSite = bucket;
                   else return;
               } else if (exp.brand === 'Nissan') {
-                  if (!isNissanSite) return;
-                  if (siteStats['Nissan']) targetSite = 'Nissan';
+                  if (!(NISSAN_SITES as string[]).includes(rawSite)) return;
+                  if (siteStats[NISSAN_BUCKET]) targetSite = NISSAN_BUCKET;
                   else return;
               }
 

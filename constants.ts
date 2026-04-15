@@ -17,7 +17,7 @@ export const SITES: Site[] = [
 ];
 
 // Sites où Alpine est présent (projets tagués Alpine → budget routé vers entité Alpine)
-export const ALPINE_SITES: Site[] = ['Clermont', 'Le Puy-en-Velay', 'Vichy'];
+export const ALPINE_SITES: Site[] = ['Clermont', 'Le Puy-en-Velay', 'Vichy', 'Rodez'];
 
 // Sites où Nissan est présent (projets tagués Nissan → budget routé vers entité Nissan)
 export const NISSAN_SITES: Site[] = ['Clermont', 'Montluçon', 'Moulins', 'Le Puy-en-Velay', 'Saint-Etienne', 'Rodez', 'Albi', 'Aurillac'];
