@@ -548,9 +548,12 @@ const Budget: React.FC = () => {
       Object.entries(siteStats).forEach(([site, stats]) => {
           const plaque = getPlaqueForSite(site);
           
-          // Filter by Site
+          // Filter by Site (inclut les buckets Alpine associés aux sites sélectionnés)
           if (filterSites.length > 0) {
-              if (!filterSites.includes(site)) return;
+              const siteMatchesBucket = filterSites.some(fs =>
+                  fs === site || ALPINE_BUCKETS[fs] === site
+              );
+              if (!siteMatchesBucket) return;
           }
           
           stats.forecastMonthly.forEach((v, i) => finalForecastMonthly[i] += v);
