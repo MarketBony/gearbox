@@ -245,6 +245,7 @@ const Budget: React.FC = () => {
   const scrollRef = useScrollRestore('budget', !loading);
 
   useEffect(() => {
+    console.log('[DIAG] ALPINE_SITES:', ALPINE_SITES);
     loadData();
   }, []);
 
@@ -313,13 +314,14 @@ const Budget: React.FC = () => {
 
       // Init
       budgets.forEach(b => {
-          siteStats[b.site] = { 
-              forecast: { VN: 0, VO: 0, PR: 0, APV: 0 }, 
+          siteStats[b.site] = {
+              forecast: { VN: 0, VO: 0, PR: 0, APV: 0 },
               actual: { VN: 0, VO: 0, PR: 0, APV: 0 },
               forecastMonthly: new Array(12).fill(0),
               actualMonthly: new Array(12).fill(0)
           };
       });
+      console.log('[DIAG] siteStats keys after init:', Object.keys(siteStats));
 
       // Define which services to aggregate
       let servicesToProcess: ('VN'|'VO'|'PR'|'APV')[];
@@ -374,10 +376,18 @@ const Budget: React.FC = () => {
 
               // Alpine/Nissan brand routing: override target to entity bucket
               const pBrands = p.brands || [];
-              if (pBrands.includes('Alpine') && siteStats['Alpine']) {
-                  targetSite = 'Alpine';
-              } else if (pBrands.includes('Nissan') && siteStats['Nissan']) {
-                  targetSite = 'Nissan';
+              const isAlpineSite = (ALPINE_SITES as string[]).includes(rawSite);
+              const isNissanSite = (NISSAN_SITES as string[]).includes(rawSite);
+
+              if (pBrands.includes('Alpine')) {
+                  console.log('[DIAG] Alpine project:', p.name, '| rawSite:', rawSite, '| isAlpineSite:', isAlpineSite, '| siteStats[Alpine]:', siteStats['Alpine'] !== undefined ? 'defined' : 'UNDEFINED');
+                  if (!isAlpineSite) return; // Site non autorisé Alpine → ignorer
+                  if (siteStats['Alpine']) targetSite = 'Alpine';
+                  else return; // Pas de bucket Alpine configuré
+              } else if (pBrands.includes('Nissan')) {
+                  if (!isNissanSite) return; // Site non autorisé Nissan → ignorer
+                  if (siteStats['Nissan']) targetSite = 'Nissan';
+                  else return; // Pas de bucket Nissan configuré
               }
 
               if (!siteStats[targetSite]) return;
@@ -448,10 +458,17 @@ const Budget: React.FC = () => {
               if (targetSite === 'Riom') targetSite = 'Mozac';
 
               // Alpine/Nissan brand routing: override target to entity bucket
-              if (exp.brand === 'Alpine' && siteStats['Alpine']) {
-                  targetSite = 'Alpine';
-              } else if (exp.brand === 'Nissan' && siteStats['Nissan']) {
-                  targetSite = 'Nissan';
+              const isAlpineSite = (ALPINE_SITES as string[]).includes(rawSite);
+              const isNissanSite = (NISSAN_SITES as string[]).includes(rawSite);
+
+              if (exp.brand === 'Alpine') {
+                  if (!isAlpineSite) return;
+                  if (siteStats['Alpine']) targetSite = 'Alpine';
+                  else return;
+              } else if (exp.brand === 'Nissan') {
+                  if (!isNissanSite) return;
+                  if (siteStats['Nissan']) targetSite = 'Nissan';
+                  else return;
               }
 
               if (!siteStats[targetSite]) return;
