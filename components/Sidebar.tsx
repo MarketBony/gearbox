@@ -192,13 +192,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
 
         {/* Logo Area — compact on lg */}
         <div className="h-14 flex items-center justify-center lg:justify-start lg:px-4 border-b border-bony-border shrink-0">
-          <div className="shrink-0">
-            <img src="/logo-color.svg" alt="GEARBOX" className="h-8 w-auto object-contain" />
-          </div>
-          <div className="ml-2.5 hidden lg:flex flex-col justify-center">
-            <span className="font-title font-bold text-base text-bony-text tracking-widest leading-none">GEARBOX</span>
-            <span className="text-[9px] text-bony-orange tracking-[0.2em] font-sans uppercase font-bold mt-0.5">Plaque Edition</span>
-          </div>
+          <img src="/logo-color.svg" alt="GEARBOX" className="h-8 w-auto object-contain" />
         </div>
 
         {/* ── DESKTOP (lg+) — grouped nav ── */}

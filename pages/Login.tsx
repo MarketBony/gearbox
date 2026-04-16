@@ -37,12 +37,8 @@ const Login: React.FC = () => {
             
             {/* LOGO ANIMATION */}
             <div className="flex flex-col items-center mb-10 group">
-                <div className="relative w-24 h-24 mb-4 transition-transform duration-700 group-hover:scale-110">
+                <div className="relative w-24 h-24 transition-transform duration-700 group-hover:scale-110">
                      <img src="/logo-white.svg" alt="GEARBOX" className="w-full h-full drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
-                </div>
-                <div className="text-center">
-                    <h1 className="font-title text-3xl text-white tracking-widest">GEARBOX</h1>
-                    <div className="h-0.5 w-12 bg-bony-gradient mx-auto mt-2 rounded-full"></div>
                 </div>
             </div>
 
