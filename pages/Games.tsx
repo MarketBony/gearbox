@@ -277,32 +277,30 @@ const PodiumSection: React.FC<{ stats: PlayerStats[] }> = ({ stats }) => {
     ? [top3[1], top3[0], top3[2]].filter(Boolean)
     : [top3[0]];
 
-  const heights = ['h-16', 'h-24', 'h-12'];
-  const ranks = top3.length >= 2 ? [2, 1, 3] : [1];
+  // i=0 → 2nd place (silver), i=1 → 1st place (gold), i=2 → 3rd place (bronze)
+  const medals    = ['🥈', '🥇', '🥉'];
+  const heights   = ['h-16', 'h-24', 'h-12'];
+  const rankNums  = [2, 1, 3];
   const rankColors = ['text-slate-300', 'text-yellow-400', 'text-amber-600'];
-  const medalIcons = ['🥈', '🥇', '🥉'];
+  const pedestalBg = [
+    'bg-slate-500/20 border-2 border-slate-500/30',
+    'bg-yellow-500/20 border-2 border-yellow-500/40',
+    'bg-amber-700/20 border-2 border-amber-700/30',
+  ];
 
   return (
     <div className="flex items-end justify-center gap-4 pt-4 pb-2">
-      {order.map((player, i) => {
-        const rank = ranks[i] - 1; // 0-indexed for color/icon
-        const pedestalH = heights[i];
-        return (
-          <div key={player.userId} className="flex flex-col items-center gap-2">
-            <span className="text-lg">{medalIcons[rank]}</span>
-            <Avatar userId={player.userId} name={player.name} color={player.color} size={rank === 1 ? 48 : 36} />
-            <p className="font-semibold text-sm text-center leading-tight max-w-[80px] truncate">{player.name}</p>
-            <p className={`text-xs font-bold ${rankColors[rank]}`}>{player.wins} victoire{player.wins !== 1 ? 's' : ''}</p>
-            <div className={`${pedestalH} w-20 rounded-t-lg flex items-center justify-center ${
-              rank === 1 ? 'bg-yellow-500/20 border-2 border-yellow-500/40' :
-              rank === 0 ? 'bg-slate-500/20 border-2 border-slate-500/30' :
-              'bg-amber-700/20 border-2 border-amber-700/30'
-            }`}>
-              <span className={`text-2xl font-black ${rankColors[rank]}`}>{ranks[i]}</span>
-            </div>
+      {order.map((player, i) => (
+        <div key={player.userId} className="flex flex-col items-center gap-2">
+          <span className="text-lg">{medals[i]}</span>
+          <Avatar userId={player.userId} name={player.name} color={player.color} size={i === 1 ? 48 : 36} />
+          <p className="font-semibold text-sm text-center leading-tight max-w-[80px] truncate">{player.name}</p>
+          <p className={`text-xs font-bold ${rankColors[i]}`}>{player.wins} victoire{player.wins !== 1 ? 's' : ''}</p>
+          <div className={`${heights[i]} w-20 rounded-t-lg flex items-center justify-center ${pedestalBg[i]}`}>
+            <span className={`text-2xl font-black ${rankColors[i]}`}>{rankNums[i]}</span>
           </div>
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
 };
@@ -524,54 +522,65 @@ const GlobalStatsTab: React.FC<{
           <p className="text-bony-text/40 text-sm text-center py-8">Aucune partie terminée.</p>
         ) : (
           <div className="flex flex-col gap-2">
-            {globalStats.map((p, i) => (
-              <div
-                key={p.userId}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
-                  p.userId === myId ? 'bg-bony-orange/5 border-bony-orange/20' : 'bg-white/5 border-white/10'
-                }`}
-              >
-                <span className="text-bony-text/30 font-mono text-sm w-5 shrink-0">{i + 1}</span>
-                <Avatar userId={p.userId} name={p.name} color={p.color} size={32} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`font-semibold text-sm truncate ${p.userId === myId ? 'text-bony-orange' : ''}`}>{p.name}</span>
-                    {i === 0 && <Crown size={11} className="text-yellow-400 shrink-0" />}
-                    {p.favoriteGame && (
-                      <span className="text-xs bg-white/10 rounded px-1.5 py-0.5 shrink-0">
-                        {GAME_ICONS[p.favoriteGame]} {GAME_LABELS[p.favoriteGame]}
-                      </span>
-                    )}
+            {globalStats.map((p, i) => {
+              const rankBadge = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null;
+              const borderClass = p.userId === myId
+                ? 'border-bony-orange/40 bg-bony-orange/5'
+                : i === 0 ? 'border-yellow-500/30 bg-yellow-500/5'
+                : i === 1 ? 'border-slate-400/30 bg-slate-500/5'
+                : i === 2 ? 'border-amber-700/30 bg-amber-700/5'
+                : 'border-white/10 bg-white/5';
+              return (
+                <div
+                  key={p.userId}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${borderClass}`}
+                >
+                  {/* Block 1 : rang + avatar + nom + jeu favori */}
+                  <div className="flex items-center gap-2 w-40 shrink-0 min-w-0">
+                    {rankBadge
+                      ? <span className="text-base w-5 text-center shrink-0">{rankBadge}</span>
+                      : <span className="text-bony-text/30 font-mono text-sm w-5 text-center shrink-0">{i + 1}</span>
+                    }
+                    <Avatar userId={p.userId} name={p.name} color={p.color} size={32} />
+                    <div className="min-w-0">
+                      <span className={`font-semibold text-sm truncate block ${p.userId === myId ? 'text-bony-orange' : ''}`}>{p.name}</span>
+                      {p.favoriteGame && (
+                        <span className="text-[10px] text-bony-text/40 block truncate">
+                          {GAME_ICONS[p.favoriteGame]} {GAME_LABELS[p.favoriteGame]}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {/* Bar chart */}
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+
+                  {/* Block 2 : barre de victoires */}
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-bony-gradient rounded-full transition-all duration-700"
                         style={{ width: `${maxWins > 0 ? (p.wins / maxWins) * 100 : 0}%` }}
                       />
                     </div>
-                    <span className="text-[10px] text-bony-text/40 shrink-0 w-12 text-right">
-                      {p.wins}V · {p.ratio}%
-                    </span>
+                  </div>
+
+                  {/* Block 3 : V / D / % */}
+                  <div className="flex items-center gap-3 text-xs shrink-0">
+                    <div className="text-center">
+                      <p className="font-bold text-green-400">{p.wins}</p>
+                      <p className="text-bony-text/30">V</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="font-bold text-red-400">{p.losses}</p>
+                      <p className="text-bony-text/30">D</p>
+                    </div>
+                    <div className="text-center min-w-[40px]">
+                      <p className={`font-bold text-base leading-none ${p.ratio >= 60 ? 'text-green-400' : p.ratio >= 40 ? 'text-yellow-400' : 'text-red-400'}`}>
+                        {p.ratio}%
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <div className="hidden sm:flex items-center gap-4 text-xs shrink-0">
-                  <div className="text-center">
-                    <p className="font-bold text-green-400">{p.wins}</p>
-                    <p className="text-bony-text/30">V</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-bold text-red-400">{p.losses}</p>
-                    <p className="text-bony-text/30">D</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-bold text-bony-text/60">{p.played}</p>
-                    <p className="text-bony-text/30">J</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

@@ -54,6 +54,9 @@ function allSunk(myGrid: Grid, shots: Grid): boolean {
   return true;
 }
 
+const COL_LABELS = ['1','2','3','4','5','6','7','8','9','10'];
+const ROW_LABELS = ['A','B','C','D','E','F','G','H','I','J'];
+
 const GridDisplay: React.FC<{
   grid: Grid;
   shots?: Grid;
@@ -65,32 +68,49 @@ const GridDisplay: React.FC<{
   onLeave?: () => void;
 }> = ({ grid, shots, interactive, onShoot, showShips, hoverCell, onHover, onLeave }) => {
   return (
-    <div className="inline-block border border-slate-300 dark:border-white/10 rounded-lg overflow-hidden" onMouseLeave={onLeave}>
-      {Array.from({ length: GRID }, (_, r) => (
-        <div key={r} className="flex">
-          {Array.from({ length: GRID }, (_, c) => {
-            const cell = grid[r][c];
-            const shot = shots?.[r]?.[c];
-            const isHover = hoverCell?.[0] === r && hoverCell?.[1] === c;
-            let bg = 'bg-slate-100 dark:bg-[#0f1929]';
-            if (showShips && cell === 'ship') bg = 'bg-slate-400 dark:bg-white/20';
-            if (shot === 'hit') bg = 'bg-red-500';
-            if (shot === 'miss') bg = 'bg-blue-400 dark:bg-blue-900';
-            if (interactive && !shot && isHover) bg = 'bg-slate-300 dark:bg-white/10';
-            return (
-              <div
-                key={c}
-                className={`w-7 h-7 border border-slate-200 dark:border-white/5 flex items-center justify-center text-xs cursor-pointer transition-colors ${bg}`}
-                onClick={() => interactive && !shot && onShoot?.(r, c)}
-                onMouseEnter={() => onHover?.(r, c)}
-              >
-                {shot === 'hit' && <span className="text-white font-bold text-[10px]">✕</span>}
-                {shot === 'miss' && <span className="text-white font-bold text-[10px]">·</span>}
-              </div>
-            );
-          })}
+    <div className="inline-block select-none" onMouseLeave={onLeave}>
+      {/* Column labels */}
+      <div className="flex ml-6 mb-0.5">
+        {COL_LABELS.map(l => (
+          <div key={l} className="w-7 h-4 flex items-center justify-center text-[9px] text-slate-400 dark:text-white/25">{l}</div>
+        ))}
+      </div>
+      <div className="flex">
+        {/* Row labels */}
+        <div className="flex flex-col mr-0.5">
+          {ROW_LABELS.map(l => (
+            <div key={l} className="w-5 h-7 flex items-center justify-center text-[9px] text-slate-400 dark:text-white/25">{l}</div>
+          ))}
         </div>
-      ))}
+        {/* Grid */}
+        <div className="border border-slate-600 dark:border-blue-900 rounded-md overflow-hidden">
+          {Array.from({ length: GRID }, (_, r) => (
+            <div key={r} className="flex">
+              {Array.from({ length: GRID }, (_, c) => {
+                const cell = grid[r][c];
+                const shot = shots?.[r]?.[c];
+                const isHover = hoverCell?.[0] === r && hoverCell?.[1] === c;
+                let bg = 'bg-blue-950';
+                if (showShips && cell === 'ship') bg = 'bg-slate-500';
+                if (shot === 'hit') bg = 'bg-red-700';
+                if (shot === 'miss') bg = 'bg-blue-800';
+                if (interactive && !shot && isHover) bg = 'bg-blue-700 cursor-crosshair';
+                return (
+                  <div
+                    key={c}
+                    className={`w-7 h-7 border border-blue-900/40 flex items-center justify-center cursor-pointer transition-colors ${bg}`}
+                    onClick={() => interactive && !shot && onShoot?.(r, c)}
+                    onMouseEnter={() => onHover?.(r, c)}
+                  >
+                    {shot === 'hit' && <span className="text-base leading-none">🔥</span>}
+                    {shot === 'miss' && <span className="text-blue-300 font-bold text-sm leading-none">●</span>}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
@@ -155,9 +175,9 @@ const Battleship: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
     newShots[r][c] = hit ? 'hit' : 'miss';
     const shotsKey = isP1 ? 'p1Shots' : 'p2Shots';
     const sunk = allSunk(oppGrid, newShots);
-    const nextTurn = isMyTurn ? (isP1 ? session.player2Id : session.player1Id) : myId;
+    const nextTurn = sunk ? myId : hit ? myId : (isP1 ? session.player2Id : session.player1Id);
     const newBoard: BattleshipBoard = { ...board, [shotsKey]: newShots };
-    onUpdate(newBoard, sunk ? myId : nextTurn, sunk ? myId : undefined);
+    onUpdate(newBoard, nextTurn, sunk ? myId : undefined);
   };
 
   const iWon = session.winnerId === myId;
@@ -260,33 +280,51 @@ const Battleship: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
     <div className="flex flex-col items-center gap-4">
       <div className="text-center">
         {isMyTurn
-          ? <p className="text-bony-orange font-semibold">Votre tour — cliquez sur la grille adverse !</p>
+          ? <p className="text-bony-orange font-semibold animate-pulse">⚡ Votre tour — cliquez sur la flotte ennemie !</p>
           : <p className="text-slate-700 dark:text-bony-text/70 text-sm">En attente du tir adverse…</p>
         }
       </div>
 
-      <div className="flex gap-6 flex-wrap justify-center">
-        <div>
-          <p className="text-xs text-slate-500 dark:text-bony-text/50 mb-2 text-center">Votre flotte</p>
+      <div className="flex items-center gap-4 flex-wrap justify-center">
+        {/* Ma flotte */}
+        <div className="flex flex-col items-center gap-2">
+          <div className="px-3 py-1 bg-blue-900/40 border border-blue-500/30 rounded-lg text-xs font-bold text-blue-300 uppercase tracking-wider">
+            Votre flotte
+          </div>
           <GridDisplay
             grid={board[myKey].grid}
             shots={isP1 ? board.p2Shots : board.p1Shots}
             showShips
           />
         </div>
-        <div>
-          <p className="text-xs text-slate-500 dark:text-bony-text/50 mb-2 text-center">
-            Grille adverse {isMyTurn && <span className="text-bony-orange">(cliquez !)</span>}
-          </p>
-          <GridDisplay
-            grid={Array.from({ length: GRID }, () => Array(GRID).fill(null))}
-            shots={myShots}
-            interactive={isMyTurn && !isFinished}
-            onShoot={handleShoot}
-            hoverCell={shootHover}
-            onHover={(r, c) => setShootHover([r, c])}
-            onLeave={() => setShootHover(null)}
-          />
+
+        {/* Séparateur VS */}
+        <div className="flex flex-col items-center gap-1 px-2 self-center">
+          <div className="w-px h-8 bg-gradient-to-b from-transparent via-bony-orange/40 to-transparent" />
+          <span className={`font-black text-xl ${isMyTurn ? 'text-bony-orange animate-pulse' : 'text-white/20'}`}>VS</span>
+          <div className="w-px h-8 bg-gradient-to-b from-transparent via-bony-orange/40 to-transparent" />
+        </div>
+
+        {/* Flotte ennemie */}
+        <div className="flex flex-col items-center gap-2">
+          <div className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+            isMyTurn
+              ? 'bg-red-900/40 border border-red-500/30 text-red-300 animate-pulse'
+              : 'bg-slate-800/40 border border-slate-600/30 text-slate-400'
+          }`}>
+            Flotte ennemie {isMyTurn && '⚡'}
+          </div>
+          <div className={isMyTurn ? 'ring-2 ring-red-500/40 ring-offset-2 ring-offset-[#0d1117] rounded-md' : ''}>
+            <GridDisplay
+              grid={Array.from({ length: GRID }, () => Array(GRID).fill(null))}
+              shots={myShots}
+              interactive={isMyTurn && !isFinished}
+              onShoot={handleShoot}
+              hoverCell={shootHover}
+              onHover={(r, c) => setShootHover([r, c])}
+              onLeave={() => setShootHover(null)}
+            />
+          </div>
         </div>
       </div>
     </div>
