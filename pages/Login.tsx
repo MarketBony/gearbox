@@ -38,15 +38,7 @@ const Login: React.FC = () => {
             {/* LOGO ANIMATION */}
             <div className="flex flex-col items-center mb-10 group">
                 <div className="relative w-24 h-24 mb-4 transition-transform duration-700 group-hover:scale-110">
-                     <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
-                        {/* H Gate */}
-                        <path d="M20 20 V80" stroke="white" strokeWidth="6" strokeLinecap="round" className="animate-draw path-1"/>
-                        <path d="M80 20 V80" stroke="white" strokeWidth="6" strokeLinecap="round" className="animate-draw path-2" style={{animationDelay: '0.2s'}}/>
-                        <path d="M20 50 H80" stroke="white" strokeWidth="6" strokeLinecap="round" className="animate-draw path-3" style={{animationDelay: '0.4s'}}/>
-                        {/* Gear Stick */}
-                        <path d="M50 50 V25" stroke="white" strokeWidth="6" strokeLinecap="round" className="animate-draw path-4" style={{animationDelay: '0.6s'}}/>
-                        <circle cx="50" cy="20" r="8" fill="white" className="animate-fade-in" style={{animationDelay: '0.8s'}}/>
-                     </svg>
+                     <img src="/logo-white.svg" alt="GEARBOX" className="w-full h-full drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
                 </div>
                 <div className="text-center">
                     <h1 className="font-title text-3xl text-white tracking-widest">GEARBOX</h1>

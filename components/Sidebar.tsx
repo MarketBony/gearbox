@@ -193,13 +193,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
         {/* Logo Area — compact on lg */}
         <div className="h-14 flex items-center justify-center lg:justify-start lg:px-4 border-b border-bony-border shrink-0">
           <div className="shrink-0">
-            <svg className="w-9 h-9 lg:w-8 lg:h-8" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M20 20 V80" stroke={logoColor} strokeWidth="8" strokeLinecap="round"/>
-              <path d="M80 20 V80" stroke={logoColor} strokeWidth="8" strokeLinecap="round"/>
-              <path d="M20 50 H80" stroke={logoColor} strokeWidth="8" strokeLinecap="round"/>
-              <path d="M50 50 V25" stroke={logoColor} strokeWidth="8" strokeLinecap="round"/>
-              <circle cx="50" cy="20" r="10" fill={logoColor}/>
-            </svg>
+            <img src="/logo-color.svg" alt="GEARBOX" className="h-8 w-auto object-contain" />
           </div>
           <div className="ml-2.5 hidden lg:flex flex-col justify-center">
             <span className="font-title font-bold text-base text-bony-text tracking-widest leading-none">GEARBOX</span>
