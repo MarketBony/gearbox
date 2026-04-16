@@ -36,10 +36,8 @@ const Login: React.FC = () => {
         <div className="relative z-10 w-full max-w-md p-8 backdrop-blur-xl bg-black/60 border border-white/10 rounded-2xl shadow-2xl animate-in fade-in zoom-in duration-700">
             
             {/* LOGO ANIMATION */}
-            <div className="flex flex-col items-center mb-10 group">
-                <div className="relative w-24 h-24 transition-transform duration-700 group-hover:scale-110">
-                     <img src="/logo-white.svg" alt="GEARBOX" className="w-full h-full drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
-                </div>
+            <div className="flex flex-col items-center mb-10">
+                <img src="/logo-white.svg" alt="GEARBOX" className="w-56 h-auto object-contain mx-auto animate-pulse-scale drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
             </div>
 
             {/* FORM */}
@@ -115,6 +113,13 @@ const Login: React.FC = () => {
             }
             @keyframes draw {
                 to { stroke-dashoffset: 0; }
+            }
+            @keyframes pulse-scale {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+            }
+            .animate-pulse-scale {
+                animation: pulse-scale 3s ease-in-out infinite;
             }
         `}</style>
     </div>

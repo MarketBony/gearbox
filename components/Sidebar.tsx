@@ -191,8 +191,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
       <div className="hidden md:flex w-20 lg:w-56 bg-bony-panel border-r border-bony-border flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300">
 
         {/* Logo Area — compact on lg */}
-        <div className="h-14 flex items-center justify-center lg:justify-start lg:px-4 border-b border-bony-border shrink-0">
-          <img src="/logo-color.svg" alt="GEARBOX" className="h-8 w-auto object-contain" />
+        <div className="flex items-center justify-center px-4 py-3 border-b border-bony-border shrink-0">
+          <img src="/logo-color.svg" alt="GEARBOX" className="w-full max-w-[180px] h-auto object-contain" />
         </div>
 
         {/* ── DESKTOP (lg+) — grouped nav ── */}
