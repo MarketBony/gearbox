@@ -114,53 +114,6 @@ const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const glitchRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const base = document.getElementById('glitch-logo');
-    const l1 = document.getElementById('glitch-l1');
-    const l2 = document.getElementById('glitch-l2');
-    if (!base || !l1 || !l2) return;
-
-    let timeout: ReturnType<typeof setTimeout>;
-
-    function randPx(max: number) {
-      return (Math.random() * max * 2 - max) + 'px';
-    }
-
-    function glitch() {
-      const steps = 4 + Math.floor(Math.random() * 4);
-      const stepDuration = 40;
-      let i = 0;
-
-      const interval = setInterval(() => {
-        if (i >= steps) {
-          (l1 as HTMLElement).style.opacity = '0';
-          (l2 as HTMLElement).style.opacity = '0';
-          (l1 as HTMLElement).style.transform = 'none';
-          (l2 as HTMLElement).style.transform = 'none';
-          (base as HTMLElement).style.transform = 'none';
-          clearInterval(interval);
-          timeout = setTimeout(glitch, 2500 + Math.random() * 3000);
-          return;
-        }
-        const intensity = Math.random();
-        (l1 as HTMLElement).style.opacity = String(0.5 + Math.random() * 0.5);
-        (l2 as HTMLElement).style.opacity = String(0.4 + Math.random() * 0.4);
-        (l1 as HTMLElement).style.transform = `translate(${randPx(6 * intensity)}, ${randPx(1)})`;
-        (l2 as HTMLElement).style.transform = `translate(${randPx(4 * intensity)}, ${randPx(1)})`;
-        (base as HTMLElement).style.transform = `translate(${randPx(1.5 * intensity)}, 0)`;
-        const y1 = Math.floor(Math.random() * 80);
-        const y2 = y1 + 10 + Math.floor(Math.random() * 20);
-        (l1 as HTMLElement).style.clipPath = `inset(${y1}% 0 ${100 - y2}% 0)`;
-        (l2 as HTMLElement).style.clipPath = `inset(${100 - y2}% 0 ${y1}% 0)`;
-        i++;
-      }, stepDuration);
-    }
-
-    timeout = setTimeout(glitch, 1000);
-    return () => clearTimeout(timeout);
-  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -287,10 +240,9 @@ const Login: React.FC = () => {
 
         {/* LOGO */}
         <div className="flex flex-col items-center mb-10">
-          <div style={{ position: 'relative', display: 'inline-block' }} ref={glitchRef}>
-            <img src="/logo-white.svg" alt="GEARBOX" className="w-48 h-auto object-contain mx-auto block" id="glitch-logo" />
-            <img src="/logo-white.svg" alt="" aria-hidden className="w-48 h-auto object-contain mx-auto block" id="glitch-l1" style={{ position: 'absolute', top: 0, left: 0, opacity: 0, pointerEvents: 'none', filter: 'hue-rotate(320deg) saturate(3) brightness(1.2)' }} />
-            <img src="/logo-white.svg" alt="" aria-hidden className="w-48 h-auto object-contain mx-auto block" id="glitch-l2" style={{ position: 'absolute', top: 0, left: 0, opacity: 0, pointerEvents: 'none', filter: 'hue-rotate(200deg) saturate(3) brightness(1.1)' }} />
+          <div style={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
+            <img src="/logo-white.svg" alt="GEARBOX" className="w-56 h-auto object-contain mx-auto drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
+            <span className="scan-line" />
           </div>
         </div>
 
@@ -350,6 +302,23 @@ const Login: React.FC = () => {
         </div>
       </div>
 
+      <style>{`
+        @keyframes scan {
+          0%   { top: -10%; opacity: 0; }
+          10%  { opacity: 1; }
+          90%  { opacity: 1; }
+          100% { top: 110%; opacity: 0; }
+        }
+        .scan-line {
+          position: absolute;
+          left: 0;
+          width: 100%;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, rgba(247,86,50,0.8), rgba(200,80,230,0.8), transparent);
+          animation: scan 4s ease-in-out infinite;
+          pointer-events: none;
+        }
+      `}</style>
     </div>
   );
 };
