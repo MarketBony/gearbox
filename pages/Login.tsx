@@ -140,7 +140,18 @@ const Login: React.FC = () => {
       const h = canvas.height;
 
       ctx.clearRect(0, 0, w, h);
-      ctx.fillStyle = '#1a0a2e';
+      ctx.fillStyle = '#0a0414';
+      ctx.fillRect(0, 0, w, h);
+
+      // Animated radial gradient overlay
+      const t = Date.now() / 8000;
+      const cx = w * (0.3 + 0.2 * Math.sin(t));
+      const cy = h * (0.4 + 0.2 * Math.cos(t * 0.7));
+      const radGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.7);
+      radGrad.addColorStop(0, 'rgba(80,10,120,0.35)');
+      radGrad.addColorStop(0.4, 'rgba(40,5,80,0.2)');
+      radGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = radGrad;
       ctx.fillRect(0, 0, w, h);
 
       // Draw segments
@@ -229,7 +240,10 @@ const Login: React.FC = () => {
 
         {/* LOGO */}
         <div className="flex flex-col items-center mb-10">
-          <img src="/logo-white.svg" alt="GEARBOX" className="w-56 h-auto object-contain mx-auto animate-pulse-scale drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
+          <div style={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
+            <img src="/logo-white.svg" alt="GEARBOX" className="w-56 h-auto object-contain mx-auto drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
+            <span className="scan-line" />
+          </div>
         </div>
 
         {/* FORM */}
@@ -289,12 +303,20 @@ const Login: React.FC = () => {
       </div>
 
       <style>{`
-        @keyframes pulse-scale {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
+        @keyframes scan {
+          0%   { top: -10%; opacity: 0; }
+          10%  { opacity: 1; }
+          90%  { opacity: 1; }
+          100% { top: 110%; opacity: 0; }
         }
-        .animate-pulse-scale {
-          animation: pulse-scale 3s ease-in-out infinite;
+        .scan-line {
+          position: absolute;
+          left: 0;
+          width: 100%;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, rgba(247,86,50,0.8), rgba(200,80,230,0.8), transparent);
+          animation: scan 4s ease-in-out infinite;
+          pointer-events: none;
         }
       `}</style>
     </div>
