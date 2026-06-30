@@ -188,7 +188,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   return (
     <>
       {/* ===== DESKTOP / TABLET SIDEBAR (md+) ===== */}
-      <div className="hidden md:flex w-20 lg:w-56 bg-bony-panel border-r border-bony-border flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300">
+      <div className="hidden md:flex w-20 lg:w-56 glass-strong border-r border-bony-border flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300">
 
         {/* Logo Area — compact on lg */}
         <div className="flex items-center justify-center px-6 py-4 border-b border-bony-border shrink-0">
@@ -338,7 +338,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
         </nav>
 
         {/* ── BOTTOM USER ZONE ── */}
-        <div className="border-t border-bony-border bg-bony-dark shrink-0">
+        <div className="border-t border-bony-border shrink-0">
 
           {/* Desktop lg: compact user card + actions */}
           <div className="hidden lg:flex flex-col p-3 gap-2">
@@ -428,7 +428,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
       </div>
 
       {/* ===== MOBILE BOTTOM NAV (< md) ===== */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-bony-panel border-t border-bony-border flex items-stretch h-16">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-bony-border flex items-stretch h-16">
         {bottomNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -476,7 +476,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
       {showActivity && (
         <div className="fixed inset-0 z-[200] flex">
           <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={closeActivity} />
-          <div className="w-80 md:w-96 bg-bony-panel border-l border-bony-border h-full flex flex-col shadow-2xl">
+          <div className="w-80 md:w-96 glass-strong glass-sheen relative overflow-hidden border-l border-bony-border h-full flex flex-col shadow-glass-lg">
             {/* Header */}
             <div className="p-4 border-b border-bony-border flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
@@ -538,7 +538,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             onClick={() => setShowMoreMenu(false)}
           />
           {/* Bottom sheet */}
-          <div className="relative bg-bony-panel border-t border-bony-border rounded-t-2xl p-4 pb-6 shadow-2xl">
+          <div className="relative glass-strong glass-sheen overflow-hidden border-t border-bony-border rounded-t-2xl p-4 pb-6 shadow-glass-lg">
             <div className="flex items-center justify-between mb-4">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Navigation</span>
               <button
