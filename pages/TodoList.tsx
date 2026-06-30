@@ -145,7 +145,7 @@ const SiteFilterDropdown: React.FC<{
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-60 bg-bony-panel border border-bony-border rounded-xl shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full left-0 mt-1 w-60 glass-strong rounded-xl shadow-2xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-bony-border">
             <span className="text-xs font-bold text-bony-text/50 uppercase tracking-wider">Périmètre</span>
             {selected.length > 0 && (
@@ -209,7 +209,7 @@ const TaskCard: React.FC<{
   const canGoRight = colIndex < KANBAN_ORDER.length - 1;
 
   return (
-    <div className={`bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-xl p-3 flex flex-col gap-2 shadow-sm border-l-4 ${urgencyBorder} transition-all hover:shadow-md`}>
+    <div className={`gx-card p-3 flex flex-col gap-2 border-l-4 ${urgencyBorder} transition-all hover:shadow-md`}>
       {/* Task name */}
       <p className="font-semibold text-sm text-slate-900 dark:text-bony-text leading-snug">{task.name}</p>
 

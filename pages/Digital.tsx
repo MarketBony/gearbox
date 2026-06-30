@@ -121,7 +121,7 @@ const VisualMultiSelect: React.FC<VisualMultiSelectProps> = ({ label, options, s
             </div>
 
             {isOpen && (
-                <div className="absolute top-full left-0 mt-1 w-64 bg-white dark:bg-[#1a1a1a] border border-bony-border rounded-lg shadow-2xl z-50 p-2 max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in duration-100">
+                <div className="glass-strong absolute top-full left-0 mt-1 w-64 rounded-lg shadow-glass-lg z-50 p-2 max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in duration-100">
                     <div className="flex flex-col gap-1">
                         {options.map(opt => {
                             const isSelected = selected.includes(opt);
@@ -237,7 +237,7 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, up
     return (
         <>
             <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                <div className="bg-bony-panel border border-bony-border rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]">
+                <div className="glass-strong glass-sheen relative overflow-hidden rounded-xl w-full max-w-2xl shadow-glass-lg flex flex-col max-h-[85vh]">
 
                     {/* Header */}
                     <div className="flex items-center justify-between px-5 py-4 border-b border-bony-border shrink-0">
@@ -1002,7 +1002,7 @@ const Digital: React.FC = () => {
       if (!hoveredPostData) return null;
       return (
           <div 
-            className="fixed z-[100] w-72 bg-white dark:bg-bony-panel border border-bony-border rounded-xl shadow-2xl p-4 pointer-events-none animate-in fade-in duration-200"
+            className="glass-strong fixed z-[100] w-72 rounded-xl shadow-glass-lg p-4 pointer-events-none animate-in fade-in duration-200"
             style={{ top: cursorPos.y, left: cursorPos.x }}
           >
               {/* Header: Brands + Status */}
@@ -1368,7 +1368,7 @@ const Digital: React.FC = () => {
         {/* Create Post Modal */}
         {showCreatePostModal && (
             <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-bony-panel border border-bony-border rounded-xl p-6 max-w-sm w-full shadow-2xl">
+                <div className="glass-strong rounded-xl p-6 max-w-sm w-full shadow-glass-lg">
                     <h3 className="text-lg font-title text-bony-text mb-1">Nouvelle Publication</h3>
                     <p className="text-xs text-bony-muted mb-4">Donnez un titre à votre publication pour commencer.</p>
                     <input

@@ -286,7 +286,7 @@ const NewsSection: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm dark:shadow-xl flex flex-col">
+    <div className="gx-card p-0 overflow-hidden flex flex-col">
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-bony-border shrink-0">
         <div>
           <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
@@ -427,7 +427,7 @@ const MarketingNewsSection: React.FC = () => {
   useEffect(() => { load(); }, []);
 
   return (
-    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm dark:shadow-xl flex flex-col">
+    <div className="gx-card p-0 overflow-hidden flex flex-col">
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-bony-border shrink-0">
         <div>
           <h3 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
@@ -664,7 +664,7 @@ const WeatherTodayCard: React.FC<{
 const WeatherForecastCard: React.FC<{ forecast: ForecastDay[] }> = ({ forecast }) => {
   if (forecast.length === 0) return null;
   return (
-    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl shadow-sm overflow-hidden h-full flex flex-col">
+    <div className="gx-card p-0 overflow-hidden h-full flex flex-col">
       <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border shrink-0">
         <h3 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
           <Cloud size={13} className="text-sky-500" /> Prévisions 5 jours
@@ -764,7 +764,7 @@ const MusicSection: React.FC = () => {
   const pct = duration > 0 ? (progress / duration) * 100 : 0;
 
   return (
-    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm">
+    <div className="gx-card p-0 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border">
         <h3 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
           <Music size={13} className="text-purple-500" /> Musique du Jour
@@ -847,7 +847,7 @@ const BirthdaysSection: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm h-48 flex flex-col">
+    <div className="gx-card p-0 overflow-hidden h-48 flex flex-col">
       <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border shrink-0">
         <h3 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
           <Cake size={13} className="text-pink-500" /> Anniversaires
@@ -948,7 +948,7 @@ const NextEventSection: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl overflow-hidden shadow-sm h-full flex flex-col">
+    <div className="gx-card p-0 overflow-hidden h-full flex flex-col">
       <div className="px-4 py-3 border-b border-slate-100 dark:border-bony-border shrink-0">
         <h3 className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
           <CalendarDays size={13} className="text-bony-orange" /> Prochains Événements
@@ -1151,7 +1151,7 @@ const ViennoiseriesSection: React.FC = () => {
                 4 sem. précédentes
               </button>
               {showHistory && (
-                <div className="absolute bottom-full right-0 mb-2 w-52 bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-xl shadow-xl p-2 z-20">
+                <div className="absolute bottom-full right-0 mb-2 w-52 glass-strong rounded-xl shadow-xl p-2 z-20">
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-1.5">Historique</p>
                   {history.map(({ label, user }) => (
                     <div key={label} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 transition">
@@ -1174,7 +1174,7 @@ const ViennoiseriesSection: React.FC = () => {
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 const WeatherSkeleton: React.FC = () => (
-  <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl shadow-sm">
+  <div className="gx-card">
     <Spinner label="Chargement météo..." />
   </div>
 );
@@ -1214,7 +1214,7 @@ const HelloMarketing: React.FC = () => {
           {/* Haut gauche — Météo du jour (compacte) */}
           <div className="flex flex-col">
             {weather.loading ? <WeatherSkeleton /> : weather.error || !weather.current ? (
-              <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl p-5 shadow-sm h-full">
+              <div className="gx-card p-5 h-full">
                 <p className="text-xs text-red-500 font-bold text-center">{weather.error || 'Données météo indisponibles.'}</p>
               </div>
             ) : (

@@ -152,7 +152,7 @@ const Expenses: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex flex-wrap gap-4 items-center bg-bony-panel p-3 rounded-xl border border-bony-border shrink-0">
+      <div className="mb-6 flex flex-wrap gap-4 items-center glass-strong p-3 rounded-xl shrink-0">
         <div className="flex items-center gap-2 bg-slate-100 dark:bg-black/30 px-3 py-1.5 rounded-lg border border-bony-border flex-1 max-w-xs">
             <Search size={14} className="text-slate-400"/>
             <input 
@@ -200,7 +200,7 @@ const Expenses: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="flex-1 bg-bony-panel border border-bony-border rounded-xl overflow-hidden flex flex-col shadow-lg">
+      <div className="flex-1 gx-card overflow-hidden flex flex-col">
         <div ref={scrollRef} className="overflow-y-auto custom-scrollbar flex-1">
           {/* Mobile card list */}
           <div className="md:hidden space-y-3 p-3">
@@ -210,7 +210,7 @@ const Expenses: React.FC = () => {
               <p className="text-center text-slate-500 py-8">Aucune dépense trouvée</p>
             ) : (
               filteredExpenses.map((exp) => (
-                <div key={exp.id} className="bg-bony-panel border border-bony-border rounded-lg p-3 space-y-2">
+                <div key={exp.id} className="gx-card p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-bony-orange">
                       {new Date(exp.date).toLocaleDateString('fr-FR')}
@@ -311,7 +311,7 @@ const Expenses: React.FC = () => {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-bony-panel border border-bony-border rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="glass-strong glass-sheen relative rounded-xl shadow-glass-lg w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-4 border-b border-bony-border flex justify-between items-center bg-slate-100 dark:bg-white/5">
               <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 {editingExpense ? <Edit size={18} className="text-bony-orange"/> : <Plus size={18} className="text-bony-orange"/>}

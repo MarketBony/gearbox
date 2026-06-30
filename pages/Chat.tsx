@@ -177,7 +177,7 @@ const GroupAvatarCropModal: React.FC<GroupAvatarModalProps> = ({ convId, convNam
 
   return (
     <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="glass-strong rounded-2xl w-full max-w-sm shadow-glass-lg overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-bony-border">
           <div>
             <h3 className="font-title text-slate-900 dark:text-bony-text flex items-center gap-2">
@@ -881,7 +881,7 @@ const Chat: React.FC = () => {
                                           <MoreHorizontal size={13} />
                                         </button>
                                         {menuMsgId === msg.id && (
-                                          <div className="absolute right-0 top-full mt-1 bg-bony-panel border border-bony-border rounded-lg shadow-xl z-20 min-w-[120px] overflow-hidden" onClick={e => e.stopPropagation()}>
+                                          <div className="glass-strong absolute right-0 top-full mt-1 rounded-lg shadow-glass z-20 min-w-[120px] overflow-hidden" onClick={e => e.stopPropagation()}>
                                             <button onClick={() => startEdit(msg)} className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5 text-bony-text"><Pencil size={12} /> Modifier</button>
                                             <button onClick={() => deleteMsg(msg.id)} className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-red-500/10 text-red-400"><Trash2 size={12} /> Supprimer</button>
                                           </div>
@@ -1022,7 +1022,7 @@ const Chat: React.FC = () => {
       {/* ===== MODAL: CHOICE ===== */}
       {showNewModal === 'choice' && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-bony-panel border border-bony-border rounded-xl w-full max-w-xs shadow-2xl overflow-hidden">
+          <div className="glass-strong rounded-xl w-full max-w-xs shadow-glass-lg overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-bony-border">
               <h3 className="font-title text-bony-text text-sm">Nouvelle conversation</h3>
               <button onClick={() => setShowNewModal('none')} className="text-slate-400 hover:text-bony-text"><X size={18} /></button>
@@ -1062,7 +1062,7 @@ const Chat: React.FC = () => {
       {/* ===== MODAL: PRIVATE ===== */}
       {showNewModal === 'private' && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-bony-panel border border-bony-border rounded-xl w-full max-w-sm shadow-2xl">
+          <div className="glass-strong rounded-xl w-full max-w-sm shadow-glass-lg">
             <div className="flex items-center justify-between p-4 border-b border-bony-border">
               <div className="flex items-center gap-2">
                 {!isExternal && (
@@ -1100,7 +1100,7 @@ const Chat: React.FC = () => {
       {/* ===== MODAL: GROUP ===== */}
       {showNewModal === 'group' && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-bony-panel border border-bony-border rounded-xl w-full max-w-sm shadow-2xl">
+          <div className="glass-strong rounded-xl w-full max-w-sm shadow-glass-lg">
             <div className="flex items-center justify-between p-4 border-b border-bony-border">
               <div className="flex items-center gap-2">
                 <button onClick={() => setShowNewModal('choice')} className="text-slate-400 hover:text-bony-text"><ArrowLeft size={18} /></button>

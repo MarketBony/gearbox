@@ -21,7 +21,7 @@ const StatsCard: React.FC<StatsCardProps> = ({ title, value, subtitle, icon, col
   const currentStyle = colorStyles[color] || colorStyles.orange;
 
   return (
-    <div className={`bg-bony-panel p-5 rounded-xl border ${currentStyle.border} shadow-sm hover:shadow-md transition-shadow`}>
+    <div className={`gx-card p-5`}>
       <div className="flex justify-between items-start">
         <div>
           <p className="text-slate-400 text-xs font-bold tracking-wider mb-1 font-sans uppercase">{title}</p>

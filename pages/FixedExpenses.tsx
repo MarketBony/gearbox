@@ -238,7 +238,7 @@ const FixedExpenses: React.FC = () => {
             <div className="flex-1 flex flex-col h-full overflow-hidden">
                 
                 {/* Header */}
-                <div className="h-16 border-b border-bony-border flex items-center justify-between px-6 bg-bony-panel shrink-0">
+                <div className="h-16 border-b border-bony-border flex items-center justify-between px-6 glass-strong shrink-0">
                     <h2 className="text-xl font-title text-bony-text flex items-center gap-2">
                         <div className="p-2 bg-bony-orange/10 rounded-lg">
                             <Euro size={24} className="text-bony-orange"/>
@@ -261,7 +261,7 @@ const FixedExpenses: React.FC = () => {
                 </div>
 
                 {/* Filters & Search */}
-                <div className="p-4 border-b border-bony-border bg-bony-panel/50 flex flex-wrap gap-4 items-center">
+                <div className="p-4 border-b border-bony-border glass-strong flex flex-wrap gap-4 items-center">
                     <div className="relative flex-1 min-w-[200px] max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                         <input 
@@ -334,7 +334,7 @@ const FixedExpenses: React.FC = () => {
                             </div>
                         ) : (
                             filteredExpenses.map((expense) => (
-                                <div key={expense.id} className="bg-bony-panel border border-bony-border rounded-lg p-3 space-y-2">
+                                <div key={expense.id} className="gx-card p-3 space-y-2">
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-bold text-bony-orange">
                                             {new Date(expense.date).toLocaleDateString()}
@@ -360,7 +360,7 @@ const FixedExpenses: React.FC = () => {
                         )}
                     </div>
 
-                    <div className="hidden md:block bg-bony-panel rounded-xl border border-bony-border overflow-hidden shadow-sm">
+                    <div className="hidden md:block gx-card overflow-hidden">
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-slate-100 dark:bg-black/20 text-[10px] uppercase font-bold text-slate-500 sticky top-0 z-10 backdrop-blur-sm">
                                 <tr>
@@ -446,7 +446,7 @@ const FixedExpenses: React.FC = () => {
                 {/* Modal */}
                 {isModalOpen && (
                     <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                        <div className="bg-bony-panel border border-bony-border rounded-xl w-full max-w-lg md:max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+                        <div className="glass-strong glass-sheen relative rounded-xl w-full max-w-lg md:max-w-2xl shadow-glass-lg flex flex-col max-h-[90vh] overflow-hidden">
                             <div className="flex justify-between items-center border-b border-bony-border p-6 pb-4 shrink-0">
                                 <h3 className="text-xl font-title text-bony-text flex items-center gap-2">
                                     {isEditing ? <Edit2 size={20} className="text-bony-blue"/> : <Plus size={20} className="text-bony-orange"/>}
@@ -499,7 +499,7 @@ const FixedExpenses: React.FC = () => {
                                             </button>
                                             
                                             {showSiteDropdown && (
-                                                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-bony-panel border border-bony-border rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto custom-scrollbar p-1">
+                                                <div className="absolute top-full left-0 right-0 mt-1 glass-strong rounded-lg shadow-glass-lg z-50 max-h-60 overflow-y-auto custom-scrollbar p-1">
                                                     <button
                                                         onClick={() => { updateSiteSelection('GROUPE BONY'); setShowSiteDropdown(false); }}
                                                         className={`w-full text-left px-3 py-2 text-xs font-bold rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between ${currentExpense.site === 'GROUPE BONY' ? 'text-bony-orange bg-orange-50 dark:bg-orange-900/20' : 'text-slate-700 dark:text-slate-300'}`}

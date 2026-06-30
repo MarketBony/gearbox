@@ -92,7 +92,7 @@ const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, userName, onClo
   return (
     <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
+        className="glass-strong glass-sheen relative rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -353,7 +353,7 @@ const Settings: React.FC = () => {
       </h2>
 
       {/* SECTION 1: MY PROFILE */}
-      <div className="max-w-4xl mx-auto bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-xl p-6 mb-10 shadow-sm dark:shadow-lg relative overflow-hidden">
+      <div className="max-w-4xl mx-auto gx-card p-6 mb-10 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full bg-bony-gradient" />
 
         <div className="flex items-start gap-6 mb-6">
@@ -463,7 +463,7 @@ const Settings: React.FC = () => {
             </button>
           </div>
 
-          <div className="bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-xl overflow-hidden shadow-sm dark:shadow-lg overflow-x-auto">
+          <div className="gx-card p-0 overflow-hidden overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-slate-50 dark:bg-black/30 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 dark:border-bony-border">
                 <tr>

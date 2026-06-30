@@ -142,8 +142,8 @@ const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange 
                             );
                             return (
                                 <>
-                                    <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] bg-bony-panel border-t border-bony-border shadow-2xl overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">{inner}</div>
-                                    <div className="hidden sm:flex fixed z-[9999] bg-bony-panel border border-bony-border rounded-xl shadow-2xl overflow-hidden flex-col w-64 max-h-80" style={{ top: pos.top, left: pos.left }}>{inner}</div>
+                                    <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-strong glass-sheen border-t border-bony-border shadow-glass-lg overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">{inner}</div>
+                                    <div className="hidden sm:flex fixed z-[9999] glass-strong glass-sheen rounded-xl shadow-glass-lg overflow-hidden flex-col w-64 max-h-80" style={{ top: pos.top, left: pos.left }}>{inner}</div>
                                 </>
                             );
                         })()}
@@ -621,7 +621,7 @@ const Budget: React.FC = () => {
 
       return (
           <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar pb-20 p-3 md:p-0">
-             <div className="bg-bony-panel border border-bony-border p-6 rounded-xl mb-6 flex items-center justify-between shadow-lg">
+             <div className="gx-card p-6 mb-6 flex items-center justify-between">
                  <div>
                      <h3 className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-1">Budget Prévisionnel Groupe (Annuel)</h3>
                      <div className="text-4xl font-title text-slate-900 dark:text-white">{totalAnnualGroup.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</div>
@@ -764,24 +764,24 @@ const Budget: React.FC = () => {
 
               {/* KPIS ROW */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4 shrink-0">
-                  <div className="bg-bony-panel p-4 rounded-xl border border-bony-border flex flex-col justify-between">
+                  <div className="gx-card p-4 flex flex-col justify-between">
                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Budget Prévu ({periodLabel})</div>
                       <div className="text-2xl font-title text-slate-900 dark:text-white">{totalForecast.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}</div>
                   </div>
-                  <div className="bg-bony-panel p-4 rounded-xl border border-bony-border flex flex-col justify-between relative overflow-hidden">
+                  <div className="gx-card p-4 flex flex-col justify-between relative overflow-hidden">
                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest relative z-10">Réalisé ({periodLabel})</div>
                       <div className="text-2xl font-title text-bony-orange relative z-10">{totalActual.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}</div>
                       <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-4 translate-y-4">
                           <Coins size={80} className="text-bony-orange"/>
                       </div>
                   </div>
-                  <div className="bg-bony-panel p-4 rounded-xl border border-bony-border flex flex-col justify-between">
+                  <div className="gx-card p-4 flex flex-col justify-between">
                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Reste à Engager</div>
                       <div className={`text-2xl font-title ${remaining < 0 ? 'text-red-500' : 'text-emerald-500 dark:text-emerald-400'}`}>
                           {remaining.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}
                       </div>
                   </div>
-                  <div className="bg-bony-panel p-4 rounded-xl border border-bony-border flex flex-col justify-between relative">
+                  <div className="gx-card p-4 flex flex-col justify-between relative">
                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Consommation</div>
                       <div className="flex items-end gap-2">
                           <div className={`text-3xl font-title ${consumedPercent > 100 ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
@@ -799,7 +799,7 @@ const Budget: React.FC = () => {
               <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0 overflow-auto md:overflow-hidden">
 
                   {/* LEFT: CHART (COMPOSED) */}
-                  <div className="md:w-1/3 bg-bony-panel border border-bony-border rounded-xl p-4 flex flex-col">
+                  <div className="md:w-1/3 gx-card p-4 flex flex-col">
                       <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-widest mb-4 flex items-center gap-2">
                           <TrendingUp size={14} className="text-bony-violet"/> Évolution Mensuelle
                       </h3>
@@ -830,7 +830,7 @@ const Budget: React.FC = () => {
                   </div>
 
                   {/* RIGHT: MATRIX */}
-                  <div className="flex-1 bg-bony-panel border border-bony-border rounded-xl flex flex-col overflow-hidden">
+                  <div className="flex-1 gx-card flex flex-col overflow-hidden">
                       <div className="p-4 border-b border-bony-border shrink-0">
                            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
                                <PieChart size={14} className="text-bony-orange"/> Répartition & Performance par Site
@@ -958,7 +958,7 @@ const Budget: React.FC = () => {
           </div>
 
           {/* Filter panel */}
-          <div className={`${showFilters ? 'flex' : 'hidden'} md:flex bg-bony-panel border border-bony-border rounded-xl px-4 py-3 flex-col md:flex-row flex-wrap gap-x-5 gap-y-3 items-start`}>
+          <div className={`${showFilters ? 'flex' : 'hidden'} md:flex glass-strong rounded-xl px-4 py-3 flex-col md:flex-row flex-wrap gap-x-5 gap-y-3 items-start`}>
               <BudgetSitePicker selected={filterSites} onChange={setFilterSites} />
               <div className="w-px self-stretch bg-bony-border/50 hidden md:block my-0.5" />
               <BudgetBrandPicker selected={filterBrands} onChange={setFilterBrands} filterSites={filterSites} />

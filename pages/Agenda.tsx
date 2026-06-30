@@ -192,8 +192,8 @@ const ProjectPill: React.FC<{
 
         {/* --- TOOLTIP --- */}
         {isHovered && (
-            <div 
-                className="absolute z-[100] w-64 bg-white dark:bg-bony-panel border border-bony-border rounded-xl shadow-2xl p-4 animate-in fade-in duration-200 pointer-events-none"
+            <div
+                className="absolute z-[100] w-64 glass-strong rounded-xl shadow-2xl p-4 animate-in fade-in duration-200 pointer-events-none"
                 style={{ 
                     top: '100%', 
                     left: style?.left ? style.left : '0%',
@@ -601,7 +601,7 @@ const Agenda: React.FC = () => {
 
           {/* FILTERS TOOLBAR */}
           {showFilters && (
-              <div className="bg-bony-panel border border-bony-border rounded-lg p-3 flex flex-wrap gap-4 animate-in slide-in-from-top-2">
+              <div className="glass-strong glass-sheen relative overflow-hidden rounded-lg p-3 flex flex-wrap gap-4 animate-in slide-in-from-top-2">
                   <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold text-slate-500 uppercase">Marque:</span>
                       <select value={filterBrand} onChange={e => setFilterBrand(e.target.value as any)} className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1 text-xs text-slate-900 dark:text-white outline-none">

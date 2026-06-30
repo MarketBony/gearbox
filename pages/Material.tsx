@@ -127,8 +127,8 @@ const BookingPill: React.FC<{
             </div>
 
             {isHovered && (
-                <div 
-                    className="absolute z-[100] w-64 bg-bony-panel border border-bony-border rounded-xl shadow-2xl p-3 animate-in fade-in duration-200 pointer-events-none"
+                <div
+                    className="absolute z-[100] w-64 glass-strong rounded-xl shadow-2xl p-3 animate-in fade-in duration-200 pointer-events-none"
                     style={{ 
                         top: '100%', 
                         left: style?.left || 0,
@@ -575,7 +575,7 @@ const Material: React.FC = () => {
             <div className="flex-1 flex flex-col h-full overflow-hidden">
                 
                 {/* Header */}
-                <div className="h-16 border-b border-bony-border flex items-center justify-between px-3 md:px-6 bg-bony-panel shrink-0">
+                <div className="h-16 border-b border-bony-border flex items-center justify-between px-3 md:px-6 glass-strong shrink-0">
                     <h2 className="text-base md:text-xl font-title text-bony-text flex items-center gap-2">
                         <div className="p-2 bg-bony-orange/10 rounded-lg">
                             <Package size={24} className="text-bony-orange"/>
@@ -675,7 +675,7 @@ const Material: React.FC = () => {
 
                     {activeTab === 'inventory' && (
                         <div className="p-6 overflow-y-auto custom-scrollbar">
-                            <div className="bg-bony-panel rounded-xl border border-bony-border overflow-hidden shadow-sm max-w-5xl mx-auto">
+                            <div className="gx-card overflow-hidden max-w-5xl mx-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead className="bg-slate-100 dark:bg-black/20 text-[10px] uppercase font-bold text-slate-500">
                                         <tr>
@@ -722,7 +722,7 @@ const Material: React.FC = () => {
             {/* Booking Modal */}
             {isBookingModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                    <div className="bg-bony-panel border border-bony-border rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="glass-strong glass-sheen relative rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
                         <div className="p-6 border-b border-bony-border flex items-center justify-between bg-slate-50 dark:bg-white/5">
                             <h3 className="text-xl font-title text-bony-text flex items-center gap-2">
                                 {isEditing ? 'Modifier la réservation' : 'Nouvelle réservation'}
@@ -887,7 +887,7 @@ const Material: React.FC = () => {
             {/* Inventory Modal */}
             {isInventoryModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                    <div className="bg-bony-panel border border-bony-border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="glass-strong glass-sheen relative rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
                         <div className="p-6 border-b border-bony-border flex items-center justify-between bg-slate-50 dark:bg-white/5">
                             <h3 className="text-xl font-title text-bony-text flex items-center gap-2">
                                 {isEditing ? 'Modifier le matériel' : 'Nouveau matériel'}

@@ -314,7 +314,7 @@ const Campaigns: React.FC = () => {
     <div className="flex flex-col h-screen overflow-hidden bg-bony-dark">
       
       {/* --- GLOBAL CHART CONTROLS --- */}
-      <div className="px-3 md:px-6 py-2 bg-bony-panel border-b border-bony-border flex items-center justify-between shrink-0">
+      <div className="px-3 md:px-6 py-2 glass-strong border-b border-bony-border flex items-center justify-between shrink-0">
          <div className="flex items-center gap-4">
              {/* DATE PICKERS */}
              <div className="flex items-center gap-2 bg-slate-100 dark:bg-black/30 p-1 rounded border border-bony-border">
@@ -350,7 +350,7 @@ const Campaigns: React.FC = () => {
       <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-bony-border bg-bony-dark shrink-0 md:h-64 h-auto">
           
           {/* CHART 1: Nb Campagnes */}
-          <div className="bg-bony-panel border border-bony-border rounded-xl p-3 flex flex-col relative shadow-sm">
+          <div className="gx-card p-3 flex flex-col relative">
                <div className="flex justify-between items-start mb-2 z-10">
                    <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1">
                        <Megaphone size={12} className="text-bony-orange"/> Nb Campagnes
@@ -381,7 +381,7 @@ const Campaigns: React.FC = () => {
           </div>
 
           {/* CHART 2: Performance */}
-          <div className="bg-bony-panel border border-bony-border rounded-xl p-3 flex flex-col relative shadow-sm">
+          <div className="gx-card p-3 flex flex-col relative">
                <div className="flex justify-between items-start mb-2 z-10">
                    <div className="flex items-center gap-2">
                        <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1">
@@ -435,7 +435,7 @@ const Campaigns: React.FC = () => {
           </div>
 
           {/* CHART 3: Répartition Budget */}
-          <div className="bg-bony-panel border border-bony-border rounded-xl p-3 flex flex-col relative shadow-sm">
+          <div className="gx-card p-3 flex flex-col relative">
                <div className="flex justify-between items-start mb-2 z-10">
                    <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1">
                        <Euro size={12} className="text-blue-400"/> Facturé / Svc
@@ -500,7 +500,7 @@ const Campaigns: React.FC = () => {
 
 
       {/* HEADER & FILTERS */}
-      <div className="px-6 py-4 border-b border-bony-border bg-bony-panel z-20 shadow-md shrink-0">
+      <div className="px-6 py-4 border-b border-bony-border glass-strong glass-sheen relative overflow-hidden z-20 shadow-md shrink-0">
           <div className="flex justify-between items-end mb-2">
               <div className="flex items-center gap-3">
                   <div className="flex items-center gap-3">

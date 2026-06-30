@@ -159,7 +159,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, o
           <div className="fixed inset-0 z-[9990]" onClick={close} />
 
           {/* Mobile: bottom sheet */}
-          <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] bg-bony-panel border-t border-bony-border rounded-t-2xl shadow-2xl overflow-hidden">
+          <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-strong border-t border-bony-border rounded-t-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-bony-border">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Période</span>
               <button onClick={close}><X size={16} className="text-slate-400" /></button>
@@ -169,7 +169,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, o
 
           {/* Desktop: fixed dropdown */}
           <div
-            className="hidden sm:block fixed z-[9999] bg-bony-panel border border-bony-border rounded-xl shadow-2xl overflow-hidden w-52"
+            className="hidden sm:block fixed z-[9999] glass-strong border border-bony-border rounded-xl shadow-2xl overflow-hidden w-52"
             style={{ top: pos.top, left: pos.left }}
           >
             {customMode ? customForm : shortcutList}
@@ -320,12 +320,12 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
             return (
               <>
                 {/* Mobile: bottom sheet */}
-                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] bg-bony-panel border-t border-bony-border shadow-2xl overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">
+                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-strong border-t border-bony-border shadow-2xl overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">
                   {inner}
                 </div>
                 {/* Desktop: fixed dropdown */}
                 <div
-                  className="hidden sm:flex fixed z-[9999] bg-bony-panel border border-bony-border rounded-xl shadow-2xl overflow-hidden flex-col w-64 max-h-80"
+                  className="hidden sm:flex fixed z-[9999] glass-strong border border-bony-border rounded-xl shadow-2xl overflow-hidden flex-col w-64 max-h-80"
                   style={{ top: pos.top, left: pos.left }}
                 >
                   {inner}
@@ -677,7 +677,7 @@ const Dashboard: React.FC = () => {
     <div className="flex flex-col h-screen overflow-hidden bg-bony-dark animate-fade-in font-sans">
       
       {/* --- HEADER: PILOTAGE BAR --- */}
-      <div className="px-6 py-5 bg-bony-panel border-b border-bony-border shrink-0 z-20 shadow-md transition-colors">
+      <div className="px-6 py-5 glass-strong border-b border-bony-border shrink-0 z-20 shadow-md transition-colors">
          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
              <div>
                  <h2 className="text-lg md:text-2xl text-bony-text font-title mb-1 flex items-center gap-2">
@@ -716,7 +716,7 @@ const Dashboard: React.FC = () => {
           {/* 1. KPI CARDS */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* BUDGET */}
-              <div className="bg-bony-panel rounded-xl border border-bony-border p-5 relative overflow-hidden group hover:border-bony-orange/30 transition-all shadow-sm">
+              <div className="gx-card p-5 relative overflow-hidden group hover:border-bony-orange/30 transition-all">
                   <div className="flex justify-between items-start mb-4">
                       <div>
                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Budget Consommé</p>
@@ -736,7 +736,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* REMAINING */}
-              <div className="bg-bony-panel rounded-xl border border-bony-border p-5 relative overflow-hidden group hover:border-bony-blue/30 transition-all shadow-sm">
+              <div className="gx-card p-5 relative overflow-hidden group hover:border-bony-blue/30 transition-all">
                   <div className="flex justify-between items-start mb-4">
                       <div>
                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Reste à Engager</p>
@@ -754,7 +754,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* PROJECTS */}
-              <div className="bg-bony-panel rounded-xl border border-bony-border p-5 relative overflow-hidden group hover:border-slate-300 dark:hover:border-white/20 transition-all shadow-sm">
+              <div className="gx-card p-5 relative overflow-hidden group hover:border-slate-300 dark:hover:border-white/20 transition-all">
                   <div className="flex justify-between items-start">
                       <div>
                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Projets Actifs</p>
@@ -771,7 +771,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* CAMPAIGNS */}
-              <div className="bg-bony-panel rounded-xl border border-bony-border p-5 relative overflow-hidden group hover:border-bony-violet/30 transition-all shadow-sm">
+              <div className="gx-card p-5 relative overflow-hidden group hover:border-bony-violet/30 transition-all">
                   <div className="flex justify-between items-start">
                       <div>
                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Campagnes Live</p>
@@ -791,7 +791,7 @@ const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
               {/* LEFT: TREND (2/3) */}
-              <div className="lg:col-span-2 bg-bony-panel border border-bony-border rounded-xl p-5 flex flex-col h-[400px] shadow-sm">
+              <div className="lg:col-span-2 gx-card p-5 flex flex-col h-[400px]">
                   <div className="flex justify-between items-center mb-6">
                       <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider flex items-center gap-2">
                           <TrendingUp size={16} className="text-bony-orange"/> Trajectoire Mensuelle ({new Date(dateStart).getFullYear()})
@@ -833,7 +833,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* RIGHT: MIX SERVICE (1/3) */}
-              <div className="bg-bony-panel border border-bony-border rounded-xl p-5 flex flex-col shadow-sm">
+              <div className="gx-card p-5 flex flex-col">
                    <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-2 flex items-center gap-2">
                       <Target size={16} className="text-bony-violet"/> Mix Activité
                    </h3>
@@ -911,7 +911,7 @@ const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:h-[400px]">
               
               {/* LEFT: PROJECT DEADLINES */}
-              <div className="bg-bony-panel border border-bony-border rounded-xl p-5 flex flex-col h-full shadow-sm">
+              <div className="gx-card p-5 flex flex-col h-full">
                   <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-4 flex items-center gap-2">
                       <Calendar size={16} className="text-bony-text"/> Prochaines Échéances (Projets)
                   </h3>
@@ -953,7 +953,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* RIGHT: DIGITAL POSTS DEADLINES */}
-              <div className="bg-bony-panel border border-bony-border rounded-xl p-5 flex flex-col h-full shadow-sm">
+              <div className="gx-card p-5 flex flex-col h-full">
                   <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-4 flex items-center gap-2">
                       <Globe size={16} className="text-bony-violet"/> Prochaines Publications (Digital)
                   </h3>
