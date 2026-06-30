@@ -463,6 +463,7 @@ const Dashboard: React.FC = () => {
   const [filterContexts, setFilterContexts] = useSessionState<string[]>('dashboard_filterContexts', []);
   const [filterBrands, setFilterBrands] = useSessionState<BrandType[]>('dashboard_filterBrands', []);
   const [filterServices, setFilterServices] = useSessionState<ServiceType[]>('dashboard_filterServices', []);
+  const [filterProPlus, setFilterProPlus] = useSessionState<'all' | 'pro' | 'standard'>('dashboard_filterProPlus', 'all');
 
   const scrollRef = useScrollRestore('dashboard', !loading);
 
@@ -541,6 +542,10 @@ const Dashboard: React.FC = () => {
         return filterServices.some(s => projectServices.includes(s));
     };
 
+    // Filtre PRO+ (B2B) à 3 états — se combine avec les autres filtres. Fallback : absent = non-PRO+.
+    const isProPlusInScope = (proPlus?: boolean) =>
+        filterProPlus === 'all' || (filterProPlus === 'pro' ? !!proPlus : !proPlus);
+
     // 2. Process BUDGETS
     const chartYear = dStart.getFullYear();
 
@@ -561,6 +566,7 @@ const Dashboard: React.FC = () => {
 
     // 3. Process PROJECTS (Actuals)
     projects.forEach(p => {
+        if (!isProPlusInScope(p.proPlus)) return;
         let pSite = p.site;
         if (pSite === 'Thiers' || pSite === 'Ambert') pSite = 'Ricoux';
         if ((pSite as string) === 'Riom') pSite = 'Mozac';
@@ -623,7 +629,7 @@ const Dashboard: React.FC = () => {
     const todayMidnight = new Date();
     todayMidnight.setHours(0, 0, 0, 0);
     const deadlines = projects
-        .filter(p => p.status === 'Active' && isSiteInScope(p.site as string)
+        .filter(p => p.status === 'Active' && isSiteInScope(p.site as string) && isProPlusInScope(p.proPlus)
             && p.endDate && parseLocalDate(p.endDate) >= todayMidnight)
         .sort((a,b) => parseLocalDate(a.endDate).getTime() - parseLocalDate(b.endDate).getTime())
         .slice(0, 10);
@@ -664,7 +670,7 @@ const Dashboard: React.FC = () => {
         upcomingPosts
     };
 
-  }, [projects, budgets, socialPosts, dateStart, dateEnd, filterContexts, filterBrands, filterServices]);
+  }, [projects, budgets, socialPosts, dateStart, dateEnd, filterContexts, filterBrands, filterServices, filterProPlus]);
 
   // --- RENDER HELPERS ---
   const formatCurrency = (val: number) => val.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
@@ -716,6 +722,20 @@ const Dashboard: React.FC = () => {
                  <div className="w-px h-6 bg-bony-border hidden sm:block" />
                  {/* 4. Services chips */}
                  <ServicePicker selected={filterServices} onChange={setFilterServices} />
+                 <div className="w-px h-6 bg-bony-border hidden sm:block" />
+                 {/* 5. Filtre PRO+ (B2B) — 3 états */}
+                 <div className="flex flex-col gap-1">
+                     <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">PRO+ (B2B)</span>
+                     <select
+                         value={filterProPlus}
+                         onChange={(e) => setFilterProPlus(e.target.value as 'all' | 'pro' | 'standard')}
+                         className={`bg-slate-100 dark:bg-black/20 border rounded-lg px-2 py-1 text-xs font-bold text-bony-text outline-none focus:border-bony-orange cursor-pointer transition-colors ${filterProPlus !== 'all' ? 'border-bony-orange' : 'border-bony-border'}`}
+                     >
+                         <option value="all">Tout</option>
+                         <option value="standard">Sans PRO+</option>
+                         <option value="pro">PRO+ uniquement</option>
+                     </select>
+                 </div>
              </div>
          </div>
       </div>

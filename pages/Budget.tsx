@@ -234,12 +234,14 @@ const Budget: React.FC = () => {
   const [filterYear, setFilterYear] = useSessionState<number>('budget_filterYear', new Date().getFullYear());
   const [filterMonthStart, setFilterMonthStart] = useSessionState<number>('budget_filterMonthStart', 0);
   const [filterMonthEnd, setFilterMonthEnd] = useSessionState<number>('budget_filterMonthEnd', 11);
+  const [filterProPlus, setFilterProPlus] = useSessionState<'all' | 'pro' | 'standard'>('budget_filterProPlus', 'all');
   const [showFilters, setShowFilters] = useSessionState<boolean>('budget_showFilters', false);
 
   const activeFilterCount =
       filterSites.length + filterBrands.length + filterServices.length +
       (filterYear !== new Date().getFullYear() ? 1 : 0) +
-      (filterMonthStart !== 0 || filterMonthEnd !== 11 ? 1 : 0);
+      (filterMonthStart !== 0 || filterMonthEnd !== 11 ? 1 : 0) +
+      (filterProPlus !== 'all' ? 1 : 0);
 
   const resetFilters = () => {
       setFilterSites([]);
@@ -248,6 +250,7 @@ const Budget: React.FC = () => {
       setFilterYear(new Date().getFullYear());
       setFilterMonthStart(0);
       setFilterMonthEnd(11);
+      setFilterProPlus('all');
   };
 
   const scrollRef = useScrollRestore('budget', !loading);
@@ -383,8 +386,15 @@ const Budget: React.FC = () => {
       });
 
       // 3. Process ACTUALS (Projects)
+      // Filtre PRO+ (B2B) à 3 états — lecture additive : ne filtre QUE les items pris en compte,
+      // sans toucher aux buckets Alpine/Nissan, à l'exclusion Groupe ni à la distribution multi-sites.
+      // Fallback : champ absent = non-PRO+.
+      const isProPlusInScope = (proPlus?: boolean) =>
+          filterProPlus === 'all' || (filterProPlus === 'pro' ? !!proPlus : !proPlus);
+
       projects.forEach(p => {
-          if (p.status === 'Draft' || p.status === 'Archived') return; 
+          if (p.status === 'Draft' || p.status === 'Archived') return;
+          if (!isProPlusInScope(p.proPlus)) return;
 
           // Determine Sites and Shares
           let siteShares: Record<string, number> = {};
@@ -467,6 +477,7 @@ const Budget: React.FC = () => {
 
       // 4. Process FIXED EXPENSES
       fixedExpenses.forEach(exp => {
+          if (!isProPlusInScope(exp.proPlus)) return;
           // Determine Sites and Shares
           let siteShares: Record<string, number> = {};
           if (exp.sites && exp.sites.length > 0 && exp.budgetDistribution) {
@@ -590,7 +601,7 @@ const Budget: React.FC = () => {
           totalForecast,
           totalActual
       };
-  }, [budgets, projects, fixedExpenses, filterSites, filterBrands, filterServices, filterYear, filterMonthStart, filterMonthEnd]);
+  }, [budgets, projects, fixedExpenses, filterSites, filterBrands, filterServices, filterYear, filterMonthStart, filterMonthEnd, filterProPlus]);
 
 
   // --- RENDERERS ---
@@ -964,6 +975,20 @@ const Budget: React.FC = () => {
               <BudgetBrandPicker selected={filterBrands} onChange={setFilterBrands} filterSites={filterSites} />
               <div className="w-px self-stretch bg-bony-border/50 hidden md:block my-0.5" />
               <BudgetServicePicker selected={filterServices} onChange={setFilterServices} />
+              <div className="w-px self-stretch bg-bony-border/50 hidden md:block my-0.5" />
+              {/* PRO+ (B2B) — 3 états */}
+              <div className="flex flex-col gap-1">
+                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">PRO+ (B2B)</span>
+                  <select
+                      value={filterProPlus}
+                      onChange={(e) => setFilterProPlus(e.target.value as 'all' | 'pro' | 'standard')}
+                      className={`bg-slate-100 dark:bg-black/20 border rounded-lg px-2 py-1 text-xs text-bony-text outline-none focus:border-bony-violet font-sans cursor-pointer transition-colors ${filterProPlus !== 'all' ? 'border-bony-orange' : 'border-bony-border'}`}
+                  >
+                      <option value="all">Tout</option>
+                      <option value="standard">Sans PRO+</option>
+                      <option value="pro">PRO+ uniquement</option>
+                  </select>
+              </div>
               <div className="w-px self-stretch bg-bony-border/50 hidden md:block my-0.5" />
               {/* Année */}
               <div className="flex flex-col gap-1">
