@@ -18,6 +18,8 @@ import TodoList from './pages/TodoList';
 import { db } from './services/dataService';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { AnimatePresence, motion } from 'framer-motion';
+import { pageVariants, pageTransition } from './lib/motion';
 
 // Inner App handles logic after provider is mounted
 const InnerApp: React.FC = () => {
@@ -48,12 +50,13 @@ const InnerApp: React.FC = () => {
   const EXTERNAL_ALLOWED_TABS = ['digital', 'chat', 'hello-marketing', 'games'];
   const GAMES_ALLOWED_ROLES = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'];
 
-  const renderContent = () => {
-    const isExternal = user?.role === 'External';
-    const canAccessGames = GAMES_ALLOWED_ROLES.includes(user?.role ?? '');
-    let tab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(activeTab)) ? 'digital' : activeTab;
-    if (tab === 'games' && !canAccessGames) tab = 'dashboard';
+  // Onglet RÉSOLU (après redirections de rôle) — sert de `key` à la transition.
+  const isExternal = user?.role === 'External';
+  const canAccessGames = GAMES_ALLOWED_ROLES.includes(user?.role ?? '');
+  let resolvedTab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(activeTab)) ? 'digital' : activeTab;
+  if (resolvedTab === 'games' && !canAccessGames) resolvedTab = 'dashboard';
 
+  const renderContent = (tab: string) => {
     switch (tab) {
       case 'hello-marketing': return <HelloMarketing />;
       case 'games': return <Games />;
@@ -77,7 +80,19 @@ const InnerApp: React.FC = () => {
     <div className="flex h-screen bg-bony-dark text-bony-text font-sans selection:bg-blue-500/30 transition-colors duration-300">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       <main className="flex-1 ml-0 md:ml-20 lg:ml-56 relative overflow-hidden pb-16 md:pb-0">
-        {renderContent()}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={resolvedTab}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={pageTransition}
+            className="h-full"
+          >
+            {renderContent(resolvedTab)}
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );
