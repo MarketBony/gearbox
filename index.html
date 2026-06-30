@@ -167,6 +167,15 @@
       .gx-gradient { background-image: linear-gradient(to right, #f75632, #8f12ab); }
       .gx-gradient:not(.bg-clip-text) { background-clip: padding-box; -webkit-background-clip: padding-box; }
 
+      /* Anti-débordement du dégradé sous la bordure (coins arrondis des pills/chips/CTA).
+         Le dégradé est clipé au padding-box → pas de frange aux coins. Exclut les textes
+         en dégradé (.bg-clip-text : titres, logos) qui doivent garder background-clip: text. */
+      .bg-bony-gradient:not(.bg-clip-text),
+      .bg-bony-gradient-hover:not(.bg-clip-text) {
+        background-clip: padding-box;
+        -webkit-background-clip: padding-box;
+      }
+
       /* ===================== SCROLLBAR ===================== */
       ::-webkit-scrollbar { width: 8px; height: 8px; }
       ::-webkit-scrollbar-track { background: transparent; }
