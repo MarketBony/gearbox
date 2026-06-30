@@ -1119,7 +1119,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                              className="bg-transparent text-bony-text text-xs font-bold outline-none flex-1 pl-2 disabled:opacity-50"
                                          />
                                          <ArrowRight size={12} className="text-slate-400"/>
-                                         <input 
+                                         <input
                                              type="date"
                                              disabled={!canEdit}
                                              value={selectedProject.endDate}
@@ -1127,6 +1127,27 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                              className="bg-transparent text-bony-text text-xs font-bold outline-none flex-1 pl-2 disabled:opacity-50"
                                          />
                                      </div>
+                                </div>
+                                <div className="w-full md:w-auto">
+                                    <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2">Client B2B</label>
+                                    <button
+                                        type="button"
+                                        disabled={!canEdit}
+                                        onClick={() => handleUpdateProject({ ...selectedProject, proPlus: !selectedProject.proPlus })}
+                                        className={`flex items-center gap-2 h-[38px] px-3 rounded-lg border text-xs font-bold uppercase tracking-wide transition-all ${
+                                            selectedProject.proPlus
+                                                ? 'bg-bony-gradient text-white border-transparent shadow'
+                                                : 'bg-slate-100 dark:bg-black/30 text-slate-500 border-bony-border hover:text-bony-text'
+                                        } ${!canEdit ? 'cursor-not-allowed opacity-50' : ''}`}
+                                        title="Marquer ce projet comme PRO+ (B2B)"
+                                    >
+                                        <span className={`flex items-center justify-center w-4 h-4 rounded border transition-colors ${
+                                            selectedProject.proPlus ? 'bg-white/25 border-white/60' : 'border-slate-400 dark:border-slate-500'
+                                        }`}>
+                                            {selectedProject.proPlus && <Check size={11} strokeWidth={3} />}
+                                        </span>
+                                        PRO+
+                                    </button>
                                 </div>
                             </div>
 

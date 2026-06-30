@@ -690,12 +690,35 @@ const FixedExpenses: React.FC = () => {
                                     <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
                                         <MessageSquare size={12}/> Commentaire
                                     </label>
-                                    <textarea 
+                                    <textarea
                                         value={currentExpense.comment}
                                         onChange={(e) => setCurrentExpense({...currentExpense, comment: e.target.value})}
                                         className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg p-2.5 text-bony-text outline-none focus:border-bony-blue text-sm min-h-[100px]"
                                         placeholder="Description de la dépense..."
                                     />
+                                </div>
+
+                                <div className="space-y-1 mt-4">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                                        <Briefcase size={12}/> Type client
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCurrentExpense({ ...currentExpense, proPlus: !currentExpense.proPlus })}
+                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold uppercase tracking-wide transition-all ${
+                                            currentExpense.proPlus
+                                                ? 'bg-bony-gradient text-white border-transparent shadow'
+                                                : 'bg-slate-100 dark:bg-black/20 text-slate-500 border-bony-border hover:text-bony-text'
+                                        }`}
+                                        title="Marquer cette dépense comme PRO+ (B2B)"
+                                    >
+                                        <span className={`flex items-center justify-center w-4 h-4 rounded border transition-colors ${
+                                            currentExpense.proPlus ? 'bg-white/25 border-white/60' : 'border-slate-400 dark:border-slate-500'
+                                        }`}>
+                                            {currentExpense.proPlus && <Check size={11} strokeWidth={3} />}
+                                        </span>
+                                        PRO+ (B2B)
+                                    </button>
                                 </div>
                             </div>
 
