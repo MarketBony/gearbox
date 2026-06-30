@@ -948,7 +948,10 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                   {/* Ligne 1 : titre + badge statut */}
                   <div className="flex items-start justify-between gap-1.5">
                     <h3 className="font-medium text-[13px] text-bony-text leading-snug line-clamp-2">{project.name}</h3>
-                    <div className="shrink-0 mt-0.5">{getListStatusBadge(project.status)}</div>
+                    <div className="shrink-0 mt-0.5 flex items-center gap-1">
+                        {project.proPlus && <span className="text-[8px] font-bold text-white bg-bony-gradient px-1.5 py-0.5 rounded uppercase tracking-wide leading-none">PRO+</span>}
+                        {getListStatusBadge(project.status)}
+                    </div>
                   </div>
 
                   {/* Ligne 2 : site · type */}

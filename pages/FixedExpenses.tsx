@@ -343,8 +343,9 @@ const FixedExpenses: React.FC = () => {
                                             {expense.amount.toLocaleString()} €
                                         </span>
                                     </div>
-                                    <div className="flex gap-2 text-xs text-slate-500">
+                                    <div className="flex gap-2 text-xs text-slate-500 items-center">
                                         <span>{expense.site}</span><span>·</span><span>{expense.service}</span>
+                                        {expense.proPlus && <span className="ml-auto text-[8px] font-bold text-white bg-bony-gradient px-1.5 py-0.5 rounded uppercase tracking-wide">PRO+</span>}
                                     </div>
                                     {expense.comment && <p className="text-xs text-slate-400 truncate">{expense.comment}</p>}
                                     <div className="flex gap-2 justify-end">
@@ -414,6 +415,7 @@ const FixedExpenses: React.FC = () => {
                                             </span>
                                         </td>
                                         <td className="p-4 text-sm text-bony-text font-medium">
+                                            {expense.proPlus && <span className="mr-2 align-middle text-[8px] font-bold text-white bg-bony-gradient px-1.5 py-0.5 rounded uppercase tracking-wide">PRO+</span>}
                                             {expense.comment}
                                         </td>
                                         <td className="p-4 text-sm font-bold text-right text-bony-text font-sans">
