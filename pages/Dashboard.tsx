@@ -41,6 +41,12 @@ const formatDateBtn = (iso: string): string => {
   return new Date(y, m - 1, d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
+// Parse local (anti-décalage J+1) : 'YYYY-MM-DD' → Date à minuit local.
+const parseLocalDate = (iso: string): Date => {
+  const [y, m, d] = (iso || '').split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
 const getPeriodRanges = () => {
   const now = new Date();
   const y = now.getFullYear();
@@ -612,10 +618,14 @@ const Dashboard: React.FC = () => {
         .filter(d => d.value > 0)
         .sort((a,b) => b.value - a.value);
 
-    // 6. Upcoming Deadlines (Projects)
+    // 6. Upcoming Deadlines (Projects) — uniquement aujourd'hui ou futur, par date de fin croissante.
+    // Comparaison via parse local (anti J+1) ; recalculé à chaque rendu → les échéances passées disparaissent.
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
     const deadlines = projects
-        .filter(p => p.status === 'Active' && isSiteInScope(p.site as string))
-        .sort((a,b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime())
+        .filter(p => p.status === 'Active' && isSiteInScope(p.site as string)
+            && p.endDate && parseLocalDate(p.endDate) >= todayMidnight)
+        .sort((a,b) => parseLocalDate(a.endDate).getTime() - parseLocalDate(b.endDate).getTime())
         .slice(0, 10);
 
     // 7. Upcoming Social Posts
@@ -925,8 +935,8 @@ const Dashboard: React.FC = () => {
                                 className="relative flex items-center gap-4 p-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-lg hover:border-bony-orange/50 hover:bg-slate-200 dark:hover:bg-white/10 transition-all cursor-pointer group"
                             >
                                 <div className="flex flex-col items-center justify-center w-10 h-10 bg-white dark:bg-black/30 rounded border border-bony-border shrink-0">
-                                    <span className="text-[9px] text-slate-500 font-bold uppercase">{new Date(p.endDate).toLocaleString('fr-FR', {month:'short'})}</span>
-                                    <span className="text-sm font-bold text-bony-text leading-none">{new Date(p.endDate).getDate()}</span>
+                                    <span className="text-[9px] text-slate-500 font-bold uppercase">{parseLocalDate(p.endDate).toLocaleString('fr-FR', {month:'short'})}</span>
+                                    <span className="text-sm font-bold text-bony-text leading-none">{parseLocalDate(p.endDate).getDate()}</span>
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate group-hover:text-bony-text transition-colors">{p.name}</h4>
