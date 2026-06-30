@@ -21,14 +21,15 @@ router.get('/', authenticateToken, async (req, res) => {
 // Allow creating expenses
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { date, service, site, comment, amount } = req.body;
+    const { date, service, site, comment, amount, proPlus } = req.body;
     const expense = await prisma.oneOffExpense.create({
       data: {
         date: new Date(date),
         service,
         site,
         comment,
-        amount: parseFloat(amount)
+        amount: parseFloat(amount),
+        proPlus: proPlus ?? false
       }
     });
     emitEvent('expense:created', expense);
@@ -42,7 +43,7 @@ router.post('/', authenticateToken, async (req, res) => {
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { date, service, site, comment, amount } = req.body;
+    const { date, service, site, comment, amount, proPlus } = req.body;
     const expense = await prisma.oneOffExpense.update({
       where: { id },
       data: {
@@ -50,7 +51,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
         service,
         site,
         comment,
-        amount: parseFloat(amount)
+        amount: parseFloat(amount),
+        proPlus: proPlus ?? false
       }
     });
     emitEvent('expense:updated', expense);

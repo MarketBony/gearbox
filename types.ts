@@ -72,6 +72,7 @@ export interface Project {
   progress: number;
   tasks: Task[];
   assignedUsers?: string[];
+  proPlus?: boolean; // PRO+ (B2B) — optionnel, absent/false = non-PRO+ (fallback)
 }
 
 export interface Campaign {
@@ -157,6 +158,7 @@ export interface FixedExpense {
   amount: number;
   brand?: BrandType; // Pour le routage budgétaire Alpine/Nissan (legacy — premier élément de brands)
   brands?: BrandType[]; // Multi-sélection marques pour le routage budgétaire
+  proPlus?: boolean; // PRO+ (B2B) — optionnel, absent/false = non-PRO+ (fallback)
 }
 
 // --- CHAT TYPES ---

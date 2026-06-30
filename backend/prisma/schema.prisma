@@ -40,6 +40,7 @@ model Project {
   budgetActual  Float
   description   String
   progress      Float
+  proPlus       Boolean  @default(false) // PRO+ (B2B) — additif, défaut false
   tasks         Task[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -142,6 +143,7 @@ model OneOffExpense {
   site      String
   comment   String?
   amount    Float
+  proPlus   Boolean  @default(false) // PRO+ (B2B) — additif, défaut false
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
