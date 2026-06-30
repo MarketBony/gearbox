@@ -46,6 +46,26 @@
             backgroundImage: {
               'bony-gradient': 'linear-gradient(to right, #f75632, #8f12ab)',
               'bony-gradient-hover': 'linear-gradient(to right, #ff6b4a, #a62bc4)',
+            },
+            // ── Liquid Glass (additif — ne touche pas à la charte) ──
+            borderRadius: {
+              '4xl': '2rem',
+              '5xl': '2.5rem',
+            },
+            boxShadow: {
+              // Ombres douces et diffuses (jamais dures)
+              'soft':    '0 1px 2px rgba(16,18,32,0.04), 0 4px 16px rgba(16,18,32,0.06)',
+              'soft-lg': '0 2px 8px rgba(16,18,32,0.05), 0 16px 40px -8px rgba(16,18,32,0.12)',
+              'soft-xl': '0 4px 12px rgba(16,18,32,0.06), 0 32px 64px -16px rgba(16,18,32,0.18)',
+              'glass':    '0 8px 32px -4px rgba(16,18,32,0.12), inset 0 1px 0 0 rgba(255,255,255,0.45)',
+              'glass-lg': '0 24px 64px -12px rgba(16,18,32,0.22), inset 0 1px 0 0 rgba(255,255,255,0.5)',
+              // Glow recolorés charte Bony (orange + violet)
+              'glow':        '0 8px 28px -6px rgba(247,86,50,0.45)',
+              'glow-violet': '0 8px 28px -6px rgba(143,18,171,0.40)',
+            },
+            transitionTimingFunction: {
+              'apple':  'cubic-bezier(0.25, 0.1, 0.25, 1)',
+              'spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
             }
           }
         }
@@ -61,6 +81,16 @@
         --border-color: #cbd5e1; /* Slate 300 - Bordures plus visibles */
         --text-main: #0f172a;    /* Slate 900 - Texte principal */
         --text-muted: #64748b;   /* Slate 500 - Texte secondaire */
+
+        /* Verre (liquid glass) */
+        --glass-bg:        rgba(255,255,255,0.60);
+        --glass-bg-strong: rgba(255,255,255,0.78);
+        --glass-border:    rgba(255,255,255,0.70);
+        --glass-blur:      22px;
+
+        /* Washes d'accent du fond (charte Bony : orange + violet) */
+        --wash-1: rgba(247,86,50,0.06);
+        --wash-2: rgba(143,18,171,0.07);
       }
 
       html.dark {
@@ -71,26 +101,110 @@
         --border-color: #333333; /* Bordures subtiles */
         --text-main: #ffffff;    /* Blanc */
         --text-muted: #94a3b8;   /* Slate 400 */
+
+        /* Verre — glassmorphism sombre cohérent (pas un simple inverse) */
+        --glass-bg:        rgba(28,28,36,0.55);
+        --glass-bg-strong: rgba(30,30,38,0.78);
+        --glass-border:    rgba(255,255,255,0.10);
+        --glass-blur:      22px;
+
+        --wash-1: rgba(247,86,50,0.10);
+        --wash-2: rgba(143,18,171,0.09);
       }
 
-      /* Custom scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+      /* ===================== VERRE (liquid glass) ===================== */
+      * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+      /* Surface translucide premium — sidebar, navbars, modales, dropdowns, cartes flottantes */
+      .glass {
+        background: var(--glass-bg);
+        backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+        border: 1px solid var(--glass-border);
       }
-      ::-webkit-scrollbar-track {
-        background: var(--bg-main); 
+      /* Variante plus opaque — quand la lisibilité du texte par-dessus est requise */
+      .glass-strong {
+        background: var(--glass-bg-strong);
+        backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+        border: 1px solid var(--glass-border);
       }
+      /* Reflet lumineux supérieur (combiner avec position:relative + overflow-hidden) */
+      .glass-sheen::before {
+        content: '';
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 45%;
+        background: linear-gradient(to bottom, rgba(255,255,255,0.35), transparent);
+        pointer-events: none;
+        opacity: 0.6;
+      }
+      html.dark .glass-sheen::before {
+        background: linear-gradient(to bottom, rgba(255,255,255,0.08), transparent);
+      }
+
+      /* Carte de contenu standard (opaque, douce) — le verre reste un accent, pas le fond partout */
+      .gx-card {
+        background: var(--bg-panel);
+        border: 1px solid var(--border-color);
+        border-radius: 1.25rem; /* 20px */
+        box-shadow: 0 1px 2px rgba(16,18,32,0.04), 0 4px 16px rgba(16,18,32,0.06);
+      }
+      html.dark .gx-card { box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35); }
+
+      /* Élévation au survol — uniquement transform/box-shadow (60fps) */
+      .gx-hover-lift {
+        transition: transform 0.3s cubic-bezier(0.25,0.1,0.25,1), box-shadow 0.3s cubic-bezier(0.25,0.1,0.25,1);
+        will-change: transform;
+      }
+      .gx-hover-lift:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 2px 8px rgba(16,18,32,0.05), 0 16px 40px -8px rgba(16,18,32,0.14);
+      }
+      html.dark .gx-hover-lift:hover { box-shadow: 0 16px 40px -8px rgba(0,0,0,0.5); }
+
+      /* Pill / CTA dégradé — charte Bony (orange → violet) */
+      .gx-gradient { background-image: linear-gradient(to right, #f75632, #8f12ab); }
+      .gx-gradient:not(.bg-clip-text) { background-clip: padding-box; -webkit-background-clip: padding-box; }
+
+      /* ===================== SCROLLBAR ===================== */
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb {
-        background: var(--border-color); 
-        border-radius: 3px;
+        background: rgba(120,120,128,0.3);
+        border-radius: 99px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #f75632; 
+        background: rgba(120,120,128,0.5);
+        border: 2px solid transparent;
+        background-clip: padding-box;
+      }
+      .custom-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(120,120,128,0.3) transparent; }
+
+      /* ===================== ANIMATIONS UTILITAIRES ===================== */
+      @keyframes gx-fade-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes gx-fade-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes gx-scale-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+      .animate-fade-in  { animation: gx-fade-in 0.5s cubic-bezier(0.25,0.1,0.25,1) both; }
+      .animate-fade-up  { animation: gx-fade-up 0.5s cubic-bezier(0.25,0.1,0.25,1) both; }
+      .animate-scale-in { animation: gx-scale-in 0.4s cubic-bezier(0.25,0.1,0.25,1) both; }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+        }
       }
 
       body {
         background-color: var(--bg-main);
+        background-image:
+          radial-gradient(ellipse 90% 70% at 12% -5%,   var(--wash-1), transparent 55%),
+          radial-gradient(ellipse 80% 70% at 105% 105%, var(--wash-2), transparent 55%);
+        background-attachment: fixed;
         color: var(--text-main);
         font-family: 'Albert Sans', sans-serif;
         transition: background-color 0.3s ease, color 0.3s ease;
