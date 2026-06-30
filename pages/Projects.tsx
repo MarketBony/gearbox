@@ -12,6 +12,12 @@ import {
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 
+// Parse local (anti-décalage J+1) : 'YYYY-MM-DD' → Date à minuit local.
+const parseLocalDate = (iso: string): Date => {
+    const [y, m, d] = (iso || '').split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+};
+
 // --- TEAM SECTION COMPONENT (extracted to use its own ref for fixed dropdown) ---
 interface TeamSectionProps {
     assignedIds: string[];
@@ -343,6 +349,8 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const [filterServices, setFilterServices] = useSessionState<ServiceType[]>(`projects_${viewMode}_filterServices`, []);
   const [filterType, setFilterType] = useSessionState<ProjectType | 'All'>(`projects_${viewMode}_filterType`, 'All');
   const [filterStatus, setFilterStatus] = useSessionState<string>(`projects_${viewMode}_filterStatus`, 'All');
+  const [filterDateFrom, setFilterDateFrom] = useSessionState<string>(`projects_${viewMode}_filterDateFrom`, '');
+  const [filterDateTo, setFilterDateTo] = useSessionState<string>(`projects_${viewMode}_filterDateTo`, '');
   const [sortOrder, setSortOrder] = useSessionState<'asc' | 'desc'>(`projects_${viewMode}_sortOrder`, 'desc');
 
   const scrollRef = useScrollRestore(`projects_${viewMode}`);
@@ -666,6 +674,13 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
         if (filterType !== 'All' && p.projectType !== filterType) return false;
         if (filterStatus !== 'All' && p.status !== filterStatus) return false;
 
+        // Filtre période sur la date de début (parse local anti J+1, bornes incluses, vide = tous)
+        if ((filterDateFrom || filterDateTo) && p.startDate) {
+            const pStart = parseLocalDate(p.startDate).getTime();
+            if (filterDateFrom && pStart < parseLocalDate(filterDateFrom).getTime()) return false;
+            if (filterDateTo && pStart > parseLocalDate(filterDateTo).getTime()) return false;
+        }
+
         return true;
     });
 
@@ -675,7 +690,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
         return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
     });
 
-  }, [projects, viewMode, searchTerm, filterSites, filterServices, filterBrands, filterType, filterStatus, sortOrder]);
+  }, [projects, viewMode, searchTerm, filterSites, filterServices, filterBrands, filterType, filterStatus, filterDateFrom, filterDateTo, sortOrder]);
 
   const budgetVariance = selectedProject ? (selectedProject.budgetPlanned - selectedProject.budgetActual) : 0;
   const isUnderBudget = budgetVariance >= 0;
@@ -684,7 +699,8 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
     : '0.0';
 
   const activeFilterCount = filterSites.length + filterBrands.length + filterServices.length
-      + (filterType !== 'All' ? 1 : 0) + (filterStatus !== 'All' ? 1 : 0);
+      + (filterType !== 'All' ? 1 : 0) + (filterStatus !== 'All' ? 1 : 0)
+      + (filterDateFrom ? 1 : 0) + (filterDateTo ? 1 : 0);
 
   const resetFilters = () => {
       setSearchTerm('');
@@ -693,6 +709,8 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
       setFilterServices([]);
       setFilterType('All');
       setFilterStatus('All');
+      setFilterDateFrom('');
+      setFilterDateTo('');
       setSortOrder('desc');
   };
 
@@ -869,6 +887,33 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                             <option value="Done">Terminé</option>
                             {viewMode === 'archived' && <option value="Archived">Archivé</option>}
                         </select>
+                    </div>
+                </div>
+
+                {/* Période (date de début) */}
+                <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Période (date de début)</label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase">Du</span>
+                            <input
+                                type="date"
+                                value={filterDateFrom}
+                                max={filterDateTo || undefined}
+                                onChange={(e) => setFilterDateFrom(e.target.value)}
+                                className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-2 py-1 text-[11px] font-bold text-bony-text outline-none focus:border-bony-orange cursor-pointer"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase">Au</span>
+                            <input
+                                type="date"
+                                value={filterDateTo}
+                                min={filterDateFrom || undefined}
+                                onChange={(e) => setFilterDateTo(e.target.value)}
+                                className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-2 py-1 text-[11px] font-bold text-bony-text outline-none focus:border-bony-orange cursor-pointer"
+                            />
+                        </div>
                     </div>
                 </div>
 
