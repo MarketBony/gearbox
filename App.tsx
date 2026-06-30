@@ -15,6 +15,7 @@ import Settings from './pages/Settings';
 import HelloMarketing from './pages/HelloMarketing';
 import Games from './pages/Games';
 import TodoList from './pages/TodoList';
+import Export, { EXPORT_ALLOWED_ROLES } from './pages/Export';
 import { db } from './services/dataService';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -53,8 +54,10 @@ const InnerApp: React.FC = () => {
   // Onglet RÉSOLU (après redirections de rôle) — sert de `key` à la transition.
   const isExternal = user?.role === 'External';
   const canAccessGames = GAMES_ALLOWED_ROLES.includes(user?.role ?? '');
+  const canExport = EXPORT_ALLOWED_ROLES.includes(user?.role ?? '');
   let resolvedTab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(activeTab)) ? 'digital' : activeTab;
   if (resolvedTab === 'games' && !canAccessGames) resolvedTab = 'dashboard';
+  if (resolvedTab === 'export' && !canExport) resolvedTab = 'dashboard';
 
   const renderContent = (tab: string) => {
     switch (tab) {
@@ -71,6 +74,7 @@ const InnerApp: React.FC = () => {
       case 'agenda': return <Agenda />;
       case 'budget': return <Budget />;
       case 'fixed-expenses': return <FixedExpenses />;
+      case 'export': return <Export />;
       case 'settings': return <Settings />;
       default: return isExternal ? <Digital /> : <Dashboard />;
     }

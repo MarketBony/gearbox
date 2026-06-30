@@ -25,7 +25,8 @@ import {
   Bell,
   Sparkles,
   Gamepad2,
-  CheckSquare
+  CheckSquare,
+  FileSpreadsheet
 } from 'lucide-react';
 
 const relativeTime = (iso: string): string => {
@@ -146,6 +147,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
 
   const isExternal = user?.role === 'External';
   const canAccessGames = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Coordinator' || user?.role === 'Digital Manager';
+  const canExport = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Coordinator';
 
   const allMainItems = [
     { id: 'hello-marketing', icon: Sparkles, label: 'Hello Marketing' },
@@ -160,6 +162,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     { id: 'agenda', icon: CalendarDays, label: 'Agenda' },
     { id: 'budget', icon: PiggyBank, label: 'Budget' },
     { id: 'fixed-expenses', icon: Euro, label: 'Dépenses Fixes' },
+    ...(canExport ? [{ id: 'export', icon: FileSpreadsheet, label: 'Export' }] : []),
   ];
 
   const mainItems = isExternal
@@ -233,6 +236,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                     { id: 'fixed-expenses', icon: Euro, label: 'Dépenses Fixes' },
                     { id: 'material', icon: Package, label: 'Matériel' },
                     { id: 'agenda', icon: CalendarDays, label: 'Agenda' },
+                    ...(canExport ? [{ id: 'export', icon: FileSpreadsheet, label: 'Export' }] : []),
                   ],
                 },
                 {
