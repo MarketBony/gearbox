@@ -33,6 +33,7 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
 import DatePicker from '../components/DatePicker';
+import FloatingPanel from '../components/FloatingPanel';
 
 // --- DATE HELPERS ---
 const toLocalIso = (d: Date): string =>
@@ -79,14 +80,9 @@ interface DateRangePickerProps {
 const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, onStartChange, onEndChange }) => {
   const [open, setOpen] = useState(false);
   const [customMode, setCustomMode] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
 
   const handleOpen = () => {
-    if (!open && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + 8, left: rect.left });
-    }
     setOpen(v => !v);
     setCustomMode(false);
   };
@@ -159,29 +155,9 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, o
         </div>
       </div>
 
-      {open && (
-        <>
-          {/* Backdrop — closes dropdown on outside click */}
-          <div className="fixed inset-0 z-[9990]" onClick={close} />
-
-          {/* Mobile: bottom sheet */}
-          <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-menu rounded-t-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-bony-border">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Période</span>
-              <button onClick={close}><X size={16} className="text-slate-400" /></button>
-            </div>
-            {customMode ? customForm : shortcutList}
-          </div>
-
-          {/* Desktop: fixed dropdown */}
-          <div
-            className="hidden sm:block fixed z-[9999] glass-menu rounded-xl overflow-hidden w-52"
-            style={{ top: pos.top, left: pos.left }}
-          >
-            {customMode ? customForm : shortcutList}
-          </div>
-        </>
-      )}
+      <FloatingPanel open={open} onClose={close} triggerRef={triggerRef} width={208} maxHeight={360} className="rounded-xl">
+        {customMode ? customForm : shortcutList}
+      </FloatingPanel>
     </div>
   );
 };
@@ -198,7 +174,6 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [expandedPlaques, setExpandedPlaques] = useState<Set<string>>(new Set(Object.keys(PLAQUES_STRUCTURE)));
-  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
 
   const toggle = (site: string) =>
@@ -227,13 +202,7 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
       ? selected[0]
       : `${selected.length} sites`;
 
-  const handleOpen = () => {
-    if (!open && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + 8, left: rect.left });
-    }
-    setOpen(v => !v);
-  };
+  const handleOpen = () => setOpen(v => !v);
 
   return (
     <div ref={triggerRef} className="relative">
@@ -250,15 +219,7 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
       </div>
 
       {/* Dropdown */}
-      {open && (
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 z-[9990]" onClick={() => setOpen(false)} />
-
-          {/* Shared inner content rendered in both mobile and desktop containers */}
-          {(() => {
-            const inner = (
-              <>
+      <FloatingPanel open={open} onClose={() => setOpen(false)} triggerRef={triggerRef} width={256} maxHeight={340} className="rounded-xl">
                 <div className="p-2 border-b border-bony-border shrink-0">
                   <div className="flex items-center gap-2 bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5">
                     <Search size={13} className="text-slate-500 shrink-0" />
@@ -321,26 +282,7 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
                     ))}
                   </div>
                 </div>
-              </>
-            );
-            return (
-              <>
-                {/* Mobile: bottom sheet */}
-                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-menu overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">
-                  {inner}
-                </div>
-                {/* Desktop: fixed dropdown */}
-                <div
-                  className="hidden sm:flex fixed z-[9999] glass-menu rounded-xl overflow-hidden flex-col w-64 max-h-80"
-                  style={{ top: pos.top, left: pos.left }}
-                >
-                  {inner}
-                </div>
-              </>
-            );
-          })()}
-        </>
-      )}
+      </FloatingPanel>
     </div>
   );
 };

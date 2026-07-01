@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
+import FloatingPanel from '../components/FloatingPanel';
 
 type Tab = 'Provisions' | 'Suivi';
 
@@ -35,7 +36,6 @@ const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange 
     const [open, setOpen] = React.useState(false);
     const [search, setSearch] = React.useState('');
     const [expandedPlaques, setExpandedPlaques] = React.useState<Set<string>>(new Set(Object.keys(PLAQUES_STRUCTURE)));
-    const [pos, setPos] = React.useState<{ top: number; left: number }>({ top: 0, left: 0 });
     const triggerRef = React.useRef<HTMLDivElement>(null);
 
     const toggle = (site: string) =>
@@ -54,13 +54,7 @@ const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange 
     const clearAll  = () => onChange([]);
     const isAll = selected.length === 0;
 
-    const handleOpen = () => {
-        if (!open && triggerRef.current) {
-            const rect = triggerRef.current.getBoundingClientRect();
-            setPos({ top: rect.bottom + 8, left: rect.left });
-        }
-        setOpen(v => !v);
-    };
+    const handleOpen = () => setOpen(v => !v);
 
     return (
         <div className="flex flex-col gap-1 min-w-0">
@@ -85,12 +79,7 @@ const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange 
                     )}
                     <ChevronDown size={12} className={`text-bony-muted shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
                 </div>
-                {open && (
-                    <>
-                        <div className="fixed inset-0 z-[9990]" onClick={() => setOpen(false)} />
-                        {(() => {
-                            const inner = (
-                                <>
+                <FloatingPanel open={open} onClose={() => setOpen(false)} triggerRef={triggerRef} width={256} maxHeight={340} className="rounded-xl">
                                     <div className="p-2 border-b border-bony-border shrink-0">
                                         <div className="flex items-center gap-2 bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5">
                                             <Search size={13} className="text-slate-500 shrink-0" />
@@ -139,17 +128,7 @@ const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange 
                                             ))}
                                         </div>
                                     </div>
-                                </>
-                            );
-                            return (
-                                <>
-                                    <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-menu glass-sheen relative overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">{inner}</div>
-                                    <div className="hidden sm:flex fixed z-[9999] glass-menu glass-sheen relative rounded-xl overflow-hidden flex-col w-64 max-h-80" style={{ top: pos.top, left: pos.left }}>{inner}</div>
-                                </>
-                            );
-                        })()}
-                    </>
-                )}
+                </FloatingPanel>
             </div>
         </div>
     );

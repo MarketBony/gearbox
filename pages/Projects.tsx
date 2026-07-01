@@ -13,6 +13,7 @@ import {
 import Avatar from '../components/Avatar';
 import DatePicker from '../components/DatePicker';
 import Select from '../components/Select';
+import FloatingPanel from '../components/FloatingPanel';
 
 // Parse local (anti-décalage J+1) : 'YYYY-MM-DD' → Date à minuit local.
 const parseLocalDate = (iso: string): Date => {
@@ -36,15 +37,8 @@ const TeamSection: React.FC<TeamSectionProps> = ({
     showDropdown, setShowDropdown, onAdd, onRemove,
 }) => {
     const btnRef = useRef<HTMLButtonElement>(null);
-    const [dropPos, setDropPos] = React.useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
-    const handleOpenDropdown = () => {
-        if (!showDropdown && btnRef.current) {
-            const r = btnRef.current.getBoundingClientRect();
-            setDropPos({ top: r.bottom + 6, left: r.left });
-        }
-        setShowDropdown(!showDropdown);
-    };
+    const handleOpenDropdown = () => setShowDropdown(!showDropdown);
 
     return (
         <div className="pt-2">
@@ -75,9 +69,6 @@ const TeamSection: React.FC<TeamSectionProps> = ({
 
                 {canEdit && unassignedUsers.length > 0 && (
                     <>
-                        {showDropdown && (
-                            <div className="fixed inset-0 z-[9990]" onClick={() => setShowDropdown(false)} />
-                        )}
                         <button
                             ref={btnRef}
                             onClick={handleOpenDropdown}
@@ -86,11 +77,8 @@ const TeamSection: React.FC<TeamSectionProps> = ({
                         >
                             <Plus size={14} />
                         </button>
-                        {showDropdown && (
-                            <div
-                                className="fixed z-[9999] glass-menu glass-sheen rounded-xl min-w-[180px] overflow-hidden"
-                                style={{ top: dropPos.top, left: dropPos.left }}
-                            >
+                        <FloatingPanel open={showDropdown} onClose={() => setShowDropdown(false)} triggerRef={btnRef} width={220} minWidth={180} maxHeight={300} className="rounded-xl">
+                            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
                                 {unassignedUsers.map(u => (
                                     <button
                                         key={u.id}
@@ -105,7 +93,7 @@ const TeamSection: React.FC<TeamSectionProps> = ({
                                     </button>
                                 ))}
                             </div>
-                        )}
+                        </FloatingPanel>
                     </>
                 )}
 
@@ -126,7 +114,6 @@ const ProjSitePicker: React.FC<ProjSitePickerProps> = ({ selected, onChange }) =
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
     const [expandedPlaques, setExpandedPlaques] = useState<Set<string>>(new Set(Object.keys(PLAQUES_STRUCTURE)));
-    const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
     const triggerRef = useRef<HTMLDivElement>(null);
 
     const toggle = (site: string) =>
@@ -147,13 +134,7 @@ const ProjSitePicker: React.FC<ProjSitePickerProps> = ({ selected, onChange }) =
 
     const triggerLabel = isAll ? 'Tout le réseau' : selected.length === 1 ? selected[0] : `${selected.length} sites`;
 
-    const handleOpen = () => {
-        if (!open && triggerRef.current) {
-            const rect = triggerRef.current.getBoundingClientRect();
-            setPos({ top: rect.bottom + 8, left: rect.left });
-        }
-        setOpen(v => !v);
-    };
+    const handleOpen = () => setOpen(v => !v);
 
     return (
         <div ref={triggerRef} className="relative">
@@ -164,12 +145,7 @@ const ProjSitePicker: React.FC<ProjSitePickerProps> = ({ selected, onChange }) =
                     <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
                 </button>
             </div>
-            {open && (
-                <>
-                    <div className="fixed inset-0 z-[9990]" onClick={() => setOpen(false)} />
-                    {(() => {
-                        const inner = (
-                            <>
+            <FloatingPanel open={open} onClose={() => setOpen(false)} triggerRef={triggerRef} width={256} maxHeight={340} className="rounded-xl">
                                 <div className="p-2 border-b border-bony-border shrink-0">
                                     <div className="flex items-center gap-2 bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5">
                                         <Search size={13} className="text-slate-500 shrink-0" />
@@ -218,17 +194,7 @@ const ProjSitePicker: React.FC<ProjSitePickerProps> = ({ selected, onChange }) =
                                         ))}
                                     </div>
                                 </div>
-                            </>
-                        );
-                        return (
-                            <>
-                                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-menu glass-sheen overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">{inner}</div>
-                                <div className="hidden sm:flex fixed z-[9999] glass-menu glass-sheen rounded-xl overflow-hidden flex-col w-64 max-h-80" style={{ top: pos.top, left: pos.left }}>{inner}</div>
-                            </>
-                        );
-                    })()}
-                </>
-            )}
+            </FloatingPanel>
         </div>
     );
 };

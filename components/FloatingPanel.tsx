@@ -85,10 +85,12 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
     const onMove = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(compute); };
     const onDocPointer = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (panelRef.current && !panelRef.current.contains(t) &&
-          triggerRef.current && !triggerRef.current.contains(t)) {
-        onClose();
-      }
+      if (panelRef.current && panelRef.current.contains(t)) return;
+      if (triggerRef.current && triggerRef.current.contains(t)) return;
+      // Ne pas fermer si le clic est dans un AUTRE panneau flottant (menu imbriqué,
+      // ex. DatePicker portalisé ouvert depuis un dropdown parent).
+      if (t instanceof Element && t.closest('[data-floating-panel]')) return;
+      onClose();
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     // capture:true → suit aussi le scroll des conteneurs internes
@@ -110,6 +112,7 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
       {open && pos && (
         <motion.div
           ref={panelRef}
+          data-floating-panel=""
           role={role}
           onKeyDown={onKeyDown}
           initial={{ opacity: 0, y: pos.placement === 'top' ? 6 : -6, scale: 0.97 }}
