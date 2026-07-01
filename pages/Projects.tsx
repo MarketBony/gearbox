@@ -15,6 +15,16 @@ import DatePicker from '../components/DatePicker';
 import Select from '../components/Select';
 import FloatingPanel from '../components/FloatingPanel';
 
+// Puces marque minimalistes (mêmes teintes que BRAND_COLORS, charte identique)
+const BRAND_DOT: Record<string, string> = {
+  Renault: 'bg-[#ffcc33]',
+  Dacia: 'bg-[#6a7551]',
+  Alpine: 'bg-[#0055a4]',
+  Nissan: 'bg-[#c3002f]',
+  Mobilize: 'bg-purple-500',
+  Groupe: 'bg-slate-500',
+};
+
 // Parse local (anti-décalage J+1) : 'YYYY-MM-DD' → Date à minuit local.
 const parseLocalDate = (iso: string): Date => {
     const [y, m, d] = (iso || '').split('-').map(Number);
@@ -890,73 +900,80 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
         <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-bony-border/20">
           {filteredProjects.length > 0 ? filteredProjects.map(project => {
             const isSelected = selectedProject?.id === project.id;
-            const allBadges: { type: 'brand' | 'service'; label: string }[] = [
-                ...(project.brands || []).map(b => ({ type: 'brand' as const, label: b })),
-                ...project.service.map(s => ({ type: 'service' as const, label: s })),
-            ];
-            const visibleBadges = allBadges.slice(0, 3);
-            const remaining = allBadges.length - 3;
+            const brandLabels = project.brands || [];
+            const serviceLabels = project.service || [];
+            const tagLabels = [...brandLabels, ...serviceLabels];
+            const hasProgress = project.tasks.length > 0 || project.budgetActual > 0;
             return (
               <div
                 key={project.id}
                 onClick={() => { setSelectedProject(project); setShowDeleteConfirm(false); }}
-                className={`px-4 py-2 cursor-pointer transition-colors group border-l-2 ${
+                className={`relative px-4 py-3 cursor-pointer transition-colors group ${
                     isSelected
-                        ? 'border-l-bony-orange bg-bony-orange/8'
-                        : 'border-l-transparent hover:bg-white/4 dark:hover:bg-white/3'
+                        ? 'bg-bony-orange/[0.06] dark:bg-bony-orange/[0.08]'
+                        : 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'
                 }`}
               >
-                <div className="flex flex-col gap-0.5">
+                {/* Accent gauche vertical (sélection) — sobre mais net */}
+                {isSelected && (
+                  <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-gradient-to-b from-bony-orange to-bony-violet" />
+                )}
 
-                  {/* Ligne 1 : titre + badge statut */}
-                  <div className="flex items-start justify-between gap-1.5">
-                    <h3 className="font-medium text-[13px] text-bony-text leading-snug line-clamp-2">{project.name}</h3>
-                    <div className="shrink-0 mt-0.5 flex items-center gap-1">
-                        {project.proPlus && <span className="text-[8px] font-bold text-white bg-bony-gradient px-1.5 py-0.5 rounded uppercase tracking-wide leading-none">PRO+</span>}
-                        {getListStatusBadge(project.status)}
-                    </div>
+                {/* Ligne 1 : titre (dominant) + PRO+ / statut */}
+                <div className="flex items-start justify-between gap-2">
+                  <h3
+                    className={`text-[13.5px] font-semibold leading-snug truncate transition-colors ${isSelected ? 'text-bony-orange' : 'text-bony-text'}`}
+                    title={project.name}
+                  >
+                    {project.name}
+                  </h3>
+                  <div className="shrink-0 flex items-center gap-1">
+                    {project.proPlus && <span className="text-[8px] font-bold text-white bg-bony-gradient px-1.5 py-0.5 rounded uppercase tracking-wide leading-none">PRO+</span>}
+                    {getListStatusBadge(project.status)}
                   </div>
+                </div>
 
-                  {/* Ligne 2 : site · type */}
-                  <div className="text-[11px] text-bony-muted truncate">
+                {/* Ligne 2 : site · type (support) + budget à droite */}
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-bony-muted">
+                  <span className="truncate">
                     {project.site}
                     <span className="mx-1 opacity-40">·</span>
                     {project.projectType}
-                  </div>
-
-                  {/* Ligne 3 : barre de progression + % + budget */}
-                  {(project.tasks.length > 0 || project.budgetActual > 0) && (
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <div className="flex-1 h-[3px] bg-slate-200 dark:bg-slate-700/60 rounded-full overflow-hidden">
-                        <div className="h-full bg-bony-gradient rounded-full" style={{width: `${project.progress}%`}}></div>
-                      </div>
-                      <span className="text-[10px] text-bony-muted whitespace-nowrap tabular-nums">
-                        {project.progress}%{project.budgetActual > 0 ? ` · ${project.budgetActual.toLocaleString()} €` : ''}
-                      </span>
-                    </div>
+                  </span>
+                  {project.budgetActual > 0 && (
+                    <span className="ml-auto shrink-0 tabular-nums text-slate-500 dark:text-slate-400">
+                      {project.budgetActual.toLocaleString()} €
+                    </span>
                   )}
-
-                  {/* Ligne 4 : badges marques + services, max 3 + overflow */}
-                  {allBadges.length > 0 && (
-                    <div className="flex items-center gap-0.5 flex-wrap mt-0.5">
-                      {visibleBadges.map((badge, i) => (
-                        badge.type === 'brand' ? (
-                          <span key={i} className={`text-[9px] px-1 py-0 rounded border leading-4 ${BRAND_COLORS[badge.label] || 'border-slate-300 dark:border-slate-600 text-slate-500'}`}>
-                            {badge.label}
-                          </span>
-                        ) : (
-                          <span key={i} className={`text-[9px] px-1 py-0 rounded border leading-4 ${SERVICE_COLORS[badge.label]?.replace('bg-', 'bg-opacity-20 bg-') || 'border-slate-300 dark:border-slate-600 text-slate-500'}`}>
-                            {badge.label}
-                          </span>
-                        )
-                      ))}
-                      {remaining > 0 && (
-                        <span className="text-[9px] px-1 py-0 rounded border border-slate-300 dark:border-slate-600 text-slate-400 leading-4">+{remaining}</span>
-                      )}
-                    </div>
-                  )}
-
                 </div>
+
+                {/* Ligne 3 : marques (puces) + marques/services (texte compact) + avancement discret */}
+                {(tagLabels.length > 0 || hasProgress) && (
+                  <div className="mt-2 flex items-center gap-2">
+                    {tagLabels.length > 0 && (
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        {brandLabels.length > 0 && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            {brandLabels.slice(0, 4).map((b, i) => (
+                              <span key={i} className={`w-1.5 h-1.5 rounded-full ${BRAND_DOT[b] || 'bg-slate-400'}`} title={b} />
+                            ))}
+                          </div>
+                        )}
+                        <span className="truncate text-[10.5px] text-bony-muted" title={tagLabels.join(' · ')}>
+                          {tagLabels.join(' · ')}
+                        </span>
+                      </div>
+                    )}
+                    {hasProgress && (
+                      <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                        <div className="w-10 h-1 rounded-full bg-slate-200/80 dark:bg-white/10 overflow-hidden">
+                          <div className="h-full rounded-full bg-gradient-to-r from-bony-orange to-bony-violet" style={{ width: `${project.progress}%` }} />
+                        </div>
+                        <span className="text-[10px] text-bony-muted tabular-nums w-7 text-right">{project.progress}%</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           }) : (
