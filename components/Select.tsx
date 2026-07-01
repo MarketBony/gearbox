@@ -17,6 +17,7 @@ interface SelectProps {
   className?: string;
   size?: 'sm' | 'md';
   multiple?: boolean;
+  disabled?: boolean;
   /** Force le champ de recherche (sinon auto si > 8 options). */
   searchable?: boolean;
 }
@@ -29,6 +30,7 @@ const Select: React.FC<SelectProps> = ({
   className = '',
   size = 'md',
   multiple = false,
+  disabled = false,
   searchable,
 }) => {
   const [open, setOpen] = useState(false);
@@ -110,6 +112,7 @@ const Select: React.FC<SelectProps> = ({
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return;
     if (!open) {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
         e.preventDefault();
@@ -140,9 +143,10 @@ const Select: React.FC<SelectProps> = ({
       <button
         type="button"
         ref={triggerRef}
-        onClick={() => setOpen(o => !o)}
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(o => !o)}
         onKeyDown={onKeyDown}
-        className={`relative w-full text-left bg-[var(--bg-input)] border rounded-2xl text-bony-text outline-none transition-all ${triggerPad} ${open ? 'border-bony-orange/60' : 'border-bony-border hover:border-bony-orange/40'} ${className}`}
+        className={`relative w-full text-left bg-[var(--bg-input)] border rounded-2xl text-bony-text outline-none transition-all ${triggerPad} ${open ? 'border-bony-orange/60' : 'border-bony-border hover:border-bony-orange/40'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
       >
         {multiple ? (
           selectedValues.length > 0 ? (

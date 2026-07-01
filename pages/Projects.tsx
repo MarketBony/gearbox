@@ -11,6 +11,8 @@ import {
     Archive, AlertTriangle, ArrowRight, Wallet, ArrowUp, ArrowDown, Lock, ChevronDown, ChevronRight, Check, PieChart, UserCircle
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
+import DatePicker from '../components/DatePicker';
+import Select from '../components/Select';
 
 // Parse local (anti-décalage J+1) : 'YYYY-MM-DD' → Date à minuit local.
 const parseLocalDate = (iso: string): Date => {
@@ -873,20 +875,27 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase">Objet (Type)</label>
-                        <select value={filterType} onChange={(e) => setFilterType(e.target.value as any)} className="w-full bg-bony-panel border border-bony-border rounded px-2 py-1 text-[11px] text-bony-text outline-none focus:border-bony-blue">
-                            <option value="All">TOUS TYPES</option>
-                            {PROJECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
+                        <Select
+                            size="sm"
+                            value={filterType}
+                            onChange={(v) => setFilterType(v as any)}
+                            options={[{ value: 'All', label: 'TOUS TYPES' }, ...PROJECT_TYPES.map(t => ({ value: t, label: t }))]}
+                        />
                     </div>
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase">Statut</label>
-                        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full bg-bony-panel border border-bony-border rounded px-2 py-1 text-[11px] text-bony-text outline-none focus:border-bony-blue">
-                            <option value="All">TOUS STATUTS</option>
-                            <option value="Draft">Brouillon</option>
-                            <option value="Active">Actif</option>
-                            <option value="Done">Terminé</option>
-                            {viewMode === 'archived' && <option value="Archived">Archivé</option>}
-                        </select>
+                        <Select
+                            size="sm"
+                            value={filterStatus}
+                            onChange={(v) => setFilterStatus(v)}
+                            options={[
+                                { value: 'All', label: 'TOUS STATUTS' },
+                                { value: 'Draft', label: 'Brouillon' },
+                                { value: 'Active', label: 'Actif' },
+                                { value: 'Done', label: 'Terminé' },
+                                ...(viewMode === 'archived' ? [{ value: 'Archived', label: 'Archivé' }] : []),
+                            ]}
+                        />
                     </div>
                 </div>
 
@@ -896,23 +905,11 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
                             <span className="text-[9px] font-bold text-slate-400 uppercase">Du</span>
-                            <input
-                                type="date"
-                                value={filterDateFrom}
-                                max={filterDateTo || undefined}
-                                onChange={(e) => setFilterDateFrom(e.target.value)}
-                                className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-2 py-1 text-[11px] font-bold text-bony-text outline-none focus:border-bony-orange cursor-pointer"
-                            />
+                            <DatePicker size="sm" value={filterDateFrom} onChange={setFilterDateFrom} placeholder="Début" />
                         </div>
                         <div className="space-y-1">
                             <span className="text-[9px] font-bold text-slate-400 uppercase">Au</span>
-                            <input
-                                type="date"
-                                value={filterDateTo}
-                                min={filterDateFrom || undefined}
-                                onChange={(e) => setFilterDateTo(e.target.value)}
-                                className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-2 py-1 text-[11px] font-bold text-bony-text outline-none focus:border-bony-orange cursor-pointer"
-                            />
+                            <DatePicker size="sm" value={filterDateTo} onChange={setFilterDateTo} placeholder="Fin" />
                         </div>
                     </div>
                 </div>
@@ -1113,23 +1110,19 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                 </div>
                                 <div className="w-full md:w-64">
                                      <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2">Période</label>
-                                     <div className="flex items-center gap-2 bg-slate-100 dark:bg-black/30 border border-bony-border p-1 rounded-lg h-[38px]">
-                                         <input 
-                                             type="date"
-                                             disabled={!canEdit}
-                                             value={selectedProject.startDate}
-                                             onChange={(e) => handleUpdateProject({...selectedProject, startDate: e.target.value})}
-                                             className="bg-transparent text-bony-text text-xs font-bold outline-none flex-1 pl-2 disabled:opacity-50"
-                                         />
-                                         <ArrowRight size={12} className="text-slate-400"/>
-                                         <input
-                                             type="date"
-                                             disabled={!canEdit}
-                                             value={selectedProject.endDate}
-                                             onChange={(e) => handleUpdateProject({...selectedProject, endDate: e.target.value})}
-                                             className="bg-transparent text-bony-text text-xs font-bold outline-none flex-1 pl-2 disabled:opacity-50"
-                                         />
-                                     </div>
+                                     {canEdit ? (
+                                         <div className="flex items-center gap-1.5">
+                                             <DatePicker size="sm" value={selectedProject.startDate} onChange={(v) => handleUpdateProject({...selectedProject, startDate: v})} placeholder="Début" />
+                                             <ArrowRight size={12} className="text-slate-400 shrink-0"/>
+                                             <DatePicker size="sm" value={selectedProject.endDate} onChange={(v) => handleUpdateProject({...selectedProject, endDate: v})} placeholder="Fin" />
+                                         </div>
+                                     ) : (
+                                         <div className="flex items-center gap-2 bg-[var(--bg-input)] border border-bony-border rounded-2xl px-3 h-[38px] text-xs font-bold text-bony-text">
+                                             <span>{selectedProject.startDate ? parseLocalDate(selectedProject.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</span>
+                                             <ArrowRight size={12} className="text-slate-400"/>
+                                             <span>{selectedProject.endDate ? parseLocalDate(selectedProject.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</span>
+                                         </div>
+                                     )}
                                 </div>
                                 <div className="w-full md:w-auto">
                                     <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2">Client B2B</label>
@@ -1226,14 +1219,12 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                 </div>
                                 <div className="space-y-2">
                                      <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase">Type de Projet</label>
-                                     <select 
+                                     <Select
                                         value={selectedProject.projectType || 'OP Clients'}
                                         disabled={!canEdit}
-                                        onChange={(e) => handleUpdateProject({...selectedProject, projectType: e.target.value as any})}
-                                        className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg p-2.5 text-bony-text outline-none focus:border-bony-blue text-sm font-bold appearance-none cursor-pointer hover:bg-slate-200 dark:hover:bg-black/30 transition-colors disabled:opacity-50"
-                                     >
-                                        {PROJECT_TYPES.map(t => <option key={t} value={t} className="bg-white dark:bg-bony-panel">{t}</option>)}
-                                     </select>
+                                        onChange={(v) => handleUpdateProject({...selectedProject, projectType: v as any})}
+                                        options={PROJECT_TYPES.map(t => ({ value: t, label: t }))}
+                                     />
                                 </div>
                             </div>
 
@@ -1480,29 +1471,29 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                 />
                                             </td>
                                             <td className="p-3">
-                                                <select
+                                                <Select
+                                                    size="sm"
                                                     value={task.channel || ''}
                                                     disabled={!canEdit}
-                                                    onChange={(e) => updateTask(task.id, 'channel', e.target.value)}
-                                                    className="w-full bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1.5 text-xs text-bony-text outline-none focus:border-bony-blue appearance-none cursor-pointer disabled:opacity-50"
-                                                >
-                                                    <option value="" className="text-slate-500">-- Aucun --</option>
-                                                    {TASK_CHANNELS.map(c => <option key={c} value={c} className="bg-white dark:bg-bony-panel">{c}</option>)}
-                                                </select>
+                                                    onChange={(v) => updateTask(task.id, 'channel', v)}
+                                                    placeholder="-- Aucun --"
+                                                    options={[{ value: '', label: '-- Aucun --' }, ...TASK_CHANNELS.map(c => ({ value: c, label: c }))]}
+                                                />
                                             </td>
                                             <td className="p-3">
-                                                <select 
+                                                <Select
+                                                    size="sm"
                                                     value={task.status}
                                                     disabled={!canEdit}
-                                                    onChange={(e) => updateTask(task.id, 'status', e.target.value)}
-                                                    className="w-full bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1.5 text-xs text-bony-text outline-none focus:border-bony-blue appearance-none cursor-pointer disabled:opacity-50"
-                                                >
-                                                    <option value="Empty" className="bg-white dark:bg-bony-panel">Vierge</option>
-                                                    <option value="Todo" className="bg-white dark:bg-bony-panel">À faire (0%)</option>
-                                                    <option value="InProgress" className="bg-white dark:bg-bony-panel">En cours (50%)</option>
-                                                    <option value="Programmed" className="bg-white dark:bg-bony-panel">Programmé (100%)</option>
-                                                    <option value="Done" className="bg-white dark:bg-bony-panel">Terminé (100%)</option>
-                                                </select>
+                                                    onChange={(v) => updateTask(task.id, 'status', v)}
+                                                    options={[
+                                                        { value: 'Empty', label: 'Vierge' },
+                                                        { value: 'Todo', label: 'À faire (0%)' },
+                                                        { value: 'InProgress', label: 'En cours (50%)' },
+                                                        { value: 'Programmed', label: 'Programmé (100%)' },
+                                                        { value: 'Done', label: 'Terminé (100%)' },
+                                                    ]}
+                                                />
                                             </td>
                                             <td className="p-3">
                                                 <div className="flex items-center gap-1.5">
@@ -1512,17 +1503,16 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                     })() : (
                                                         <UserCircle size={20} className="text-slate-300 dark:text-slate-600 shrink-0" />
                                                     )}
-                                                    <select
-                                                        value={task.assignedUserId || ''}
-                                                        disabled={!canEdit}
-                                                        onChange={e => updateTask(task.id, 'assignedUserId', e.target.value || undefined)}
-                                                        className="flex-1 bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-1.5 py-1.5 text-xs text-bony-text outline-none focus:border-bony-blue appearance-none cursor-pointer disabled:opacity-50"
-                                                    >
-                                                        <option value="">— Non assigné —</option>
-                                                        {users.map(u => (
-                                                            <option key={u.id} value={u.id}>{u.name}</option>
-                                                        ))}
-                                                    </select>
+                                                    <div className="flex-1">
+                                                        <Select
+                                                            size="sm"
+                                                            value={task.assignedUserId || ''}
+                                                            disabled={!canEdit}
+                                                            onChange={(v) => updateTask(task.id, 'assignedUserId', v || undefined)}
+                                                            placeholder="— Non assigné —"
+                                                            options={[{ value: '', label: '— Non assigné —' }, ...users.map(u => ({ value: u.id, label: u.name }))]}
+                                                        />
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="p-3">
