@@ -296,27 +296,41 @@
         transition: background-color 0.3s ease, color 0.3s ease;
       }
 
-      /* Fond spatial : halos de couleur charte (matière à réfracter pour le verre).
-         Couche fixe derrière l'app, dérive très lente (gelée par prefers-reduced-motion). */
-      body::before {
+      /* Fond animé subtil : deux couches de formes floues (charte orange/violet/bleu) qui
+         dérivent lentement et indépendamment en TRANSFORM (pas de background-position →
+         pas de repaint). Très discret, derrière l'app, pour faire ressortir le verre.
+         Login n'est pas concerné (son canvas recouvre le viewport). Gelé par
+         prefers-reduced-motion via la règle globale ci-dessus. */
+      body::before, body::after {
         content: '';
         position: fixed;
-        inset: -25%;
+        inset: -30%;
         z-index: -1;
         pointer-events: none;
         background-repeat: no-repeat;
-        background-image:
-          radial-gradient(38% 44% at 8% -2%,   var(--wash-1), transparent 60%),
-          radial-gradient(42% 48% at 100% 108%, var(--wash-2), transparent 60%),
-          radial-gradient(30% 36% at 88% 6%,    var(--wash-3), transparent 62%),
-          radial-gradient(34% 40% at 16% 94%,   var(--wash-2), transparent 60%),
-          radial-gradient(26% 32% at 55% 46%,   var(--wash-1), transparent 66%);
-        animation: gx-bg-drift 42s ease-in-out infinite alternate;
         will-change: transform;
       }
-      @keyframes gx-bg-drift {
-        from { transform: translate3d(-1%, -1%, 0) scale(1); }
-        to   { transform: translate3d(2%, 1.5%, 0) scale(1.06); }
+      /* Couche 1 : orange (haut-gauche) + touche bleu (haut-droite) */
+      body::before {
+        background-image:
+          radial-gradient(38% 42% at 20% 22%,  var(--wash-1), transparent 60%),
+          radial-gradient(32% 36% at 82% 14%,  var(--wash-3), transparent 62%);
+        animation: gx-bg-drift-a 46s ease-in-out infinite alternate;
+      }
+      /* Couche 2 : violet (bas-droite) + orange (bas-gauche), dérive opposée + lente */
+      body::after {
+        background-image:
+          radial-gradient(40% 44% at 80% 82%,  var(--wash-2), transparent 60%),
+          radial-gradient(30% 34% at 24% 88%,  var(--wash-1), transparent 64%);
+        animation: gx-bg-drift-b 61s ease-in-out infinite alternate;
+      }
+      @keyframes gx-bg-drift-a {
+        from { transform: translate3d(-3%, -2%, 0) scale(1); }
+        to   { transform: translate3d(4%, 3%, 0)  scale(1.08); }
+      }
+      @keyframes gx-bg-drift-b {
+        from { transform: translate3d(3%, 2%, 0)  scale(1.05); }
+        to   { transform: translate3d(-4%, -3%, 0) scale(1); }
       }
 
       /* Transitions douces pour les éléments de thème */
