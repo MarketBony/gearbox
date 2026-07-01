@@ -5,6 +5,8 @@ import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Trash2, Edit, Save, X, Filter, Calendar, CreditCard, Search } from 'lucide-react';
 import { SITES, SERVICES, PLAQUES_STRUCTURE } from '../constants';
+import Select from '../components/Select';
+import DatePicker from '../components/DatePicker';
 
 const Expenses: React.FC = () => {
   const { user } = useAuth();
@@ -117,20 +119,16 @@ const Expenses: React.FC = () => {
 
   const totalAmount = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
 
-  // Group options for Site Select
-  const renderSiteOptions = () => (
-    <>
-      <option value="GROUPE BONY">GROUPE BONY</option>
-      {Object.entries(PLAQUES_STRUCTURE).map(([plaque, sites]) => (
-        <optgroup key={plaque} label={plaque}>
-          <option value={plaque}>{plaque}</option>
-          {sites.map(s => <option key={s} value={s}>{s}</option>)}
-        </optgroup>
-      ))}
-      <option value="Alpine">Alpine</option>
-      <option value="Nissan">Nissan</option>
-    </>
-  );
+  // Flat options for Site Select (same values/order as before, optgroups flattened)
+  const siteOptions = [
+    { value: 'GROUPE BONY', label: 'GROUPE BONY' },
+    ...Object.entries(PLAQUES_STRUCTURE).flatMap(([plaque, sites]) => [
+      { value: plaque, label: plaque },
+      ...sites.map(s => ({ value: s, label: s })),
+    ]),
+    { value: 'Alpine', label: 'Alpine' },
+    { value: 'Nissan', label: 'Nissan' },
+  ];
 
   return (
     <div className="p-3 md:p-6 h-screen flex flex-col overflow-hidden animate-fade-in bg-bony-dark">
@@ -169,26 +167,22 @@ const Expenses: React.FC = () => {
         <div className="flex items-center gap-2">
             <Filter size={14} className="text-bony-orange"/>
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Site :</span>
-            <select 
+            <Select
+                size="sm"
                 value={filterSite}
-                onChange={(e) => setFilterSite(e.target.value)}
-                className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1 text-xs text-slate-900 dark:text-white outline-none focus:border-bony-orange"
-            >
-                <option value="All">TOUS</option>
-                {renderSiteOptions()}
-            </select>
+                onChange={(v) => setFilterSite(v)}
+                options={[{ value: 'All', label: 'TOUS' }, ...siteOptions]}
+            />
         </div>
 
         <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Service :</span>
-            <select 
+            <Select
+                size="sm"
                 value={filterService}
-                onChange={(e) => setFilterService(e.target.value)}
-                className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1 text-xs text-slate-900 dark:text-white outline-none focus:border-bony-orange"
-            >
-                <option value="All">TOUS</option>
-                {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+                onChange={(v) => setFilterService(v)}
+                options={[{ value: 'All', label: 'TOUS' }, ...SERVICES.map(s => ({ value: s, label: s }))]}
+            />
         </div>
 
         <div className="ml-auto flex items-center gap-2 bg-slate-100 dark:bg-black/30 px-4 py-2 rounded-lg border border-bony-border">
@@ -326,12 +320,9 @@ const Expenses: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date</label>
-                  <input 
-                    type="date" 
-                    required
+                  <DatePicker
                     value={formData.date}
-                    onChange={(e) => setFormData({...formData, date: e.target.value})}
-                    className="w-full bg-slate-50 dark:bg-black/20 border border-bony-border rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-bony-orange transition-colors"
+                    onChange={(v) => setFormData({...formData, date: v})}
                   />
                 </div>
                 <div className="space-y-1">
@@ -351,25 +342,19 @@ const Expenses: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Site / Plaque</label>
-                  <select 
-                    required
-                    value={formData.site}
-                    onChange={(e) => setFormData({...formData, site: e.target.value})}
-                    className="w-full bg-slate-50 dark:bg-black/20 border border-bony-border rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-bony-orange transition-colors"
-                  >
-                    {renderSiteOptions()}
-                  </select>
+                  <Select
+                    value={formData.site as string}
+                    onChange={(v) => setFormData({...formData, site: v})}
+                    options={siteOptions}
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Service</label>
-                  <select 
-                    required
-                    value={formData.service}
-                    onChange={(e) => setFormData({...formData, service: e.target.value})}
-                    className="w-full bg-slate-50 dark:bg-black/20 border border-bony-border rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-bony-orange transition-colors"
-                  >
-                    {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  <Select
+                    value={formData.service as string}
+                    onChange={(v) => setFormData({...formData, service: v as ServiceType})}
+                    options={SERVICES.map(s => ({ value: s, label: s }))}
+                  />
                 </div>
               </div>
 
