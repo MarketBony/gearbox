@@ -7,6 +7,8 @@ import { Plus, Calendar, Package, Trash2, Edit, ChevronLeft, ChevronRight, Searc
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, isSameDay, startOfMonth, endOfMonth, addMonths, subMonths, isWithinInterval, parseISO, getDay, getDate } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { SITES, SERVICES, BRANDS, SERVICE_COLORS, PLAQUES_STRUCTURE } from '../constants';
+import Select from '../components/Select';
+import DatePicker from '../components/DatePicker';
 
 // --- HELPERS ---
 
@@ -651,16 +653,17 @@ const Material: React.FC = () => {
                                 {/* Filter by Equipment */}
                                 <div className="flex items-center gap-2">
                                     <Filter size={16} className="text-slate-500"/>
-                                    <select 
-                                        value={selectedEquipmentId}
-                                        onChange={(e) => setSelectedEquipmentId(e.target.value)}
-                                        className="bg-bony-dark border border-bony-border rounded-lg px-3 py-2 text-xs font-bold text-bony-text outline-none focus:border-bony-orange"
-                                    >
-                                        <option value="All">TOUT LE MATÉRIEL</option>
-                                        {equipment.map(e => (
-                                            <option key={e.id} value={e.id}>{e.name}</option>
-                                        ))}
-                                    </select>
+                                    <div className="min-w-[200px]">
+                                        <Select
+                                            size="sm"
+                                            value={selectedEquipmentId}
+                                            onChange={(v) => setSelectedEquipmentId(v)}
+                                            options={[
+                                                { value: 'All', label: 'TOUT LE MATÉRIEL' },
+                                                ...equipment.map(e => ({ value: e.id, label: e.name })),
+                                            ]}
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
@@ -734,35 +737,30 @@ const Material: React.FC = () => {
                         <div className="p-6 space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Matériel</label>
-                                <select 
-                                    value={currentBooking.equipmentId}
-                                    onChange={(e) => setCurrentBooking({...currentBooking, equipmentId: e.target.value})}
-                                    className="w-full bg-bony-dark border border-bony-border rounded-lg px-3 py-2 text-sm text-bony-text outline-none focus:border-bony-orange"
+                                <Select
+                                    size="md"
+                                    value={currentBooking.equipmentId || ''}
+                                    onChange={(v) => setCurrentBooking({...currentBooking, equipmentId: v})}
+                                    options={equipment.map(e => ({ value: e.id, label: `${e.name} (Total: ${e.totalQuantity})` }))}
                                     disabled={isEditing}
-                                >
-                                    {equipment.map(e => (
-                                        <option key={e.id} value={e.id}>{e.name} (Total: {e.totalQuantity})</option>
-                                    ))}
-                                </select>
+                                />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date de début</label>
-                                    <input 
-                                        type="date" 
-                                        value={currentBooking.startDate}
-                                        onChange={(e) => setCurrentBooking({...currentBooking, startDate: e.target.value})}
-                                        className="w-full bg-bony-dark border border-bony-border rounded-lg px-3 py-2 text-sm text-bony-text outline-none focus:border-bony-orange"
+                                    <DatePicker
+                                        size="md"
+                                        value={currentBooking.startDate || ''}
+                                        onChange={(v) => setCurrentBooking({...currentBooking, startDate: v})}
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date de fin</label>
-                                    <input 
-                                        type="date" 
-                                        value={currentBooking.endDate}
-                                        onChange={(e) => setCurrentBooking({...currentBooking, endDate: e.target.value})}
-                                        className="w-full bg-bony-dark border border-bony-border rounded-lg px-3 py-2 text-sm text-bony-text outline-none focus:border-bony-orange"
+                                    <DatePicker
+                                        size="md"
+                                        value={currentBooking.endDate || ''}
+                                        onChange={(v) => setCurrentBooking({...currentBooking, endDate: v})}
                                     />
                                 </div>
                             </div>
@@ -793,32 +791,28 @@ const Material: React.FC = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Site</label>
-                                    <select 
-                                        value={currentBooking.site}
-                                        onChange={(e) => setCurrentBooking({...currentBooking, site: e.target.value as any})}
-                                        className="w-full bg-bony-dark border border-bony-border rounded-lg px-3 py-2 text-sm text-bony-text outline-none focus:border-bony-orange"
-                                    >
-                                        <option value="GROUPE BONY">GROUPE BONY</option>
-                                        {Object.entries(PLAQUES_STRUCTURE).map(([plaque, sites]) => (
-                                            <optgroup key={plaque} label={plaque}>
-                                                {sites.map(s => <option key={s} value={s}>{s}</option>)}
-                                            </optgroup>
-                                        ))}
-                                        <optgroup label="MARQUES">
-                                            <option value="Alpine">Alpine</option>
-                                            <option value="Nissan">Nissan</option>
-                                        </optgroup>
-                                    </select>
+                                    <Select
+                                        size="md"
+                                        value={currentBooking.site || ''}
+                                        onChange={(v) => setCurrentBooking({...currentBooking, site: v as any})}
+                                        options={[
+                                            { value: 'GROUPE BONY', label: 'GROUPE BONY' },
+                                            ...Object.entries(PLAQUES_STRUCTURE).flatMap(([plaque, sites]) =>
+                                                sites.map(s => ({ value: s, label: s }))
+                                            ),
+                                            { value: 'Alpine', label: 'Alpine' },
+                                            { value: 'Nissan', label: 'Nissan' },
+                                        ]}
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Service</label>
-                                    <select 
-                                        value={currentBooking.service}
-                                        onChange={(e) => setCurrentBooking({...currentBooking, service: e.target.value as any})}
-                                        className="w-full bg-bony-dark border border-bony-border rounded-lg px-3 py-2 text-sm text-bony-text outline-none focus:border-bony-orange"
-                                    >
-                                        {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
+                                    <Select
+                                        size="md"
+                                        value={currentBooking.service || ''}
+                                        onChange={(v) => setCurrentBooking({...currentBooking, service: v as any})}
+                                        options={SERVICES.map(s => ({ value: s, label: s }))}
+                                    />
                                 </div>
                             </div>
 
