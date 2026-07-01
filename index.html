@@ -82,15 +82,16 @@
         --text-main: #0f172a;    /* Slate 900 - Texte principal */
         --text-muted: #64748b;   /* Slate 500 - Texte secondaire */
 
-        /* Verre (liquid glass) */
-        --glass-bg:        rgba(255,255,255,0.60);
-        --glass-bg-strong: rgba(255,255,255,0.78);
-        --glass-border:    rgba(255,255,255,0.70);
-        --glass-blur:      22px;
+        /* Verre (liquid glass) — dépoli plus marqué (moins opaque, plus flou) */
+        --glass-bg:        rgba(255,255,255,0.45);
+        --glass-bg-strong: rgba(255,255,255,0.72);
+        --glass-border:    rgba(255,255,255,0.75);
+        --glass-blur:      30px;
 
-        /* Washes d'accent du fond (charte Bony : orange + violet) */
-        --wash-1: rgba(247,86,50,0.06);
-        --wash-2: rgba(143,18,171,0.07);
+        /* Washes d'accent du fond (charte Bony : orange + violet + bleu) — plus présents */
+        --wash-1: rgba(247,86,50,0.16);
+        --wash-2: rgba(143,18,171,0.15);
+        --wash-3: rgba(41,63,116,0.12);
       }
 
       html.dark {
@@ -103,13 +104,14 @@
         --text-muted: #94a3b8;   /* Slate 400 */
 
         /* Verre — glassmorphism sombre cohérent (pas un simple inverse) */
-        --glass-bg:        rgba(28,28,36,0.55);
-        --glass-bg-strong: rgba(30,30,38,0.78);
-        --glass-border:    rgba(255,255,255,0.10);
-        --glass-blur:      22px;
+        --glass-bg:        rgba(28,28,36,0.50);
+        --glass-bg-strong: rgba(30,30,38,0.72);
+        --glass-border:    rgba(255,255,255,0.12);
+        --glass-blur:      30px;
 
-        --wash-1: rgba(247,86,50,0.10);
-        --wash-2: rgba(143,18,171,0.09);
+        --wash-1: rgba(247,86,50,0.20);
+        --wash-2: rgba(143,18,171,0.18);
+        --wash-3: rgba(41,63,116,0.16);
       }
 
       /* ===================== VERRE (liquid glass) ===================== */
@@ -118,29 +120,36 @@
       /* Surface translucide premium — sidebar, navbars, modales, dropdowns, cartes flottantes */
       .glass {
         background: var(--glass-bg);
-        backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+        backdrop-filter: blur(var(--glass-blur)) saturate(200%);
+        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(200%);
         border: 1px solid var(--glass-border);
+        /* Profondeur : highlight interne haut (bordure lumineuse) + ombre portée diffuse */
+        box-shadow: 0 8px 32px -6px rgba(16,18,32,0.18), inset 0 1px 0 0 rgba(255,255,255,0.55);
       }
       /* Variante plus opaque — quand la lisibilité du texte par-dessus est requise */
       .glass-strong {
         background: var(--glass-bg-strong);
-        backdrop-filter: blur(var(--glass-blur)) saturate(180%);
-        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+        backdrop-filter: blur(var(--glass-blur)) saturate(200%);
+        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(200%);
         border: 1px solid var(--glass-border);
+        box-shadow: 0 8px 32px -6px rgba(16,18,32,0.18), inset 0 1px 0 0 rgba(255,255,255,0.55);
+      }
+      html.dark .glass, html.dark .glass-strong {
+        box-shadow: 0 10px 36px -8px rgba(0,0,0,0.55), inset 0 1px 0 0 rgba(255,255,255,0.12);
       }
       /* Reflet lumineux supérieur (combiner avec position:relative + overflow-hidden) */
       .glass-sheen::before {
         content: '';
         position: absolute;
         inset: 0 0 auto 0;
-        height: 45%;
-        background: linear-gradient(to bottom, rgba(255,255,255,0.35), transparent);
+        height: 50%;
+        background: linear-gradient(to bottom, rgba(255,255,255,0.55), rgba(255,255,255,0.06) 62%, transparent);
         pointer-events: none;
-        opacity: 0.6;
+        opacity: 0.9;
       }
       html.dark .glass-sheen::before {
-        background: linear-gradient(to bottom, rgba(255,255,255,0.08), transparent);
+        background: linear-gradient(to bottom, rgba(255,255,255,0.14), rgba(255,255,255,0.02) 62%, transparent);
+        opacity: 0.8;
       }
 
       /* Carte de contenu standard (opaque, douce) — le verre reste un accent, pas le fond partout */
@@ -210,13 +219,32 @@
 
       body {
         background-color: var(--bg-main);
-        background-image:
-          radial-gradient(ellipse 90% 70% at 12% -5%,   var(--wash-1), transparent 55%),
-          radial-gradient(ellipse 80% 70% at 105% 105%, var(--wash-2), transparent 55%);
-        background-attachment: fixed;
         color: var(--text-main);
         font-family: 'Albert Sans', sans-serif;
         transition: background-color 0.3s ease, color 0.3s ease;
+      }
+
+      /* Fond spatial : halos de couleur charte (matière à réfracter pour le verre).
+         Couche fixe derrière l'app, dérive très lente (gelée par prefers-reduced-motion). */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: -25%;
+        z-index: -1;
+        pointer-events: none;
+        background-repeat: no-repeat;
+        background-image:
+          radial-gradient(38% 44% at 8% -2%,   var(--wash-1), transparent 60%),
+          radial-gradient(42% 48% at 100% 108%, var(--wash-2), transparent 60%),
+          radial-gradient(30% 36% at 88% 6%,    var(--wash-3), transparent 62%),
+          radial-gradient(34% 40% at 16% 94%,   var(--wash-2), transparent 60%),
+          radial-gradient(26% 32% at 55% 46%,   var(--wash-1), transparent 66%);
+        animation: gx-bg-drift 42s ease-in-out infinite alternate;
+        will-change: transform;
+      }
+      @keyframes gx-bg-drift {
+        from { transform: translate3d(-1%, -1%, 0) scale(1); }
+        to   { transform: translate3d(2%, 1.5%, 0) scale(1.06); }
       }
 
       /* Transitions douces pour les éléments de thème */
