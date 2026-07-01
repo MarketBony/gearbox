@@ -5,6 +5,7 @@ import {
   ExternalLink, Calendar, Tag, Banknote, Radio, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import DatePicker from '../components/DatePicker';
 import { db } from '../services/dataService';
 import { Project, Task, TaskStatus, BrandType, ServiceType, PlaqueName } from '../types';
 import { BRAND_COLORS, SERVICE_COLORS, PLAQUES_STRUCTURE, BRANDS, SERVICES } from '../constants';
@@ -469,18 +470,16 @@ const TodoList: React.FC = () => {
       {/* Date range */}
       <div className="flex items-center gap-2">
         <Calendar size={13} className="text-bony-text/40 shrink-0" />
-        <input
-          type="date"
+        <DatePicker
           value={filterDateStart}
-          onChange={e => setFilterDateStart(e.target.value)}
-          className="text-xs bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-lg px-2 py-1.5 text-slate-900 dark:text-bony-text focus:outline-none focus:border-bony-orange/60"
+          onChange={v => setFilterDateStart(v)}
+          size="sm"
         />
         <span className="text-bony-text/30 text-xs">→</span>
-        <input
-          type="date"
+        <DatePicker
           value={filterDateEnd}
-          onChange={e => setFilterDateEnd(e.target.value)}
-          className="text-xs bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-lg px-2 py-1.5 text-slate-900 dark:text-bony-text focus:outline-none focus:border-bony-orange/60"
+          onChange={v => setFilterDateEnd(v)}
+          size="sm"
         />
       </div>
 
