@@ -393,7 +393,9 @@ const Budget: React.FC = () => {
           filterProPlus === 'all' || (filterProPlus === 'pro' ? !!proPlus : !proPlus);
 
       projects.forEach(p => {
-          if (p.status === 'Draft' || p.status === 'Archived') return;
+          // Le budget RÉALISÉ inclut les projets archivés (l'archivage est un classement
+          // visuel, pas une annulation comptable). Seuls les brouillons (Draft) sont exclus.
+          if (p.status === 'Draft') return;
           if (!isProPlusInScope(p.proPlus)) return;
 
           // Determine Sites and Shares
