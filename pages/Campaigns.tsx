@@ -11,6 +11,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList 
 } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
+import Select from '../components/Select';
+import DatePicker from '../components/DatePicker';
 
 // --- TYPES ---
 interface CampaignTask extends Task {
@@ -301,13 +303,12 @@ const Campaigns: React.FC = () => {
   };
 
   const FilterSelect = ({value, onChange, options}: {value: string, onChange: (v: any) => void, options: string[]}) => (
-      <select 
-        value={value} 
-        onChange={(e) => onChange(e.target.value)} 
-        className="bg-slate-100 dark:bg-black/30 text-[9px] text-slate-900 dark:text-white border border-bony-border rounded px-2 py-1 outline-none focus:border-bony-orange"
-      >
-          {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
+      <Select
+        value={value}
+        onChange={(v) => onChange(v)}
+        options={options.map(o => ({ value: o, label: o }))}
+        size="sm"
+      />
   );
 
   return (
@@ -319,19 +320,21 @@ const Campaigns: React.FC = () => {
              {/* DATE PICKERS */}
              <div className="flex items-center gap-2 bg-slate-100 dark:bg-black/30 p-1 rounded border border-bony-border">
                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest pl-1">Du</span>
-                 <input 
-                    type="date"
-                    value={chartStartDate}
-                    onChange={(e) => setChartStartDate(e.target.value)}
-                    className="bg-transparent text-[10px] text-slate-900 dark:text-white font-bold outline-none uppercase"
-                 />
+                 <div className="w-36">
+                     <DatePicker
+                        value={chartStartDate}
+                        onChange={(v) => setChartStartDate(v)}
+                        size="sm"
+                     />
+                 </div>
                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Au</span>
-                 <input 
-                    type="date"
-                    value={chartEndDate}
-                    onChange={(e) => setChartEndDate(e.target.value)}
-                    className="bg-transparent text-[10px] text-slate-900 dark:text-white font-bold outline-none uppercase"
-                 />
+                 <div className="w-36">
+                     <DatePicker
+                        value={chartEndDate}
+                        onChange={(v) => setChartEndDate(v)}
+                        size="sm"
+                     />
+                 </div>
              </div>
              
              <div className="w-px h-4 bg-bony-border"></div>
@@ -552,36 +555,37 @@ const Campaigns: React.FC = () => {
                     {/* Context */}
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase">Plaque / Site</label>
-                        <select 
+                        <Select
                             value={filterContext}
-                            onChange={(e) => setFilterContext(e.target.value)}
-                            className="w-full bg-white dark:bg-bony-panel border border-bony-border rounded p-1.5 text-[10px] text-slate-900 dark:text-white outline-none focus:border-bony-violet"
-                        >
-                            <option value="All">TOUT LE RÉSEAU</option>
-                            {Object.entries(PLAQUES_STRUCTURE).map(([plaqueName, sites]) => (
-                                <optgroup key={plaqueName} label={plaqueName}>
-                                    <option value={plaqueName}>★ {plaqueName}</option>
-                                    {sites.map(site => <option key={site} value={site}>{site}</option>)}
-                                </optgroup>
-                            ))}
-                        </select>
+                            onChange={(v) => setFilterContext(v)}
+                            size="sm"
+                            options={[
+                                { value: 'All', label: 'TOUT LE RÉSEAU' },
+                                ...Object.entries(PLAQUES_STRUCTURE).flatMap(([plaqueName, sites]) => [
+                                    { value: plaqueName, label: `★ ${plaqueName}` },
+                                    ...sites.map(site => ({ value: site, label: site })),
+                                ]),
+                            ]}
+                        />
                     </div>
                     {/* Dates */}
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase">Période Liste</label>
                         <div className="flex gap-2">
-                            <input 
-                                type="date"
-                                value={filterStartDate}
-                                onChange={(e) => setFilterStartDate(e.target.value)}
-                                className="w-full bg-white dark:bg-bony-panel border border-bony-border rounded p-1.5 text-[10px] text-slate-900 dark:text-white outline-none focus:border-bony-violet"
-                            />
-                            <input 
-                                type="date"
-                                value={filterEndDate}
-                                onChange={(e) => setFilterEndDate(e.target.value)}
-                                className="w-full bg-white dark:bg-bony-panel border border-bony-border rounded p-1.5 text-[10px] text-slate-900 dark:text-white outline-none focus:border-bony-violet"
-                            />
+                            <div className="flex-1">
+                                <DatePicker
+                                    value={filterStartDate}
+                                    onChange={(v) => setFilterStartDate(v)}
+                                    size="sm"
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <DatePicker
+                                    value={filterEndDate}
+                                    onChange={(v) => setFilterEndDate(v)}
+                                    size="sm"
+                                />
+                            </div>
                         </div>
                     </div>
                     {/* Brand */}
