@@ -5,6 +5,8 @@ import { db } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN } from '../constants';
 import { Plus, Trash2, Edit2, Save, X, Search, Filter, Euro, Calendar, MapPin, MessageSquare, Briefcase, ArrowUp, ArrowDown, ChevronDown, Check, PieChart } from 'lucide-react';
+import Select from '../components/Select';
+import DatePicker from '../components/DatePicker';
 
 const FixedExpenses: React.FC = () => {
     const { user } = useAuth();
@@ -277,48 +279,46 @@ const FixedExpenses: React.FC = () => {
 
                     <div className="flex items-center gap-2">
                         <Filter size={16} className="text-slate-500"/>
-                        <select 
+                        <Select
+                            size="sm"
                             value={filterSite}
-                            onChange={(e) => setFilterSite(e.target.value)}
-                            className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-3 py-2 text-xs font-bold text-bony-text outline-none focus:border-bony-orange cursor-pointer"
-                        >
-                            <option value="All">TOUS SITES</option>
-                            <option value="GROUPE BONY">GROUPE BONY</option>
-                            {Object.entries(PLAQUES_STRUCTURE).map(([plaqueName, sites]) => (
-                                <optgroup key={plaqueName} label={plaqueName}>
-                                    {sites.map(site => (
-                                        <option key={site} value={site}>{site}</option>
-                                    ))}
-                                </optgroup>
-                            ))}
-                        </select>
+                            onChange={(v) => setFilterSite(v)}
+                            options={[
+                                { value: 'All', label: 'TOUS SITES' },
+                                { value: 'GROUPE BONY', label: 'GROUPE BONY' },
+                                ...Object.values(PLAQUES_STRUCTURE).flat().map(site => ({ value: site, label: site })),
+                            ]}
+                        />
 
-                        <select 
+                        <Select
+                            size="sm"
                             value={filterService}
-                            onChange={(e) => setFilterService(e.target.value as any)}
-                            className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-3 py-2 text-xs font-bold text-bony-text outline-none focus:border-bony-orange cursor-pointer"
-                        >
-                            <option value="All">TOUS SERVICES</option>
-                            {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                            onChange={(v) => setFilterService(v as any)}
+                            options={[
+                                { value: 'All', label: 'TOUS SERVICES' },
+                                ...SERVICES.map(s => ({ value: s, label: s })),
+                            ]}
+                        />
 
                         <div className="h-8 w-px bg-bony-border mx-2 hidden md:block"></div>
 
                         <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-slate-500 uppercase">Du</span>
-                            <input 
-                                type="date" 
-                                value={filterStartDate}
-                                onChange={(e) => setFilterStartDate(e.target.value)}
-                                className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-3 py-2 text-xs font-bold text-bony-text outline-none focus:border-bony-orange cursor-pointer"
-                            />
+                            <div className="w-40">
+                                <DatePicker
+                                    size="sm"
+                                    value={filterStartDate}
+                                    onChange={(v) => setFilterStartDate(v)}
+                                />
+                            </div>
                             <span className="text-xs font-bold text-slate-500 uppercase">Au</span>
-                            <input 
-                                type="date" 
-                                value={filterEndDate}
-                                onChange={(e) => setFilterEndDate(e.target.value)}
-                                className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-3 py-2 text-xs font-bold text-bony-text outline-none focus:border-bony-orange cursor-pointer"
-                            />
+                            <div className="w-40">
+                                <DatePicker
+                                    size="sm"
+                                    value={filterEndDate}
+                                    onChange={(v) => setFilterEndDate(v)}
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -465,11 +465,10 @@ const FixedExpenses: React.FC = () => {
                                         <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
                                             <Calendar size={12}/> Date
                                         </label>
-                                        <input 
-                                            type="date" 
-                                            value={currentExpense.date}
-                                            onChange={(e) => setCurrentExpense({...currentExpense, date: e.target.value})}
-                                            className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg p-2.5 text-bony-text outline-none focus:border-bony-blue text-sm font-bold"
+                                        <DatePicker
+                                            size="md"
+                                            value={currentExpense.date || ''}
+                                            onChange={(v) => setCurrentExpense({...currentExpense, date: v})}
                                         />
                                     </div>
                                     <div className="space-y-1">
@@ -561,13 +560,12 @@ const FixedExpenses: React.FC = () => {
                                         <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
                                             <Briefcase size={12}/> Service
                                         </label>
-                                        <select 
-                                            value={currentExpense.service}
-                                            onChange={(e) => setCurrentExpense({...currentExpense, service: e.target.value as any})}
-                                            className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg p-2.5 text-bony-text outline-none focus:border-bony-blue text-sm font-bold appearance-none cursor-pointer"
-                                        >
-                                            {SERVICES.map(s => <option key={s} value={s} className="bg-white dark:bg-bony-panel">{s}</option>)}
-                                        </select>
+                                        <Select
+                                            size="md"
+                                            value={currentExpense.service || ''}
+                                            onChange={(v) => setCurrentExpense({...currentExpense, service: v as any})}
+                                            options={SERVICES.map(s => ({ value: s, label: s }))}
+                                        />
                                     </div>
                                 </div>
 
