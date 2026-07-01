@@ -88,7 +88,7 @@ const TeamSection: React.FC<TeamSectionProps> = ({
                         </button>
                         {showDropdown && (
                             <div
-                                className="fixed z-[9999] glass-strong rounded-xl shadow-2xl min-w-[180px] overflow-hidden"
+                                className="fixed z-[9999] glass-menu glass-sheen rounded-xl min-w-[180px] overflow-hidden"
                                 style={{ top: dropPos.top, left: dropPos.left }}
                             >
                                 {unassignedUsers.map(u => (
@@ -98,9 +98,9 @@ const TeamSection: React.FC<TeamSectionProps> = ({
                                         className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
                                     >
                                         <Avatar userId={u.id} name={u.name} color={u.avatarColor} size={26} />
-                                        <div>
-                                            <p className="text-xs font-bold text-bony-text leading-tight">{u.name}</p>
-                                            <p className="text-[9px] text-bony-muted">{u.role}</p>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-bony-text leading-tight truncate">{u.name}</p>
+                                            <p className="text-[9px] text-bony-muted truncate">{u.role}</p>
                                         </div>
                                     </button>
                                 ))}
@@ -200,9 +200,9 @@ const ProjSitePicker: React.FC<ProjSitePickerProps> = ({ selected, onChange }) =
                                                     </button>
                                                 </div>
                                                 {(expanded || search) && (search ? filtered : sites).map(site => (
-                                                    <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
-                                                        <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
-                                                        {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                                                    <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between gap-2 pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                                                        <span className={`truncate min-w-0 ${selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}`}>{site}</span>
+                                                        {selected.includes(site) && <Check size={12} className="text-bony-orange shrink-0" />}
                                                     </button>
                                                 ))}
                                             </div>
@@ -211,9 +211,9 @@ const ProjSitePicker: React.FC<ProjSitePickerProps> = ({ selected, onChange }) =
                                     <div>
                                         <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Entités Spécifiques</div>
                                         {PROJ_SPECIAL_SITES.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
-                                            <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
-                                                <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
-                                                {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                                            <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between gap-2 pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                                                <span className={`truncate min-w-0 ${selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}`}>{site}</span>
+                                                {selected.includes(site) && <Check size={12} className="text-bony-orange shrink-0" />}
                                             </button>
                                         ))}
                                     </div>
@@ -222,8 +222,8 @@ const ProjSitePicker: React.FC<ProjSitePickerProps> = ({ selected, onChange }) =
                         );
                         return (
                             <>
-                                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-strong border-t border-bony-border shadow-2xl overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">{inner}</div>
-                                <div className="hidden sm:flex fixed z-[9999] glass-strong rounded-xl shadow-2xl overflow-hidden flex-col w-64 max-h-80" style={{ top: pos.top, left: pos.left }}>{inner}</div>
+                                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-menu glass-sheen overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">{inner}</div>
+                                <div className="hidden sm:flex fixed z-[9999] glass-menu glass-sheen rounded-xl overflow-hidden flex-col w-64 max-h-80" style={{ top: pos.top, left: pos.left }}>{inner}</div>
                             </>
                         );
                     })()}
@@ -1161,20 +1161,20 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                         </button>
                                         
                                         {showSiteDropdown && (
-                                            <div className="absolute top-full left-0 right-0 mt-1 glass-strong rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto custom-scrollbar p-1">
+                                            <div className="absolute top-full left-0 right-0 mt-1 glass-menu rounded-lg z-50 max-h-60 overflow-y-auto custom-scrollbar p-1">
                                                 <button
                                                     onClick={() => { updateSiteSelection('GROUPE BONY'); setShowSiteDropdown(false); }}
-                                                    className={`w-full text-left px-3 py-2 text-xs font-bold rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between ${selectedProject.site === 'GROUPE BONY' ? 'text-bony-orange bg-orange-50 dark:bg-orange-900/20' : 'text-slate-700 dark:text-slate-300'}`}
+                                                    className={`w-full text-left px-3 py-2 text-xs font-bold rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between gap-2 ${selectedProject.site === 'GROUPE BONY' ? 'text-bony-orange bg-orange-50 dark:bg-orange-900/20' : 'text-slate-700 dark:text-slate-300'}`}
                                                 >
-                                                    GROUPE BONY (GLOBAL)
-                                                    {selectedProject.site === 'GROUPE BONY' && <Check size={14}/>}
+                                                    <span className="truncate min-w-0">GROUPE BONY (GLOBAL)</span>
+                                                    {selectedProject.site === 'GROUPE BONY' && <Check size={14} className="shrink-0"/>}
                                                 </button>
                                                 <button
                                                     onClick={() => { updateSiteSelection('GROUPE BONY (R/N)'); setShowSiteDropdown(false); }}
-                                                    className={`w-full text-left px-3 py-2 text-xs font-bold rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between ${selectedProject.site === 'GROUPE BONY (R/N)' ? 'text-bony-orange bg-orange-50 dark:bg-orange-900/20' : 'text-slate-700 dark:text-slate-300'}`}
+                                                    className={`w-full text-left px-3 py-2 text-xs font-bold rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between gap-2 ${selectedProject.site === 'GROUPE BONY (R/N)' ? 'text-bony-orange bg-orange-50 dark:bg-orange-900/20' : 'text-slate-700 dark:text-slate-300'}`}
                                                 >
-                                                    GROUPE BONY (R/N)
-                                                    {selectedProject.site === 'GROUPE BONY (R/N)' && <Check size={14}/>}
+                                                    <span className="truncate min-w-0">GROUPE BONY (R/N)</span>
+                                                    {selectedProject.site === 'GROUPE BONY (R/N)' && <Check size={14} className="shrink-0"/>}
                                                 </button>
                                                 
                                                 <div className="h-px bg-slate-100 dark:bg-white/10 my-1"></div>
@@ -1188,10 +1188,10 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                                 <button
                                                                     key={site}
                                                                     onClick={() => updateSiteSelection(site)}
-                                                                    className={`w-full text-left px-3 py-1.5 text-xs rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between ${isSelected ? 'text-bony-blue font-bold bg-blue-50 dark:bg-blue-900/20' : 'text-slate-600 dark:text-slate-400'}`}
+                                                                    className={`w-full text-left px-3 py-1.5 text-xs rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between gap-2 ${isSelected ? 'text-bony-blue font-bold bg-blue-50 dark:bg-blue-900/20' : 'text-slate-600 dark:text-slate-400'}`}
                                                                 >
-                                                                    {site}
-                                                                    {isSelected && <Check size={14}/>}
+                                                                    <span className="truncate min-w-0">{site}</span>
+                                                                    {isSelected && <Check size={14} className="shrink-0"/>}
                                                                 </button>
                                                             );
                                                         })}
@@ -1205,10 +1205,10 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                             <button
                                                                 key={site}
                                                                 onClick={() => updateSiteSelection(site)}
-                                                                className={`w-full text-left px-3 py-1.5 text-xs rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between ${isSelected ? 'text-bony-blue font-bold bg-blue-50 dark:bg-blue-900/20' : 'text-slate-600 dark:text-slate-400'}`}
+                                                                className={`w-full text-left px-3 py-1.5 text-xs rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between gap-2 ${isSelected ? 'text-bony-blue font-bold bg-blue-50 dark:bg-blue-900/20' : 'text-slate-600 dark:text-slate-400'}`}
                                                             >
-                                                                {site}
-                                                                {isSelected && <Check size={14}/>}
+                                                                <span className="truncate min-w-0">{site}</span>
+                                                                {isSelected && <Check size={14} className="shrink-0"/>}
                                                             </button>
                                                         );
                                                     })}

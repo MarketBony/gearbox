@@ -123,7 +123,7 @@ const VisualMultiSelect: React.FC<VisualMultiSelectProps> = ({ label, options, s
             </div>
 
             {isOpen && (
-                <div className="glass-strong absolute top-full left-0 mt-1 w-64 rounded-lg shadow-glass-lg z-50 p-2 max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in duration-100">
+                <div className="glass-menu absolute top-full left-0 mt-1 w-64 rounded-lg z-50 p-2 max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in duration-100">
                     <div className="flex flex-col gap-1">
                         {options.map(opt => {
                             const isSelected = selected.includes(opt);
@@ -131,12 +131,12 @@ const VisualMultiSelect: React.FC<VisualMultiSelectProps> = ({ label, options, s
                                 <button
                                     key={opt}
                                     onClick={() => toggleOption(opt)}
-                                    className={`flex items-center gap-2 px-2 py-2 rounded text-xs text-left transition-colors ${isSelected ? 'bg-bony-orange/10 dark:bg-white/10 text-bony-orange dark:text-white font-bold' : 'text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                                    className={`flex items-center gap-2 px-2 py-2 rounded text-xs text-left transition-colors min-w-0 ${isSelected ? 'bg-bony-orange/10 dark:bg-white/10 text-bony-orange dark:text-white font-bold' : 'text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
                                 >
-                                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'border-bony-orange bg-bony-orange' : 'border-slate-300 dark:border-slate-600'}`}>
+                                    <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isSelected ? 'border-bony-orange bg-bony-orange' : 'border-slate-300 dark:border-slate-600'}`}>
                                         {isSelected && <Check size={10} className="text-white"/>}
                                     </div>
-                                    {opt}
+                                    <span className="truncate min-w-0">{opt}</span>
                                 </button>
                             );
                         })}
@@ -1000,7 +1000,7 @@ const Digital: React.FC = () => {
       if (!hoveredPostData) return null;
       return (
           <div 
-            className="glass-strong fixed z-[100] w-72 rounded-xl shadow-glass-lg p-4 pointer-events-none animate-in fade-in duration-200"
+            className="glass-menu fixed z-[100] w-72 rounded-xl p-4 pointer-events-none animate-in fade-in duration-200"
             style={{ top: cursorPos.y, left: cursorPos.x }}
           >
               {/* Header: Brands + Status */}

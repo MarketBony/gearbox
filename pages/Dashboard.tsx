@@ -108,9 +108,9 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, o
     <div className="p-1">
       {shortcuts.map(s => (
         <button key={s.label} onClick={s.apply}
-          className="w-full text-left px-3 py-2.5 text-xs font-bold text-bony-text hover:bg-white/5 rounded-lg transition flex items-center justify-between">
-          {s.label}
-          {s.label === 'Personnalisé' && <ChevronRight size={14} className="text-slate-500" />}
+          className="w-full text-left px-3 py-2.5 text-xs font-bold text-bony-text hover:bg-white/5 rounded-lg transition flex items-center justify-between gap-2 min-w-0">
+          <span className="truncate min-w-0">{s.label}</span>
+          {s.label === 'Personnalisé' && <ChevronRight size={14} className="text-slate-500 shrink-0" />}
         </button>
       ))}
     </div>
@@ -165,7 +165,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, o
           <div className="fixed inset-0 z-[9990]" onClick={close} />
 
           {/* Mobile: bottom sheet */}
-          <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-strong border-t border-bony-border rounded-t-2xl shadow-2xl overflow-hidden">
+          <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-menu rounded-t-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-bony-border">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Période</span>
               <button onClick={close}><X size={16} className="text-slate-400" /></button>
@@ -175,7 +175,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, o
 
           {/* Desktop: fixed dropdown */}
           <div
-            className="hidden sm:block fixed z-[9999] glass-strong border border-bony-border rounded-xl shadow-2xl overflow-hidden w-52"
+            className="hidden sm:block fixed z-[9999] glass-menu rounded-xl overflow-hidden w-52"
             style={{ top: pos.top, left: pos.left }}
           >
             {customMode ? customForm : shortcutList}
@@ -289,9 +289,9 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
                       <div key={plaqueName}>
                         <div className="flex items-center px-2 py-1">
                           <button onClick={() => toggleExpandPlaque(plaqueName)}
-                            className="flex items-center gap-1 flex-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-bony-text transition">
-                            <ChevronRight size={11} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
-                            {plaqueName}
+                            className="flex items-center gap-1 flex-1 min-w-0 text-[9px] font-bold text-slate-500 uppercase tracking-widest hover:text-bony-text transition">
+                            <ChevronRight size={11} className={`shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+                            <span className="truncate min-w-0">{plaqueName}</span>
                           </button>
                           <button onClick={() => togglePlaque(sites as string[])}
                             className={`w-4 h-4 rounded border flex items-center justify-center transition ${
@@ -302,9 +302,9 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
                         </div>
                         {(expanded || search) && (search ? filtered : sites).map(site => (
                           <button key={site} onClick={() => toggle(site)}
-                            className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
-                            <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
-                            {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                            className="w-full flex items-center justify-between gap-2 min-w-0 pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                            <span className={`truncate min-w-0 ${selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}`}>{site}</span>
+                            {selected.includes(site) && <Check size={12} className="text-bony-orange shrink-0" />}
                           </button>
                         ))}
                       </div>
@@ -314,9 +314,9 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
                     <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Entités Spécifiques</div>
                     {SPECIAL_SITES.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
                       <button key={site} onClick={() => toggle(site)}
-                        className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
-                        <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
-                        {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                        className="w-full flex items-center justify-between gap-2 min-w-0 pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                        <span className={`truncate min-w-0 ${selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}`}>{site}</span>
+                        {selected.includes(site) && <Check size={12} className="text-bony-orange shrink-0" />}
                       </button>
                     ))}
                   </div>
@@ -326,12 +326,12 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
             return (
               <>
                 {/* Mobile: bottom sheet */}
-                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-strong border-t border-bony-border shadow-2xl overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">
+                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-menu overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">
                   {inner}
                 </div>
                 {/* Desktop: fixed dropdown */}
                 <div
-                  className="hidden sm:flex fixed z-[9999] glass-strong border border-bony-border rounded-xl shadow-2xl overflow-hidden flex-col w-64 max-h-80"
+                  className="hidden sm:flex fixed z-[9999] glass-menu rounded-xl overflow-hidden flex-col w-64 max-h-80"
                   style={{ top: pos.top, left: pos.left }}
                 >
                   {inner}

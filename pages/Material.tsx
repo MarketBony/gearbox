@@ -130,7 +130,7 @@ const BookingPill: React.FC<{
 
             {isHovered && (
                 <div
-                    className="absolute z-[100] w-64 glass-strong rounded-xl shadow-2xl p-3 animate-in fade-in duration-200 pointer-events-none"
+                    className="absolute z-[100] w-64 glass-menu rounded-xl p-3 animate-in fade-in duration-200 pointer-events-none"
                     style={{ 
                         top: '100%', 
                         left: style?.left || 0,

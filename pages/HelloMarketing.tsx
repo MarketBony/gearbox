@@ -1151,7 +1151,7 @@ const ViennoiseriesSection: React.FC = () => {
                 4 sem. précédentes
               </button>
               {showHistory && (
-                <div className="absolute bottom-full right-0 mb-2 w-52 glass-strong rounded-xl shadow-xl p-2 z-20">
+                <div className="absolute bottom-full right-0 mb-2 w-52 glass-menu rounded-xl p-2 z-20">
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-1.5">Historique</p>
                   {history.map(({ label, user }) => (
                     <div key={label} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 transition">

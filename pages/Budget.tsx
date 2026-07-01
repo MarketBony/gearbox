@@ -121,9 +121,9 @@ const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange 
                                                         </button>
                                                     </div>
                                                     {(expanded || search) && (search ? filtered : sites).map(site => (
-                                                        <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
-                                                            <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
-                                                            {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                                                        <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between gap-2 pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                                                            <span className={`truncate min-w-0 ${selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}`}>{site}</span>
+                                                            {selected.includes(site) && <Check size={12} className="text-bony-orange shrink-0" />}
                                                         </button>
                                                     ))}
                                                 </div>
@@ -132,9 +132,9 @@ const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange 
                                         <div>
                                             <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Entités Spécifiques</div>
                                             {BUDGET_SPECIAL_SITES.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
-                                                <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
-                                                    <span className={selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}>{site}</span>
-                                                    {selected.includes(site) && <Check size={12} className="text-bony-orange" />}
+                                                <button key={site} onClick={() => toggle(site)} className="w-full flex items-center justify-between gap-2 pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
+                                                    <span className={`truncate min-w-0 ${selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}`}>{site}</span>
+                                                    {selected.includes(site) && <Check size={12} className="text-bony-orange shrink-0" />}
                                                 </button>
                                             ))}
                                         </div>
@@ -143,8 +143,8 @@ const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange 
                             );
                             return (
                                 <>
-                                    <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-strong glass-sheen border-t border-bony-border shadow-glass-lg overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">{inner}</div>
-                                    <div className="hidden sm:flex fixed z-[9999] glass-strong glass-sheen rounded-xl shadow-glass-lg overflow-hidden flex-col w-64 max-h-80" style={{ top: pos.top, left: pos.left }}>{inner}</div>
+                                    <div className="sm:hidden fixed bottom-0 left-0 right-0 z-[9999] glass-menu glass-sheen relative overflow-hidden flex flex-col rounded-t-2xl max-h-[75vh]">{inner}</div>
+                                    <div className="hidden sm:flex fixed z-[9999] glass-menu glass-sheen relative rounded-xl overflow-hidden flex-col w-64 max-h-80" style={{ top: pos.top, left: pos.left }}>{inner}</div>
                                 </>
                             );
                         })()}

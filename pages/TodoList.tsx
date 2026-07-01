@@ -146,7 +146,7 @@ const SiteFilterDropdown: React.FC<{
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-60 glass-strong rounded-xl shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full left-0 mt-1 w-60 glass-menu rounded-xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-bony-border">
             <span className="text-xs font-bold text-bony-text/50 uppercase tracking-wider">Périmètre</span>
             {selected.length > 0 && (
@@ -179,9 +179,9 @@ const SiteFilterDropdown: React.FC<{
                         type="checkbox"
                         checked={selected.includes(site)}
                         onChange={() => toggle(site)}
-                        className="accent-bony-orange"
+                        className="accent-bony-orange shrink-0"
                       />
-                      {site}
+                      <span className="truncate min-w-0">{site}</span>
                     </label>
                   ))}
                 </div>

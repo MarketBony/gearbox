@@ -881,9 +881,9 @@ const Chat: React.FC = () => {
                                           <MoreHorizontal size={13} />
                                         </button>
                                         {menuMsgId === msg.id && (
-                                          <div className="glass-strong absolute right-0 top-full mt-1 rounded-lg shadow-glass z-20 min-w-[120px] overflow-hidden" onClick={e => e.stopPropagation()}>
-                                            <button onClick={() => startEdit(msg)} className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5 text-bony-text"><Pencil size={12} /> Modifier</button>
-                                            <button onClick={() => deleteMsg(msg.id)} className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-red-500/10 text-red-400"><Trash2 size={12} /> Supprimer</button>
+                                          <div className="glass-menu absolute right-0 top-full mt-1 rounded-lg z-20 min-w-[120px] overflow-hidden" onClick={e => e.stopPropagation()}>
+                                            <button onClick={() => startEdit(msg)} className="w-full flex items-center gap-2 px-3 py-2 text-xs whitespace-nowrap hover:bg-white/5 text-bony-text"><Pencil size={12} /> Modifier</button>
+                                            <button onClick={() => deleteMsg(msg.id)} className="w-full flex items-center gap-2 px-3 py-2 text-xs whitespace-nowrap hover:bg-red-500/10 text-red-400"><Trash2 size={12} /> Supprimer</button>
                                           </div>
                                         )}
                                       </div>

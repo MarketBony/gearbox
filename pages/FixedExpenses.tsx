@@ -500,20 +500,20 @@ const FixedExpenses: React.FC = () => {
                                             </button>
                                             
                                             {showSiteDropdown && (
-                                                <div className="absolute top-full left-0 right-0 mt-1 glass-strong rounded-lg shadow-glass-lg z-50 max-h-60 overflow-y-auto custom-scrollbar p-1">
+                                                <div className="absolute top-full left-0 right-0 mt-1 glass-menu rounded-lg z-50 max-h-60 overflow-y-auto custom-scrollbar p-1">
                                                     <button
                                                         onClick={() => { updateSiteSelection('GROUPE BONY'); setShowSiteDropdown(false); }}
                                                         className={`w-full text-left px-3 py-2 text-xs font-bold rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between ${currentExpense.site === 'GROUPE BONY' ? 'text-bony-orange bg-orange-50 dark:bg-orange-900/20' : 'text-slate-700 dark:text-slate-300'}`}
                                                     >
-                                                        GROUPE BONY (GLOBAL)
-                                                        {currentExpense.site === 'GROUPE BONY' && <Check size={14}/>}
+                                                        <span className="truncate min-w-0">GROUPE BONY (GLOBAL)</span>
+                                                        {currentExpense.site === 'GROUPE BONY' && <Check size={14} className="shrink-0"/>}
                                                     </button>
                                                     <button
                                                         onClick={() => { updateSiteSelection('GROUPE BONY (R/N)'); setShowSiteDropdown(false); }}
                                                         className={`w-full text-left px-3 py-2 text-xs font-bold rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between ${currentExpense.site === 'GROUPE BONY (R/N)' ? 'text-bony-orange bg-orange-50 dark:bg-orange-900/20' : 'text-slate-700 dark:text-slate-300'}`}
                                                     >
-                                                        GROUPE BONY (R/N)
-                                                        {currentExpense.site === 'GROUPE BONY (R/N)' && <Check size={14}/>}
+                                                        <span className="truncate min-w-0">GROUPE BONY (R/N)</span>
+                                                        {currentExpense.site === 'GROUPE BONY (R/N)' && <Check size={14} className="shrink-0"/>}
                                                     </button>
                                                     
                                                     <div className="h-px bg-slate-100 dark:bg-white/10 my-1"></div>
@@ -529,8 +529,8 @@ const FixedExpenses: React.FC = () => {
                                                                         onClick={() => updateSiteSelection(site)}
                                                                         className={`w-full text-left px-3 py-1.5 text-xs rounded hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-between ${isSelected ? 'text-bony-blue font-bold bg-blue-50 dark:bg-blue-900/20' : 'text-slate-600 dark:text-slate-400'}`}
                                                                     >
-                                                                        {site}
-                                                                        {isSelected && <Check size={14}/>}
+                                                                        <span className="truncate min-w-0">{site}</span>
+                                                                        {isSelected && <Check size={14} className="shrink-0"/>}
                                                                     </button>
                                                                 );
                                                             })}
