@@ -6,6 +6,8 @@ import { User, UserRole, ActivityLog } from '../types';
 import { Save, User as UserIcon, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn, MapPin, Cake } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import Avatar, { avatarKey } from '../components/Avatar';
+import Select from '../components/Select';
+import DatePicker from '../components/DatePicker';
 import { SITES } from '../constants';
 
 // --- Types for react-easy-crop ---
@@ -396,20 +398,21 @@ const Settings: React.FC = () => {
               <label className="block text-xs font-bold text-slate-600 dark:text-slate-500 mb-1 flex items-center gap-1">
                 <MapPin size={11} /> Ville de référence (météo)
               </label>
-              <select value={userCity} onChange={e => setUserCity(e.target.value)} className={inputCls}>
-                <option value="">— Sélectionner une ville —</option>
-                {SITES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <Select
+                value={userCity}
+                onChange={v => setUserCity(v)}
+                options={[{ value: '', label: '— Sélectionner une ville —' }, ...SITES.map(s => ({ value: s, label: s }))]}
+                size="md"
+              />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-600 dark:text-slate-500 mb-1 flex items-center gap-1">
                 <Cake size={11} /> Date de naissance
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={userBirthdate}
-                onChange={e => setUserBirthdate(e.target.value)}
-                className={inputCls}
+                onChange={v => setUserBirthdate(v)}
+                size="md"
               />
             </div>
           </div>
@@ -490,24 +493,31 @@ const Settings: React.FC = () => {
                       <input className={tableInputCls} placeholder="ID" value={editForm.loginId || ''} onChange={e => setEditForm({ ...editForm, loginId: e.target.value })} />
                     </td>
                     <td className="p-4">
-                      <select className={tableInputCls} value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value as UserRole })}>
-                        <option value="Master">Master</option>
-                        <option value="Administrator">Administrator</option>
-                        <option value="Director">Director</option>
-                        <option value="Coordinator">Coordinator</option>
-                        <option value="Digital Manager">Digital Manager</option>
-                        <option value="Guest">Guest</option>
-                        <option value="External">External</option>
-                      </select>
+                      <Select
+                        value={editForm.role ?? ''}
+                        onChange={v => setEditForm({ ...editForm, role: v as UserRole })}
+                        options={[
+                          { value: 'Master', label: 'Master' },
+                          { value: 'Administrator', label: 'Administrator' },
+                          { value: 'Director', label: 'Director' },
+                          { value: 'Coordinator', label: 'Coordinator' },
+                          { value: 'Digital Manager', label: 'Digital Manager' },
+                          { value: 'Guest', label: 'Guest' },
+                          { value: 'External', label: 'External' },
+                        ]}
+                        size="sm"
+                      />
                     </td>
                     <td className="p-4">
-                      <select className={tableInputCls} value={editPrefs.city} onChange={e => setEditPrefs({ ...editPrefs, city: e.target.value })}>
-                        <option value="">—</option>
-                        {SITES.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
+                      <Select
+                        value={editPrefs.city}
+                        onChange={v => setEditPrefs({ ...editPrefs, city: v })}
+                        options={[{ value: '', label: '—' }, ...SITES.map(s => ({ value: s, label: s }))]}
+                        size="sm"
+                      />
                     </td>
                     <td className="p-4">
-                      <input type="date" className={tableInputCls} value={editPrefs.birthdate} onChange={e => setEditPrefs({ ...editPrefs, birthdate: e.target.value })} />
+                      <DatePicker value={editPrefs.birthdate} onChange={v => setEditPrefs({ ...editPrefs, birthdate: v })} size="sm" />
                     </td>
                     <td className="p-4">
                       <input className={tableInputCls} placeholder="Mot de passe" value={editForm.password || ''} onChange={e => setEditForm({ ...editForm, password: e.target.value })} />
@@ -537,24 +547,31 @@ const Settings: React.FC = () => {
                           <input className={editInputCls} value={editForm.loginId || ''} onChange={e => setEditForm({ ...editForm, loginId: e.target.value })} />
                         </td>
                         <td className="p-4">
-                          <select className={editInputCls} value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value as UserRole })}>
-                            <option value="Master">Master</option>
-                            <option value="Administrator">Administrator</option>
-                            <option value="Director">Director</option>
-                            <option value="Coordinator">Coordinator</option>
-                            <option value="Digital Manager">Digital Manager</option>
-                            <option value="Guest">Guest</option>
-                            <option value="External">External</option>
-                          </select>
+                          <Select
+                            value={editForm.role ?? ''}
+                            onChange={v => setEditForm({ ...editForm, role: v as UserRole })}
+                            options={[
+                              { value: 'Master', label: 'Master' },
+                              { value: 'Administrator', label: 'Administrator' },
+                              { value: 'Director', label: 'Director' },
+                              { value: 'Coordinator', label: 'Coordinator' },
+                              { value: 'Digital Manager', label: 'Digital Manager' },
+                              { value: 'Guest', label: 'Guest' },
+                              { value: 'External', label: 'External' },
+                            ]}
+                            size="sm"
+                          />
                         </td>
                         <td className="p-4">
-                          <select className={editInputCls} value={editPrefs.city} onChange={e => setEditPrefs({ ...editPrefs, city: e.target.value })}>
-                            <option value="">—</option>
-                            {SITES.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
+                          <Select
+                            value={editPrefs.city}
+                            onChange={v => setEditPrefs({ ...editPrefs, city: v })}
+                            options={[{ value: '', label: '—' }, ...SITES.map(s => ({ value: s, label: s }))]}
+                            size="sm"
+                          />
                         </td>
                         <td className="p-4">
-                          <input type="date" className={editInputCls} value={editPrefs.birthdate} onChange={e => setEditPrefs({ ...editPrefs, birthdate: e.target.value })} />
+                          <DatePicker value={editPrefs.birthdate} onChange={v => setEditPrefs({ ...editPrefs, birthdate: v })} size="sm" />
                         </td>
                         <td className="p-4">
                           <input className={editInputCls} placeholder="Laisser vide si inchangé" value={editForm.password || ''} onChange={e => setEditForm({ ...editForm, password: e.target.value })} />
