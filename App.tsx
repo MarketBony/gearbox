@@ -16,6 +16,7 @@ import HelloMarketing from './pages/HelloMarketing';
 import Games from './pages/Games';
 import TodoList from './pages/TodoList';
 import Export, { EXPORT_ALLOWED_ROLES } from './pages/Export';
+import AnimatedBackground from './components/AnimatedBackground';
 import { db } from './services/dataService';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -82,6 +83,7 @@ const InnerApp: React.FC = () => {
 
   return (
     <div className="flex h-screen text-bony-text font-sans selection:bg-blue-500/30 transition-colors duration-300">
+      <AnimatedBackground />
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       <main className="flex-1 ml-0 md:ml-20 lg:ml-56 relative overflow-hidden pb-16 md:pb-0">
         <AnimatePresence mode="wait">

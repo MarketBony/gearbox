@@ -296,41 +296,69 @@
         transition: background-color 0.3s ease, color 0.3s ease;
       }
 
-      /* Fond animé subtil : deux couches de formes floues (charte orange/violet/bleu) qui
-         dérivent lentement et indépendamment en TRANSFORM (pas de background-position →
-         pas de repaint). Très discret, derrière l'app, pour faire ressortir le verre.
-         Login n'est pas concerné (son canvas recouvre le viewport). Gelé par
-         prefers-reduced-motion via la règle globale ci-dessus. */
-      body::before, body::after {
-        content: '';
+      /* ===================== FOND ANIMÉ (blobs charte) =====================
+         Grandes formes floues (orange / orange→violet / violet / bleu) réparties sur
+         tout le viewport, dérive lente et VISIBLE, animée uniquement en transform
+         (translate/scale) → pas de repaint. Rendu par <AnimatedBackground> côté React
+         (monté uniquement dans l'app authentifiée, donc PAS sur Login). Gelé par
+         prefers-reduced-motion via la règle globale ci-dessus (palette conservée). */
+      :root      { --bg-blob-op: 0.40; } /* clair : plus faible pour la lisibilité */
+      html.dark  { --bg-blob-op: 0.60; } /* sombre : plus riche */
+
+      .gx-bg {
         position: fixed;
-        inset: -30%;
+        inset: 0;
         z-index: -1;
+        overflow: hidden;
         pointer-events: none;
-        background-repeat: no-repeat;
+        contain: strict;
+      }
+      .gx-blob {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(90px);
+        opacity: var(--bg-blob-op);
         will-change: transform;
       }
-      /* Couche 1 : orange (haut-gauche) + touche bleu (haut-droite) */
-      body::before {
-        background-image:
-          radial-gradient(38% 42% at 20% 22%,  var(--wash-1), transparent 60%),
-          radial-gradient(32% 36% at 82% 14%,  var(--wash-3), transparent 62%);
-        animation: gx-bg-drift-a 46s ease-in-out infinite alternate;
+      /* A — orange → violet, haut-gauche */
+      .gx-blob-a {
+        top: -20vh; left: -12vw; width: 72vw; height: 72vh;
+        background: radial-gradient(circle at 35% 35%, #f75632, #8f12ab 70%, transparent 74%);
+        animation: gx-blob-a 34s ease-in-out infinite;
       }
-      /* Couche 2 : violet (bas-droite) + orange (bas-gauche), dérive opposée + lente */
-      body::after {
-        background-image:
-          radial-gradient(40% 44% at 80% 82%,  var(--wash-2), transparent 60%),
-          radial-gradient(30% 34% at 24% 88%,  var(--wash-1), transparent 64%);
-        animation: gx-bg-drift-b 61s ease-in-out infinite alternate;
+      /* B — violet, bas-droite */
+      .gx-blob-b {
+        bottom: -25vh; right: -12vw; width: 78vw; height: 78vh;
+        background: radial-gradient(circle, #8f12ab, transparent 70%);
+        animation: gx-blob-b 47s ease-in-out infinite; animation-delay: -12s;
       }
-      @keyframes gx-bg-drift-a {
-        from { transform: translate3d(-3%, -2%, 0) scale(1); }
-        to   { transform: translate3d(4%, 3%, 0)  scale(1.08); }
+      /* C — bleu (touche charte), centre / diagonale */
+      .gx-blob-c {
+        top: 18vh; left: 28vw; width: 62vw; height: 62vh;
+        background: radial-gradient(circle, #293f74, transparent 68%);
+        animation: gx-blob-c 58s ease-in-out infinite; animation-delay: -26s;
       }
-      @keyframes gx-bg-drift-b {
-        from { transform: translate3d(3%, 2%, 0)  scale(1.05); }
-        to   { transform: translate3d(-4%, -3%, 0) scale(1); }
+      /* D — orange, bas-gauche (renfort palette + zone visible sous la sidebar) */
+      .gx-blob-d {
+        bottom: -18vh; left: -8vw; width: 58vw; height: 62vh;
+        background: radial-gradient(circle, #f75632, transparent 70%);
+        animation: gx-blob-a 41s ease-in-out infinite reverse; animation-delay: -8s;
+      }
+      @keyframes gx-blob-a {
+        0%   { transform: translate(0, 0) scale(1); }
+        33%  { transform: translate(12vw, 9vh) scale(1.15); }
+        66%  { transform: translate(4vw, 15vh) scale(0.95); }
+        100% { transform: translate(0, 0) scale(1); }
+      }
+      @keyframes gx-blob-b {
+        0%   { transform: translate(0, 0) scale(1); }
+        50%  { transform: translate(-14vw, -10vh) scale(1.12); }
+        100% { transform: translate(0, 0) scale(1); }
+      }
+      @keyframes gx-blob-c {
+        0%   { transform: translate(0, 0) scale(1); }
+        50%  { transform: translate(11vw, -12vh) scale(1.2); }
+        100% { transform: translate(0, 0) scale(1); }
       }
 
       /* Transitions douces pour les éléments de thème */
