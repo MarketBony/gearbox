@@ -28,7 +28,7 @@ export const BRANDS: BrandType[] = ['Renault', 'Dacia', 'Alpine', 'Nissan', 'Mob
 
 export const PROJECT_TYPES: ProjectType[] = ['Partenariat', 'Expo/Salon', 'Animation Co', 'OP Clients', 'Contenu', 'Collaborateurs'];
 
-export const TASK_CHANNELS: TaskChannel[] = ['SMS', 'E-mail', 'GMB', 'Radio', 'Print', 'Affichage', 'Presse', 'Street Market', 'PLV'];
+export const TASK_CHANNELS: TaskChannel[] = ['SMS', 'E-mail', 'GMB', 'Radio', 'Print', 'Affichage', 'Presse', 'Street Market', 'PLV', 'Traiteur', 'Audiovisuel', 'Mobilier', 'Lieu'];
 
 export const SERVICE_COLORS: Record<ServiceType, string> = {
   VN: 'text-bony-blue border-bony-blue bg-bony-blue/10',

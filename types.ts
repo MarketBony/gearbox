@@ -21,7 +21,7 @@ export type BrandType = 'Renault' | 'Dacia' | 'Alpine' | 'Nissan' | 'Mobilize' |
 
 export type ProjectType = 'Partenariat' | 'Expo/Salon' | 'Animation Co' | 'OP Clients' | 'Contenu' | 'Collaborateurs';
 
-export type TaskChannel = '' | 'SMS' | 'E-mail' | 'GMB' | 'Radio' | 'Print' | 'Affichage' | 'Presse' | 'Street Market' | 'PLV';
+export type TaskChannel = '' | 'SMS' | 'E-mail' | 'GMB' | 'Radio' | 'Print' | 'Affichage' | 'Presse' | 'Street Market' | 'PLV' | 'Traiteur' | 'Audiovisuel' | 'Mobilier' | 'Lieu';
 
 export type TaskStatus = 'Todo' | 'InProgress' | 'Done' | 'Programmed' | 'Empty';
 
@@ -40,6 +40,7 @@ export interface User {
 export interface Task {
   id: string;
   name: string;
+  provider?: string; // Prestataire (texte libre, optionnel — tâches existantes sans ce champ = undefined)
   channel: TaskChannel;
   cost: number;
   status: TaskStatus;

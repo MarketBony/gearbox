@@ -1465,6 +1465,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                     <tr>
                                         <th className="p-3 w-10"></th>
                                         <th className="p-3">Nom de la tâche</th>
+                                        <th className="p-3 w-40">Prestataire</th>
                                         <th className="p-3 w-32">Canal</th>
                                         <th className="p-3 w-40">Statut</th>
                                         <th className="p-3 w-36">Assigné</th>
@@ -1483,6 +1484,16 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                     value={task.name}
                                                     onChange={(e) => updateTask(task.id, 'name', e.target.value)}
                                                     placeholder="Description de la tâche..."
+                                                    className="w-full bg-transparent outline-none text-bony-text text-sm placeholder-slate-400 disabled:opacity-50"
+                                                />
+                                            </td>
+                                            <td className="p-3">
+                                                <input
+                                                    type="text"
+                                                    disabled={!canEdit}
+                                                    value={task.provider || ''}
+                                                    onChange={(e) => updateTask(task.id, 'provider', e.target.value)}
+                                                    placeholder="Prestataire..."
                                                     className="w-full bg-transparent outline-none text-bony-text text-sm placeholder-slate-400 disabled:opacity-50"
                                                 />
                                             </td>
@@ -1551,7 +1562,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                     ))}
                                     {selectedProject.tasks.length === 0 && (
                                         <tr>
-                                            <td colSpan={7} className="p-8 text-center text-slate-500 text-sm italic">
+                                            <td colSpan={8} className="p-8 text-center text-slate-500 text-sm italic">
                                                 Aucune tâche définie. Ajoutez des tâches pour piloter le budget et l'avancement.
                                             </td>
                                         </tr>
