@@ -10,6 +10,7 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
+import Select from '../components/Select';
 
 type Tab = 'Provisions' | 'Suivi';
 
@@ -981,48 +982,54 @@ const Budget: React.FC = () => {
               {/* PRO+ (B2B) — 3 états */}
               <div className="flex flex-col gap-1">
                   <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">PRO+ (B2B)</span>
-                  <select
-                      value={filterProPlus}
-                      onChange={(e) => setFilterProPlus(e.target.value as 'all' | 'pro' | 'standard')}
-                      className={`bg-slate-100 dark:bg-black/20 border rounded-lg px-2 py-1 text-xs text-bony-text outline-none focus:border-bony-violet font-sans cursor-pointer transition-colors ${filterProPlus !== 'all' ? 'border-bony-orange' : 'border-bony-border'}`}
-                  >
-                      <option value="all">Tout</option>
-                      <option value="standard">Sans PRO+</option>
-                      <option value="pro">PRO+ uniquement</option>
-                  </select>
+                  <div className="w-40">
+                      <Select
+                          size="sm"
+                          value={filterProPlus}
+                          onChange={(v) => setFilterProPlus(v as 'all' | 'pro' | 'standard')}
+                          options={[
+                              { value: 'all', label: 'Tout' },
+                              { value: 'standard', label: 'Sans PRO+' },
+                              { value: 'pro', label: 'PRO+ uniquement' },
+                          ]}
+                      />
+                  </div>
               </div>
               <div className="w-px self-stretch bg-bony-border/50 hidden md:block my-0.5" />
               {/* Année */}
               <div className="flex flex-col gap-1">
                   <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Année</span>
-                  <select
-                      value={filterYear}
-                      onChange={(e) => setFilterYear(Number(e.target.value))}
-                      className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-2 py-1 text-xs text-bony-text outline-none focus:border-bony-violet font-sans"
-                  >
-                      {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
+                  <div className="w-24">
+                      <Select
+                          size="sm"
+                          value={String(filterYear)}
+                          onChange={(v) => setFilterYear(Number(v))}
+                          options={YEARS.map(y => ({ value: String(y), label: String(y) }))}
+                      />
+                  </div>
               </div>
               <div className="w-px self-stretch bg-bony-border/50 hidden md:block my-0.5" />
               {/* Période mensuelle */}
               <div className="flex flex-col gap-1">
                   <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Période</span>
                   <div className="flex items-center gap-1">
-                      <select
-                          value={filterMonthStart}
-                          onChange={(e) => { const v = Number(e.target.value); setFilterMonthStart(v); if (v > filterMonthEnd) setFilterMonthEnd(v); }}
-                          className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-2 py-1 text-xs text-bony-text outline-none focus:border-bony-violet"
-                      >
-                          {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
-                      </select>
+                      <div className="w-32">
+                          <Select
+                              size="sm"
+                              value={String(filterMonthStart)}
+                              onChange={(v) => { const n = Number(v); setFilterMonthStart(n); if (n > filterMonthEnd) setFilterMonthEnd(n); }}
+                              options={MONTHS.map((m, i) => ({ value: String(i), label: m }))}
+                          />
+                      </div>
                       <span className="text-slate-400 text-xs">→</span>
-                      <select
-                          value={filterMonthEnd}
-                          onChange={(e) => { const v = Number(e.target.value); setFilterMonthEnd(v); if (v < filterMonthStart) setFilterMonthStart(v); }}
-                          className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-2 py-1 text-xs text-bony-text outline-none focus:border-bony-violet"
-                      >
-                          {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
-                      </select>
+                      <div className="w-32">
+                          <Select
+                              size="sm"
+                              value={String(filterMonthEnd)}
+                              onChange={(v) => { const n = Number(v); setFilterMonthEnd(n); if (n < filterMonthStart) setFilterMonthStart(n); }}
+                              options={MONTHS.map((m, i) => ({ value: String(i), label: m }))}
+                          />
+                      </div>
                   </div>
               </div>
               {/* Desktop reset */}
