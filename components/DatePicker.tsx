@@ -1,10 +1,8 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useRef, useEffect } from 'react';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { startOfMonth, startOfWeek, addDays, addMonths, isSameMonth, isSameDay, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { easeApple } from '../lib/motion';
+import FloatingPanel from './FloatingPanel';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const toISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -27,53 +25,13 @@ interface DatePickerProps {
 
 const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 'Choisir une date', className = '', size = 'md' }) => {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const selected = fromISO(value);
   const [viewMonth, setViewMonth] = useState<Date>(() => startOfMonth(selected ?? new Date()));
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const popRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (selected) setViewMonth(startOfMonth(selected));
   }, [value]);
-
-  const computePos = () => {
-    const el = triggerRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const PANEL_W = 300, PANEL_H = 360, GAP = 8;
-    let top = r.bottom + GAP;
-    if (top + PANEL_H > window.innerHeight && r.top - GAP - PANEL_H > 0) {
-      top = r.top - GAP - PANEL_H;
-    }
-    let left = r.left;
-    if (left + PANEL_W > window.innerWidth - 8) left = window.innerWidth - PANEL_W - 8;
-    if (left < 8) left = 8;
-    setPos({ top, left, width: r.width });
-  };
-
-  useLayoutEffect(() => {
-    if (open) computePos();
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (
-        popRef.current && !popRef.current.contains(e.target as Node) &&
-        triggerRef.current && !triggerRef.current.contains(e.target as Node)
-      ) setOpen(false);
-    };
-    const onScrollOrResize = () => setOpen(false);
-    document.addEventListener('mousedown', onDocClick);
-    window.addEventListener('resize', onScrollOrResize);
-    window.addEventListener('scroll', onScrollOrResize, true);
-    return () => {
-      document.removeEventListener('mousedown', onDocClick);
-      window.removeEventListener('resize', onScrollOrResize);
-      window.removeEventListener('scroll', onScrollOrResize, true);
-    };
-  }, [open]);
 
   const gridStart = startOfWeek(startOfMonth(viewMonth), { weekStartsOn: 1 });
   const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
@@ -102,18 +60,14 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
           : <span className="block truncate text-bony-muted">{placeholder}</span>}
       </button>
 
-      {createPortal(
-        <AnimatePresence>
-          {open && pos && (
-            <motion.div
-              ref={popRef}
-              initial={{ opacity: 0, y: -6, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.97 }}
-              transition={{ duration: 0.18, ease: easeApple }}
-              style={{ position: 'fixed', top: pos.top, left: pos.left, width: 300, transformOrigin: 'top' }}
-              className="z-[10000] glass-menu glass-sheen relative overflow-hidden rounded-3xl p-4"
-            >
+      <FloatingPanel
+        open={open}
+        onClose={() => setOpen(false)}
+        triggerRef={triggerRef}
+        width={300}
+        maxHeight={380}
+        className="rounded-3xl p-4"
+      >
               <div className="flex items-center justify-between mb-3">
                 <button type="button" onClick={() => setViewMonth(m => addMonths(m, -1))} className="p-1.5 rounded-full hover:bg-[var(--text-main)]/[0.08] text-bony-muted hover:text-bony-text transition-colors">
                   <ChevronLeft size={18} />
@@ -159,15 +113,11 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
               <button
                 type="button"
                 onClick={() => handlePick(new Date())}
-                className="w-full mt-3 py-2 rounded-full text-xs font-bold text-bony-orange hover:bg-bony-orange/[0.08] transition-colors"
+                className="w-full mt-3 py-2 rounded-full text-xs font-bold text-bony-orange hover:bg-bony-orange/[0.08] transition-colors shrink-0"
               >
                 Aujourd'hui
               </button>
-            </motion.div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
+      </FloatingPanel>
     </>
   );
 };

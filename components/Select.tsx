@@ -1,8 +1,6 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, Check, Search, X } from 'lucide-react';
-import { easeApple } from '../lib/motion';
+import FloatingPanel from './FloatingPanel';
 
 export interface SelectOption {
   value: string;
@@ -34,11 +32,9 @@ const Select: React.FC<SelectProps> = ({
   searchable,
 }) => {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number; flip: boolean } | null>(null);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const popRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const selectedValues: string[] = multiple
@@ -53,24 +49,6 @@ const Select: React.FC<SelectProps> = ({
     return options.filter(o => o.label.toLowerCase().includes(q));
   }, [options, query]);
 
-  const computePos = () => {
-    const el = triggerRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const PANEL_H = 300, GAP = 6;
-    const flip = r.bottom + GAP + PANEL_H > window.innerHeight && r.top - GAP - PANEL_H > 0;
-    const top = flip ? r.top - GAP : r.bottom + GAP;
-    let left = r.left;
-    const width = Math.max(r.width, 200);
-    if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8;
-    if (left < 8) left = 8;
-    setPos({ top, left, width, flip });
-  };
-
-  useLayoutEffect(() => {
-    if (open) computePos();
-  }, [open]);
-
   useEffect(() => {
     if (open) {
       setQuery('');
@@ -79,25 +57,6 @@ const Select: React.FC<SelectProps> = ({
       if (showSearch) requestAnimationFrame(() => searchRef.current?.focus());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (
-        popRef.current && !popRef.current.contains(e.target as Node) &&
-        triggerRef.current && !triggerRef.current.contains(e.target as Node)
-      ) setOpen(false);
-    };
-    const onScrollOrResize = () => setOpen(false);
-    document.addEventListener('mousedown', onDocClick);
-    window.addEventListener('resize', onScrollOrResize);
-    window.addEventListener('scroll', onScrollOrResize, true);
-    return () => {
-      document.removeEventListener('mousedown', onDocClick);
-      window.removeEventListener('resize', onScrollOrResize);
-      window.removeEventListener('scroll', onScrollOrResize, true);
-    };
   }, [open]);
 
   const commit = (v: string) => {
@@ -182,75 +141,60 @@ const Select: React.FC<SelectProps> = ({
         />
       </button>
 
-      {createPortal(
-        <AnimatePresence>
-          {open && pos && (
-            <motion.div
-              ref={popRef}
-              role="listbox"
+      <FloatingPanel
+        open={open}
+        onClose={() => setOpen(false)}
+        triggerRef={triggerRef}
+        role="listbox"
+        onKeyDown={onKeyDown}
+        minWidth={200}
+        className="rounded-2xl p-1.5"
+      >
+        {showSearch && (
+          <div className="relative mb-1.5 shrink-0">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-bony-muted" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setActiveIndex(0); }}
               onKeyDown={onKeyDown}
-              initial={{ opacity: 0, y: pos.flip ? 6 : -6, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: pos.flip ? 6 : -6, scale: 0.97 }}
-              transition={{ duration: 0.18, ease: easeApple }}
-              style={{
-                position: 'fixed',
-                left: pos.left,
-                width: pos.width,
-                transformOrigin: pos.flip ? 'bottom' : 'top',
-                ...(pos.flip ? { bottom: window.innerHeight - pos.top } : { top: pos.top }),
-              }}
-              className="z-[10000] glass-menu glass-sheen relative overflow-hidden rounded-2xl p-1.5"
-            >
-              {showSearch && (
-                <div className="relative mb-1.5">
-                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-bony-muted" />
-                  <input
-                    ref={searchRef}
-                    type="text"
-                    value={query}
-                    onChange={(e) => { setQuery(e.target.value); setActiveIndex(0); }}
-                    onKeyDown={onKeyDown}
-                    placeholder="Rechercher…"
-                    className="w-full bg-[var(--bg-input)] border border-bony-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-bony-text outline-none focus:border-bony-orange/60"
-                  />
-                </div>
-              )}
+              placeholder="Rechercher…"
+              className="w-full bg-[var(--bg-input)] border border-bony-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-bony-text outline-none focus:border-bony-orange/60"
+            />
+          </div>
+        )}
 
-              <div className="max-h-[280px] overflow-y-auto custom-scrollbar">
-                {filtered.length === 0 ? (
-                  <div className="px-3 py-4 text-center text-xs text-bony-muted italic">Aucun résultat.</div>
-                ) : (
-                  filtered.map((opt, i) => {
-                    const isSel = selectedValues.includes(opt.value);
-                    const isActive = i === activeIndex;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        role="option"
-                        aria-selected={isSel}
-                        onMouseEnter={() => setActiveIndex(i)}
-                        onClick={() => commit(opt.value)}
-                        className={`w-full text-left flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors
-                          ${isActive ? 'bg-[var(--text-main)]/[0.08]' : ''}
-                          ${isSel ? 'text-bony-orange font-bold' : 'text-bony-text'}`}
-                      >
-                        <span className="flex items-center gap-2 min-w-0 flex-1">
-                          {isSel && <span className="w-1.5 h-1.5 rounded-full gx-gradient shrink-0" />}
-                          <span className="truncate">{opt.label}</span>
-                        </span>
-                        {isSel && <Check size={15} className="text-bony-orange shrink-0" />}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </motion.div>
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-4 text-center text-xs text-bony-muted italic">Aucun résultat.</div>
+          ) : (
+            filtered.map((opt, i) => {
+              const isSel = selectedValues.includes(opt.value);
+              const isActive = i === activeIndex;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="option"
+                  aria-selected={isSel}
+                  onMouseEnter={() => setActiveIndex(i)}
+                  onClick={() => commit(opt.value)}
+                  className={`w-full text-left flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors
+                    ${isActive ? 'bg-[var(--text-main)]/[0.08]' : ''}
+                    ${isSel ? 'text-bony-orange font-bold' : 'text-bony-text'}`}
+                >
+                  <span className="flex items-center gap-2 min-w-0 flex-1">
+                    {isSel && <span className="w-1.5 h-1.5 rounded-full gx-gradient shrink-0" />}
+                    <span className="truncate">{opt.label}</span>
+                  </span>
+                  {isSel && <Check size={15} className="text-bony-orange shrink-0" />}
+                </button>
+              );
+            })
           )}
-        </AnimatePresence>,
-        document.body
-      )}
+        </div>
+      </FloatingPanel>
     </>
   );
 };
