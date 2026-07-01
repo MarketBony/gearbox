@@ -5,6 +5,7 @@ import { db } from '../services/dataService';
 import { Project, ServiceType, BrandType, ProjectType } from '../types';
 import { SERVICE_COLORS, BRANDS, SERVICES, PROJECT_TYPES, BRAND_COLORS } from '../constants';
 import { ChevronLeft, ChevronRight, Calendar, Filter, X } from 'lucide-react';
+import Select from '../components/Select';
 
 type ViewMode = 'Semaine' | 'Mois' | 'Trimestre' | 'Semestre' | 'Année';
 
@@ -604,24 +605,30 @@ const Agenda: React.FC = () => {
               <div className="glass-strong glass-sheen relative overflow-hidden rounded-lg p-3 flex flex-wrap gap-4 animate-in slide-in-from-top-2">
                   <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold text-slate-500 uppercase">Marque:</span>
-                      <select value={filterBrand} onChange={e => setFilterBrand(e.target.value as any)} className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1 text-xs text-slate-900 dark:text-white outline-none">
-                          <option value="All">Toutes</option>
-                          {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
-                      </select>
+                      <Select
+                          value={filterBrand}
+                          onChange={(v) => setFilterBrand(v as any)}
+                          options={[{ value: 'All', label: 'Toutes' }, ...BRANDS.map(b => ({ value: b, label: b }))]}
+                          size="sm"
+                      />
                   </div>
                   <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold text-slate-500 uppercase">Service:</span>
-                      <select value={filterService} onChange={e => setFilterService(e.target.value as any)} className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1 text-xs text-slate-900 dark:text-white outline-none">
-                          <option value="All">Tous</option>
-                          {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
+                      <Select
+                          value={filterService}
+                          onChange={(v) => setFilterService(v as any)}
+                          options={[{ value: 'All', label: 'Tous' }, ...SERVICES.map(s => ({ value: s, label: s }))]}
+                          size="sm"
+                      />
                   </div>
                   <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold text-slate-500 uppercase">Objet:</span>
-                      <select value={filterType} onChange={e => setFilterType(e.target.value as any)} className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1 text-xs text-slate-900 dark:text-white outline-none">
-                          <option value="All">Tous</option>
-                          {PROJECT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
+                      <Select
+                          value={filterType}
+                          onChange={(v) => setFilterType(v as any)}
+                          options={[{ value: 'All', label: 'Tous' }, ...PROJECT_TYPES.map(t => ({ value: t, label: t }))]}
+                          size="sm"
+                      />
                   </div>
               </div>
           )}
