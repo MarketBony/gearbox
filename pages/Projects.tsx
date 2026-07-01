@@ -271,6 +271,8 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  // Répartition budgétaire : bascule d'affichage/saisie (UI only) — le modèle reste en %
+  const [budgetDistMode, setBudgetDistMode] = useState<'%' | '€'>('%');
 
   // --- PERMISSIONS ---
   const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Coordinator';
@@ -1285,35 +1287,66 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                             {/* BUDGET ALLOCATION SECTION */}
                             {(selectedProject.sites && selectedProject.sites.length > 1) && (
                                 <div className="mt-6 pt-6 border-t border-bony-border animate-in fade-in">
-                                    <h4 className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-4 flex items-center gap-2">
-                                        <PieChart size={14} className="text-bony-orange"/> Répartition Budgétaire
-                                    </h4>
-                                    
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-[10px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-2">
+                                            <PieChart size={14} className="text-bony-orange"/> Répartition Budgétaire
+                                        </h4>
+                                        {/* Bascule d'affichage/saisie % ↔ € (UI uniquement, stockage en % inchangé) */}
+                                        <div className="flex items-center bg-slate-100 dark:bg-black/30 rounded-lg p-0.5 border border-bony-border">
+                                            {(['%', '€'] as const).map(m => (
+                                                <button
+                                                    key={m}
+                                                    onClick={() => setBudgetDistMode(m)}
+                                                    className={`px-2.5 py-0.5 text-[11px] font-bold rounded-md transition-colors ${budgetDistMode === m ? 'bg-bony-gradient text-white' : 'text-slate-500 hover:text-bony-text'}`}
+                                                >
+                                                    {m}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
                                     <div className="grid grid-cols-2 gap-4">
                                         {(selectedProject.sites || []).map(site => {
                                             const pct = (selectedProject.budgetDistribution || {})[site] || 0;
                                             const isFixed = selectedProject.site === 'GROUPE BONY' || selectedProject.site === 'GROUPE BONY (R/N)';
-                                            
+                                            const amount = Math.round(selectedProject.budgetActual * (pct / 100));
+                                            const euroMode = budgetDistMode === '€';
+                                            // En € : conversion immédiate montant → % stocké (garde le modèle en %). Division par zéro gérée.
+                                            const euroDisabled = isFixed || !canEdit || !(selectedProject.budgetActual > 0);
+
                                             return (
                                                 <div key={site} className="flex items-center gap-2">
                                                     <span className="text-xs font-bold text-slate-600 dark:text-slate-400 w-24 truncate" title={site}>{site}</span>
                                                     <div className="flex-1 flex items-center gap-2 bg-slate-100 dark:bg-black/30 rounded px-2 py-1 border border-bony-border">
-                                                        <input 
-                                                            type="number" 
-                                                            value={Number(pct.toFixed(2))}
-                                                            disabled={isFixed || !canEdit}
-                                                            onChange={(e) => updateBudgetDistribution(site, Number(e.target.value))}
-                                                            className="w-full bg-transparent text-xs font-bold text-right outline-none disabled:opacity-50"
-                                                        />
-                                                        <span className="text-[10px] text-slate-500">%</span>
+                                                        {euroMode ? (
+                                                            <input
+                                                                type="number"
+                                                                value={amount}
+                                                                disabled={euroDisabled}
+                                                                onChange={(e) => updateBudgetDistribution(site, selectedProject.budgetActual > 0 ? (Number(e.target.value) / selectedProject.budgetActual) * 100 : 0)}
+                                                                className="w-full bg-transparent text-xs font-bold text-right outline-none disabled:opacity-50"
+                                                            />
+                                                        ) : (
+                                                            <input
+                                                                type="number"
+                                                                value={Number(pct.toFixed(2))}
+                                                                disabled={isFixed || !canEdit}
+                                                                onChange={(e) => updateBudgetDistribution(site, Number(e.target.value))}
+                                                                className="w-full bg-transparent text-xs font-bold text-right outline-none disabled:opacity-50"
+                                                            />
+                                                        )}
+                                                        <span className="text-[10px] text-slate-500">{euroMode ? '€' : '%'}</span>
                                                     </div>
                                                     <div className="text-[10px] text-slate-400 w-16 text-right">
-                                                        {Math.round(selectedProject.budgetActual * (pct/100)).toLocaleString()} €
+                                                        {euroMode ? `${Number(pct.toFixed(1))} %` : `${amount.toLocaleString()} €`}
                                                     </div>
                                                 </div>
                                             );
                                         })}
                                     </div>
+                                    {budgetDistMode === '€' && !(selectedProject.budgetActual > 0) && (
+                                        <div className="mt-2 text-[10px] text-amber-500">Budget réalisé = 0 € : saisie en € indisponible (utilisez le mode %).</div>
+                                    )}
                                     
                                     <div className="mt-2 text-right text-[10px] text-slate-400">
                                         Total: <span className={`font-bold ${Math.abs(Object.values(selectedProject.budgetDistribution || {}).reduce((a,b)=>a+b,0) - 100) > 0.1 ? 'text-red-500' : 'text-emerald-500'}`}>
