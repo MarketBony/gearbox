@@ -31,6 +31,8 @@ import {
   ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Area
 } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
+import Select from '../components/Select';
+import DatePicker from '../components/DatePicker';
 
 // --- DATE HELPERS ---
 const toLocalIso = (d: Date): string =>
@@ -123,13 +125,11 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, o
       <div className="space-y-2">
         <div>
           <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Du</label>
-          <input type="date" value={startDate} onChange={e => onStartChange(e.target.value)}
-            className="w-full bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5 text-xs text-bony-text outline-none focus:border-bony-orange transition" />
+          <DatePicker value={startDate} onChange={v => onStartChange(v)} size="sm" />
         </div>
         <div>
           <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Au</label>
-          <input type="date" value={endDate} onChange={e => onEndChange(e.target.value)}
-            className="w-full bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5 text-xs text-bony-text outline-none focus:border-bony-orange transition" />
+          <DatePicker value={endDate} onChange={v => onEndChange(v)} size="sm" />
         </div>
       </div>
       <button onClick={close} className="w-full py-2 rounded-lg bg-bony-gradient text-white text-xs font-bold mt-1">
@@ -726,15 +726,16 @@ const Dashboard: React.FC = () => {
                  {/* 5. Filtre PRO+ (B2B) — 3 états */}
                  <div className="flex flex-col gap-1">
                      <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">PRO+ (B2B)</span>
-                     <select
+                     <Select
                          value={filterProPlus}
-                         onChange={(e) => setFilterProPlus(e.target.value as 'all' | 'pro' | 'standard')}
-                         className={`bg-slate-100 dark:bg-black/20 border rounded-lg px-2 py-1 text-xs font-bold text-bony-text outline-none focus:border-bony-orange cursor-pointer transition-colors ${filterProPlus !== 'all' ? 'border-bony-orange' : 'border-bony-border'}`}
-                     >
-                         <option value="all">Tout</option>
-                         <option value="standard">Sans PRO+</option>
-                         <option value="pro">PRO+ uniquement</option>
-                     </select>
+                         onChange={(v) => setFilterProPlus(v as 'all' | 'pro' | 'standard')}
+                         size="sm"
+                         options={[
+                             { value: 'all', label: 'Tout' },
+                             { value: 'standard', label: 'Sans PRO+' },
+                             { value: 'pro', label: 'PRO+ uniquement' },
+                         ]}
+                     />
                  </div>
              </div>
          </div>
