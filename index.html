@@ -302,8 +302,8 @@
          (translate/scale) → pas de repaint. Rendu par <AnimatedBackground> côté React
          (monté uniquement dans l'app authentifiée, donc PAS sur Login). Gelé par
          prefers-reduced-motion via la règle globale ci-dessus (palette conservée). */
-      :root      { --bg-blob-op: 0.40; } /* clair : plus faible pour la lisibilité */
-      html.dark  { --bg-blob-op: 0.60; } /* sombre : plus riche */
+      :root      { --bg-blob-op: 0.33; } /* clair : plus faible pour la lisibilité (~-17%) */
+      html.dark  { --bg-blob-op: 0.50; } /* sombre : plus riche (~-17%) */
 
       .gx-bg {
         position: fixed;
@@ -344,20 +344,21 @@
         background: radial-gradient(circle, #f75632, transparent 70%);
         animation: gx-blob-a 41s ease-in-out infinite reverse; animation-delay: -8s;
       }
+      /* Amplitude de dérive augmentée (~+40%) — mouvement plus perceptible, cycle lent */
       @keyframes gx-blob-a {
         0%   { transform: translate(0, 0) scale(1); }
-        33%  { transform: translate(12vw, 9vh) scale(1.15); }
-        66%  { transform: translate(4vw, 15vh) scale(0.95); }
+        33%  { transform: translate(17vw, 13vh) scale(1.18); }
+        66%  { transform: translate(6vw, 21vh) scale(0.92); }
         100% { transform: translate(0, 0) scale(1); }
       }
       @keyframes gx-blob-b {
         0%   { transform: translate(0, 0) scale(1); }
-        50%  { transform: translate(-14vw, -10vh) scale(1.12); }
+        50%  { transform: translate(-20vw, -15vh) scale(1.15); }
         100% { transform: translate(0, 0) scale(1); }
       }
       @keyframes gx-blob-c {
         0%   { transform: translate(0, 0) scale(1); }
-        50%  { transform: translate(11vw, -12vh) scale(1.2); }
+        50%  { transform: translate(16vw, -17vh) scale(1.24); }
         100% { transform: translate(0, 0) scale(1); }
       }
 
