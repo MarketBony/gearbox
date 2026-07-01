@@ -7,6 +7,8 @@ import { SocialPost, SocialStatus, SocialNetwork, BrandType, ServiceType, Social
 import { SOCIAL_STATUS_COLORS, BRANDS, SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTIONS, SITES, BRAND_COLORS } from '../constants';
 import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import Select from '../components/Select';
+import DatePicker from '../components/DatePicker';
 
 type Tab = 'Calendrier Editorial' | 'Planning Digital' | 'Archives' | 'Gestion des TAGS';
 type CalendarView = 'Mois' | 'Semaine';
@@ -410,24 +412,25 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
             <div className="w-32 flex flex-col gap-2 shrink-0">
                 <div className="relative">
                     <label className="text-[9px] text-slate-500 uppercase font-bold mb-0.5 block">Date</label>
-                    <input 
-                        type="date" 
-                        value={post.date}
-                        disabled={!canEdit}
-                        onChange={e => onUpdate({...post, date: e.target.value})}
-                        className="w-full bg-slate-100 dark:bg-black/40 border border-bony-border rounded px-2 py-1 text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/60 transition-colors"
-                    />
+                    {canEdit ? (
+                        <DatePicker
+                            value={post.date}
+                            onChange={v => onUpdate({...post, date: v})}
+                            size="sm"
+                        />
+                    ) : (
+                        <div className="w-full bg-[var(--bg-input)] border border-bony-border rounded-2xl px-3 py-2 text-sm text-bony-text">{post.date ? parseLocalDate(post.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : '—'}</div>
+                    )}
                 </div>
                 <div>
                     <label className="text-[9px] text-slate-500 uppercase font-bold mb-0.5 block">Statut</label>
-                    <select 
+                    <Select
                         value={post.status}
                         disabled={!canEdit}
-                        onChange={e => onUpdate({...post, status: e.target.value as SocialStatus})}
-                        className={`w-full text-[10px] font-bold uppercase py-1 px-2 rounded outline-none cursor-pointer border bg-white dark:bg-black ${borderClass} ${textColorClass}`}
-                    >
-                        {Object.keys(SOCIAL_STATUS_COLORS).map(s => <option key={s} value={s} className="bg-white dark:bg-gray-900 text-black dark:text-white">{s}</option>)}
-                    </select>
+                        onChange={v => onUpdate({...post, status: v as SocialStatus})}
+                        options={Object.keys(SOCIAL_STATUS_COLORS).map(s => ({ value: s, label: s }))}
+                        size="sm"
+                    />
                 </div>
             </div>
 
@@ -499,14 +502,13 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
 
             {/* COL 4: Details (Service, LOM, CO2, Target) */}
             <div className="w-40 flex flex-col gap-2 shrink-0">
-                 <select 
+                 <Select
                     value={post.service}
                     disabled={!canEdit}
-                    onChange={e => onUpdate({...post, service: e.target.value as ServiceType})}
-                    className="w-full bg-slate-100 dark:bg-black/40 border border-bony-border rounded px-2 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-bony-blue cursor-pointer hover:bg-slate-200 dark:hover:bg-black/60"
-                >
-                    {SERVICES.map(s => <option key={s} value={s} className="bg-white dark:bg-gray-900">{s}</option>)}
-                </select>
+                    onChange={v => onUpdate({...post, service: v as ServiceType})}
+                    options={SERVICES.map(s => ({ value: s, label: s }))}
+                    size="sm"
+                />
 
                 <div className="flex gap-1">
                     {(['Internet', 'Collaborateurs'] as const).map(t => (
@@ -527,24 +529,20 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                     ))}
                 </div>
 
-                <select 
+                <Select
                     value={post.lom}
                     disabled={!canEdit}
-                    onChange={e => onUpdate({...post, lom: e.target.value})}
-                    className="w-full bg-slate-100 dark:bg-black/40 border border-bony-border rounded px-2 py-1 text-[10px] text-slate-500 dark:text-slate-400 outline-none focus:border-bony-blue truncate hover:bg-slate-200 dark:hover:bg-black/60"
-                >
-                    <option value="" className="bg-white dark:bg-gray-900">Loi LOM...</option>
-                    {LOI_LOM_OPTIONS.map(l => <option key={l} value={l} className="bg-white dark:bg-gray-900">{l}</option>)}
-                </select>
-                <select 
+                    onChange={v => onUpdate({...post, lom: v})}
+                    options={[{ value: '', label: 'Loi LOM...' }, ...LOI_LOM_OPTIONS.map(l => ({ value: l, label: l }))]}
+                    size="sm"
+                />
+                <Select
                     value={post.co2}
                     disabled={!canEdit}
-                    onChange={e => onUpdate({...post, co2: e.target.value})}
-                    className="w-full bg-slate-100 dark:bg-black/40 border border-bony-border rounded px-2 py-1 text-[10px] text-slate-500 dark:text-slate-400 outline-none focus:border-bony-blue truncate hover:bg-slate-200 dark:hover:bg-black/60"
-                >
-                    <option value="" className="bg-white dark:bg-gray-900">Classe CO²...</option>
-                    {co2Options.map(c => <option key={c} value={c} className="bg-white dark:bg-gray-900">{c}</option>)}
-                </select>
+                    onChange={v => onUpdate({...post, co2: v})}
+                    options={[{ value: '', label: 'Classe CO²...' }, ...co2Options.map(c => ({ value: c, label: c }))]}
+                    size="sm"
+                />
             </div>
 
             {/* COL 5: Media & Actions */}
@@ -1211,15 +1209,18 @@ const Digital: React.FC = () => {
 
                   {/* Planning Filters */}
                   <div className="flex items-center gap-2">
-                      <select value={filterConcession} onChange={e => setFilterConcession(e.target.value)} className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-2 py-1.5 text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet">
-                          <option value="All">Tous Sites</option>
-                          {Object.entries(PLAQUES_STRUCTURE).map(([plaque, sites]) => (
-                              <optgroup key={plaque} label={plaque}>
-                                  <option value={plaque}>★ {plaque}</option>
-                                  {sites.map(s => <option key={s} value={s}>{s}</option>)}
-                              </optgroup>
-                          ))}
-                      </select>
+                      <Select
+                          value={filterConcession}
+                          onChange={v => setFilterConcession(v)}
+                          options={[
+                              { value: 'All', label: 'Tous Sites' },
+                              ...Object.entries(PLAQUES_STRUCTURE).flatMap(([plaque, sites]) => [
+                                  { value: plaque, label: `★ ${plaque}` },
+                                  ...sites.map(s => ({ value: s, label: s })),
+                              ]),
+                          ]}
+                          size="sm"
+                      />
                       <div className="hidden md:block text-xs text-slate-500 font-sans border-l border-bony-border pl-2 ml-2">
                           {filteredPosts.length} posts
                       </div>
@@ -1455,22 +1456,22 @@ const Digital: React.FC = () => {
 
                     {/* Filters — colonne sur mobile */}
                     <div className="flex flex-col md:flex-row gap-2">
-                        <select
-                            value={filterBrand}
-                            onChange={e => setFilterBrand(e.target.value as any)}
-                            className="w-full md:w-auto bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-3 py-2 text-xs text-slate-900 dark:text-bony-text outline-none focus:border-bony-violet"
-                        >
-                            <option value="All" className="bg-white dark:bg-gray-900">Toutes Marques</option>
-                            {BRANDS.map(b => <option key={b} value={b} className="bg-white dark:bg-gray-900">{b}</option>)}
-                        </select>
-                        <select
-                            value={filterService}
-                            onChange={e => setFilterService(e.target.value as any)}
-                            className="w-full md:w-auto bg-slate-100 dark:bg-black/30 border border-bony-border rounded px-3 py-2 text-xs text-slate-900 dark:text-bony-text outline-none focus:border-bony-violet"
-                        >
-                            <option value="All" className="bg-white dark:bg-gray-900">Tous Services</option>
-                            {SERVICES.map(s => <option key={s} value={s} className="bg-white dark:bg-gray-900">{s}</option>)}
-                        </select>
+                        <div className="w-full md:w-48">
+                            <Select
+                                value={filterBrand}
+                                onChange={v => setFilterBrand(v as any)}
+                                options={[{ value: 'All', label: 'Toutes Marques' }, ...BRANDS.map(b => ({ value: b, label: b }))]}
+                                size="sm"
+                            />
+                        </div>
+                        <div className="w-full md:w-48">
+                            <Select
+                                value={filterService}
+                                onChange={v => setFilterService(v as any)}
+                                options={[{ value: 'All', label: 'Tous Services' }, ...SERVICES.map(s => ({ value: s, label: s }))]}
+                                size="sm"
+                            />
+                        </div>
                     </div>
 
                     <div className="hidden md:flex flex-1"></div>
