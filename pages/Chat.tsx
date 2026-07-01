@@ -567,7 +567,7 @@ const Chat: React.FC = () => {
   // RENDER
   // ========================
   return (
-    <div className="flex h-screen overflow-hidden bg-bony-dark text-bony-text" onClick={() => setMenuMsgId(null)}>
+    <div className="flex h-screen overflow-hidden text-bony-text" onClick={() => setMenuMsgId(null)}>
 
       {/* ===== LEFT: CONVERSATION LIST ===== */}
       <div className={`${showMobileChat ? 'hidden md:flex' : 'flex'} w-full md:w-[280px] md:min-w-[280px] border-r border-bony-border flex-col bg-bony-panel h-full shrink-0`}>

@@ -573,7 +573,7 @@ const Material: React.FC = () => {
     };
 
     return (
-        <div className="flex h-screen overflow-hidden bg-bony-dark relative">
+        <div className="flex h-screen overflow-hidden relative">
             <div className="flex-1 flex flex-col h-full overflow-hidden">
                 
                 {/* Header */}

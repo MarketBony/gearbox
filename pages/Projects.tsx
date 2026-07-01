@@ -705,7 +705,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bony-dark relative">
+    <div className="flex h-screen overflow-hidden relative">
       
       {showCreateModal && (
           <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">

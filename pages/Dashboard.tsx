@@ -632,7 +632,7 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-bony-dark animate-fade-in font-sans">
+    <div className="flex flex-col h-screen overflow-hidden animate-fade-in font-sans">
       
       {/* --- HEADER: PILOTAGE BAR --- */}
       <div className="px-6 py-5 glass-strong border-b border-bony-border shrink-0 z-20 shadow-md transition-colors">

@@ -349,7 +349,7 @@ const Settings: React.FC = () => {
   const tableInputCls = 'bg-white dark:bg-black/40 border border-bony-orange/50 rounded p-1 text-slate-900 dark:text-white w-full text-sm';
 
   return (
-    <div className="p-3 md:p-8 h-screen overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-bony-dark animate-fade-in pb-20">
+    <div className="p-3 md:p-8 h-screen overflow-y-auto custom-scrollbar animate-fade-in pb-20">
       <h2 className="text-xl md:text-3xl text-slate-900 dark:text-white font-title mb-8 flex items-center gap-3">
         <UserIcon className="text-bony-violet" size={32} /> Paramètres du Compte
       </h2>

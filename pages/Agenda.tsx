@@ -556,7 +556,7 @@ const Agenda: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-bony-dark p-3 md:p-6 animate-fade-in">
+    <div className="h-screen flex flex-col p-3 md:p-6 animate-fade-in">
       
       {/* HEADER CONTROLS */}
       <div className="flex flex-col gap-4 mb-4 shrink-0">

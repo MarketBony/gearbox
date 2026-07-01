@@ -312,7 +312,7 @@ const Campaigns: React.FC = () => {
   );
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-bony-dark">
+    <div className="flex flex-col h-screen overflow-hidden">
       
       {/* --- GLOBAL CHART CONTROLS --- */}
       <div className="px-3 md:px-6 py-2 glass-strong border-b border-bony-border flex items-center justify-between shrink-0">

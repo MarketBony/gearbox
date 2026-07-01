@@ -131,7 +131,7 @@ const Expenses: React.FC = () => {
   ];
 
   return (
-    <div className="p-3 md:p-6 h-screen flex flex-col overflow-hidden animate-fade-in bg-bony-dark">
+    <div className="p-3 md:p-6 h-screen flex flex-col overflow-hidden animate-fade-in">
       {/* Header */}
       <div className="flex justify-between items-end mb-6 border-b border-bony-border pb-4 shrink-0">
         <div>
