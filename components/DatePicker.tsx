@@ -21,9 +21,11 @@ interface DatePickerProps {
   placeholder?: string;
   className?: string;
   size?: 'sm' | 'md';
+  /** Date minimale sélectionnable (ISO 'YYYY-MM-DD') — les jours antérieurs sont désactivés. */
+  minDate?: string;
 }
 
-const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 'Choisir une date', className = '', size = 'md' }) => {
+const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 'Choisir une date', className = '', size = 'md', minDate }) => {
   const [open, setOpen] = useState(false);
   const selected = fromISO(value);
   const [viewMonth, setViewMonth] = useState<Date>(() => startOfMonth(selected ?? new Date()));
@@ -37,10 +39,14 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
   const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
   const today = new Date();
 
+  const isDisabled = (d: Date) => !!minDate && toISO(d) < minDate;
+
   const handlePick = (d: Date) => {
+    if (isDisabled(d)) return;
     onChange(toISO(d));
     setOpen(false);
   };
+  const todayDisabled = isDisabled(new Date());
 
   const triggerPad = size === 'sm' ? 'py-1.5 pl-9 pr-3 text-xs' : 'py-3 pl-11 pr-4 text-sm';
   const iconLeft = size === 'sm' ? 'left-2.5' : 'left-3.5';
@@ -91,18 +97,22 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
                   const inMonth = isSameMonth(d, viewMonth);
                   const isSel = selected && isSameDay(d, selected);
                   const isToday = isSameDay(d, today);
+                  const disabled = isDisabled(d);
                   return (
                     <button
                       key={i}
                       type="button"
+                      disabled={disabled}
                       onClick={() => handlePick(d)}
                       className={`h-9 rounded-full text-[13px] font-semibold flex items-center justify-center transition-all
-                        ${isSel
-                          ? 'gx-gradient text-white shadow-glow'
-                          : inMonth
-                            ? 'text-bony-text hover:bg-[var(--text-main)]/[0.08]'
-                            : 'text-bony-muted/40 hover:bg-[var(--text-main)]/[0.05]'}
-                        ${isToday && !isSel ? 'ring-1 ring-bony-orange/50' : ''}`}
+                        ${disabled
+                          ? 'text-bony-muted/25 cursor-not-allowed line-through decoration-1'
+                          : isSel
+                            ? 'gx-gradient text-white shadow-glow'
+                            : inMonth
+                              ? 'text-bony-text hover:bg-[var(--text-main)]/[0.08]'
+                              : 'text-bony-muted/40 hover:bg-[var(--text-main)]/[0.05]'}
+                        ${isToday && !isSel && !disabled ? 'ring-1 ring-bony-orange/50' : ''}`}
                     >
                       {d.getDate()}
                     </button>
@@ -112,8 +122,9 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
 
               <button
                 type="button"
+                disabled={todayDisabled}
                 onClick={() => handlePick(new Date())}
-                className="w-full mt-3 py-2 rounded-full text-xs font-bold text-bony-orange hover:bg-bony-orange/[0.08] transition-colors shrink-0"
+                className={`w-full mt-3 py-2 rounded-full text-xs font-bold transition-colors shrink-0 ${todayDisabled ? 'text-bony-muted/30 cursor-not-allowed' : 'text-bony-orange hover:bg-bony-orange/[0.08]'}`}
               >
                 Aujourd'hui
               </button>

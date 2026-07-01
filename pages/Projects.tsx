@@ -1095,9 +1095,9 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                      <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2">Période</label>
                                      {canEdit ? (
                                          <div className="flex items-center gap-1.5">
-                                             <DatePicker size="sm" value={selectedProject.startDate} onChange={(v) => handleUpdateProject({...selectedProject, startDate: v})} placeholder="Début" />
+                                             <DatePicker size="sm" value={selectedProject.startDate} onChange={(v) => handleUpdateProject({...selectedProject, startDate: v, ...(v && selectedProject.endDate && v > selectedProject.endDate ? { endDate: v } : {})})} placeholder="Début" />
                                              <ArrowRight size={12} className="text-slate-400 shrink-0"/>
-                                             <DatePicker size="sm" value={selectedProject.endDate} onChange={(v) => handleUpdateProject({...selectedProject, endDate: v})} placeholder="Fin" />
+                                             <DatePicker size="sm" value={selectedProject.endDate} minDate={selectedProject.startDate} onChange={(v) => handleUpdateProject({...selectedProject, endDate: v})} placeholder="Fin" />
                                          </div>
                                      ) : (
                                          <div className="flex items-center gap-2 bg-[var(--bg-input)] border border-bony-border rounded-2xl px-3 h-[38px] text-xs font-bold text-bony-text">
