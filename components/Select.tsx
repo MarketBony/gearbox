@@ -171,7 +171,9 @@ const Select: React.FC<SelectProps> = ({
             <span className="text-bony-muted">{placeholder}</span>
           )
         ) : (
-          singleLabel ? <span>{singleLabel}</span> : <span className="text-bony-muted">{placeholder}</span>
+          singleLabel
+            ? <span className="block truncate">{singleLabel}</span>
+            : <span className="block truncate text-bony-muted">{placeholder}</span>
         )}
 
         <ChevronDown
@@ -198,7 +200,7 @@ const Select: React.FC<SelectProps> = ({
                 transformOrigin: pos.flip ? 'bottom' : 'top',
                 ...(pos.flip ? { bottom: window.innerHeight - pos.top } : { top: pos.top }),
               }}
-              className="z-[10000] glass-strong border border-bony-border rounded-2xl shadow-glass-lg p-1.5"
+              className="z-[10000] glass-menu glass-sheen relative overflow-hidden rounded-2xl p-1.5"
             >
               {showSearch && (
                 <div className="relative mb-1.5">
@@ -234,7 +236,7 @@ const Select: React.FC<SelectProps> = ({
                           ${isActive ? 'bg-[var(--text-main)]/[0.08]' : ''}
                           ${isSel ? 'text-bony-orange font-bold' : 'text-bony-text'}`}
                       >
-                        <span className="flex items-center gap-2 truncate">
+                        <span className="flex items-center gap-2 min-w-0 flex-1">
                           {isSel && <span className="w-1.5 h-1.5 rounded-full gx-gradient shrink-0" />}
                           <span className="truncate">{opt.label}</span>
                         </span>

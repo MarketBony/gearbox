@@ -98,8 +98,8 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
       >
         <Calendar size={iconSize} className={`absolute ${iconLeft} top-1/2 -translate-y-1/2 ${open ? 'text-bony-orange' : 'text-bony-muted'} transition-colors`} />
         {selected
-          ? <span>{format(selected, 'd MMM yyyy', { locale: fr })}</span>
-          : <span className="text-bony-muted">{placeholder}</span>}
+          ? <span className="block truncate">{format(selected, 'd MMM yyyy', { locale: fr })}</span>
+          : <span className="block truncate text-bony-muted">{placeholder}</span>}
       </button>
 
       {createPortal(
@@ -112,7 +112,7 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
               exit={{ opacity: 0, y: -6, scale: 0.97 }}
               transition={{ duration: 0.18, ease: easeApple }}
               style={{ position: 'fixed', top: pos.top, left: pos.left, width: 300, transformOrigin: 'top' }}
-              className="z-[10000] glass-strong border border-bony-border rounded-3xl shadow-glass-lg p-4"
+              className="z-[10000] glass-menu glass-sheen relative overflow-hidden rounded-3xl p-4"
             >
               <div className="flex items-center justify-between mb-3">
                 <button type="button" onClick={() => setViewMonth(m => addMonths(m, -1))} className="p-1.5 rounded-full hover:bg-[var(--text-main)]/[0.08] text-bony-muted hover:text-bony-text transition-colors">
