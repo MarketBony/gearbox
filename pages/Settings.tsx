@@ -356,7 +356,7 @@ const Settings: React.FC = () => {
 
       {/* SECTION 1: MY PROFILE */}
       <div className="max-w-4xl mx-auto gx-card p-6 mb-10 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1 h-full bg-bony-gradient" />
+        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-bony-orange to-bony-violet" />
 
         <div className="flex items-start gap-6 mb-6">
           {/* Clickable avatar */}

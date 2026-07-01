@@ -1037,7 +1037,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                         
                         {/* LEFT COLUMN: CONTEXT (White Panel in Light Mode) */}
                         <div className="md:col-span-8 bg-bony-panel border border-bony-border rounded-xl p-6 flex flex-col justify-between gap-6 relative overflow-hidden shadow-sm">
-                            <div className="absolute top-0 left-0 w-1 h-full bg-bony-gradient"></div>
+                            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-bony-orange to-bony-violet"></div>
 
                             <div className="flex flex-col md:flex-row gap-6 border-b border-bony-border pb-6">
                                 <div className="flex-1">
