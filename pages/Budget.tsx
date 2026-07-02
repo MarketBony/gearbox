@@ -650,7 +650,7 @@ const Budget: React.FC = () => {
                                  const totalAnnualSite = Object.values(budget.entries).flat().reduce((s, v) => s + v, 0);
                                  
                                  return (
-                                     <div key={budget.site} className="bg-bony-panel border border-bony-border rounded-lg overflow-hidden transition-all hover:border-bony-violet/30">
+                                     <div key={budget.site} className="gx-glass-panel rounded-lg overflow-hidden transition-all hover:border-bony-violet/30">
                                          <div 
                                             onClick={() => toggleSite(budget.site)}
                                             className="p-4 flex items-center justify-between cursor-pointer bg-slate-50 hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 transition-colors"
