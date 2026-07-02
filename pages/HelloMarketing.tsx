@@ -623,7 +623,7 @@ const WeatherTodayCard: React.FC<{
     new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
   );
   return (
-    <div className={`relative rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br ${bg} text-white h-full flex flex-col`}>
+    <div className={`relative rounded-2xl overflow-hidden shadow-lg border border-white/15 bg-gradient-to-br ${bg} text-white h-full flex flex-col`}>
       <button
         onClick={onRefresh}
         className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition text-white"
@@ -1098,7 +1098,7 @@ const ViennoiseriesSection: React.FC = () => {
   const badge    = BADGE_LIST[weekNumber % BADGE_LIST.length];
 
   return (
-    <div className="relative rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1 border border-orange-200/60 dark:border-orange-500/20 bg-gradient-to-br from-orange-50 to-white dark:from-orange-500/10 dark:to-bony-panel">
+    <div className="relative rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1 border border-orange-200/60 dark:border-orange-500/20 backdrop-blur-md bg-gradient-to-br from-orange-50/70 to-white/40 dark:from-orange-500/[0.14] dark:to-white/[0.04]">
       {loading ? (
         <div className="flex items-center justify-center flex-1 p-8"><Spinner /></div>
       ) : !designated ? (
