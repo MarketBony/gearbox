@@ -313,7 +313,7 @@ const Agenda: React.FC = () => {
 
   const renderGridHeader = (days: string[]) => {
       return (
-          <div className="grid grid-cols-7 border-b border-bony-border bg-[var(--bg-panel)] shrink-0">
+          <div className="grid grid-cols-7 border-b border-bony-border shrink-0">
               {days.map(d => (
                   <div key={d} className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase tracking-widest border-r border-bony-border last:border-r-0">
                       {d}
@@ -381,7 +381,7 @@ const Agenda: React.FC = () => {
                                   {week.map((day, dIdx) => {
                                       const isToday = isSameDay(day.date, new Date());
                                       return (
-                                          <div key={dIdx} className={`h-full ${!day.isCurrentMonth ? 'bg-slate-100/50 dark:bg-black/20' : 'bg-white/45 dark:bg-transparent'} ${isToday ? 'bg-bony-blue/10' : ''}`}>
+                                          <div key={dIdx} className={`h-full transition-colors ${!day.isCurrentMonth ? 'bg-slate-100/40 dark:bg-white/[0.02]' : 'bg-white/45 dark:bg-white/[0.04]'} ${isToday ? 'bg-bony-orange/[0.08] dark:bg-bony-orange/[0.12]' : ''}`}>
                                               <div className={`text-right text-xs font-sans font-bold p-1 ${isToday ? 'text-bony-orange' : 'text-slate-500'}`}>
                                                   {day.date.getDate()}
                                               </div>
@@ -452,7 +452,7 @@ const Agenda: React.FC = () => {
                           const day = addDays(startOfWeek, i);
                           const isToday = isSameDay(day, new Date());
                           return (
-                              <div key={i} className={`h-full ${isToday ? 'bg-bony-blue/5' : ''}`}></div>
+                              <div key={i} className={`h-full ${isToday ? 'bg-bony-orange/[0.08] dark:bg-bony-orange/[0.12]' : ''}`}></div>
                           );
                       })}
                  </div>
@@ -516,7 +516,7 @@ const Agenda: React.FC = () => {
 
       return (
           <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
-              <div className="flex border-b border-bony-border bg-[var(--bg-panel)] h-10 divide-x divide-bony-border shrink-0">
+              <div className="flex border-b border-bony-border h-10 divide-x divide-bony-border shrink-0">
                   {months.map(m => (
                       <div key={m.toISOString()} className="flex-1 flex items-center justify-center text-xs font-bold text-slate-400 uppercase tracking-widest">
                           {m.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}

@@ -376,7 +376,7 @@ const Material: React.FC = () => {
 
     const renderGridHeader = (days: Date[]) => {
         return (
-            <div className="grid grid-cols-7 border-b border-bony-border bg-[var(--bg-panel)] shrink-0">
+            <div className="grid grid-cols-7 border-b border-bony-border shrink-0">
                 {days.map(d => {
                     const isToday = isSameDay(d, new Date());
                     return (
@@ -426,7 +426,7 @@ const Material: React.FC = () => {
 
         return (
             <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
-                <div className="grid grid-cols-7 border-b border-bony-border bg-[var(--bg-panel)] shrink-0">
+                <div className="grid grid-cols-7 border-b border-bony-border shrink-0">
                     {daysHeader.map(d => (
                         <div key={d} className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase tracking-widest border-r border-bony-border last:border-r-0">
                             {d}
@@ -457,7 +457,7 @@ const Material: React.FC = () => {
                                         return (
                                             <div
                                                 key={dIdx}
-                                                className={`h-full ${!day.isCurrentMonth ? 'bg-slate-100/50 dark:bg-black/20' : 'bg-white/45 dark:bg-transparent'} ${isToday ? 'bg-bony-blue/10' : ''} hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer`}
+                                                className={`h-full ${!day.isCurrentMonth ? 'bg-slate-100/40 dark:bg-white/[0.02]' : 'bg-white/45 dark:bg-white/[0.04]'} ${isToday ? 'bg-bony-orange/[0.08] dark:bg-bony-orange/[0.12]' : ''} hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer`}
                                                 onClick={() => openBookingModal(undefined, day.date)}
                                             >
                                                 <div className={`text-right text-xs font-sans font-bold p-1 ${isToday ? 'text-bony-orange' : 'text-slate-500'}`}>
@@ -531,7 +531,7 @@ const Material: React.FC = () => {
                               return (
                                   <div 
                                     key={i} 
-                                    className={`h-full ${isToday ? 'bg-bony-blue/5' : ''} hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer`}
+                                    className={`h-full ${isToday ? 'bg-bony-orange/[0.08] dark:bg-bony-orange/[0.12]' : ''} hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer`}
                                     onClick={() => openBookingModal(undefined, day)}
                                   ></div>
                               );
