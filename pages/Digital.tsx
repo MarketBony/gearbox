@@ -403,7 +403,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
     };
 
     return (
-        <div className={`group relative flex items-start gap-4 bg-white dark:bg-bony-panel border-b border-bony-border hover:bg-slate-50 dark:hover:bg-[#252525] transition-colors p-3 ${post.archived ? 'opacity-60 grayscale' : ''}`}>
+        <div className={`group relative flex items-start gap-4 gx-glass-panel rounded-xl hover:bg-slate-50 dark:hover:bg-[#252525] transition-colors p-3 ${post.archived ? 'opacity-60 grayscale' : ''}`}>
             
             {/* Status Strip */}
             <div className={`w-1.5 self-stretch rounded-full ${stripColor} shrink-0 shadow-[0_0_10px_rgba(0,0,0,0.5)]`}></div>
@@ -1185,7 +1185,7 @@ const Digital: React.FC = () => {
         : `Semaine du ${getStartOfWeek(planningDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
 
       return (
-          <div className="flex flex-col flex-1 min-h-0 bg-bony-dark relative max-w-full overflow-x-hidden">
+          <div className="flex flex-col flex-1 min-h-0 relative max-w-full overflow-x-hidden">
               {renderTooltip()}
               
               {/* Controls */}
@@ -1320,7 +1320,7 @@ const Digital: React.FC = () => {
       const isArchivedView = activeTab === 'Archives';
 
       return (
-          <div className="flex-1 flex flex-col min-h-0 bg-bony-dark">
+          <div className="flex-1 flex flex-col min-h-0">
               {/* TABLE HEADER */}
               <div className="hidden md:flex items-center gap-4 px-6 py-3 border-b border-bony-border bg-slate-100 dark:bg-black/40 text-[10px] font-bold text-slate-500 uppercase tracking-widest sticky top-0 z-20 shadow-lg backdrop-blur-md">
                   <div className="w-1.5"></div>
