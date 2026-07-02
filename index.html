@@ -93,6 +93,12 @@
         --glass-menu-bg:     rgba(255,255,255,0.90);
         --glass-menu-border: rgba(255,255,255,0.90);
 
+        /* Verre pour CARTES DE CONTENU (KPI, graphiques, tableaux, panneaux de liste) :
+           translucide pour laisser deviner le fond animé, assez opaque pour des chiffres/
+           texte nets. Blur modéré (perf sur grandes surfaces). */
+        --panel-glass-bg:     rgba(255,255,255,0.62);
+        --panel-glass-border: rgba(255,255,255,0.65);
+
         /* Washes d'accent du fond (charte Bony : orange + violet + bleu) — plus présents */
         --wash-1: rgba(247,86,50,0.16);
         --wash-2: rgba(143,18,171,0.15);
@@ -116,6 +122,9 @@
 
         --glass-menu-bg:     rgba(24,24,30,0.92);
         --glass-menu-border: rgba(255,255,255,0.14);
+
+        --panel-glass-bg:     rgba(28,28,36,0.58);
+        --panel-glass-border: rgba(255,255,255,0.10);
 
         --wash-1: rgba(247,86,50,0.20);
         --wash-2: rgba(143,18,171,0.18);
@@ -224,14 +233,25 @@
         box-shadow: 0 1px 4px rgba(16,18,32,0.2), inset 0 2px 5px rgba(0,0,0,0.14);
       }
 
-      /* Carte de contenu standard (opaque, douce) — le verre reste un accent, pas le fond partout */
-      .gx-card {
-        background: var(--bg-panel);
-        border: 1px solid var(--border-color);
-        border-radius: 1.25rem; /* 20px */
-        box-shadow: 0 1px 2px rgba(16,18,32,0.04), 0 4px 16px rgba(16,18,32,0.06);
+      /* Carte de contenu en VERRE — translucide + flou modéré + saturation + reflet interne.
+         Laisse deviner le fond animé sans nuire à la lisibilité des chiffres/tableaux.
+         .gx-card impose son rayon ; .gx-glass-panel = même surface sans rayon forcé
+         (pour panneaux structurants à rayon/bordure propres). */
+      .gx-card, .gx-glass-panel {
+        background: var(--panel-glass-bg);
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        border: 1px solid var(--panel-glass-border);
+        box-shadow: 0 4px 20px -6px rgba(16,18,32,0.14), inset 0 1px 0 0 rgba(255,255,255,0.45);
       }
-      html.dark .gx-card { box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35); }
+      .gx-card { border-radius: 1.25rem; /* 20px */ }
+      html.dark .gx-card, html.dark .gx-glass-panel {
+        box-shadow: 0 8px 28px -8px rgba(0,0,0,0.5), inset 0 1px 0 0 rgba(255,255,255,0.08);
+      }
+      /* Fallback sans backdrop-filter : rendre opaque pour garantir la lisibilité */
+      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .gx-card, .gx-glass-panel { background: var(--bg-panel); }
+      }
 
       /* Élévation au survol — uniquement transform/box-shadow (60fps) */
       .gx-hover-lift {

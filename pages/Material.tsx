@@ -376,7 +376,7 @@ const Material: React.FC = () => {
 
     const renderGridHeader = (days: Date[]) => {
         return (
-            <div className="grid grid-cols-7 border-b border-bony-border bg-bony-panel shrink-0">
+            <div className="grid grid-cols-7 border-b border-bony-border bg-[var(--bg-panel)] shrink-0">
                 {days.map(d => {
                     const isToday = isSameDay(d, new Date());
                     return (
@@ -425,8 +425,8 @@ const Material: React.FC = () => {
         const filteredBookings = bookings.filter(b => selectedEquipmentId === 'All' || b.equipmentId === selectedEquipmentId);
 
         return (
-            <div className="flex flex-col h-full bg-bony-dark border border-bony-border rounded-b-xl overflow-hidden">
-                <div className="grid grid-cols-7 border-b border-bony-border bg-bony-panel shrink-0">
+            <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
+                <div className="grid grid-cols-7 border-b border-bony-border bg-[var(--bg-panel)] shrink-0">
                     {daysHeader.map(d => (
                         <div key={d} className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase tracking-widest border-r border-bony-border last:border-r-0">
                             {d}
@@ -521,7 +521,7 @@ const Material: React.FC = () => {
         const totalHeight = Math.max(500, (maxLane + 1) * (itemHeight + 4) + 20);
 
         return (
-            <div className="flex flex-col h-full bg-bony-dark border border-bony-border rounded-b-xl overflow-hidden">
+            <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
                  {renderGridHeader(days)}
                  <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-bony-dark">
                      {/* Columns Background */}

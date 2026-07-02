@@ -313,7 +313,7 @@ const Agenda: React.FC = () => {
 
   const renderGridHeader = (days: string[]) => {
       return (
-          <div className="grid grid-cols-7 border-b border-bony-border bg-bony-panel shrink-0">
+          <div className="grid grid-cols-7 border-b border-bony-border bg-[var(--bg-panel)] shrink-0">
               {days.map(d => (
                   <div key={d} className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase tracking-widest border-r border-bony-border last:border-r-0">
                       {d}
@@ -357,7 +357,7 @@ const Agenda: React.FC = () => {
       const daysHeader = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
 
       return (
-          <div className="flex flex-col h-full bg-bony-dark border border-bony-border rounded-b-xl overflow-hidden">
+          <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
               {renderGridHeader(daysHeader)}
               <div className="flex-1 flex flex-col bg-bony-border gap-[1px] overflow-y-auto custom-scrollbar">
                   {weeks.map((week, weekIdx) => {
@@ -443,7 +443,7 @@ const Agenda: React.FC = () => {
     const totalHeight = Math.max(500, (maxLane + 1) * (itemHeight + 4) + 20);
 
     return (
-        <div className="flex flex-col h-full bg-bony-dark border border-bony-border rounded-b-xl overflow-hidden">
+        <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
              {renderGridHeader(daysHeader)}
              <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-bony-dark">
                  {/* Columns Background */}
@@ -515,8 +515,8 @@ const Agenda: React.FC = () => {
       }
 
       return (
-          <div className="flex flex-col h-full bg-bony-dark border border-bony-border rounded-b-xl overflow-hidden">
-              <div className="flex border-b border-bony-border bg-bony-panel h-10 divide-x divide-bony-border shrink-0">
+          <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
+              <div className="flex border-b border-bony-border bg-[var(--bg-panel)] h-10 divide-x divide-bony-border shrink-0">
                   {months.map(m => (
                       <div key={m.toISOString()} className="flex-1 flex items-center justify-center text-xs font-bold text-slate-400 uppercase tracking-widest">
                           {m.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}

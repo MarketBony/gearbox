@@ -772,11 +772,11 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
 
       {/* List Panel — full width on mobile, resizable on desktop */}
       <div
-        className={`${selectedProject ? 'hidden md:flex' : 'flex'} flex-col bg-bony-panel border-r border-bony-border relative shrink-0`}
+        className={`${selectedProject ? 'hidden md:flex' : 'flex'} flex-col gx-glass-panel border-r border-bony-border relative shrink-0`}
         style={{ width: window.innerWidth >= 768 ? `${listWidth}px` : '100%' }}
       >
 
-        <div className="px-3 py-2.5 border-b border-bony-border space-y-2 bg-bony-panel z-20 shadow-sm">
+        <div className="px-3 py-2.5 border-b border-bony-border space-y-2 bg-[var(--bg-panel)] z-20 shadow-sm">
             <div className="flex justify-between items-center">
                 <h2 className="text-sm font-bold text-bony-text flex items-center gap-1.5">
                     {viewMode === 'archived' && <Archive size={14} className="text-slate-500"/>}
@@ -997,7 +997,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
       <div className={`${selectedProject ? 'flex' : 'hidden md:flex'} flex-1 flex-col h-full overflow-hidden`}>
         {selectedProject ? (
           <>
-            <div className="h-14 border-b border-bony-border flex items-center justify-between px-3 md:px-6 bg-bony-panel shrink-0 transition-colors">
+            <div className="h-14 border-b border-bony-border flex items-center justify-between px-3 md:px-6 glass-strong shrink-0 transition-colors">
                <div className="text-sm text-slate-400 flex items-center gap-2 md:gap-3 min-w-0">
                  <button
                    onClick={() => setSelectedProject(null)}
@@ -1055,7 +1055,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
                         
                         {/* LEFT COLUMN: CONTEXT (White Panel in Light Mode) */}
-                        <div className="md:col-span-8 bg-bony-panel border border-bony-border rounded-xl p-6 flex flex-col justify-between gap-6 relative overflow-hidden shadow-sm">
+                        <div className="md:col-span-8 gx-glass-panel border border-bony-border rounded-xl p-6 flex flex-col justify-between gap-6 relative overflow-hidden shadow-sm">
                             <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-bony-orange to-bony-violet"></div>
 
                             <div className="flex flex-col md:flex-row gap-6 border-b border-bony-border pb-6">
@@ -1358,7 +1358,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                         </div>
 
                         {/* RIGHT COLUMN: BUDGET CARD (Inverted for Light Mode or Keep Dark?) Let's adapt it properly */}
-                        <div className="md:col-span-4 bg-bony-panel border border-bony-border rounded-xl p-6 flex flex-col justify-between relative overflow-hidden group shadow-sm">
+                        <div className="md:col-span-4 gx-glass-panel border border-bony-border rounded-xl p-6 flex flex-col justify-between relative overflow-hidden group shadow-sm">
                              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
                                  <Coins size={100} className="text-bony-text"/>
                              </div>
@@ -1459,7 +1459,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                             )}
                         </div>
 
-                        <div className="bg-bony-panel rounded-xl border border-bony-border overflow-hidden shadow-sm">
+                        <div className="gx-glass-panel rounded-xl border border-bony-border overflow-hidden shadow-sm">
                             <table className="w-full text-left">
                                 <thead className="bg-slate-100 dark:bg-black/20 text-[10px] uppercase font-bold text-slate-500">
                                     <tr>

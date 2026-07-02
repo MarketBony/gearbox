@@ -640,7 +640,7 @@ const Campaigns: React.FC = () => {
               {/* Mobile card view */}
               <div className="md:hidden space-y-2">
                 {filteredCampaigns.map(c => (
-                  <div key={c.id} className="bg-bony-panel border border-bony-border rounded-lg p-3 space-y-2">
+                  <div key={c.id} className="gx-glass-panel border border-bony-border rounded-lg p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-bony-orange">{new Date(c.parentStartDate).toLocaleDateString('fr-FR')}</span>
                       <span className="text-xs font-bold text-slate-500">{c.channel}</span>
@@ -664,7 +664,7 @@ const Campaigns: React.FC = () => {
                     const borderHover = isEmail ? 'hover:border-bony-orange/50' : 'hover:border-bony-blue/50';
 
                     return (
-                        <div key={`${task.parentProjectId}-${task.id}-${idx}`} className={`bg-bony-panel border border-bony-border rounded-lg p-3 flex items-center gap-4 transition-all group ${borderHover}`}>
+                        <div key={`${task.parentProjectId}-${task.id}-${idx}`} className={`gx-glass-panel border border-bony-border rounded-lg p-3 flex items-center gap-4 transition-all group ${borderHover}`}>
                             
                             {/* DATE COLUMN */}
                             <div className="w-20 flex flex-col items-center justify-center border-r border-bony-border pr-4 shrink-0">

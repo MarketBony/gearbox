@@ -570,7 +570,7 @@ const Chat: React.FC = () => {
     <div className="flex h-screen overflow-hidden text-bony-text" onClick={() => setMenuMsgId(null)}>
 
       {/* ===== LEFT: CONVERSATION LIST ===== */}
-      <div className={`${showMobileChat ? 'hidden md:flex' : 'flex'} w-full md:w-[280px] md:min-w-[280px] border-r border-bony-border flex-col bg-bony-panel h-full shrink-0`}>
+      <div className={`${showMobileChat ? 'hidden md:flex' : 'flex'} w-full md:w-[280px] md:min-w-[280px] border-r border-bony-border flex-col gx-glass-panel h-full shrink-0`}>
 
         <div className="h-16 flex items-center justify-between px-4 border-b border-bony-border shrink-0">
           <h2 className="font-title text-lg text-bony-text flex items-center gap-2">
@@ -713,7 +713,7 @@ const Chat: React.FC = () => {
         {activeConv ? (
           <>
             {/* Header */}
-            <div className="h-16 flex items-center gap-3 px-4 border-b border-bony-border bg-bony-panel shrink-0 z-10">
+            <div className="h-16 flex items-center gap-3 px-4 border-b border-bony-border bg-[var(--bg-panel)] shrink-0 z-10">
               <button className="md:hidden p-2 rounded-lg text-slate-400 hover:text-bony-text hover:bg-white/5 transition" onClick={() => setShowMobileChat(false)}>
                 <ArrowLeft size={20} />
               </button>
@@ -959,7 +959,7 @@ const Chat: React.FC = () => {
 
               {/* Members panel (group) */}
               {showMembersPanel && activeConv.type === 'group' && (
-                <div className="w-60 border-l border-bony-border bg-bony-panel flex flex-col shrink-0 overflow-hidden">
+                <div className="w-60 border-l border-bony-border gx-glass-panel flex flex-col shrink-0 overflow-hidden">
                   <div className="p-4 border-b border-bony-border flex items-center justify-between shrink-0">
                     <h4 className="font-title text-sm text-bony-text">Membres ({activeMembers.length})</h4>
                     <button onClick={() => setShowMembersPanel(false)} className="text-slate-400 hover:text-bony-text"><X size={16} /></button>

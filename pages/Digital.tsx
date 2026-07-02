@@ -676,7 +676,7 @@ const TagsManager: React.FC<{
     };
 
     const renderList = (title: string, items: string[], type: 'networks' | 'co2', inputValue: string, setInput: (v: string) => void) => (
-        <div className="flex-1 bg-bony-panel border border-bony-border rounded-xl flex flex-col min-h-0 shadow-lg h-full overflow-hidden">
+        <div className="flex-1 gx-glass-panel border border-bony-border rounded-xl flex flex-col min-h-0 shadow-lg h-full overflow-hidden">
             <div className="p-4 border-b border-bony-border bg-slate-100 dark:bg-black/20 shrink-0">
                 <h3 className="text-sm font-bold text-bony-text uppercase tracking-widest flex items-center gap-2">
                     {type === 'networks' ? <Globe size={16} className="text-bony-violet"/> : <Settings size={16} className="text-bony-orange"/>}
