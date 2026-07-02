@@ -350,7 +350,7 @@ const Campaigns: React.FC = () => {
       </div>
 
       {/* --- DASHBOARD GRAPHIQUE (Fixed Height) --- */}
-      <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-bony-border bg-bony-dark shrink-0 md:h-64 h-auto">
+      <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-bony-border shrink-0 md:h-64 h-auto">
           
           {/* CHART 1: Nb Campagnes */}
           <div className="gx-card p-3 flex flex-col relative">
