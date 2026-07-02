@@ -570,7 +570,7 @@ const Chat: React.FC = () => {
     <div className="flex h-screen overflow-hidden text-bony-text" onClick={() => setMenuMsgId(null)}>
 
       {/* ===== LEFT: CONVERSATION LIST ===== */}
-      <div className={`${showMobileChat ? 'hidden md:flex' : 'flex'} w-full md:w-[280px] md:min-w-[280px] border-r border-bony-border flex-col gx-glass-panel h-full shrink-0`}>
+      <div className={`${showMobileChat ? 'hidden md:flex' : 'flex'} w-full md:w-[280px] md:min-w-[280px] border-r border-bony-border flex-col glass-strong h-full shrink-0`}>
 
         <div className="h-16 flex items-center justify-between px-4 border-b border-bony-border shrink-0">
           <h2 className="font-title text-lg text-bony-text flex items-center gap-2">
