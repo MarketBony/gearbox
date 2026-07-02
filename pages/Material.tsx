@@ -425,7 +425,7 @@ const Material: React.FC = () => {
         const filteredBookings = bookings.filter(b => selectedEquipmentId === 'All' || b.equipmentId === selectedEquipmentId);
 
         return (
-            <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
+            <div className="flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-b-xl overflow-hidden">
                 <div className="grid grid-cols-7 border-b border-bony-border shrink-0">
                     {daysHeader.map(d => (
                         <div key={d} className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase tracking-widest border-r border-bony-border last:border-r-0">
@@ -433,7 +433,7 @@ const Material: React.FC = () => {
                         </div>
                     ))}
                 </div>
-                <div ref={scrollRef} className="flex-1 flex flex-col bg-bony-border gap-[1px] overflow-y-auto custom-scrollbar">
+                <div ref={scrollRef} className="flex-1 flex flex-col gap-[1px] overflow-y-auto custom-scrollbar">
                     {weeks.map((week, weekIdx) => {
                         const weekStart = week[0].date;
                         const weekEnd = week[6].date;
@@ -521,7 +521,7 @@ const Material: React.FC = () => {
         const totalHeight = Math.max(500, (maxLane + 1) * (itemHeight + 4) + 20);
 
         return (
-            <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
+            <div className="flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-b-xl overflow-hidden">
                  {renderGridHeader(days)}
                  <div className="flex-1 overflow-y-auto custom-scrollbar relative">
                      {/* Columns Background */}

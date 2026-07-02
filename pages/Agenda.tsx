@@ -357,9 +357,9 @@ const Agenda: React.FC = () => {
       const daysHeader = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
 
       return (
-          <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
+          <div className="flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-b-xl overflow-hidden">
               {renderGridHeader(daysHeader)}
-              <div className="flex-1 flex flex-col bg-bony-border gap-[1px] overflow-y-auto custom-scrollbar">
+              <div className="flex-1 flex flex-col gap-[1px] overflow-y-auto custom-scrollbar">
                   {weeks.map((week, weekIdx) => {
                       const weekStart = week[0].date;
                       const weekEnd = week[6].date;
@@ -443,7 +443,7 @@ const Agenda: React.FC = () => {
     const totalHeight = Math.max(500, (maxLane + 1) * (itemHeight + 4) + 20);
 
     return (
-        <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
+        <div className="flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-b-xl overflow-hidden">
              {renderGridHeader(daysHeader)}
              <div className="flex-1 overflow-y-auto custom-scrollbar relative">
                  {/* Columns Background */}
@@ -515,7 +515,7 @@ const Agenda: React.FC = () => {
       }
 
       return (
-          <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
+          <div className="flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-b-xl overflow-hidden">
               <div className="flex border-b border-bony-border h-10 divide-x divide-bony-border shrink-0">
                   {months.map(m => (
                       <div key={m.toISOString()} className="flex-1 flex items-center justify-center text-xs font-bold text-slate-400 uppercase tracking-widest">
@@ -523,7 +523,7 @@ const Agenda: React.FC = () => {
                       </div>
                   ))}
               </div>
-              <div className="flex-1 relative overflow-y-auto custom-scrollbar bg-slate-50/50 dark:bg-black/20 p-4">
+              <div className="flex-1 relative overflow-y-auto custom-scrollbar bg-slate-50/40 dark:bg-black/10 p-4">
                   <div className="absolute inset-0 flex divide-x divide-bony-border/30 pointer-events-none">
                       {months.map(m => <div key={m.toISOString()} className="flex-1"></div>)}
                   </div>
