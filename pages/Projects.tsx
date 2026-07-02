@@ -1578,7 +1578,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                             value={selectedProject.description}
                             disabled={!canEdit}
                             onChange={(e) => handleUpdateProject({...selectedProject, description: e.target.value})}
-                            className="w-full h-32 bg-bony-panel border border-bony-border rounded-lg p-4 text-bony-text outline-none focus:border-bony-blue resize-none leading-relaxed text-sm disabled:opacity-50 shadow-sm"
+                            className="w-full h-32 gx-glass-panel rounded-lg p-4 text-bony-text outline-none focus:border-bony-blue resize-none leading-relaxed text-sm disabled:opacity-50"
                             placeholder="Contexte général du projet..."
                         />
                     </div>
