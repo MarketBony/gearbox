@@ -375,13 +375,13 @@ const Agenda: React.FC = () => {
                       const contentHeight = Math.max(minHeight, headerHeight + (maxLane + 1) * itemHeight + 10);
 
                       return (
-                          <div key={weekIdx} className="relative bg-bony-dark w-full" style={{ height: `${contentHeight}px` }}>
+                          <div key={weekIdx} className="relative w-full" style={{ height: `${contentHeight}px` }}>
                               {/* Grid Background */}
                               <div className="absolute inset-0 grid grid-cols-7 divide-x divide-bony-border/30">
                                   {week.map((day, dIdx) => {
                                       const isToday = isSameDay(day.date, new Date());
                                       return (
-                                          <div key={dIdx} className={`h-full ${!day.isCurrentMonth ? 'bg-slate-100 dark:bg-black/20' : 'bg-white dark:bg-transparent'} ${isToday ? 'bg-bony-blue/5' : ''}`}>
+                                          <div key={dIdx} className={`h-full ${!day.isCurrentMonth ? 'bg-slate-100/50 dark:bg-black/20' : 'bg-white/45 dark:bg-transparent'} ${isToday ? 'bg-bony-blue/10' : ''}`}>
                                               <div className={`text-right text-xs font-sans font-bold p-1 ${isToday ? 'text-bony-orange' : 'text-slate-500'}`}>
                                                   {day.date.getDate()}
                                               </div>
@@ -445,7 +445,7 @@ const Agenda: React.FC = () => {
     return (
         <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
              {renderGridHeader(daysHeader)}
-             <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-bony-dark">
+             <div className="flex-1 overflow-y-auto custom-scrollbar relative">
                  {/* Columns Background */}
                  <div className="absolute inset-0 grid grid-cols-7 divide-x divide-bony-border/30 h-full" style={{minHeight: totalHeight}}>
                       {Array.from({length: 7}).map((_, i) => {
@@ -523,7 +523,7 @@ const Agenda: React.FC = () => {
                       </div>
                   ))}
               </div>
-              <div className="flex-1 relative overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-black/20 p-4">
+              <div className="flex-1 relative overflow-y-auto custom-scrollbar bg-slate-50/50 dark:bg-black/20 p-4">
                   <div className="absolute inset-0 flex divide-x divide-bony-border/30 pointer-events-none">
                       {months.map(m => <div key={m.toISOString()} className="flex-1"></div>)}
                   </div>

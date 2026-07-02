@@ -1094,7 +1094,7 @@ const Digital: React.FC = () => {
                       return (
                           <div 
                               key={day.toISOString()} 
-                              className={`min-h-[80px] lg:min-h-[140px] bg-white dark:bg-bony-panel border rounded-lg p-1 lg:p-2 flex flex-col gap-0.5 lg:gap-1 transition-all ${isToday ? 'border-bony-orange/50 ring-1 ring-bony-orange/20' : 'border-bony-border'}`}
+                              className={`min-h-[80px] lg:min-h-[140px] bg-white/45 dark:bg-white/[0.04] border rounded-lg p-1 lg:p-2 flex flex-col gap-0.5 lg:gap-1 transition-all ${isToday ? 'border-bony-orange/50 ring-1 ring-bony-orange/20' : 'border-bony-border'}`}
                           >
                               <div className={`text-right text-[10px] font-bold mb-0.5 ${isToday ? 'text-bony-orange' : 'text-slate-400'}`}>
                                   {day.getDate()}
@@ -1142,7 +1142,7 @@ const Digital: React.FC = () => {
                       const dayPosts = getPostsForDay(day);
                       
                       return (
-                          <div key={day.toISOString()} className={`flex flex-col bg-white dark:bg-bony-panel border rounded-lg overflow-hidden h-full ${isToday ? 'border-bony-orange/50' : 'border-bony-border'}`}>
+                          <div key={day.toISOString()} className={`flex flex-col bg-white/45 dark:bg-white/[0.04] border rounded-lg overflow-hidden h-full ${isToday ? 'border-bony-orange/50' : 'border-bony-border'}`}>
                               <div className={`p-2 text-center border-b border-bony-border shrink-0 ${isToday ? 'bg-bony-orange/10' : 'bg-slate-50 dark:bg-black/20'}`}>
                                   <div className="text-[10px] font-bold uppercase text-slate-500">{weekDays[day.getDay() === 0 ? 6 : day.getDay() - 1]}</div>
                                   <div className={`text-xl font-title font-bold ${isToday ? 'text-bony-orange' : 'text-slate-800 dark:text-white'}`}>{day.getDate()}</div>
@@ -1272,7 +1272,7 @@ const Digital: React.FC = () => {
               {!isMobile && (
                   <>
                       {/* Tablette (md → lg) : scroll horizontal contrôlé sur vue Semaine */}
-                      <div className="hidden md:flex lg:hidden flex-col flex-1 min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-3 max-w-full overflow-x-hidden">
+                      <div className="hidden md:flex lg:hidden flex-col flex-1 min-h-0 bg-slate-50/40 dark:bg-black/10 overflow-y-auto custom-scrollbar p-3 max-w-full overflow-x-hidden">
                           {calendarView === 'Mois' && (
                               <div className="grid grid-cols-7 mb-2 shrink-0">
                                   {weekDays.map(d => (
@@ -1290,7 +1290,7 @@ const Digital: React.FC = () => {
                       </div>
 
                       {/* Desktop (lg+) : grille calendrier inchangée */}
-                      <div className="hidden lg:flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-black/10 overflow-y-auto custom-scrollbar p-4 max-w-full overflow-x-hidden">
+                      <div className="hidden lg:flex flex-col flex-1 min-h-0 bg-slate-50/40 dark:bg-black/10 overflow-y-auto custom-scrollbar p-4 max-w-full overflow-x-hidden">
                           {calendarView === 'Mois' && (
                               <div className="grid grid-cols-7 mb-2 shrink-0">
                                   {weekDays.map(d => (

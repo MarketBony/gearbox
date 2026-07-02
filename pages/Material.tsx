@@ -449,15 +449,15 @@ const Material: React.FC = () => {
                         const contentHeight = Math.max(minHeight, headerHeight + (maxLane + 1) * itemHeight + 10);
 
                         return (
-                            <div key={weekIdx} className="relative bg-bony-dark w-full" style={{ height: `${contentHeight}px` }}>
+                            <div key={weekIdx} className="relative w-full" style={{ height: `${contentHeight}px` }}>
                                 {/* Grid Background */}
                                 <div className="absolute inset-0 grid grid-cols-7 divide-x divide-bony-border/30">
                                     {week.map((day, dIdx) => {
                                         const isToday = isSameDay(day.date, new Date());
                                         return (
-                                            <div 
-                                                key={dIdx} 
-                                                className={`h-full ${!day.isCurrentMonth ? 'bg-slate-100 dark:bg-black/20' : 'bg-white dark:bg-transparent'} ${isToday ? 'bg-bony-blue/5' : ''} hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer`}
+                                            <div
+                                                key={dIdx}
+                                                className={`h-full ${!day.isCurrentMonth ? 'bg-slate-100/50 dark:bg-black/20' : 'bg-white/45 dark:bg-transparent'} ${isToday ? 'bg-bony-blue/10' : ''} hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer`}
                                                 onClick={() => openBookingModal(undefined, day.date)}
                                             >
                                                 <div className={`text-right text-xs font-sans font-bold p-1 ${isToday ? 'text-bony-orange' : 'text-slate-500'}`}>
@@ -523,7 +523,7 @@ const Material: React.FC = () => {
         return (
             <div className="flex flex-col h-full gx-glass-panel border border-bony-border rounded-b-xl overflow-hidden">
                  {renderGridHeader(days)}
-                 <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-bony-dark">
+                 <div className="flex-1 overflow-y-auto custom-scrollbar relative">
                      {/* Columns Background */}
                      <div className="absolute inset-0 grid grid-cols-7 divide-x divide-bony-border/30 h-full" style={{minHeight: totalHeight}}>
                           {days.map((day, i) => {
@@ -668,7 +668,7 @@ const Material: React.FC = () => {
                             </div>
 
                             {/* Planning Grid */}
-                            <div className="flex-1 overflow-hidden p-4 bg-bony-dark overflow-x-auto md:overflow-hidden">
+                            <div className="flex-1 overflow-hidden p-4 overflow-x-auto md:overflow-hidden">
                                 <div className="min-w-[600px] md:min-w-0 h-full">
                                     {viewMode === 'week' ? renderWeekView() : renderMonthView()}
                                 </div>
