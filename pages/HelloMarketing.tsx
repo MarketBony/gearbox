@@ -1192,7 +1192,7 @@ const HelloMarketing: React.FC = () => {
   return (
     <div className="h-screen overflow-y-auto custom-scrollbar pb-20">
       {/* Header */}
-      <div className="px-5 md:px-8 pt-6 pb-5 border-b border-slate-200 dark:border-bony-border bg-white dark:bg-bony-panel">
+      <div className="px-5 md:px-8 pt-6 pb-5 border-b border-slate-200 dark:border-bony-border glass-strong">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-title text-slate-900 dark:text-white flex items-center gap-2.5">
             <Sparkles size={28} className="text-bony-orange" />

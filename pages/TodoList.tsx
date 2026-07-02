@@ -417,7 +417,7 @@ const TodoList: React.FC = () => {
           placeholder="Rechercher une tâche ou un projet…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full pl-8 pr-3 py-1.5 text-sm bg-white dark:bg-bony-panel border border-slate-200 dark:border-bony-border rounded-lg text-slate-900 dark:text-bony-text placeholder-slate-400 dark:placeholder-bony-text/30 focus:outline-none focus:border-bony-orange/60"
+          className="w-full pl-8 pr-3 py-1.5 text-sm bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-bony-border rounded-lg text-slate-900 dark:text-bony-text placeholder-slate-400 dark:placeholder-bony-text/30 focus:outline-none focus:border-bony-orange/60"
         />
         {search && (
           <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-bony-text/30 hover:text-bony-text">

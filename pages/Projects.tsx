@@ -776,7 +776,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
         style={{ width: window.innerWidth >= 768 ? `${listWidth}px` : '100%' }}
       >
 
-        <div className="px-3 py-2.5 border-b border-bony-border space-y-2 bg-[var(--bg-panel)] z-20 shadow-sm">
+        <div className="px-3 py-2.5 border-b border-bony-border space-y-2 z-20">
             <div className="flex justify-between items-center">
                 <h2 className="text-sm font-bold text-bony-text flex items-center gap-1.5">
                     {viewMode === 'archived' && <Archive size={14} className="text-slate-500"/>}

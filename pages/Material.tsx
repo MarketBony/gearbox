@@ -624,7 +624,7 @@ const Material: React.FC = () => {
                     {activeTab === 'planning' && (
                         <>
                             {/* Planning Controls */}
-                            <div className="p-3 md:p-4 border-b border-bony-border bg-bony-panel/50 flex flex-wrap items-center gap-3 md:justify-between">
+                            <div className="p-3 md:p-4 border-b border-bony-border glass-strong flex flex-wrap items-center gap-3 md:justify-between">
                                 <div className="flex flex-wrap items-center gap-2 md:gap-4">
                                     <div className="flex items-center bg-bony-dark rounded-lg border border-bony-border">
                                         <button onClick={() => navigateDate('prev')} className="p-2 hover:bg-bony-panel text-slate-400 hover:text-bony-text rounded-l-lg"><ChevronLeft size={18}/></button>

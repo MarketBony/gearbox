@@ -1189,7 +1189,7 @@ const Digital: React.FC = () => {
               {renderTooltip()}
               
               {/* Controls */}
-              <div className="flex flex-wrap justify-between items-center gap-2 px-3 md:px-6 py-3 md:py-4 border-b border-bony-border bg-white dark:bg-bony-panel shrink-0">
+              <div className="flex flex-wrap justify-between items-center gap-2 px-3 md:px-6 py-3 md:py-4 border-b border-bony-border glass-strong shrink-0">
                   <div className="flex items-center gap-2 md:gap-4 flex-wrap">
                       <h3 className="text-sm md:text-xl font-title text-slate-900 dark:text-white capitalize md:min-w-[200px]">
                           {titleLabel}
@@ -1401,7 +1401,7 @@ const Digital: React.FC = () => {
         )}
 
         {/* Header */}
-        <div className="px-3 py-3 md:px-6 md:py-4 bg-white dark:bg-bony-panel border-b border-bony-border shrink-0 z-30 shadow-md">
+        <div className="px-3 py-3 md:px-6 md:py-4 glass-strong border-b border-bony-border shrink-0 z-30 shadow-md">
             <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-3 mb-4">
                 <div>
                     <h2 className="text-lg md:text-2xl text-slate-900 dark:text-bony-text font-title mb-1 flex items-center gap-3">

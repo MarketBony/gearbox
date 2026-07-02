@@ -713,7 +713,7 @@ const Chat: React.FC = () => {
         {activeConv ? (
           <>
             {/* Header */}
-            <div className="h-16 flex items-center gap-3 px-4 border-b border-bony-border bg-[var(--bg-panel)] shrink-0 z-10">
+            <div className="h-16 flex items-center gap-3 px-4 border-b border-bony-border glass-strong shrink-0 z-10">
               <button className="md:hidden p-2 rounded-lg text-slate-400 hover:text-bony-text hover:bg-white/5 transition" onClick={() => setShowMobileChat(false)}>
                 <ArrowLeft size={20} />
               </button>
@@ -934,7 +934,7 @@ const Chat: React.FC = () => {
                 )}
 
                 {/* Input */}
-                <div className="px-4 py-3 border-t border-bony-border bg-bony-panel shrink-0">
+                <div className="px-4 py-3 border-t border-bony-border glass-strong shrink-0">
                   <div className="flex items-end gap-2 bg-bony-dark border border-bony-border rounded-xl px-3 py-2 focus-within:border-bony-orange transition-colors">
                     <button onClick={() => fileInputRef.current?.click()} className="text-slate-400 hover:text-bony-orange transition p-1 shrink-0 mb-0.5" title="Envoyer une image">
                       <Image size={18} />
