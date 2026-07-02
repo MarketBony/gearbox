@@ -994,7 +994,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
       </div>
 
       {/* Detail Panel — hidden on mobile when no project selected */}
-      <div className={`${selectedProject ? 'flex' : 'hidden md:flex'} flex-1 bg-bony-dark flex-col h-full overflow-hidden`}>
+      <div className={`${selectedProject ? 'flex' : 'hidden md:flex'} flex-1 flex-col h-full overflow-hidden`}>
         {selectedProject ? (
           <>
             <div className="h-14 border-b border-bony-border flex items-center justify-between px-3 md:px-6 bg-bony-panel shrink-0 transition-colors">

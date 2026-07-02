@@ -1364,7 +1364,7 @@ const Digital: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-bony-dark animate-fade-in transition-colors relative max-w-full">
+    <div className="flex flex-col h-full overflow-hidden animate-fade-in transition-colors relative max-w-full">
 
         {/* Create Post Modal */}
         {showCreatePostModal && (
