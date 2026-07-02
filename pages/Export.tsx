@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
 import { FileSpreadsheet, Calendar, Loader2, CheckCircle2, AlertCircle, Lock, Download } from 'lucide-react';
+import DatePicker from '../components/DatePicker';
 
 // Rôles autorisés à exporter les données financières (projets + dépenses fixes).
 export const EXPORT_ALLOWED_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator'];
@@ -203,22 +204,21 @@ const Export: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <span className="text-[9px] font-bold text-slate-400 uppercase">Du</span>
-                <input
-                  type="date"
+                <DatePicker
+                  size="sm"
                   value={from}
-                  max={to || undefined}
-                  onChange={(e) => setFrom(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-3 py-2 text-sm font-bold text-bony-text outline-none focus:border-bony-orange cursor-pointer"
+                  placeholder="Début"
+                  onChange={(v) => { setFrom(v); if (v && to && v > to) setTo(v); }}
                 />
               </div>
               <div className="space-y-1">
                 <span className="text-[9px] font-bold text-slate-400 uppercase">Au</span>
-                <input
-                  type="date"
+                <DatePicker
+                  size="sm"
                   value={to}
-                  min={from || undefined}
-                  onChange={(e) => setTo(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg px-3 py-2 text-sm font-bold text-bony-text outline-none focus:border-bony-orange cursor-pointer"
+                  minDate={from}
+                  placeholder="Fin"
+                  onChange={(v) => setTo(v)}
                 />
               </div>
             </div>
