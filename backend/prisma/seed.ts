@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -9,12 +9,14 @@ dotenv.config({ path: path.resolve(process.cwd(), 'backend/.env') });
 const prisma = new PrismaClient();
 
 async function main() {
+  // Rôles = chaînes libres alignées sur types.ts (UserRole frontend, 7 valeurs valides,
+  // dont "Digital Manager" avec espace) — l'enum Prisma a été supprimé du schéma.
   const users = [
-    { name: 'Théo Labonne', loginId: 'theo', role: UserRole.Master, color: '#f75632' },
-    { name: 'Admin User', loginId: 'admin', role: UserRole.Administrator, color: '#8f12ab' },
-    { name: 'Coord User', loginId: 'coord', role: UserRole.Coordinator, color: '#293f74' },
-    { name: 'Digital Mgr', loginId: 'digital', role: UserRole.DigitalManager, color: '#10b981' },
-    { name: 'Guest User', loginId: 'guest', role: UserRole.Guest, color: '#64748b' },
+    { name: 'Théo Labonne', loginId: 'theo', role: 'Master', color: '#f75632' },
+    { name: 'Admin User', loginId: 'admin', role: 'Administrator', color: '#8f12ab' },
+    { name: 'Coord User', loginId: 'coord', role: 'Coordinator', color: '#293f74' },
+    { name: 'Digital Mgr', loginId: 'digital', role: 'Digital Manager', color: '#10b981' },
+    { name: 'Guest User', loginId: 'guest', role: 'Guest', color: '#64748b' },
   ];
 
   for (const u of users) {

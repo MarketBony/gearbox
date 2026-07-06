@@ -8,62 +8,63 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum UserRole {
-  Master
-  Administrator
-  Coordinator
-  DigitalManager
-  Guest
-}
-
+// Rôles/sites/marques/services = String libres alignés sur les unions de types.ts.
+// Pas d'enum Prisma : "Digital Manager" contient un espace, et on ne veut aucune
+// couche de traduction entre frontend et base (convention déjà en place ailleurs).
 model User {
   id           String   @id @default(uuid())
   loginId      String   @unique
   passwordHash String
   name         String
-  role         UserRole
+  role         String // 7 valeurs valides côté frontend (types.ts UserRole)
   avatarColor  String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
 
 model Project {
-  id            String   @id @default(uuid())
-  name          String
-  site          String
-  service       String[] // Stored as array of strings
-  brands        String[]
-  projectType   String
-  status        String
-  startDate     DateTime
-  endDate       DateTime
-  budgetPlanned Float
-  budgetActual  Float
-  description   String
-  progress      Float
-  proPlus       Boolean  @default(false) // PRO+ (B2B) — additif, défaut false
-  tasks         Task[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  name               String
+  site               String
+  sites              String[] @default([])
+  budgetDistribution Json? // Record<string, number> — % par site
+  service            String[]
+  brands             String[]
+  projectType        String
+  status             String
+  startDate          DateTime
+  endDate            DateTime
+  budgetPlanned      Float
+  budgetActual       Float
+  description        String
+  progress           Float
+  assignedUsers      String[] @default([])
+  alpineShare        Float? // % Alpine vs RDM (0-100), défaut 50 côté UI
+  proPlus            Boolean  @default(false)
+  tasks              Task[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 model Task {
-  id           String   @id @default(uuid())
-  projectId    String
-  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  name         String
-  channel      String
-  cost         Float
-  status       String
-  volumetry    Float?
-  openRate     Float?
-  npaiRate     Float?
-  stopRate     Float?
-  clickRate    Float?
-  codTxt       String?
-  billedAmount Float?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(uuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name           String
+  provider       String? // Prestataire (texte libre)
+  channel        String
+  cost           Float
+  status         String
+  assignedUserId String? // Référence libre vers User (pas de FK, style du schéma)
+  volumetry      Float?
+  openRate       Float?
+  npaiRate       Float?
+  stopRate       Float?
+  clickRate      Float?
+  codTxt         String?
+  billedAmount   Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Campaign {
@@ -108,7 +109,7 @@ model DigitalTags {
 }
 
 model Contact {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   firstName       String
   lastName        String
   email           String
@@ -119,24 +120,23 @@ model Contact {
   rgpdConsent     Boolean
   tags            String[]
   lastContactDate DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
+// Prévisionnel budgétaire : une ligne par site/bucket (ex. "Alpine-Clermont"),
+// sans dimension année (aligné sur les données frontend réelles — décision validée).
 model BudgetLine {
   id        String   @id @default(uuid())
-  site      String
+  site      String   @unique
   brands    String[]
-  year      Int
-  // Storing entries as JSON because it's a fixed structure of arrays in the frontend
-  // { VN: number[], VO: number[], ... }
-  entries   Json
+  entries   Json // { VN: number[12], VO: number[12], PR: number[12], APV: number[12] }
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@unique([site, year])
 }
 
+// Dépense ponctuelle (page Expenses) — conservé tel quel : matche la forme vivante
+// {date, service, site, comment, amount} réellement manipulée par la page (décision validée).
 model OneOffExpense {
   id        String   @id @default(uuid())
   date      DateTime
@@ -144,7 +144,101 @@ model OneOffExpense {
   site      String
   comment   String?
   amount    Float
-  proPlus   Boolean  @default(false) // PRO+ (B2B) — additif, défaut false
+  proPlus   Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Dépense fixe (module Dépenses Fixes) — calqué sur types.ts (FixedExpense) + alpineShare runtime.
+model FixedExpense {
+  id                 String   @id @default(uuid())
+  date               DateTime
+  service            String
+  site               String
+  sites              String[] @default([])
+  budgetDistribution Json? // Record<string, number> — % par site
+  comment            String
+  amount             Float
+  brand              String? // legacy — premier élément de brands
+  brands             String[] @default([])
+  alpineShare        Float? // % Alpine vs RDM (0-100)
+  proPlus            Boolean  @default(false)
+  isAnnual           Boolean  @default(false) // fractionnée /12 à l'agrégation Budget (jamais dupliquée)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// Module Matériel — calqué sur types.ts (Equipment / EquipmentBooking).
+model Equipment {
+  id            String             @id @default(uuid())
+  name          String
+  totalQuantity Int
+  category      String?
+  bookings      EquipmentBooking[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model EquipmentBooking {
+  id          String    @id @default(uuid())
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  quantity    Int
+  startDate   DateTime
+  endDate     DateTime
+  site        String
+  service     String
+  brand       String
+  description String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Module Chat — calqué sur types.ts (ChatConversation / ChatMessage).
+model ChatConversation {
+  id            String        @id @default(uuid())
+  type          String // 'general' | 'private' | 'group'
+  participants  String[] // userIds (références libres)
+  adminIds      String[]      @default([])
+  name          String?
+  pinnedBy      String[]      @default([])
+  lastMessage   String?
+  lastMessageAt DateTime?
+  unreadCounts  Json          @default("{}") // Record<userId, number>
+  messages      ChatMessage[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model ChatMessage {
+  id             String           @id @default(uuid())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  senderName     String
+  senderColor    String
+  content        String
+  type           String // 'text' | 'image'
+  timestamp      DateTime
+  edited         Boolean          @default(false)
+  editedAt       DateTime?
+  deleted        Boolean          @default(false)
+  reactions      Json             @default("{}") // Record<emoji, userId[]>
+  replyToId      String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+// Journal d'activité — calqué sur types.ts (ActivityLog). Immuable : pas d'updatedAt.
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String
+  userName   String
+  userColor  String
+  action     String
+  entity     String
+  entityName String
+  entityId   String?
+  timestamp  DateTime
+  createdAt  DateTime @default(now())
 }
