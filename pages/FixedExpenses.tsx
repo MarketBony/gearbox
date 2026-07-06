@@ -17,6 +17,10 @@ const FixedExpenses: React.FC = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [showSiteDropdown, setShowSiteDropdown] = useState(false);
 
+    // Répartition budgétaire : bascule d'affichage/saisie (UI only) — le modèle reste en %
+    // Base de conversion € = le champ "Montant" de la dépense (au lieu du budgetActual côté Projets).
+    const [budgetDistMode, setBudgetDistMode] = useState<'%' | '€'>('%');
+
     // Filters
     const [filterSite, setFilterSite] = useSessionState<string>('fixedexpenses_filterSite', 'All');
     const [filterService, setFilterService] = useSessionState<ServiceType | 'All'>('fixedexpenses_filterService', 'All');
@@ -645,39 +649,76 @@ const FixedExpenses: React.FC = () => {
                                 {/* BUDGET ALLOCATION SECTION */}
                                 {(currentExpense.sites && currentExpense.sites.length > 1) && (
                                     <div className="mt-4 pt-4 border-t border-bony-border animate-in fade-in">
-                                        <h4 className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-4 flex items-center gap-2">
-                                            <PieChart size={14} className="text-bony-orange"/> Répartition Budgétaire
-                                        </h4>
-                                        
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="text-[10px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-2">
+                                                <PieChart size={14} className="text-bony-orange"/> Répartition Budgétaire
+                                            </h4>
+                                            {/* Bascule d'affichage/saisie % ↔ € (UI uniquement, stockage en % inchangé) */}
+                                            <div className="flex items-center bg-slate-100 dark:bg-black/30 rounded-lg p-0.5 border border-bony-border">
+                                                {(['%', '€'] as const).map(m => (
+                                                    <button
+                                                        key={m}
+                                                        type="button"
+                                                        onClick={() => setBudgetDistMode(m)}
+                                                        className={`px-2.5 py-0.5 text-[11px] font-bold rounded-md transition-colors ${budgetDistMode === m ? 'bg-bony-gradient text-white' : 'text-slate-500 hover:text-bony-text'}`}
+                                                    >
+                                                        {m}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
                                         <div className="grid grid-cols-2 gap-4">
                                             {(currentExpense.sites || []).map(site => {
                                                 const pct = (currentExpense.budgetDistribution || {})[site] || 0;
                                                 const isFixed = currentExpense.site === 'GROUPE BONY' || currentExpense.site === 'GROUPE BONY (R/N)';
-                                                
+                                                // Base de conversion € = le Montant total de la dépense.
+                                                const baseAmount = Number(currentExpense.amount) || 0;
+                                                const amount = Math.round(baseAmount * (pct / 100));
+                                                const euroMode = budgetDistMode === '€';
+                                                // En € : conversion immédiate montant → % stocké (garde le modèle en %). Division par zéro gérée.
+                                                const euroDisabled = isFixed || !(baseAmount > 0);
+
                                                 return (
                                                     <div key={site} className="flex items-center gap-2">
-                                                        <span className="text-xs font-bold text-slate-600 dark:text-slate-400 w-24 truncate">{site}</span>
-                                                        <div className="flex-1 flex items-center gap-2">
-                                                            <input 
-                                                                type="number" 
-                                                                min="0" 
-                                                                max="100"
-                                                                disabled={isFixed}
-                                                                value={pct}
-                                                                onChange={(e) => updateBudgetDistribution(site, Number(e.target.value))}
-                                                                className={`w-16 bg-slate-100 dark:bg-black/20 border border-bony-border rounded px-2 py-1 text-xs font-bold text-center outline-none focus:border-bony-blue ${isFixed ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                            />
-                                                            <span className="text-xs text-slate-400">%</span>
+                                                        <span className="text-xs font-bold text-slate-600 dark:text-slate-400 w-24 truncate" title={site}>{site}</span>
+                                                        <div className="flex-1 flex items-center gap-2 bg-slate-100 dark:bg-black/20 rounded px-2 py-1 border border-bony-border">
+                                                            {euroMode ? (
+                                                                <input
+                                                                    type="number"
+                                                                    value={amount}
+                                                                    disabled={euroDisabled}
+                                                                    onChange={(e) => updateBudgetDistribution(site, baseAmount > 0 ? (Number(e.target.value) / baseAmount) * 100 : 0)}
+                                                                    className="w-full bg-transparent text-xs font-bold text-right outline-none disabled:opacity-50"
+                                                                />
+                                                            ) : (
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max="100"
+                                                                    value={Number(pct.toFixed(2))}
+                                                                    disabled={isFixed}
+                                                                    onChange={(e) => updateBudgetDistribution(site, Number(e.target.value))}
+                                                                    className="w-full bg-transparent text-xs font-bold text-right outline-none disabled:opacity-50"
+                                                                />
+                                                            )}
+                                                            <span className="text-[10px] text-slate-500">{euroMode ? '€' : '%'}</span>
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-400 w-16 text-right">
+                                                            {euroMode ? `${Number(pct.toFixed(1))} %` : `${amount.toLocaleString()} €`}
                                                         </div>
                                                     </div>
                                                 );
                                             })}
                                         </div>
-                                        
+                                        {budgetDistMode === '€' && !((Number(currentExpense.amount) || 0) > 0) && (
+                                            <div className="mt-2 text-[10px] text-amber-500">Montant = 0 € : saisie en € indisponible (utilisez le mode %).</div>
+                                        )}
+
                                         <div className="mt-2 flex justify-end">
                                             <span className={`text-xs font-bold ${
-                                                Object.values(currentExpense.budgetDistribution || {}).reduce((a, b) => a + b, 0) === 100 
-                                                ? 'text-emerald-500' 
+                                                Object.values(currentExpense.budgetDistribution || {}).reduce((a, b) => a + b, 0) === 100
+                                                ? 'text-emerald-500'
                                                 : 'text-red-500'
                                             }`}>
                                                 Total: {Math.round(Object.values(currentExpense.budgetDistribution || {}).reduce((a, b) => a + b, 0))}%
