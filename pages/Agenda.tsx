@@ -6,6 +6,9 @@ import { Project, ServiceType, BrandType, ProjectType } from '../types';
 import { SERVICE_COLORS, BRANDS, SERVICES, PROJECT_TYPES, BRAND_COLORS } from '../constants';
 import { ChevronLeft, ChevronRight, Calendar, Filter, X } from 'lucide-react';
 import Select from '../components/Select';
+import CalendarGrid, { EventRenderMeta } from '../components/calendar/CalendarGrid';
+import EventBar from '../components/calendar/EventBar';
+import { serviceAccent } from '../components/calendar/calendarShared';
 
 type ViewMode = 'Semaine' | 'Mois' | 'Trimestre' | 'Semestre' | 'Année';
 
@@ -68,74 +71,51 @@ const getServiceColor = (services: ServiceType[]) => {
     return 'border-slate-500 bg-slate-200 dark:bg-slate-500/20 text-slate-700 dark:text-slate-300';
 };
 
-// --- LAYOUT ENGINE (Calculates lanes to avoid overlap) ---
-interface LayoutItem {
-    project: Project;
-    startCol: number;
-    span: number;
-    lane: number;
-}
-
-const calculateLayout = (projects: Project[], startDate: Date, endDate: Date, totalCols: number): LayoutItem[] => {
-    // Normalize Grid Boundaries to 00:00:00
-    const gridStart = normalizeDate(startDate);
-    const gridEnd = normalizeDate(endDate);
-
-    // 1. Filter and clip projects to the view range
-    const items = projects.map(p => {
-        // Normalize Project Dates to 00:00:00
-        const pStart = normalizeDate(p.startDate);
-        const pEnd = normalizeDate(p.endDate);
-
-        // Check intersection
-        if (pEnd < gridStart || pStart > gridEnd) return null;
-
-        const effectiveStart = pStart < gridStart ? gridStart : pStart;
-        const effectiveEnd = pEnd > gridEnd ? gridEnd : pEnd;
-
-        // Calculate columns based on DAY DIFFERENCE (Math.round to handle DST 23h/25h days safe)
-        const msPerDay = 1000 * 60 * 60 * 24;
-        const startCol = Math.round((effectiveStart.getTime() - gridStart.getTime()) / msPerDay);
-        const endCol = Math.round((effectiveEnd.getTime() - gridStart.getTime()) / msPerDay);
-        
-        // Span must be at least 1
-        const span = Math.max(1, endCol - startCol + 1);
-
-        return { project: p, startCol, span, lane: -1 };
-    }).filter(Boolean) as LayoutItem[];
-
-    // 2. Sort by start date, then duration (longest first)
-    items.sort((a, b) => {
-        if (a.startCol !== b.startCol) return a.startCol - b.startCol;
-        return b.span - a.span;
-    });
-
-    // 3. Assign lanes
-    const lanes: number[] = []; // Stores the end column index of the last item in this lane
-
-    items.forEach(item => {
-        let placed = false;
-        // Try to find an existing lane that is free
-        for (let i = 0; i < lanes.length; i++) {
-            // If the lane's last item ends before this item starts
-            if (lanes[i] < item.startCol) {
-                item.lane = i;
-                lanes[i] = item.startCol + item.span - 1;
-                placed = true;
-                break;
-            }
-        }
-        // If not placed, add a new lane
-        if (!placed) {
-            item.lane = lanes.length;
-            lanes.push(item.startCol + item.span - 1);
-        }
-    });
-
-    return items;
-};
+// NB : la mise en page mois/semaine (packing en lanes) est désormais mutualisée
+// dans components/calendar/CalendarGrid.tsx (source unique partagée avec Matériel).
+// Les vues Trimestre/Semestre/Année ci-dessous gardent leur propre rendu timeline.
 
 // --- COMPONENTS ---
+
+/** Navigation vers la fiche projet (dispatch d'un événement global). */
+const navigateToProject = (project: Project) => {
+    // CRITICAL: Set the pending ID in session storage so Projects.tsx sees it on mount
+    window.sessionStorage.setItem('pendingProjectId', project.id);
+    window.dispatchEvent(new CustomEvent('gearbox-navigate', {
+        detail: { tab: 'projects', projectId: project.id },
+    }));
+};
+
+/** Contenu du tooltip projet — partagé entre la timeline (ProjectPill) et la grille. */
+const ProjectTooltipContent: React.FC<{ project: Project }> = ({ project }) => (
+    <>
+        <div className="flex justify-between items-start mb-2">
+            <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-tight">{project.name}</h4>
+            <span className="text-[10px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-300">{project.progress}%</span>
+        </div>
+        <div className="space-y-2 mb-3">
+            <div className="flex flex-wrap gap-1">
+                <span className="text-[9px] bg-blue-100 dark:bg-bony-blue/20 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-bony-blue/30 px-1.5 rounded">{project.site}</span>
+                <span className="text-[9px] bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-white/10 px-1.5 rounded">{project.projectType}</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+                {project.brands?.map(b => (
+                    <span key={b} className={`text-[8px] px-1.5 rounded border ${BRAND_COLORS[b]}`}>{b}</span>
+                ))}
+            </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-[10px] border-t border-bony-border pt-2">
+            <div>
+                <span className="block text-slate-500 font-bold uppercase">Dates</span>
+                <span className="text-slate-800 dark:text-white font-sans">{formatDateRange(project.startDate, project.endDate)}</span>
+            </div>
+            <div>
+                <span className="block text-slate-500 font-bold uppercase">Budget</span>
+                <span className="text-slate-800 dark:text-white font-sans">{project.budgetActual} €</span>
+            </div>
+        </div>
+    </>
+);
 
 const ProjectPill: React.FC<{ 
     project: Project; 
@@ -149,13 +129,7 @@ const ProjectPill: React.FC<{
 
     const handleNavigate = (e: React.MouseEvent) => {
         e.stopPropagation();
-        // CRITICAL: Set the pending ID in session storage so Projects.tsx sees it on mount
-        window.sessionStorage.setItem('pendingProjectId', project.id);
-        
-        const event = new CustomEvent('gearbox-navigate', { 
-            detail: { tab: 'projects', projectId: project.id } 
-        });
-        window.dispatchEvent(event);
+        navigateToProject(project);
     };
 
     return (
@@ -195,38 +169,13 @@ const ProjectPill: React.FC<{
         {isHovered && (
             <div
                 className="absolute z-[100] w-64 glass-menu rounded-xl p-4 animate-in fade-in duration-200 pointer-events-none"
-                style={{ 
-                    top: '100%', 
+                style={{
+                    top: '100%',
                     left: style?.left ? style.left : '0%',
-                    marginTop: '4px' 
+                    marginTop: '4px'
                 }}
             >
-                <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-tight">{project.name}</h4>
-                    <span className="text-[10px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-300">{project.progress}%</span>
-                </div>
-                
-                <div className="space-y-2 mb-3">
-                    <div className="flex flex-wrap gap-1">
-                        <span className="text-[9px] bg-blue-100 dark:bg-bony-blue/20 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-bony-blue/30 px-1.5 rounded">{project.site}</span>
-                        <span className="text-[9px] bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-white/10 px-1.5 rounded">{project.projectType}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                        {project.brands?.map(b => (
-                            <span key={b} className={`text-[8px] px-1.5 rounded border ${BRAND_COLORS[b]}`}>{b}</span>
-                        ))}
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-[10px] border-t border-bony-border pt-2">
-                    <div>
-                        <span className="block text-slate-500 font-bold uppercase">Dates</span>
-                        <span className="text-slate-800 dark:text-white font-sans">{formatDateRange(project.startDate, project.endDate)}</span>
-                    </div>
-                    <div>
-                        <span className="block text-slate-500 font-bold uppercase">Budget</span>
-                        <span className="text-slate-800 dark:text-white font-sans">{project.budgetActual} €</span>
-                    </div>
-                </div>
+                <ProjectTooltipContent project={project} />
             </div>
         )}
         </>
@@ -311,181 +260,58 @@ const Agenda: React.FC = () => {
 
   // --- RENDERERS ---
 
-  const renderGridHeader = (days: string[]) => {
-      return (
-          <div className="grid grid-cols-7 border-b border-bony-border shrink-0">
-              {days.map(d => (
-                  <div key={d} className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase tracking-widest border-r border-bony-border last:border-r-0">
-                      {d}
+  // --- ÉVÉNEMENT PROJET (rendu partagé via EventBar, style Digital) ---
+  // Le contenu diffère entre Mois (compact) et Semaine (avec progression),
+  // mais la coquille visuelle et le comportement viennent du composant partagé.
+  const renderProjectEvent = (project: Project, meta: EventRenderMeta) => (
+      <EventBar
+          accentClass={serviceAccent(project.service)}
+          onClick={(e) => { e.stopPropagation(); navigateToProject(project); }}
+          tooltip={<ProjectTooltipContent project={project} />}
+          clipLeft={meta.clipLeft}
+          clipRight={meta.clipRight}
+      >
+          {meta.view === 'week' ? (
+              <div className="w-full overflow-hidden">
+                  <div className="flex items-center justify-between gap-2 overflow-hidden">
+                      <span className="font-bold truncate text-[11px] leading-tight">{project.name}</span>
+                      <span className="text-[9px] opacity-60 shrink-0 font-sans">{formatDateRange(project.startDate, project.endDate)}</span>
                   </div>
-              ))}
-          </div>
-      );
-  };
-
-  // --- VUE MOIS ---
-  const renderMonthView = () => {
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth();
-      
-      const firstDayOfMonth = normalizeDate(new Date(year, month, 1));
-      // Adjust start day to Monday (0=Sun -> 6, 1=Mon -> 0)
-      const startDayIndex = (firstDayOfMonth.getDay() + 6) % 7;
-      
-      const daysInMonth = getMonthDays(year, month);
-      
-      // Build Cells
-      const cells = [];
-      const prevMonthLastDay = new Date(year, month, 0).getDate();
-      for(let i = 0; i < startDayIndex; i++) {
-          cells.push({ date: new Date(year, month - 1, prevMonthLastDay - startDayIndex + 1 + i), isCurrentMonth: false });
-      }
-      daysInMonth.forEach(d => cells.push({ date: d, isCurrentMonth: true }));
-      const remaining = 7 - (cells.length % 7);
-      if (remaining < 7) {
-          for(let i = 1; i <= remaining; i++) {
-              cells.push({ date: new Date(year, month + 1, i), isCurrentMonth: false });
-          }
-      }
-
-      // Chunk into Weeks
-      const weeks = [];
-      for (let i = 0; i < cells.length; i += 7) {
-          weeks.push(cells.slice(i, i + 7));
-      }
-
-      const daysHeader = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
-
-      return (
-          <div className="flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-b-xl overflow-hidden">
-              {renderGridHeader(daysHeader)}
-              <div className="flex-1 flex flex-col gap-[1px] overflow-y-auto custom-scrollbar">
-                  {weeks.map((week, weekIdx) => {
-                      const weekStart = week[0].date;
-                      const weekEnd = week[6].date;
-                      
-                      // Calculate Layout for this week row
-                      const placedProjects = calculateLayout(filteredProjects, weekStart, weekEnd, 7);
-
-                      // Determine Row Height dynamically
-                      const maxLane = placedProjects.reduce((max, p) => Math.max(max, p.lane), -1);
-                      const itemHeight = 24; 
-                      const headerHeight = 28; 
-                      const minHeight = 110; 
-                      const contentHeight = Math.max(minHeight, headerHeight + (maxLane + 1) * itemHeight + 10);
-
-                      return (
-                          <div key={weekIdx} className="relative w-full" style={{ height: `${contentHeight}px` }}>
-                              {/* Grid Background */}
-                              <div className="absolute inset-0 grid grid-cols-7 divide-x divide-bony-border/30">
-                                  {week.map((day, dIdx) => {
-                                      const isToday = isSameDay(day.date, new Date());
-                                      return (
-                                          <div key={dIdx} className={`h-full transition-colors ${!day.isCurrentMonth ? 'bg-slate-100/40 dark:bg-white/[0.02]' : 'bg-white/45 dark:bg-white/[0.04]'} ${isToday ? 'bg-bony-orange/[0.08] dark:bg-bony-orange/[0.12]' : ''}`}>
-                                              <div className={`text-right text-xs font-sans font-bold p-1 ${isToday ? 'text-bony-orange' : 'text-slate-500'}`}>
-                                                  {day.date.getDate()}
-                                              </div>
-                                          </div>
-                                      );
-                                  })}
-                              </div>
-
-                              {/* Projects Layer */}
-                              <div className="absolute inset-0 top-7 px-1 grid grid-cols-7 pointer-events-none">
-                                   {placedProjects.map((item, idx) => (
-                                       <div 
-                                           key={item.project.id + weekIdx + idx}
-                                           className="relative pointer-events-auto"
-                                           style={{
-                                               gridColumnStart: item.startCol + 1,
-                                               gridColumnEnd: `span ${item.span}`,
-                                               marginTop: `${item.lane * itemHeight}px`
-                                           }}
-                                       >
-                                           <ProjectPill 
-                                               project={item.project} 
-                                               showProgress={false} // NO PROGRESS BAR IN MONTH VIEW
-                                               className={`
-                                                  h-[22px]
-                                                  ${item.startCol === 0 && normalizeDate(item.project.startDate) < normalizeDate(weekStart) ? 'rounded-l-none border-l-0 opacity-80' : ''}
-                                                  ${(item.startCol + item.span) === 7 && normalizeDate(item.project.endDate) > normalizeDate(weekEnd) ? 'rounded-r-none' : ''}
-                                               `}
-                                           />
-                                       </div>
-                                   ))}
-                              </div>
-                          </div>
-                      );
-                  })}
+                  <div className="mt-1 w-full">
+                      <div className="flex justify-between items-center text-[8px] opacity-70 mb-0.5 font-sans">
+                          <span>{project.progress}%</span>
+                          <span>{project.budgetActual}€</span>
+                      </div>
+                      <div className="h-1 bg-black/10 dark:bg-white/15 rounded-full overflow-hidden w-full">
+                          <div className="h-full bg-current opacity-70" style={{ width: `${project.progress}%` }}></div>
+                      </div>
+                  </div>
               </div>
-          </div>
-      );
-  };
+          ) : (
+              <span className="font-bold truncate text-[10px] leading-tight">{project.name}</span>
+          )}
+      </EventBar>
+  );
 
-  // --- VUE SEMAINE ---
-  const renderWeekView = () => {
-    const startOfWeek = getStartOfWeek(currentDate);
-    const endOfWeek = addDays(startOfWeek, 6);
-    
-    // Header labels with Date
-    const daysHeader = [];
-    for(let i=0; i<7; i++) {
-        const d = addDays(startOfWeek, i);
-        daysHeader.push(d.toLocaleDateString('fr-FR', {weekday: 'short', day: 'numeric'}).toUpperCase());
-    }
+  // --- VUE MOIS (grille partagée) ---
+  const renderMonthView = () => (
+      <CalendarGrid
+          view="month"
+          currentDate={currentDate}
+          items={filteredProjects}
+          renderEvent={renderProjectEvent}
+      />
+  );
 
-    // Calculate Layout for the single week
-    const placedProjects = calculateLayout(filteredProjects, startOfWeek, endOfWeek, 7);
-
-    // Dynamic height calculation
-    const maxLane = placedProjects.reduce((max, p) => Math.max(max, p.lane), -1);
-    const itemHeight = 44; // TALLER for Week View to show progress bar
-    const totalHeight = Math.max(500, (maxLane + 1) * (itemHeight + 4) + 20);
-
-    return (
-        <div className="flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-b-xl overflow-hidden">
-             {renderGridHeader(daysHeader)}
-             <div className="flex-1 overflow-y-auto custom-scrollbar relative">
-                 {/* Columns Background */}
-                 <div className="absolute inset-0 grid grid-cols-7 divide-x divide-bony-border/30 h-full" style={{minHeight: totalHeight}}>
-                      {Array.from({length: 7}).map((_, i) => {
-                          const day = addDays(startOfWeek, i);
-                          const isToday = isSameDay(day, new Date());
-                          return (
-                              <div key={i} className={`h-full ${isToday ? 'bg-bony-orange/[0.08] dark:bg-bony-orange/[0.12]' : ''}`}></div>
-                          );
-                      })}
-                 </div>
-
-                 {/* Projects Layer */}
-                 <div className="absolute inset-0 top-2 px-1 grid grid-cols-7 pointer-events-none" style={{height: totalHeight}}>
-                     {placedProjects.map((item, idx) => (
-                         <div 
-                             key={item.project.id + idx}
-                             className="relative pointer-events-auto"
-                             style={{
-                                 gridColumnStart: item.startCol + 1,
-                                 gridColumnEnd: `span ${item.span}`,
-                                 marginTop: `${item.lane * (itemHeight + 4)}px`, // +4 for spacing
-                                 height: `${itemHeight}px`
-                             }}
-                         >
-                              <ProjectPill 
-                                   project={item.project} 
-                                   showProgress={true} // YES PROGRESS BAR IN WEEK VIEW
-                                   className={`
-                                      h-full
-                                      ${item.startCol === 0 && normalizeDate(item.project.startDate) < normalizeDate(startOfWeek) ? 'rounded-l-none border-l-0 opacity-80' : ''}
-                                      ${(item.startCol + item.span) === 7 && normalizeDate(item.project.endDate) > normalizeDate(endOfWeek) ? 'rounded-r-none' : ''}
-                                   `}
-                               />
-                         </div>
-                     ))}
-                 </div>
-             </div>
-        </div>
-    );
-  };
+  // --- VUE SEMAINE (grille partagée) ---
+  const renderWeekView = () => (
+      <CalendarGrid
+          view="week"
+          currentDate={currentDate}
+          items={filteredProjects}
+          renderEvent={renderProjectEvent}
+      />
+  );
 
   // --- VUE TIMELINE (TRIMESTRE/ANNEE) ---
   const renderTimelineView = (monthsCount: number) => {

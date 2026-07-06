@@ -9,6 +9,9 @@ import { fr } from 'date-fns/locale';
 import { SITES, SERVICES, BRANDS, SERVICE_COLORS, PLAQUES_STRUCTURE } from '../constants';
 import Select from '../components/Select';
 import DatePicker from '../components/DatePicker';
+import CalendarGrid, { EventRenderMeta } from '../components/calendar/CalendarGrid';
+import EventBar from '../components/calendar/EventBar';
+import { serviceAccent } from '../components/calendar/calendarShared';
 
 // --- HELPERS ---
 
@@ -40,117 +43,25 @@ const getMonthDays = (year: number, month: number) => {
   return days;
 };
 
-// --- LAYOUT ENGINE ---
-
-interface LayoutItem {
-    booking: EquipmentBooking;
-    startCol: number;
-    span: number;
-    lane: number;
-}
-
-const calculateLayout = (bookings: EquipmentBooking[], startDate: Date, endDate: Date, totalCols: number): LayoutItem[] => {
-    const gridStart = normalizeDate(startDate);
-    const gridEnd = normalizeDate(endDate);
-    const msPerDay = 1000 * 60 * 60 * 24;
-
-    const items = bookings.map(b => {
-        const bStart = normalizeDate(b.startDate);
-        const bEnd = normalizeDate(b.endDate);
-
-        if (bEnd < gridStart || bStart > gridEnd) return null;
-
-        const effectiveStart = bStart < gridStart ? gridStart : bStart;
-        const effectiveEnd = bEnd > gridEnd ? gridEnd : bEnd;
-
-        const startCol = Math.round((effectiveStart.getTime() - gridStart.getTime()) / msPerDay);
-        // Span is at least 1 day
-        const span = Math.max(1, Math.round((effectiveEnd.getTime() - effectiveStart.getTime()) / msPerDay) + 1);
-
-        return { booking: b, startCol, span, lane: -1 };
-    }).filter(Boolean) as LayoutItem[];
-
-    items.sort((a, b) => {
-        if (a.startCol !== b.startCol) return a.startCol - b.startCol;
-        return b.span - a.span;
-    });
-
-    const lanes: number[] = [];
-    items.forEach(item => {
-        let placed = false;
-        for (let i = 0; i < lanes.length; i++) {
-            if (lanes[i] < item.startCol) {
-                item.lane = i;
-                lanes[i] = item.startCol + item.span - 1;
-                placed = true;
-                break;
-            }
-        }
-        if (!placed) {
-            item.lane = lanes.length;
-            lanes.push(item.startCol + item.span - 1);
-        }
-    });
-
-    return items;
-};
+// NB : le packing en lanes (mois/semaine) est désormais mutualisé dans
+// components/calendar/CalendarGrid.tsx — source unique partagée avec Agenda.
 
 // --- COMPONENTS ---
 
-const BookingPill: React.FC<{ 
-    booking: EquipmentBooking; 
-    equipmentName: string;
-    onClick: () => void;
-    className?: string;
-    style?: React.CSSProperties;
-}> = ({ booking, equipmentName, onClick, className, style }) => {
-    const [isHovered, setIsHovered] = useState(false);
-    const colorClass = SERVICE_COLORS[booking.service] || 'bg-slate-500 text-white border-slate-600';
-
-    return (
-        <>
-            <div 
-                onClick={(e) => { e.stopPropagation(); onClick(); }}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
-                className={`
-                    absolute border-l-[3px] rounded-r px-2 shadow-sm 
-                    hover:brightness-110 hover:z-50 transition cursor-pointer overflow-hidden whitespace-nowrap
-                    flex flex-col justify-center select-none z-10 text-[10px]
-                    ${colorClass} ${className}
-                `}
-                style={style}
-            >
-                <div className="flex items-center gap-1 overflow-hidden">
-                    <span className="font-bold">{booking.quantity}x</span>
-                    <span className="font-bold truncate">{equipmentName}</span>
-                    <span className="opacity-70 text-[9px]">- {booking.site}</span>
-                </div>
-            </div>
-
-            {isHovered && (
-                <div
-                    className="absolute z-[100] w-64 glass-menu rounded-xl p-3 animate-in fade-in duration-200 pointer-events-none"
-                    style={{ 
-                        top: '100%', 
-                        left: style?.left || 0,
-                        marginTop: '4px' 
-                    }}
-                >
-                    <div className="font-bold text-bony-text text-sm mb-1">{equipmentName}</div>
-                    <div className="text-xs text-slate-500 mb-2">{booking.description}</div>
-                    <div className="flex flex-wrap gap-1 mb-2">
-                        <span className="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded text-white">{booking.site}</span>
-                        <span className="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded text-white">{booking.service}</span>
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-bony-border text-[10px] text-slate-500">
-                        {format(new Date(booking.startDate), 'dd MMM')} - {format(new Date(booking.endDate), 'dd MMM yyyy')}
-                    </div>
-                </div>
-            )}
-        </>
-    );
-};
+/** Contenu du tooltip réservation (affiché au survol par EventBar). */
+const BookingTooltipContent: React.FC<{ booking: EquipmentBooking; equipmentName: string }> = ({ booking, equipmentName }) => (
+    <>
+        <div className="font-bold text-bony-text text-sm mb-1">{equipmentName}</div>
+        <div className="text-xs text-slate-500 mb-2">{booking.description}</div>
+        <div className="flex flex-wrap gap-1 mb-2">
+            <span className="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded text-white">{booking.site}</span>
+            <span className="text-[9px] bg-slate-700 px-1.5 py-0.5 rounded text-white">{booking.service}</span>
+        </div>
+        <div className="mt-2 pt-2 border-t border-bony-border text-[10px] text-slate-500">
+            {format(new Date(booking.startDate), 'dd MMM')} - {format(new Date(booking.endDate), 'dd MMM yyyy')}
+        </div>
+    </>
+);
 
 const Material: React.FC = () => {
     const { user } = useAuth();
@@ -374,203 +285,61 @@ const Material: React.FC = () => {
 
     // --- RENDERERS ---
 
-    const renderGridHeader = (days: Date[]) => {
+    // Réservations filtrées par le sélecteur de matériel (logique métier conservée)
+    const filteredBookings = bookings.filter(b => selectedEquipmentId === 'All' || b.equipmentId === selectedEquipmentId);
+
+    // --- ÉVÉNEMENT RÉSERVATION (rendu partagé via EventBar, style Digital) ---
+    const renderBookingEvent = (booking: EquipmentBooking, meta: EventRenderMeta) => {
+        const eqName = equipment.find(e => e.id === booking.equipmentId)?.name || 'Inconnu';
         return (
-            <div className="grid grid-cols-7 border-b border-bony-border shrink-0">
-                {days.map(d => {
-                    const isToday = isSameDay(d, new Date());
-                    return (
-                        <div key={d.toISOString()} className={`p-2 text-center border-r border-bony-border last:border-r-0 ${isToday ? 'bg-bony-orange/10' : ''}`}>
-                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{format(d, 'EEE', { locale: fr })}</div>
-                            <div className={`text-sm font-bold ${isToday ? 'text-bony-orange' : 'text-bony-text'}`}>{d.getDate()}</div>
+            <EventBar
+                accentClass={serviceAccent(booking.service)}
+                onClick={(e) => { e.stopPropagation(); openBookingModal(booking); }}
+                tooltip={<BookingTooltipContent booking={booking} equipmentName={eqName} />}
+                clipLeft={meta.clipLeft}
+                clipRight={meta.clipRight}
+            >
+                {meta.view === 'week' ? (
+                    <div className="w-full overflow-hidden">
+                        <div className="flex items-center gap-1 overflow-hidden">
+                            <span className="font-bold text-[11px] shrink-0">{booking.quantity}x</span>
+                            <span className="font-bold truncate text-[11px] leading-tight">{eqName}</span>
                         </div>
-                    );
-                })}
-            </div>
+                        <div className="text-[9px] opacity-70 truncate mt-0.5">{booking.site} · {booking.service}</div>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-1 overflow-hidden">
+                        <span className="font-bold text-[10px] shrink-0">{booking.quantity}x</span>
+                        <span className="font-bold truncate text-[10px] leading-tight">{eqName}</span>
+                        <span className="opacity-60 text-[9px] truncate">- {booking.site}</span>
+                    </div>
+                )}
+            </EventBar>
         );
     };
 
-    const renderMonthView = () => {
-        const year = currentDate.getFullYear();
-        const month = currentDate.getMonth();
-        
-        const firstDayOfMonth = normalizeDate(new Date(year, month, 1));
-        // Adjust start day to Monday (0=Sun -> 6, 1=Mon -> 0)
-        const startDayIndex = (firstDayOfMonth.getDay() + 6) % 7;
-        const daysInMonth = getMonthDays(year, month);
-        
-        // Build Cells
-        const cells = [];
-        const prevMonthLastDay = new Date(year, month, 0).getDate();
-        for(let i = 0; i < startDayIndex; i++) {
-            cells.push({ date: new Date(year, month - 1, prevMonthLastDay - startDayIndex + 1 + i), isCurrentMonth: false });
-        }
-        daysInMonth.forEach(d => cells.push({ date: d, isCurrentMonth: true }));
-        const remaining = 7 - (cells.length % 7);
-        if (remaining < 7) {
-            for(let i = 1; i <= remaining; i++) {
-                cells.push({ date: new Date(year, month + 1, i), isCurrentMonth: false });
-            }
-        }
+    // --- VUE MOIS (grille partagée) ---
+    const renderMonthView = () => (
+        <CalendarGrid
+            view="month"
+            currentDate={currentDate}
+            items={filteredBookings}
+            renderEvent={renderBookingEvent}
+            onDayClick={(date) => openBookingModal(undefined, date)}
+            scrollRef={scrollRef}
+        />
+    );
 
-        // Chunk into Weeks
-        const weeks = [];
-        for (let i = 0; i < cells.length; i += 7) {
-            weeks.push(cells.slice(i, i + 7));
-        }
-
-        const daysHeader = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
-
-        // Filter bookings
-        const filteredBookings = bookings.filter(b => selectedEquipmentId === 'All' || b.equipmentId === selectedEquipmentId);
-
-        return (
-            <div className="flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-b-xl overflow-hidden">
-                <div className="grid grid-cols-7 border-b border-bony-border shrink-0">
-                    {daysHeader.map(d => (
-                        <div key={d} className="p-2 text-center text-[10px] font-bold text-slate-500 uppercase tracking-widest border-r border-bony-border last:border-r-0">
-                            {d}
-                        </div>
-                    ))}
-                </div>
-                <div ref={scrollRef} className="flex-1 flex flex-col gap-[1px] overflow-y-auto custom-scrollbar">
-                    {weeks.map((week, weekIdx) => {
-                        const weekStart = week[0].date;
-                        const weekEnd = week[6].date;
-                        
-                        // Calculate Layout for this week row
-                        const layoutItems = calculateLayout(filteredBookings, weekStart, weekEnd, 7);
-
-                        // Determine Row Height dynamically
-                        const maxLane = layoutItems.reduce((max, p) => Math.max(max, p.lane), -1);
-                        const itemHeight = 24; 
-                        const headerHeight = 28; 
-                        const minHeight = 110; 
-                        const contentHeight = Math.max(minHeight, headerHeight + (maxLane + 1) * itemHeight + 10);
-
-                        return (
-                            <div key={weekIdx} className="relative w-full" style={{ height: `${contentHeight}px` }}>
-                                {/* Grid Background */}
-                                <div className="absolute inset-0 grid grid-cols-7 divide-x divide-bony-border/30">
-                                    {week.map((day, dIdx) => {
-                                        const isToday = isSameDay(day.date, new Date());
-                                        return (
-                                            <div
-                                                key={dIdx}
-                                                className={`h-full ${!day.isCurrentMonth ? 'bg-slate-100/40 dark:bg-white/[0.02]' : 'bg-white/45 dark:bg-white/[0.04]'} ${isToday ? 'bg-bony-orange/[0.08] dark:bg-bony-orange/[0.12]' : ''} hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer`}
-                                                onClick={() => openBookingModal(undefined, day.date)}
-                                            >
-                                                <div className={`text-right text-xs font-sans font-bold p-1 ${isToday ? 'text-bony-orange' : 'text-slate-500'}`}>
-                                                    {day.date.getDate()}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Bookings Layer */}
-                                <div className="absolute inset-0 top-7 px-1 grid grid-cols-7 pointer-events-none">
-                                     {layoutItems.map((item, idx) => {
-                                         const eqName = equipment.find(e => e.id === item.booking.equipmentId)?.name || 'Inconnu';
-                                         return (
-                                            <div 
-                                                key={item.booking.id + weekIdx + idx}
-                                                className="relative pointer-events-auto"
-                                                style={{
-                                                    gridColumnStart: item.startCol + 1,
-                                                    gridColumnEnd: `span ${item.span}`,
-                                                    marginTop: `${item.lane * itemHeight}px`
-                                                }}
-                                            >
-                                                <BookingPill 
-                                                    booking={item.booking}
-                                                    equipmentName={eqName}
-                                                    onClick={() => openBookingModal(item.booking)}
-                                                    className={`
-                                                        w-full h-[22px]
-                                                        ${item.startCol === 0 && normalizeDate(item.booking.startDate) < normalizeDate(weekStart) ? 'rounded-l-none border-l-0 opacity-80' : ''}
-                                                        ${(item.startCol + item.span) === 7 && normalizeDate(item.booking.endDate) > normalizeDate(weekEnd) ? 'rounded-r-none' : ''}
-                                                    `}
-                                                />
-                                            </div>
-                                         );
-                                     })}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        );
-    };
-
-    const renderWeekView = () => {
-        const startOfWeek = getStartOfWeekDate(currentDate);
-        const endOfWeek = addDays(startOfWeek, 6);
-        const days = Array.from({length: 7}, (_, i) => addDays(startOfWeek, i));
-
-        // Filter bookings
-        const filteredBookings = bookings.filter(b => selectedEquipmentId === 'All' || b.equipmentId === selectedEquipmentId);
-        
-        // Calculate Layout
-        const layoutItems = calculateLayout(filteredBookings, startOfWeek, endOfWeek, 7);
-
-        // Dynamic height
-        const maxLane = layoutItems.reduce((max, p) => Math.max(max, p.lane), -1);
-        const itemHeight = 44; 
-        const totalHeight = Math.max(500, (maxLane + 1) * (itemHeight + 4) + 20);
-
-        return (
-            <div className="flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-b-xl overflow-hidden">
-                 {renderGridHeader(days)}
-                 <div className="flex-1 overflow-y-auto custom-scrollbar relative">
-                     {/* Columns Background */}
-                     <div className="absolute inset-0 grid grid-cols-7 divide-x divide-bony-border/30 h-full" style={{minHeight: totalHeight}}>
-                          {days.map((day, i) => {
-                              const isToday = isSameDay(day, new Date());
-                              return (
-                                  <div 
-                                    key={i} 
-                                    className={`h-full ${isToday ? 'bg-bony-orange/[0.08] dark:bg-bony-orange/[0.12]' : ''} hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer`}
-                                    onClick={() => openBookingModal(undefined, day)}
-                                  ></div>
-                              );
-                          })}
-                     </div>
-
-                     {/* Bookings Layer */}
-                     <div className="absolute inset-0 top-2 px-1 grid grid-cols-7 pointer-events-none" style={{height: totalHeight}}>
-                         {layoutItems.map((item, idx) => {
-                             const eqName = equipment.find(e => e.id === item.booking.equipmentId)?.name || 'Inconnu';
-                             return (
-                                 <div 
-                                     key={item.booking.id + idx}
-                                     className="relative pointer-events-auto"
-                                     style={{
-                                         gridColumnStart: item.startCol + 1,
-                                         gridColumnEnd: `span ${item.span}`,
-                                         marginTop: `${item.lane * (itemHeight + 4)}px`,
-                                         height: `${itemHeight}px`
-                                     }}
-                                 >
-                                      <BookingPill 
-                                           booking={item.booking}
-                                           equipmentName={eqName}
-                                           onClick={() => openBookingModal(item.booking)}
-                                           className={`
-                                              w-full h-full
-                                              ${item.startCol === 0 && normalizeDate(item.booking.startDate) < normalizeDate(startOfWeek) ? 'rounded-l-none border-l-0 opacity-80' : ''}
-                                              ${(item.startCol + item.span) === 7 && normalizeDate(item.booking.endDate) > normalizeDate(endOfWeek) ? 'rounded-r-none' : ''}
-                                           `}
-                                       />
-                                 </div>
-                             );
-                         })}
-                     </div>
-                 </div>
-            </div>
-        );
-    };
+    // --- VUE SEMAINE (grille partagée) ---
+    const renderWeekView = () => (
+        <CalendarGrid
+            view="week"
+            currentDate={currentDate}
+            items={filteredBookings}
+            renderEvent={renderBookingEvent}
+            onDayClick={(date) => openBookingModal(undefined, date)}
+        />
+    );
 
     return (
         <div className="flex h-screen overflow-hidden relative">
