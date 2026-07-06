@@ -160,6 +160,7 @@ export interface FixedExpense {
   brand?: BrandType; // Pour le routage budgétaire Alpine/Nissan (legacy — premier élément de brands)
   brands?: BrandType[]; // Multi-sélection marques pour le routage budgétaire
   proPlus?: boolean; // PRO+ (B2B) — optionnel, absent/false = non-PRO+ (fallback)
+  isAnnual?: boolean; // Dépense annuelle : montant total sur l'année, fractionné sur 12 mois UNIQUEMENT à l'agrégation Budget (jamais stocké dupliqué). Absent/false = mensuelle (comportement inchangé).
 }
 
 // --- CHAT TYPES ---

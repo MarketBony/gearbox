@@ -340,8 +340,11 @@ const FixedExpenses: React.FC = () => {
                             filteredExpenses.map((expense) => (
                                 <div key={expense.id} className="gx-card p-3 space-y-2">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-xs font-bold text-bony-orange">
+                                        <span className="text-xs font-bold text-bony-orange flex items-center gap-1.5">
                                             {new Date(expense.date).toLocaleDateString()}
+                                            {expense.isAnnual && (
+                                                <span className="text-[8px] font-bold uppercase tracking-wide text-bony-violet bg-bony-violet/10 border border-bony-violet/30 px-1.5 py-0.5 rounded">Annuelle</span>
+                                            )}
                                         </span>
                                         <span className="font-bold text-bony-text">
                                             {expense.amount.toLocaleString()} €
@@ -406,7 +409,12 @@ const FixedExpenses: React.FC = () => {
                                 {filteredExpenses.length > 0 ? filteredExpenses.map((expense) => (
                                     <tr key={expense.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition group">
                                         <td className="p-4 text-sm font-sans font-medium text-slate-600 dark:text-slate-300">
-                                            {new Date(expense.date).toLocaleDateString()}
+                                            <div className="flex flex-col gap-1">
+                                                <span>{new Date(expense.date).toLocaleDateString()}</span>
+                                                {expense.isAnnual && (
+                                                    <span className="w-fit text-[8px] font-bold uppercase tracking-wide text-bony-violet bg-bony-violet/10 border border-bony-violet/30 px-1.5 py-0.5 rounded">Annuelle</span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-4">
                                             <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 bg-slate-100 dark:bg-black/30 px-2 py-1 rounded border border-bony-border block truncate max-w-[200px]" title={expense.site}>
@@ -466,14 +474,43 @@ const FixedExpenses: React.FC = () => {
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pt-4 space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
-                                            <Calendar size={12}/> Date
-                                        </label>
-                                        <DatePicker
-                                            size="md"
-                                            value={currentExpense.date || ''}
-                                            onChange={(v) => setCurrentExpense({...currentExpense, date: v})}
-                                        />
+                                        <div className="flex items-center justify-between gap-2 min-h-[16px]">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                                                <Calendar size={12}/> Date
+                                            </label>
+                                            {/* Dépense annuelle — création uniquement (hors scope en édition) */}
+                                            {!isEditing && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCurrentExpense({ ...currentExpense, isAnnual: !currentExpense.isAnnual })}
+                                                    className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wide transition-all ${
+                                                        currentExpense.isAnnual
+                                                            ? 'bg-bony-gradient text-white border-transparent shadow'
+                                                            : 'bg-slate-100 dark:bg-black/20 text-slate-500 border-bony-border hover:text-bony-text'
+                                                    }`}
+                                                    title="Montant total réparti automatiquement sur les 12 mois de l'année (calcul au Budget uniquement)"
+                                                >
+                                                    <span className={`flex items-center justify-center w-3 h-3 rounded border transition-colors ${
+                                                        currentExpense.isAnnual ? 'bg-white/25 border-white/60' : 'border-slate-400 dark:border-slate-500'
+                                                    }`}>
+                                                        {currentExpense.isAnnual && <Check size={9} strokeWidth={3} />}
+                                                    </span>
+                                                    Annuelle
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className={currentExpense.isAnnual ? 'opacity-50 pointer-events-none' : ''}>
+                                            <DatePicker
+                                                size="md"
+                                                value={currentExpense.date || ''}
+                                                onChange={(v) => setCurrentExpense({...currentExpense, date: v})}
+                                            />
+                                        </div>
+                                        {currentExpense.isAnnual && currentExpense.date && (
+                                            <p className="text-[9px] text-slate-400 italic">
+                                                Réparti sur toute l'année {new Date(currentExpense.date).getFullYear()} (montant total ci-contre).
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">

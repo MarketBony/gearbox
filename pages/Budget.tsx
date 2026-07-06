@@ -501,12 +501,6 @@ const Budget: React.FC = () => {
               
               const siteCost = totalCost * (sharePct / 100);
 
-              // Month Mapping
-              const monthIdx = expDate.getMonth();
-              
-              // Only process if within date range
-              if (monthIdx < filterMonthStart || monthIdx > filterMonthEnd) return;
-
               // Service Dispatch
               let servicesToHit: string[] = [];
               if (exp.service === 'Tous Services') {
@@ -514,10 +508,25 @@ const Budget: React.FC = () => {
               } else if (['VN', 'VO', 'PR', 'APV'].includes(exp.service)) {
                   servicesToHit = [exp.service];
               }
+              if (servicesToHit.length === 0) return;
 
-              if (servicesToHit.length > 0) {
-                  const costPerSvc = siteCost / servicesToHit.length;
-                  
+              // Month Mapping — répartition sur les mois.
+              // Dépense ANNUELLE : on ignore le mois de expDate, seule l'année sert de
+              // référence ; le coût du site est étalé à parts égales (siteCost/12) sur les
+              // 12 mois de l'année. Ce fractionnement est calculé ici, à l'agrégation
+              // uniquement — aucune ligne n'est dupliquée en base.
+              // Dépense MENSUELLE : comportement inchangé, coût versé sur le mois de expDate.
+              const monthlyContributions = exp.isAnnual
+                  ? Array.from({ length: 12 }, (_, m) => ({ monthIdx: m, cost: siteCost / 12 }))
+                  : [{ monthIdx: expDate.getMonth(), cost: siteCost }];
+
+              monthlyContributions.forEach(({ monthIdx, cost }) => {
+                  // Le filtre de période s'applique par mois : une dépense annuelle ne
+                  // verse que les mois compris dans [filterMonthStart, filterMonthEnd].
+                  if (monthIdx < filterMonthStart || monthIdx > filterMonthEnd) return;
+
+                  const costPerSvc = cost / servicesToHit.length;
+
                   servicesToHit.forEach(svc => {
                       if (servicesToProcess.includes(svc as any)) {
                           if (siteStats[targetSite].actual[svc] !== undefined) {
@@ -526,7 +535,7 @@ const Budget: React.FC = () => {
                           siteStats[targetSite].actualMonthly[monthIdx] += costPerSvc;
                       }
                   });
-              }
+              });
           });
       });
 
