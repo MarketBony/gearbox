@@ -416,8 +416,9 @@ const Budget: React.FC = () => {
                   if (!filterBrands.some(fb => pBrands.includes(fb)) && !pBrands.includes('Groupe')) return;
               }
 
-              // Year Filter
-              const pDate = new Date(p.endDate);
+              // Year Filter — un projet est compté sur sa date de DÉBUT (startDate),
+              // pas de fin. pDate pilote l'année (filterYear) et le mois (monthIdx ci-dessous).
+              const pDate = new Date(p.startDate);
               if (pDate.getFullYear() !== filterYear) return;
 
               // Cost Calculation for this Site

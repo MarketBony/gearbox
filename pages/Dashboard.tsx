@@ -525,7 +525,9 @@ const Dashboard: React.FC = () => {
         const hasCampaign = p.tasks.some(t => (t.channel === 'SMS' || t.channel === 'E-mail') && t.status === 'Programmed');
         if (hasCampaign) activeCampaignsCount++;
 
-        const pDate = new Date(p.endDate);
+        // Date de référence = date de DÉBUT du projet (cohérent avec l'agrégation Budget) :
+        // le budget réalisé est compté sur le mois/année de startDate, pas de fin.
+        const pDate = new Date(p.startDate);
         const cost = p.budgetActual || 0;
 
         if (pDate.getFullYear() === chartYear) {
