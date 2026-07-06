@@ -478,26 +478,24 @@ const FixedExpenses: React.FC = () => {
                                             <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
                                                 <Calendar size={12}/> Date
                                             </label>
-                                            {/* Dépense annuelle — création uniquement (hors scope en édition) */}
-                                            {!isEditing && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setCurrentExpense({ ...currentExpense, isAnnual: !currentExpense.isAnnual })}
-                                                    className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wide transition-all ${
-                                                        currentExpense.isAnnual
-                                                            ? 'bg-bony-gradient text-white border-transparent shadow'
-                                                            : 'bg-slate-100 dark:bg-black/20 text-slate-500 border-bony-border hover:text-bony-text'
-                                                    }`}
-                                                    title="Montant total réparti automatiquement sur les 12 mois de l'année (calcul au Budget uniquement)"
-                                                >
-                                                    <span className={`flex items-center justify-center w-3 h-3 rounded border transition-colors ${
-                                                        currentExpense.isAnnual ? 'bg-white/25 border-white/60' : 'border-slate-400 dark:border-slate-500'
-                                                    }`}>
-                                                        {currentExpense.isAnnual && <Check size={9} strokeWidth={3} />}
-                                                    </span>
-                                                    Annuelle
-                                                </button>
-                                            )}
+                                            {/* Dépense annuelle — disponible en création ET en édition (cochable/décochable) */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setCurrentExpense({ ...currentExpense, isAnnual: !currentExpense.isAnnual })}
+                                                className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wide transition-all ${
+                                                    currentExpense.isAnnual
+                                                        ? 'bg-bony-gradient text-white border-transparent shadow'
+                                                        : 'bg-slate-100 dark:bg-black/20 text-slate-500 border-bony-border hover:text-bony-text'
+                                                }`}
+                                                title="Montant total réparti automatiquement sur les 12 mois de l'année (calcul au Budget uniquement)"
+                                            >
+                                                <span className={`flex items-center justify-center w-3 h-3 rounded border transition-colors ${
+                                                    currentExpense.isAnnual ? 'bg-white/25 border-white/60' : 'border-slate-400 dark:border-slate-500'
+                                                }`}>
+                                                    {currentExpense.isAnnual && <Check size={9} strokeWidth={3} />}
+                                                </span>
+                                                Annuelle
+                                            </button>
                                         </div>
                                         <div className={currentExpense.isAnnual ? 'opacity-50 pointer-events-none' : ''}>
                                             <DatePicker
