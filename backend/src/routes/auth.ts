@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET as SECRET } from '../auth/secret';
 
 const router = Router();
 const prisma = new PrismaClient();
-const SECRET = process.env.JWT_SECRET || 'secret';
 
 router.post('/login', async (req, res) => {
   const { loginId, password } = req.body;
