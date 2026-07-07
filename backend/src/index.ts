@@ -11,6 +11,7 @@ import budgetRoutes from './routes/budget';
 import contactRoutes from './routes/contacts';
 import tagRoutes from './routes/tags';
 import expenseRoutes from './routes/expenses';
+import fixedExpenseRoutes from './routes/fixedExpenses';
 import userRoutes from './routes/users';
 import seedRoutes from './routes/seed';
 import { setupRealtime } from './realtime';
@@ -40,6 +41,7 @@ app.use('/api/budget', budgetRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/fixed-expenses', fixedExpenseRoutes);
 
 // Realtime
 setupRealtime(io);

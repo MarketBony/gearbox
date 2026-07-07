@@ -16,6 +16,7 @@ import budgetRoutes from './backend/src/routes/budget';
 import contactRoutes from './backend/src/routes/contacts';
 import tagRoutes from './backend/src/routes/tags';
 import expenseRoutes from './backend/src/routes/expenses';
+import fixedExpenseRoutes from './backend/src/routes/fixedExpenses';
 import userRoutes from './backend/src/routes/users';
 import seedRoutes from './backend/src/routes/seed';
 import { setupRealtime } from './backend/src/realtime';
@@ -48,6 +49,7 @@ async function startServer() {
   app.use('/api/contacts', contactRoutes);
   app.use('/api/tags', tagRoutes);
   app.use('/api/expenses', expenseRoutes);
+  app.use('/api/fixed-expenses', fixedExpenseRoutes);
 
   // Realtime
   setupRealtime(io);
