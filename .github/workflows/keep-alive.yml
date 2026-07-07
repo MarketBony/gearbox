@@ -27,3 +27,4 @@ jobs:
           # importance pour un simple SELECT.
           psql "$SUPABASE_DB_URL" -c "SELECT 1 AS keep_alive;"
           echo "Base contactée avec succès — le projet Supabase reste actif."
+# (réindexation forcée)
