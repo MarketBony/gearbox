@@ -6,8 +6,8 @@ import { emitEvent } from '../realtime';
 const router = Router();
 const prisma = new PrismaClient();
 
-// Mutations réservées aux rôles autorisés à modifier le budget (même règle que budget.ts).
-const EDIT_ROLES = ['Master', 'Administrator'];
+// Mutations réservées aux rôles autorisés à modifier le budget.
+const EDIT_ROLES = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'];
 
 // Contrat aligné sur le frontend (types.ts FixedExpense + pages/FixedExpenses.tsx) :
 // { date, service, site, sites?, budgetDistribution?, comment, amount,

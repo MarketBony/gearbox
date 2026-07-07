@@ -10,8 +10,8 @@ import DatePicker from '../components/DatePicker';
 
 const FixedExpenses: React.FC = () => {
     const { user } = useAuth();
-    // Écritures réservées Master/Administrator (aligné sur les rôles du backend).
-    const canEdit = user?.role === 'Master' || user?.role === 'Administrator';
+    // Écritures réservées aux rôles autorisés (aligné sur EDIT_ROLES du backend).
+    const canEdit = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'].includes(user?.role ?? '');
     const [expenses, setExpenses] = useState<FixedExpense[]>([]);
     const [searchTerm, setSearchTerm] = useSessionState<string>('fixedexpenses_searchTerm', '');
     const [isModalOpen, setIsModalOpen] = useState(false);
