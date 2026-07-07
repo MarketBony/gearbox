@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost } from '../types';
+import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense } from '../types';
 import { db } from '../services/dataService';
 import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS } from '../constants';
 import {
@@ -394,6 +394,7 @@ const Dashboard: React.FC = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [budgets, setBudgets] = useState<BudgetLine[]>([]);
   const [socialPosts, setSocialPosts] = useState<SocialPost[]>([]); // New State
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
   const [loading, setLoading] = useState(true);
 
   // --- FILTER STATES ---
@@ -412,16 +413,18 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [pData, cData, bData, sData] = await Promise.all([
+      const [pData, cData, bData, sData, feData] = await Promise.all([
         db.getProjects(),
         db.getCampaigns(),
         db.getBudgets(),
-        db.getSocialPosts()
+        db.getSocialPosts(),
+        db.getFixedExpenses()
       ]);
       setProjects(pData);
       setCampaigns(cData);
       setBudgets(bData);
       setSocialPosts(sData);
+      setFixedExpenses(feData);
       setLoading(false);
     };
     load();
@@ -555,6 +558,63 @@ const Dashboard: React.FC = () => {
         }
     });
 
+    // 3bis. Process FIXED EXPENSES (Actuals) — même scope et même niveau de détail
+    // que les projets ci-dessus (site principal remappé, pas de routage bucket
+    // Alpine/Nissan ni de split par site : le Dashboard ne le fait pas pour les projets).
+    fixedExpenses.forEach(e => {
+        if (!isProPlusInScope(e.proPlus)) return;
+
+        let eSite = e.site;
+        if (eSite === 'Thiers' || eSite === 'Ambert') eSite = 'Ricoux';
+        if (eSite === 'Riom') eSite = 'Mozac';
+        if (!isSiteInScope(eSite)) return;
+
+        const eBrands = e.brands || (e.brand ? [e.brand] : []);
+        if (!isBrandInScope(eBrands)) return;
+
+        if (!isServiceInScope([e.service])) return;
+
+        const cost = e.amount || 0;
+        if (cost === 0) return;
+
+        const expDate = new Date(e.date);
+        const expYear = expDate.getFullYear();
+
+        // Dépense ANNUELLE : même principe que l'agrégation Budget.tsx — le mois de
+        // expDate est ignoré, le montant contribue cost/12 sur chacun des 12 mois de
+        // l'année civile de référence. Dépense mensuelle : tout sur le mois de expDate.
+        const monthlyContributions = e.isAnnual
+            ? Array.from({ length: 12 }, (_, m) => ({ monthIdx: m, mCost: cost / 12 }))
+            : [{ monthIdx: expDate.getMonth(), mCost: cost }];
+
+        let servicesToHit: string[] = [];
+        if (e.service === 'Tous Services') {
+            servicesToHit = ['VN', 'VO', 'APV', 'PR'];
+        } else if (['VN', 'VO', 'APV', 'PR'].includes(e.service)) {
+            servicesToHit = [e.service];
+        }
+
+        monthlyContributions.forEach(({ monthIdx, mCost }) => {
+            if (expYear === chartYear) {
+                monthlyTrend[monthIdx].reel += mCost;
+            }
+
+            // Fenêtre de période : la contribution mensuelle d'une annuelle est testée
+            // au 15 du mois (même convention que la section budgets ci-dessus) ;
+            // une mensuelle est testée sur sa date réelle, comme les projets.
+            const checkDate = e.isAnnual ? new Date(expYear, monthIdx, 15) : expDate;
+            if (checkDate >= dStart && checkDate <= dEnd) {
+                totalActual += mCost;
+                if (servicesToHit.length > 0) {
+                    const splitAmount = mCost / servicesToHit.length;
+                    servicesToHit.forEach(s => {
+                        if (serviceMix[s] !== undefined) serviceMix[s] += splitAmount;
+                    });
+                }
+            }
+        });
+    });
+
     let accReel = 0;
     monthlyTrend.forEach(m => {
         accReel += m.reel;
@@ -614,7 +674,7 @@ const Dashboard: React.FC = () => {
         upcomingPosts
     };
 
-  }, [projects, budgets, socialPosts, dateStart, dateEnd, filterContexts, filterBrands, filterServices, filterProPlus]);
+  }, [projects, budgets, socialPosts, fixedExpenses, dateStart, dateEnd, filterContexts, filterBrands, filterServices, filterProPlus]);
 
   // --- RENDER HELPERS ---
   const formatCurrency = (val: number) => val.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
