@@ -1,0 +1,29 @@
+# Keep-alive Supabase : requête minimale tous les 3 jours pour éviter la mise
+# en pause du projet Free tier après 7 jours d'inactivité.
+# Secret requis : SUPABASE_DB_URL (URL Session pooler — voir ETAT-BACKEND.md).
+name: Supabase keep-alive
+
+on:
+  schedule:
+    # Tous les 3 jours à 06:17 UTC (heure décalée pour éviter les pics de charge GitHub).
+    # NB: "*/3" se réinitialise en début de mois — sans incidence, l'intervalle reste < 7 jours.
+    - cron: '17 6 */3 * *'
+  workflow_dispatch: {} # déclenchement manuel pour le premier test
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: SELECT 1 vers Supabase
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Secret SUPABASE_DB_URL manquant (à créer dans Settings > Secrets and variables > Actions)"
+            exit 1
+          fi
+          # psql est préinstallé sur ubuntu-latest ; la version cliente est sans
+          # importance pour un simple SELECT.
+          psql "$SUPABASE_DB_URL" -c "SELECT 1 AS keep_alive;"
+          echo "Base contactée avec succès — le projet Supabase reste actif."
