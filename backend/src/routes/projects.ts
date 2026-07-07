@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
+import { withDates } from '../utils/dates';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -18,7 +19,7 @@ router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) =>
   const { tasks, ...projectData } = req.body;
   const project = await prisma.project.create({
     data: {
-      ...projectData,
+      ...withDates(projectData, ['startDate', 'endDate']),
       tasks: {
         create: tasks
       }
@@ -57,7 +58,7 @@ router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) 
   const project = await prisma.$transaction(async (tx) => {
     await tx.project.update({
       where: { id },
-      data: projectData
+      data: withDates(projectData, ['startDate', 'endDate'])
     });
 
     const existing = await tx.task.findMany({
