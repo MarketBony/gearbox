@@ -27,6 +27,7 @@
     "@types/node": "^20.11.24",
     "nodemon": "^3.1.0",
     "prisma": "^5.10.2",
+    "socket.io-client": "^4.8.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }

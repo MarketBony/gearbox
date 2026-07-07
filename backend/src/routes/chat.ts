@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, AuthRequest } from '../auth/middleware';
+import { joinConversationRooms, notifyConversationCreated } from '../realtime';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -92,6 +93,11 @@ router.post('/conversations', authenticateToken, async (req: AuthRequest, res) =
       unreadCounts: {}
     }
   });
+
+  // Les sockets déjà connectées des participants rejoignent la room de la
+  // nouvelle conversation et en sont notifiées.
+  await joinConversationRooms(conversation.id, allParticipants);
+  notifyConversationCreated(conversation);
 
   res.json(conversation);
 });

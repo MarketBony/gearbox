@@ -1,6 +1,12 @@
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../auth/secret';
+import {
+  joinUserRooms,
+  registerChatHandlers,
+  joinConversationRooms as chatJoinConversationRooms,
+  notifyConversationCreated as chatNotifyConversationCreated
+} from './chat';
 
 let io: Server;
 
@@ -40,6 +46,12 @@ export const setupRealtime = (socketIo: Server) => {
 
   io.on('connection', (socket) => {
     console.log('Client connected', socket.id, `(user ${socket.data.user?.id})`);
+
+    // Chat : rejoint sa room personnelle + celles de ses conversations,
+    // puis enregistre les handlers temps réel (voir ./chat).
+    joinUserRooms(socket).catch(err => console.error('joinUserRooms failed', err));
+    registerChatHandlers(io, socket);
+
     socket.on('disconnect', () => {
       console.log('Client disconnected', socket.id);
     });
@@ -50,4 +62,14 @@ export const emitEvent = (event: string, data: any) => {
   if (io) {
     io.emit(event, data);
   }
+};
+
+// Helpers chat exposés aux routes REST (création de conversation) —
+// no-op si le serveur socket n'est pas initialisé.
+export const joinConversationRooms = async (conversationId: string, participantIds: string[]) => {
+  if (io) await chatJoinConversationRooms(io, conversationId, participantIds);
+};
+
+export const notifyConversationCreated = (conversation: { participants: string[] }) => {
+  if (io) chatNotifyConversationCreated(io, conversation);
 };
