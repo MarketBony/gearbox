@@ -12,6 +12,8 @@ import contactRoutes from './routes/contacts';
 import tagRoutes from './routes/tags';
 import expenseRoutes from './routes/expenses';
 import fixedExpenseRoutes from './routes/fixedExpenses';
+import equipmentRoutes from './routes/equipment';
+import equipmentBookingRoutes from './routes/equipmentBookings';
 import userRoutes from './routes/users';
 import seedRoutes from './routes/seed';
 import { setupRealtime } from './realtime';
@@ -42,6 +44,8 @@ app.use('/api/contacts', contactRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/fixed-expenses', fixedExpenseRoutes);
+app.use('/api/equipment', equipmentRoutes);
+app.use('/api/equipment-bookings', equipmentBookingRoutes);
 
 // Realtime
 setupRealtime(io);
