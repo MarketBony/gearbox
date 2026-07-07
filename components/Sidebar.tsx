@@ -55,7 +55,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const [gamesChallengeCount, setGamesChallengeCount] = useState(0);
 
   const loadActivity = () => {
-    setActivityLog(db.getActivityLog());
+    // GET /api/activity-log — best-effort : la cloche reste vide si l'API est injoignable.
+    db.getActivityLog().then(setActivityLog).catch(() => { /* ignore */ });
     setLastReadTs(localStorage.getItem('gearbox_activity_last_read'));
   };
 

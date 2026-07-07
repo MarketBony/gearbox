@@ -7,25 +7,6 @@ import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPT
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-const MOCK_EQUIPMENT: Equipment[] = [
-    { id: 'eq-1', name: 'Enceinte JBL', totalQuantity: 2, category: 'Son' },
-    { id: 'eq-2', name: 'Desk Bony', totalQuantity: 1, category: 'Mobilier' },
-    { id: 'eq-3', name: 'Desk Alpine', totalQuantity: 1, category: 'Mobilier' },
-    { id: 'eq-4', name: 'Kakémono ID', totalQuantity: 2, category: 'PLV' },
-    { id: 'eq-5', name: 'Mur d\'image', totalQuantity: 1, category: 'PLV' },
-    { id: 'eq-6', name: 'Kakémono Carte RH', totalQuantity: 1, category: 'PLV' },
-    { id: 'eq-7', name: 'Kakémono Valeurs RH', totalQuantity: 1, category: 'PLV' },
-    { id: 'eq-8', name: 'Kakémono Métiers RH', totalQuantity: 1, category: 'PLV' },
-    { id: 'eq-9', name: 'Kit Kakémono VA', totalQuantity: 1, category: 'PLV' },
-    { id: 'eq-10', name: 'Tonelle Renault', totalQuantity: 1, category: 'Structure' },
-    { id: 'eq-11', name: 'Tonelle Dacia', totalQuantity: 2, category: 'Structure' },
-    { id: 'eq-12', name: 'Tonelle Blanche', totalQuantity: 1, category: 'Structure' },
-    { id: 'eq-13', name: 'Transat Dacia', totalQuantity: 2, category: 'Mobilier' },
-    { id: 'eq-14', name: 'Tables', totalQuantity: 10, category: 'Mobilier' },
-    { id: 'eq-15', name: 'Chaises', totalQuantity: 32, category: 'Mobilier' },
-    { id: 'eq-16', name: 'Mange-debout', totalQuantity: 12, category: 'Mobilier' },
-];
-
 const DEFAULT_USERS: User[] = [
     { id: 'u1', name: 'Théo Labonne', loginId: 'Theo', password: 'admin', role: 'Master', avatarColor: '#f75632' },
     { id: 'u2', name: 'Claire Richard', loginId: 'Claire', password: 'admin', role: 'Administrator', avatarColor: '#8f12ab' },
@@ -163,6 +144,20 @@ const normalizeFixedExpense = (e: any): FixedExpense => ({
   ...e,
   date: toDay(e.date)
 });
+const normalizeCampaign = (c: any): Campaign => ({
+  ...c,
+  startDate: toDay(c.startDate),
+  endDate: toDay(c.endDate)
+});
+const normalizeBooking = (b: any): EquipmentBooking => ({
+  ...b,
+  startDate: toDay(b.startDate),
+  endDate: toDay(b.endDate)
+});
+// Le backend génère les ids et gère createdAt/updatedAt : on ne les renvoie
+// pas dans les corps de mutation (les routes social/campaigns passent le body
+// brut à Prisma).
+const stripMeta = ({ id, createdAt, updatedAt, ...data }: any) => data;
 
 // Helpers de migration one-shot localStorage -> Supabase (étape 7.2) :
 // ne s'exécute que si l'API est vide, qu'aucune migration n'a déjà eu lieu
@@ -199,14 +194,6 @@ class DataService {
     // Ensure budgets exist if adding this feature later
     if (!localStorage.getItem('gearbox_budgets')) {
         localStorage.setItem('gearbox_budgets', JSON.stringify(INITIAL_BUDGET_SCENARIO));
-    }
-    // Ensure Equipment exists
-    if (!localStorage.getItem('gearbox_equipment')) {
-        localStorage.setItem('gearbox_equipment', JSON.stringify(MOCK_EQUIPMENT));
-    }
-    // Ensure Equipment Bookings exist
-    if (!localStorage.getItem('gearbox_equipment_bookings')) {
-        localStorage.setItem('gearbox_equipment_bookings', JSON.stringify([]));
     }
     // Ensure Users exist
     if (!localStorage.getItem('gearbox_users')) {
@@ -270,17 +257,95 @@ class DataService {
     await apiFetch(`/projects/${id}`, { method: 'DELETE' });
   }
   
-  // --- Campaigns ---
-  async getCampaigns(): Promise<Campaign[]> { return this.get('campaigns'); }
-  async saveCampaigns(campaigns: Campaign[]) { await this.save('campaigns', campaigns); }
+  // --- Campaigns (BRANCHÉES BACKEND — étape 7.4) ---
+  // Aucun CRUD UI aujourd'hui (Campaigns.tsx travaille sur les tâches des
+  // projets ; seul le Dashboard lit la liste) — le CRUD unitaire est posé
+  // pour le jour où un écran l'utilisera. Écritures : Master/Admin/Coordinator.
+  async getCampaigns(): Promise<Campaign[]> {
+    const campaigns = await apiFetch<any[]>('/campaigns');
+    return campaigns.map(normalizeCampaign);
+  }
+  async createCampaign(campaign: Campaign): Promise<Campaign> {
+    return normalizeCampaign(await apiFetch('/campaigns', { method: 'POST', body: JSON.stringify(stripMeta(campaign)) }));
+  }
+  async updateCampaign(campaign: Campaign): Promise<Campaign> {
+    return normalizeCampaign(await apiFetch(`/campaigns/${campaign.id}`, { method: 'PUT', body: JSON.stringify(stripMeta(campaign)) }));
+  }
+  async deleteCampaign(id: string): Promise<void> {
+    await apiFetch(`/campaigns/${id}`, { method: 'DELETE' });
+  }
 
-  // --- Equipment ---
-  async getEquipment(): Promise<Equipment[]> { return this.get('equipment'); }
-  async saveEquipment(equipment: Equipment[]) { await this.save('equipment', equipment); }
+  // --- Equipment + réservations (BRANCHÉS BACKEND — étape 7.4) ---
+  // Catalogue : mutations Master/Administrator (routes/equipment.ts) ;
+  // réservations : tout utilisateur authentifié (routes/equipmentBookings.ts).
+  // Pas de contrôle de chevauchement côté serveur (BUGS-CONNUS.md) : le
+  // frontend garde son calcul de disponibilité en mémoire.
+  async getEquipment(): Promise<Equipment[]> {
+    let equipment = await apiFetch<any[]>('/equipment');
+    equipment = await this.migrateEquipmentIfNeeded(equipment);
+    return equipment;
+  }
+  async createEquipment(eq: Omit<Equipment, 'id'>): Promise<Equipment> {
+    return apiFetch('/equipment', { method: 'POST', body: JSON.stringify(eq) });
+  }
+  async updateEquipment(eq: Equipment): Promise<Equipment> {
+    return apiFetch(`/equipment/${eq.id}`, { method: 'PUT', body: JSON.stringify(stripMeta(eq)) });
+  }
+  async deleteEquipment(id: string): Promise<void> {
+    await apiFetch(`/equipment/${id}`, { method: 'DELETE' });
+  }
 
-  async getEquipmentBookings(): Promise<EquipmentBooking[]> { return this.get('equipment_bookings'); }
-  async saveEquipmentBookings(bookings: EquipmentBooking[]) { await this.save('equipment_bookings', bookings); }
-  
+  async getEquipmentBookings(): Promise<EquipmentBooking[]> {
+    const bookings = await apiFetch<any[]>('/equipment-bookings');
+    return bookings.map(normalizeBooking);
+  }
+  async createEquipmentBooking(booking: Omit<EquipmentBooking, 'id'>): Promise<EquipmentBooking> {
+    return normalizeBooking(await apiFetch('/equipment-bookings', { method: 'POST', body: JSON.stringify(booking) }));
+  }
+  async updateEquipmentBooking(booking: EquipmentBooking): Promise<EquipmentBooking> {
+    return normalizeBooking(await apiFetch(`/equipment-bookings/${booking.id}`, { method: 'PUT', body: JSON.stringify(stripMeta(booking)) }));
+  }
+  async deleteEquipmentBooking(id: string): Promise<void> {
+    await apiFetch(`/equipment-bookings/${id}`, { method: 'DELETE' });
+  }
+  // Migration one-shot catalogue + réservations : les réservations locales
+  // référencent les anciens ids localStorage -> on mappe vers les ids générés
+  // par le backend au fil des POST.
+  private async migrateEquipmentIfNeeded(apiEquipment: any[]): Promise<any[]> {
+    const FLAG = 'gearbox_migrated_equipment';
+    if (apiEquipment.length > 0 || localStorage.getItem(FLAG) || !isStoredUserAdmin()) return apiEquipment;
+    const localEq = readLocalStore<Equipment>('equipment');
+    if (localEq.length === 0) {
+      localStorage.setItem(FLAG, '1');
+      return apiEquipment;
+    }
+    const idMap: Record<string, string> = {};
+    for (const eq of localEq) {
+      const created = await apiFetch('/equipment', {
+        method: 'POST',
+        body: JSON.stringify({ name: eq.name, totalQuantity: Number(eq.totalQuantity), category: eq.category })
+      });
+      idMap[eq.id] = created.id;
+    }
+    const localBk = readLocalStore<EquipmentBooking>('equipment_bookings');
+    let migratedBk = 0;
+    for (const bk of localBk) {
+      const equipmentId = idMap[bk.equipmentId];
+      if (!equipmentId) continue; // réservation orpheline (matériel disparu)
+      try {
+        await apiFetch('/equipment-bookings', {
+          method: 'POST',
+          body: JSON.stringify({ ...stripMeta(bk), equipmentId, quantity: Number(bk.quantity) })
+        });
+        migratedBk++;
+      } catch { /* réservation invalide : on ne bloque pas le reste */ }
+    }
+    localStorage.setItem(FLAG, '1');
+    console.info(`[migration] ${localEq.length} matériel(s) et ${migratedBk} réservation(s) localStorage poussés vers Supabase.`);
+    return apiFetch<any[]>('/equipment');
+  }
+
+
   // --- Expenses (Actuals) ---
   async getExpenses(): Promise<Expense[]> { return this.get('expenses'); }
   async saveExpenses(expenses: Expense[]) { await this.save('expenses', expenses); }
@@ -426,23 +491,19 @@ class DataService {
     await this.saveUsers(users.filter(u => u.id !== id));
   }
 
-  // --- ACTIVITY LOG ---
-  getActivityLog(): ActivityLog[] {
-    const data = localStorage.getItem('gearbox_activity_log');
-    return data ? JSON.parse(data) : [];
+  // --- ACTIVITY LOG (BRANCHÉ BACKEND — étape 7.4) ---
+  // Lecture : GET (200 entrées max, récent d'abord, plafond appliqué côté
+  // serveur). Écriture : POST fire-and-forget — la règle "Master non
+  // journalisé" est appliquée côté backend d'après le rôle du JWT (204).
+  async getActivityLog(): Promise<ActivityLog[]> {
+    return apiFetch<ActivityLog[]>('/activity-log');
   }
 
   logActivity(entry: ActivityLog) {
-    // Actions du Master invisibles dans le fil d'actualité
-    try {
-      const users: User[] = JSON.parse(localStorage.getItem('gearbox_users') || '[]');
-      const actor = users.find(u => u.id === entry.userId);
-      if (actor?.role === 'Master') return;
-    } catch { /* ignore */ }
-    const log = this.getActivityLog();
-    const updated = [entry, ...log].slice(0, 200);
-    localStorage.setItem('gearbox_activity_log', JSON.stringify(updated));
-    window.dispatchEvent(new CustomEvent('gearbox-activity-updated'));
+    const { id, ...data } = entry; // id généré par le backend
+    apiFetch('/activity-log', { method: 'POST', body: JSON.stringify(data) })
+      .then(() => window.dispatchEvent(new CustomEvent('gearbox-activity-updated')))
+      .catch(() => { /* journalisation best-effort : ne bloque jamais l'action */ });
   }
 
   // --- AUTH (BRANCHÉE BACKEND — étape 7.1) ---

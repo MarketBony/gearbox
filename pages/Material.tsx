@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { db } from '../services/dataService';
+import { db, ApiError } from '../services/dataService';
 import { Equipment, EquipmentBooking, Site, ServiceType, BrandType, ActivityLog } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Calendar, Package, Trash2, Edit, ChevronLeft, ChevronRight, Search, Filter, X, AlertCircle } from 'lucide-react';
@@ -65,6 +65,10 @@ const BookingTooltipContent: React.FC<{ booking: EquipmentBooking; equipmentName
 
 const Material: React.FC = () => {
     const { user } = useAuth();
+    // Gestion du catalogue réservée Master/Administrator (aligné sur
+    // MANAGE_ROLES de routes/equipment.ts) ; les réservations restent
+    // ouvertes à tout utilisateur authentifié (routes/equipmentBookings.ts).
+    const canManageCatalog = user?.role === 'Master' || user?.role === 'Administrator';
     const [activeTab, setActiveTab] = useSessionState<'planning' | 'inventory'>('material_activeTab', 'planning');
     const [equipment, setEquipment] = useState<Equipment[]>([]);
     const [bookings, setBookings] = useState<EquipmentBooking[]>([]);
@@ -157,31 +161,39 @@ const Material: React.FC = () => {
             return;
         }
 
-        let updatedEquipment = [...equipment];
-        if (isEditing && currentEquipment.id) {
-            updatedEquipment = updatedEquipment.map(e => e.id === currentEquipment.id ? currentEquipment as Equipment : e);
-        } else {
-            const newEq: Equipment = {
-                ...currentEquipment as Equipment,
-                id: Math.random().toString(36).substr(2, 9)
-            };
-            updatedEquipment.push(newEq);
+        try {
+            if (isEditing && currentEquipment.id) {
+                const saved = await db.updateEquipment({ ...currentEquipment, totalQuantity: Number(currentEquipment.totalQuantity) } as Equipment);
+                setEquipment(equipment.map(e => e.id === saved.id ? saved : e));
+            } else {
+                // L'id est généré par le backend.
+                const created = await db.createEquipment({
+                    name: currentEquipment.name,
+                    totalQuantity: Number(currentEquipment.totalQuantity),
+                    category: currentEquipment.category
+                } as Omit<Equipment, 'id'>);
+                setEquipment([...equipment, created]);
+            }
+            if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: isEditing ? 'a modifié le matériel' : 'a ajouté le matériel', entity: 'equipment', entityName: currentEquipment.name || 'Matériel', timestamp: new Date().toISOString() });
+            setIsInventoryModalOpen(false);
+            setCurrentEquipment({});
+        } catch (e) {
+            alert(e instanceof ApiError ? e.message : "Échec de l'enregistrement (serveur injoignable ?).");
         }
-
-        await db.saveEquipment(updatedEquipment);
-        setEquipment(updatedEquipment);
-        if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: isEditing ? 'a modifié le matériel' : 'a ajouté le matériel', entity: 'equipment', entityName: currentEquipment.name || 'Matériel', timestamp: new Date().toISOString() });
-        setIsInventoryModalOpen(false);
-        setCurrentEquipment({});
     };
 
     const handleDeleteEquipment = async (id: string) => {
-        if (confirm("Êtes-vous sûr de vouloir supprimer ce matériel ?")) {
+        if (confirm("Êtes-vous sûr de vouloir supprimer ce matériel ? Les réservations liées seront aussi supprimées.")) {
             const toDelete = equipment.find(e => e.id === id);
-            const updatedEquipment = equipment.filter(e => e.id !== id);
-            await db.saveEquipment(updatedEquipment);
-            setEquipment(updatedEquipment);
-            if (user && toDelete) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé le matériel', entity: 'equipment', entityName: toDelete.name, timestamp: new Date().toISOString() });
+            try {
+                await db.deleteEquipment(id);
+                setEquipment(equipment.filter(e => e.id !== id));
+                // La cascade FK côté backend supprime aussi les réservations liées.
+                setBookings(bookings.filter(b => b.equipmentId !== id));
+                if (user && toDelete) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé le matériel', entity: 'equipment', entityName: toDelete.name, timestamp: new Date().toISOString() });
+            } catch (e) {
+                alert(e instanceof ApiError ? e.message : 'Échec de la suppression (serveur injoignable ?).');
+            }
         }
     };
 
@@ -218,37 +230,33 @@ const Material: React.FC = () => {
             return;
         }
 
-        let updatedBookings = [...bookings];
-        if (isEditing && currentBooking.id) {
-            updatedBookings = updatedBookings.map(b => b.id === currentBooking.id ? currentBooking as EquipmentBooking : b);
-        } else {
-            const newBooking: EquipmentBooking = {
-                ...currentBooking as EquipmentBooking,
-                id: Math.random().toString(36).substr(2, 9)
-            };
-            updatedBookings.push(newBooking);
+        try {
+            const payload = { ...currentBooking, quantity: Number(currentBooking.quantity) };
+            if (isEditing && currentBooking.id) {
+                const saved = await db.updateEquipmentBooking(payload as EquipmentBooking);
+                setBookings(bookings.map(b => b.id === saved.id ? saved : b));
+            } else {
+                // L'id est généré par le backend.
+                const created = await db.createEquipmentBooking(payload as Omit<EquipmentBooking, 'id'>);
+                setBookings([...bookings, created]);
+            }
+            if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: isEditing ? 'a modifié une réservation matériel' : 'a créé une réservation matériel', entity: 'booking', entityName: eq.name, timestamp: new Date().toISOString() });
+            setIsBookingModalOpen(false);
+            setCurrentBooking({});
+        } catch (e) {
+            alert(e instanceof ApiError ? e.message : "Échec de l'enregistrement (serveur injoignable ?).");
         }
-
-        await db.saveEquipmentBookings(updatedBookings);
-        setBookings(updatedBookings);
-        if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: isEditing ? 'a modifié une réservation matériel' : 'a créé une réservation matériel', entity: 'booking', entityName: eq.name, timestamp: new Date().toISOString() });
-        setIsBookingModalOpen(false);
-        setCurrentBooking({});
     };
 
     const handleDeleteBooking = async (id: string) => {
         try {
-            // Fetch latest bookings to ensure we're working with current data
-            const currentBookings = await db.getEquipmentBookings();
-            const toDelete = currentBookings.find(b => b.id === id);
+            const toDelete = bookings.find(b => b.id === id);
             const eqName = toDelete ? (equipment.find(e => e.id === toDelete.equipmentId)?.name || 'Matériel') : 'Matériel';
-            const updatedBookings = currentBookings.filter(b => b.id !== id);
-            await db.saveEquipmentBookings(updatedBookings);
-            setBookings(updatedBookings);
+            await db.deleteEquipmentBooking(id);
+            setBookings(bookings.filter(b => b.id !== id));
             if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé une réservation matériel', entity: 'booking', entityName: eqName, timestamp: new Date().toISOString() });
-        } catch (error) {
-            console.error("Error deleting booking:", error);
-            alert("Une erreur est survenue lors de la suppression.");
+        } catch (e) {
+            alert(e instanceof ApiError ? e.message : 'Échec de la suppression (serveur injoignable ?).');
         }
     };
 
@@ -376,7 +384,7 @@ const Material: React.FC = () => {
                                 <Plus size={18} />
                                 RÉSERVER
                             </button>
-                        ) : (
+                        ) : canManageCatalog ? (
                             <button
                                 onClick={() => openInventoryModal()}
                                 className="flex items-center gap-2 bg-bony-gradient text-white px-4 py-2 min-h-[44px] rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20"
@@ -384,7 +392,7 @@ const Material: React.FC = () => {
                                 <Plus size={18} />
                                 AJOUTER MATÉRIEL
                             </button>
-                        )}
+                        ) : null}
                     </div>
                 </div>
 
@@ -466,20 +474,22 @@ const Material: React.FC = () => {
                                                 </td>
                                                 <td className="p-4 text-center font-mono font-bold text-bony-orange text-lg">{eq.totalQuantity}</td>
                                                 <td className="p-4 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <button 
-                                                            onClick={() => openInventoryModal(eq)}
-                                                            className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg text-slate-500 hover:text-bony-text transition-colors"
-                                                        >
-                                                            <Edit size={16}/>
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleDeleteEquipment(eq.id)}
-                                                            className="p-2 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg text-slate-500 hover:text-red-500 transition-colors"
-                                                        >
-                                                            <Trash2 size={16}/>
-                                                        </button>
-                                                    </div>
+                                                    {canManageCatalog && (
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button
+                                                                onClick={() => openInventoryModal(eq)}
+                                                                className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg text-slate-500 hover:text-bony-text transition-colors"
+                                                            >
+                                                                <Edit size={16}/>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteEquipment(eq.id)}
+                                                                className="p-2 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg text-slate-500 hover:text-red-500 transition-colors"
+                                                            >
+                                                                <Trash2 size={16}/>
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))}
