@@ -26,20 +26,6 @@ const MOCK_EQUIPMENT: Equipment[] = [
     { id: 'eq-16', name: 'Mange-debout', totalQuantity: 12, category: 'Mobilier' },
 ];
 
-const DEFAULT_USERS: User[] = [
-    { id: 'u1', name: 'Théo Labonne', loginId: 'Theo', password: 'admin', role: 'Master', avatarColor: '#f75632' },
-    { id: 'u2', name: 'Claire Richard', loginId: 'Claire', password: 'admin', role: 'Administrator', avatarColor: '#8f12ab' },
-    { id: 'u3', name: 'Christian Charlier', loginId: 'Christian', password: 'admin', role: 'Administrator', avatarColor: '#293f74' },
-    { id: 'u4', name: 'Bastien Fuziol', loginId: 'Bastien', password: 'admin', role: 'Coordinator', avatarColor: '#10b981' },
-    { id: 'u5', name: 'Alexis Perz', loginId: 'Alexis', password: 'admin', role: 'Coordinator', avatarColor: '#0ea5e9' },
-    { id: 'u6', name: 'Romane Chambon', loginId: 'Romane', password: 'admin', role: 'Coordinator', avatarColor: '#f43f5e' },
-    // Nouveaux utilisateurs
-    { id: 'u7', name: 'Morgane Barthe', loginId: 'Morgane', password: 'admin', role: 'Digital Manager', avatarColor: '#ec4899' }, // Pink
-    { id: 'u8', name: 'Hugo Culetto', loginId: 'Hugo', password: 'admin', role: 'Digital Manager', avatarColor: '#8b5cf6' }, // Violet light
-    { id: 'u9', name: 'Ludivine Roux', loginId: 'Ludivine', password: 'admin', role: 'Guest', avatarColor: '#64748b' }, // Slate
-    { id: 'u10', name: 'Lucy Bohere', loginId: 'Lucy', password: 'admin', role: 'Coordinator', avatarColor: '#14b8a6' }, // Teal
-];
-
 // MOCK SOCIAL POSTS
 const MOCK_SOCIAL_POSTS: SocialPost[] = [
     {
@@ -208,18 +194,6 @@ class DataService {
     if (!localStorage.getItem('gearbox_equipment_bookings')) {
         localStorage.setItem('gearbox_equipment_bookings', JSON.stringify([]));
     }
-    // Ensure Users exist
-    if (!localStorage.getItem('gearbox_users')) {
-        localStorage.setItem('gearbox_users', JSON.stringify(DEFAULT_USERS));
-    } else {
-        // QUICK FIX FOR DEMO: If users exist but are missing the new ones, merge them.
-        const currentUsers: User[] = JSON.parse(localStorage.getItem('gearbox_users') || '[]');
-        if (currentUsers.length < 10) {
-             const existingIds = new Set(currentUsers.map(u => u.id));
-             const toAdd = DEFAULT_USERS.filter(u => !existingIds.has(u.id));
-             localStorage.setItem('gearbox_users', JSON.stringify([...currentUsers, ...toAdd]));
-        }
-    }
     // Ensure Social Posts exist
     if (!localStorage.getItem('gearbox_social_posts')) {
         localStorage.setItem('gearbox_social_posts', JSON.stringify(MOCK_SOCIAL_POSTS));
@@ -354,10 +328,26 @@ class DataService {
     return apiFetch<any[]>('/budget');
   }
 
-  // --- USERS ---
-  async getUsers(): Promise<User[]> { return this.get('users'); }
-  async saveUsers(users: User[]) { await this.save('users', users); }
-  
+  // --- Users (BRANCHÉS BACKEND — étape 7.3) ---
+  // GET ouvert à tout utilisateur authentifié ; mutations réservées
+  // Master/Administrator (règle backend routes/users.ts). Le mot de passe
+  // transite EN CLAIR dans la requête (HTTPS) — le hash bcrypt est fait
+  // côté serveur, jamais côté client. L'API ne renvoie jamais de hash.
+  async getUsers(): Promise<User[]> {
+    return apiFetch<User[]>('/users');
+  }
+  async createUser(user: Omit<User, 'id'>): Promise<User> {
+    return apiFetch('/users', { method: 'POST', body: JSON.stringify(user) });
+  }
+  async updateUser(user: User): Promise<User> {
+    const { id, ...data } = user;
+    return apiFetch(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteUser(id: string): Promise<void> {
+    await apiFetch(`/users/${id}`, { method: 'DELETE' });
+  }
+
+
   // --- SOCIAL POSTS (DIGITAL) ---
   async getSocialPosts(): Promise<SocialPost[]> { return this.get('social_posts'); }
   async saveSocialPosts(posts: SocialPost[]) { await this.save('social_posts', posts); }
@@ -412,20 +402,6 @@ class DataService {
     localStorage.setItem(`gearbox_messages_${conversationId}`, JSON.stringify(messages));
   }
 
-  // --- USER CRUD ---
-  async saveUser(user: User) {
-    const users = await this.getUsers();
-    const idx = users.findIndex(u => u.id === user.id);
-    if (idx >= 0) users[idx] = user;
-    else users.push(user);
-    await this.saveUsers(users);
-  }
-
-  async deleteUser(id: string) {
-    const users = await this.getUsers();
-    await this.saveUsers(users.filter(u => u.id !== id));
-  }
-
   // --- ACTIVITY LOG ---
   getActivityLog(): ActivityLog[] {
     const data = localStorage.getItem('gearbox_activity_log');
@@ -433,10 +409,10 @@ class DataService {
   }
 
   logActivity(entry: ActivityLog) {
-    // Actions du Master invisibles dans le fil d'actualité
+    // Actions du Master invisibles dans le fil d'actualité. L'acteur est
+    // toujours l'utilisateur connecté (les users ne sont plus en localStorage).
     try {
-      const users: User[] = JSON.parse(localStorage.getItem('gearbox_users') || '[]');
-      const actor = users.find(u => u.id === entry.userId);
+      const actor = JSON.parse(localStorage.getItem(AUTH_USER_KEY) || 'null');
       if (actor?.role === 'Master') return;
     } catch { /* ignore */ }
     const log = this.getActivityLog();

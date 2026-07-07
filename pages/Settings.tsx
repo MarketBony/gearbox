@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../services/dataService';
+import { db, ApiError } from '../services/dataService';
 import { User, UserRole, ActivityLog } from '../types';
 import { Save, User as UserIcon, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn, MapPin, Cake } from 'lucide-react';
 import Cropper from 'react-easy-crop';
@@ -249,6 +249,7 @@ const Settings: React.FC = () => {
   const [userBirthdate, setUserBirthdate] = useState('');
 
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [userMgmtError, setUserMgmtError] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [editPrefs, setEditPrefs] = useState<UserPrefs>({ city: '', birthdate: '' });
@@ -258,21 +259,29 @@ const Settings: React.FC = () => {
   // Map userId -> prefs for display in user table
   const [allUserPrefs, setAllUserPrefs] = useState<Record<string, UserPrefs>>({});
 
+  // Gestion des comptes réservée Master/Administrator (aligné sur ADMIN_ROLES
+  // du backend routes/users.ts — les mutations y sont déjà protégées).
+  const canManageUsers = user?.role === 'Master' || user?.role === 'Administrator';
+
   useEffect(() => {
     if (user) {
       const prefs = loadUserPrefs(user.id);
       setUserCity(prefs.city);
       setUserBirthdate(prefs.birthdate);
     }
-    if (user?.role === 'Master') loadAllUsers();
+    if (canManageUsers) loadAllUsers();
   }, [user]);
 
   const loadAllUsers = async () => {
-    const users = await db.getUsers();
-    setAllUsers(users);
-    const prefsMap: Record<string, UserPrefs> = {};
-    users.forEach(u => { prefsMap[u.id] = loadUserPrefs(u.id); });
-    setAllUserPrefs(prefsMap);
+    try {
+      const users = await db.getUsers(); // GET /api/users — plus de localStorage
+      setAllUsers(users);
+      const prefsMap: Record<string, UserPrefs> = {};
+      users.forEach(u => { prefsMap[u.id] = loadUserPrefs(u.id); });
+      setAllUserPrefs(prefsMap);
+    } catch (e) {
+      setUserMgmtError(e instanceof ApiError ? e.message : 'Impossible de charger les utilisateurs.');
+    }
   };
 
   const handleUpdateProfile = async () => {
@@ -314,34 +323,47 @@ const Settings: React.FC = () => {
 
   const saveUser = async () => {
     if (!editForm.name || !editForm.loginId || !editForm.role) return;
-    if (isAddingUser) {
-      const newUser: User = {
-        id: `u-${Date.now()}`,
-        name: editForm.name,
-        loginId: editForm.loginId,
-        password: editForm.password || 'admin',
-        role: editForm.role as UserRole,
-        avatarColor: '#' + Math.floor(Math.random() * 16777215).toString(16)
-      };
-      await db.saveUser(newUser);
-      saveUserPrefs(newUser.id, editPrefs);
-      if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a créé l'utilisateur", entity: 'user', entityName: newUser.name, timestamp: new Date().toISOString() });
-    } else {
-      const updatedUser = { ...allUsers.find(u => u.id === editingUserId), ...editForm } as User;
-      await db.saveUser(updatedUser);
-      saveUserPrefs(updatedUser.id, editPrefs);
-      if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a modifié l'utilisateur", entity: 'user', entityName: updatedUser.name, timestamp: new Date().toISOString() });
+    setUserMgmtError('');
+    try {
+      if (isAddingUser) {
+        // L'id est généré par le backend ; le mot de passe part en clair,
+        // le hash bcrypt est fait côté serveur.
+        const created = await db.createUser({
+          name: editForm.name,
+          loginId: editForm.loginId,
+          password: editForm.password || 'admin',
+          role: editForm.role as UserRole,
+          avatarColor: '#' + Math.floor(Math.random() * 16777215).toString(16)
+        });
+        saveUserPrefs(created.id, editPrefs);
+        if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a créé l'utilisateur", entity: 'user', entityName: created.name, timestamp: new Date().toISOString() });
+      } else {
+        // password vide -> non envoyé -> hash inchangé côté backend.
+        const updatedUser = { ...allUsers.find(u => u.id === editingUserId), ...editForm } as User;
+        if (!updatedUser.password) delete updatedUser.password;
+        const saved = await db.updateUser(updatedUser);
+        saveUserPrefs(saved.id, editPrefs);
+        if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a modifié l'utilisateur", entity: 'user', entityName: saved.name, timestamp: new Date().toISOString() });
+      }
+      await loadAllUsers();
+      cancelEdit();
+    } catch (e) {
+      // Un 400 backend (rôle invalide, loginId déjà pris...) porte un message clair.
+      setUserMgmtError(e instanceof ApiError ? e.message : "Échec de l'enregistrement (serveur injoignable ?).");
     }
-    await loadAllUsers();
-    cancelEdit();
   };
 
   const deleteUser = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) return;
+    setUserMgmtError('');
     const toDelete = allUsers.find(u => u.id === id);
-    await db.deleteUser(id);
-    if (user && toDelete) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a supprimé l'utilisateur", entity: 'user', entityName: toDelete.name, timestamp: new Date().toISOString() });
-    await loadAllUsers();
+    try {
+      await db.deleteUser(id);
+      if (user && toDelete) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a supprimé l'utilisateur", entity: 'user', entityName: toDelete.name, timestamp: new Date().toISOString() });
+      await loadAllUsers();
+    } catch (e) {
+      setUserMgmtError(e instanceof ApiError ? e.message : 'Échec de la suppression (serveur injoignable ?).');
+    }
   };
 
   if (!user) return null;
@@ -453,12 +475,12 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
-      {/* SECTION 2: USER MANAGEMENT (MASTER ONLY) */}
-      {user.role === 'Master' && (
+      {/* SECTION 2: USER MANAGEMENT (MASTER/ADMINISTRATOR) */}
+      {canManageUsers && (
         <div className="max-w-6xl mx-auto mt-12">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <ShieldAlert className="text-red-500" size={24} /> Gestion des Utilisateurs (Master)
+              <ShieldAlert className="text-red-500" size={24} /> Gestion des Utilisateurs (Master/Admin)
             </h3>
             <button
               onClick={() => { setIsAddingUser(true); setEditingUserId('new'); setEditForm({ role: 'Coordinator', password: 'admin' }); setEditPrefs({ city: '', birthdate: '' }); }}
@@ -467,6 +489,12 @@ const Settings: React.FC = () => {
               <Plus size={16} /> Nouvel Utilisateur
             </button>
           </div>
+
+          {userMgmtError && (
+            <p className="mb-4 text-xs font-bold text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+              {userMgmtError}
+            </p>
+          )}
 
           <div className="gx-card p-0 overflow-hidden overflow-x-auto">
             <table className="w-full text-left">
