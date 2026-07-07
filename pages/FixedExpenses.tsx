@@ -10,6 +10,8 @@ import DatePicker from '../components/DatePicker';
 
 const FixedExpenses: React.FC = () => {
     const { user } = useAuth();
+    // Écritures réservées Master/Administrator (aligné sur les rôles du backend).
+    const canEdit = user?.role === 'Master' || user?.role === 'Administrator';
     const [expenses, setExpenses] = useState<FixedExpense[]>([]);
     const [searchTerm, setSearchTerm] = useSessionState<string>('fixedexpenses_searchTerm', '');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,22 +61,26 @@ const FixedExpenses: React.FC = () => {
             return;
         }
 
-        let updatedExpenses = [...expenses];
         const expenseName = currentExpense.comment || currentExpense.site || 'Dépense fixe';
         const saveBrands = currentExpense.brands || [];
         const expenseData = { ...currentExpense, brands: saveBrands, brand: saveBrands[0] };
-        if (isEditing && currentExpense.id) {
-            updatedExpenses = updatedExpenses.map(e => e.id === currentExpense.id ? expenseData as FixedExpense : e);
-        } else {
-            const newExpense: FixedExpense = {
-                ...expenseData as FixedExpense,
-                id: Math.random().toString(36).substr(2, 9)
-            };
-            updatedExpenses = [newExpense, ...updatedExpenses];
-        }
 
-        setExpenses(updatedExpenses);
-        await db.saveFixedExpenses(updatedExpenses);
+        // CRUD unitaire vers l'API (étape 7.2) — l'id d'une création vient du
+        // backend. isAnnual/alpineShare/budgetDistribution transitent tels quels.
+        try {
+            if (isEditing && currentExpense.id) {
+                const saved = await db.updateFixedExpense(expenseData as FixedExpense);
+                setExpenses(prev => prev.map(e => e.id === saved.id ? saved : e));
+            } else {
+                const created = await db.createFixedExpense(expenseData as FixedExpense);
+                setExpenses(prev => [created, ...prev]);
+            }
+        } catch (error) {
+            console.error('Fixed expense save failed:', error);
+            alert('Échec de la sauvegarde (serveur injoignable ou droits insuffisants ?).');
+            await loadExpenses().catch(() => {});
+            return; // modal laissé ouvert : la saisie n'est pas perdue
+        }
         if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: isEditing ? 'a modifié une dépense fixe' : 'a créé une dépense fixe', entity: 'fixed-expense', entityName: expenseName, timestamp: new Date().toISOString() });
         closeModal();
     };
@@ -82,9 +88,14 @@ const FixedExpenses: React.FC = () => {
     const handleDelete = async (id: string) => {
         if (confirm('Êtes-vous sûr de vouloir supprimer cette dépense ?')) {
             const toDelete = expenses.find(e => e.id === id);
-            const updated = expenses.filter(e => e.id !== id);
-            setExpenses(updated);
-            await db.saveFixedExpenses(updated);
+            try {
+                await db.deleteFixedExpense(id);
+            } catch (error) {
+                console.error('Fixed expense delete failed:', error);
+                alert('Échec de la suppression (serveur injoignable ou droits insuffisants ?).');
+                return;
+            }
+            setExpenses(prev => prev.filter(e => e.id !== id));
             if (user && toDelete) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé une dépense fixe', entity: 'fixed-expense', entityName: toDelete.comment || toDelete.site || 'Dépense fixe', timestamp: new Date().toISOString() });
         }
     };
@@ -99,6 +110,7 @@ const FixedExpenses: React.FC = () => {
     };
 
     const openModal = (expense?: FixedExpense) => {
+        if (!canEdit) return;
         if (expense) {
             setCurrentExpense({
                 ...expense,
@@ -256,13 +268,15 @@ const FixedExpenses: React.FC = () => {
                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Période</span>
                             <span className="text-bony-text text-lg font-bold font-sans">{totalAmount.toLocaleString()} €</span>
                         </div>
-                        <button
-                            onClick={() => openModal()}
-                            className="flex items-center gap-2 bg-bony-gradient text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20 min-h-[44px]"
-                        >
-                            <Plus size={18} />
-                            NOUVELLE DÉPENSE
-                        </button>
+                        {canEdit && (
+                            <button
+                                onClick={() => openModal()}
+                                className="flex items-center gap-2 bg-bony-gradient text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20 min-h-[44px]"
+                            >
+                                <Plus size={18} />
+                                NOUVELLE DÉPENSE
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -355,14 +369,16 @@ const FixedExpenses: React.FC = () => {
                                         {expense.proPlus && <span className="ml-auto text-[8px] font-bold text-white bg-bony-gradient px-1.5 py-0.5 rounded uppercase tracking-wide">PRO+</span>}
                                     </div>
                                     {expense.comment && <p className="text-xs text-slate-400 truncate">{expense.comment}</p>}
-                                    <div className="flex gap-2 justify-end">
-                                        <button onClick={() => openModal(expense)} className="p-1.5 rounded-md hover:bg-bony-blue/10 text-slate-400 hover:text-bony-blue transition">
-                                            <Edit2 size={16} />
-                                        </button>
-                                        <button onClick={() => handleDelete(expense.id)} className="p-1.5 rounded-md hover:bg-red-500/10 text-slate-400 hover:text-red-500 transition">
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
+                                    {canEdit && (
+                                        <div className="flex gap-2 justify-end">
+                                            <button onClick={() => openModal(expense)} className="p-1.5 rounded-md hover:bg-bony-blue/10 text-slate-400 hover:text-bony-blue transition">
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <button onClick={() => handleDelete(expense.id)} className="p-1.5 rounded-md hover:bg-red-500/10 text-slate-400 hover:text-red-500 transition">
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ))
                         )}
@@ -434,12 +450,16 @@ const FixedExpenses: React.FC = () => {
                                             {expense.amount.toLocaleString()} €
                                         </td>
                                         <td className="p-4 flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={() => openModal(expense)} className="p-1.5 rounded-md hover:bg-bony-blue/10 text-slate-400 hover:text-bony-blue transition">
-                                                <Edit2 size={16} />
-                                            </button>
-                                            <button onClick={() => handleDelete(expense.id)} className="p-1.5 rounded-md hover:bg-red-500/10 text-slate-400 hover:text-red-500 transition">
-                                                <Trash2 size={16} />
-                                            </button>
+                                            {canEdit && (
+                                                <>
+                                                    <button onClick={() => openModal(expense)} className="p-1.5 rounded-md hover:bg-bony-blue/10 text-slate-400 hover:text-bony-blue transition">
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                    <button onClick={() => handleDelete(expense.id)} className="p-1.5 rounded-md hover:bg-red-500/10 text-slate-400 hover:text-red-500 transition">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </>
+                                            )}
                                         </td>
                                     </tr>
                                 )) : (

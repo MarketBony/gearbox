@@ -5,7 +5,8 @@ import { emitEvent } from '../realtime';
 
 const router = Router();
 const prisma = new PrismaClient();
-const EDIT_ROLES = ['Master', 'Administrator'];
+// Director inclus : aligné sur canEditProvisions du frontend (Budget.tsx).
+const EDIT_ROLES = ['Master', 'Administrator', 'Director'];
 
 // Contrat aligné sur le frontend (types.ts BudgetLine + db.saveBudgets) :
 // une ligne de prévisionnel par site/bucket, identifiée par `site` (unique en base),

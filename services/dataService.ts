@@ -159,6 +159,31 @@ const normalizeProject = (p: any): Project => ({
   startDate: toDay(p.startDate),
   endDate: toDay(p.endDate)
 });
+const normalizeFixedExpense = (e: any): FixedExpense => ({
+  ...e,
+  date: toDay(e.date)
+});
+
+// Helpers de migration one-shot localStorage -> Supabase (étape 7.2) :
+// ne s'exécute que si l'API est vide, qu'aucune migration n'a déjà eu lieu
+// (flag), que le compte connecté peut écrire (Master/Admin) et que des
+// données locales existent.
+const readLocalStore = <T,>(key: string): T[] => {
+  try {
+    const raw = localStorage.getItem(`gearbox_${key}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+const isStoredUserAdmin = (): boolean => {
+  try {
+    const u = JSON.parse(localStorage.getItem(AUTH_USER_KEY) || 'null');
+    return u?.role === 'Master' || u?.role === 'Administrator';
+  } catch {
+    return false;
+  }
+};
 
 class DataService {
   private isElectron = !!window.electron;
@@ -260,13 +285,74 @@ class DataService {
   async getExpenses(): Promise<Expense[]> { return this.get('expenses'); }
   async saveExpenses(expenses: Expense[]) { await this.save('expenses', expenses); }
 
-  // --- Fixed Expenses ---
-  async getFixedExpenses(): Promise<FixedExpense[]> { return this.get('fixed_expenses'); }
-  async saveFixedExpenses(expenses: FixedExpense[]) { await this.save('fixed_expenses', expenses); }
+  // --- Fixed Expenses (BRANCHÉES BACKEND — étape 7.2) ---
+  // CRUD unitaire ; isAnnual/alpineShare/budgetDistribution transitent BRUTS
+  // (tout calcul — fractionnement /12, routage Alpine/Nissan — reste dans Budget.tsx).
+  async getFixedExpenses(): Promise<FixedExpense[]> {
+    let expenses = await apiFetch<any[]>('/fixed-expenses');
+    expenses = await this.migrateFixedExpensesIfNeeded(expenses);
+    return expenses.map(normalizeFixedExpense);
+  }
+  async createFixedExpense(expense: FixedExpense): Promise<FixedExpense> {
+    return normalizeFixedExpense(await apiFetch('/fixed-expenses', { method: 'POST', body: JSON.stringify(expense) }));
+  }
+  async updateFixedExpense(expense: FixedExpense): Promise<FixedExpense> {
+    return normalizeFixedExpense(await apiFetch(`/fixed-expenses/${expense.id}`, { method: 'PUT', body: JSON.stringify(expense) }));
+  }
+  async deleteFixedExpense(id: string): Promise<void> {
+    await apiFetch(`/fixed-expenses/${id}`, { method: 'DELETE' });
+  }
+  private async migrateFixedExpensesIfNeeded(apiExpenses: any[]): Promise<any[]> {
+    const FLAG = 'gearbox_migrated_fixed_expenses';
+    if (apiExpenses.length > 0 || localStorage.getItem(FLAG) || !isStoredUserAdmin()) return apiExpenses;
+    const local = readLocalStore<FixedExpense>('fixed_expenses');
+    if (local.length === 0) {
+      localStorage.setItem(FLAG, '1');
+      return apiExpenses;
+    }
+    for (const expense of local) {
+      await apiFetch('/fixed-expenses', { method: 'POST', body: JSON.stringify(expense) });
+    }
+    localStorage.setItem(FLAG, '1');
+    console.info(`[migration] ${local.length} dépense(s) fixe(s) localStorage poussée(s) vers Supabase.`);
+    return apiFetch<any[]>('/fixed-expenses');
+  }
 
-  // --- Budgets (Forecasts) ---
-  async getBudgets(): Promise<BudgetLine[]> { return this.get('budgets'); }
-  async saveBudgets(budgets: BudgetLine[]) { await this.save('budgets', budgets); }
+  // --- Budgets / prévisionnel (BRANCHÉS BACKEND — étape 7.2) ---
+  // Une ligne par site (identité = site, upsert côté backend), pas de dimension
+  // année. Le GET renvoie aussi id/createdAt/updatedAt — bénin pour le frontend.
+  async getBudgets(): Promise<BudgetLine[]> {
+    let budgets = await apiFetch<any[]>('/budget');
+    budgets = await this.migrateBudgetsIfNeeded(budgets);
+    return budgets;
+  }
+  async upsertBudget(line: BudgetLine): Promise<BudgetLine> {
+    return apiFetch('/budget', {
+      method: 'POST',
+      body: JSON.stringify({ site: line.site, entries: line.entries, brands: line.brands ?? [] })
+    });
+  }
+  async deleteBudget(id: string): Promise<void> {
+    await apiFetch(`/budget/${id}`, { method: 'DELETE' });
+  }
+  private async migrateBudgetsIfNeeded(apiBudgets: any[]): Promise<any[]> {
+    const FLAG = 'gearbox_migrated_budgets';
+    if (apiBudgets.length > 0 || localStorage.getItem(FLAG) || !isStoredUserAdmin()) return apiBudgets;
+    const local = readLocalStore<BudgetLine>('budgets');
+    if (local.length === 0) {
+      localStorage.setItem(FLAG, '1');
+      return apiBudgets;
+    }
+    for (const line of local) {
+      await apiFetch('/budget', {
+        method: 'POST',
+        body: JSON.stringify({ site: line.site, entries: line.entries, brands: line.brands ?? [] })
+      });
+    }
+    localStorage.setItem(FLAG, '1');
+    console.info(`[migration] ${local.length} ligne(s) de prévisionnel localStorage poussée(s) vers Supabase.`);
+    return apiFetch<any[]>('/budget');
+  }
 
   // --- USERS ---
   async getUsers(): Promise<User[]> { return this.get('users'); }

@@ -247,13 +247,17 @@ const Budget: React.FC = () => {
         db.getFixedExpenses()
     ]);
 
-    // Migration silencieuse : buckets Alpine distincts par site + Nissan
+    // Migration silencieuse : buckets Alpine distincts par site + Nissan.
+    // Depuis la bascule API (7.2) : écritures réservées aux rôles éditeurs —
+    // un lecteur (Coordinator/Guest...) obtient la fusion EN MÉMOIRE seulement
+    // (affichage cohérent, zéro requête d'écriture, zéro 403 au chargement).
     {
         const allBuckets = [...Object.values(ALPINE_BUCKETS), NISSAN_BUCKET];
         const missing = allBuckets.filter(bucket => !budgetData.some(b => b.site === bucket));
         // Retire le bucket générique 'Alpine' s'il existe encore
+        const generic = budgetData.find(b => b.site === 'Alpine');
         const withoutGeneric = budgetData.filter(b => b.site !== 'Alpine');
-        if (missing.length > 0 || withoutGeneric.length !== budgetData.length) {
+        if (missing.length > 0 || generic) {
             const newEntries = missing.map(bucket => ({
                 site: bucket,
                 brands: [bucket === NISSAN_BUCKET ? 'Nissan' : 'Alpine'] as BrandType[],
@@ -264,9 +268,16 @@ const Budget: React.FC = () => {
                     APV: new Array(12).fill(0)
                 }
             }));
-            const merged = [...withoutGeneric, ...newEntries];
-            await db.saveBudgets(merged);
-            budgetData = merged;
+            if (canEditProvisions) {
+                try {
+                    // Upsert des seules nouvelles lignes + purge du bucket générique en base.
+                    for (const line of newEntries) await db.upsertBudget(line as any);
+                    if (generic && (generic as any).id) await db.deleteBudget((generic as any).id);
+                } catch (error) {
+                    console.error('Bucket migration failed:', error);
+                }
+            }
+            budgetData = [...withoutGeneric, ...newEntries];
         }
     }
 
@@ -278,10 +289,22 @@ const Budget: React.FC = () => {
     setLoading(false);
   };
 
-  const handleSave = async (newData: BudgetLine[]) => {
+  // Sauvegarde optimiste : état local complet, mais UNE seule requête —
+  // l'upsert par site de la ligne modifiée (contrat POST /api/budget).
+  const handleSave = async (newData: BudgetLine[], changedLine: BudgetLine) => {
       setSaving(true);
       setBudgets(newData);
-      await db.saveBudgets(newData);
+      try {
+          await db.upsertBudget(changedLine);
+      } catch (error) {
+          console.error('Budget save failed:', error);
+          alert('Échec de la sauvegarde du prévisionnel (serveur injoignable ?). Rechargement des données.');
+          const fresh = await db.getBudgets().catch(() => null);
+          if (fresh) {
+              fresh.sort((a, b) => a.site.localeCompare(b.site));
+              setBudgets(fresh);
+          }
+      }
       setTimeout(() => setSaving(false), 800);
   };
 
@@ -297,7 +320,8 @@ const Budget: React.FC = () => {
           }
           return b;
       });
-      handleSave(newData);
+      const changed = newData.find(b => b.site === site);
+      if (changed) handleSave(newData, changed);
   };
 
   const toggleSite = (site: string) => {
