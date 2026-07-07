@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireRole } from '../auth/middleware';
 import { emitEvent } from '../realtime';
+import { withDates } from '../utils/dates';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -13,14 +14,14 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) => {
-  const campaign = await prisma.campaign.create({ data: req.body });
+  const campaign = await prisma.campaign.create({ data: withDates(req.body, ['startDate', 'endDate']) });
   emitEvent('campaigns:updated', campaign);
   res.json(campaign);
 });
 
 router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) => {
   const { id } = req.params;
-  const campaign = await prisma.campaign.update({ where: { id }, data: req.body });
+  const campaign = await prisma.campaign.update({ where: { id }, data: withDates(req.body, ['startDate', 'endDate']) });
   emitEvent('campaigns:updated', campaign);
   res.json(campaign);
 });

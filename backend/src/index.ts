@@ -1,8 +1,10 @@
 import express from 'express';
+import 'express-async-errors'; // patch Express 4 : les rejets async atteignent le middleware d'erreur
 import http from 'http';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
+import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth';
 import projectRoutes from './routes/projects';
 import campaignRoutes from './routes/campaigns';
@@ -48,6 +50,9 @@ app.use('/api/fixed-expenses', fixedExpenseRoutes);
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/equipment-bookings', equipmentBookingRoutes);
 app.use('/api/chat', chatRoutes);
+
+// Middleware d'erreur global — après toutes les routes.
+app.use(errorHandler);
 
 // Realtime
 setupRealtime(io);
