@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
-import { db } from '../services/dataService';
+import { db, getToken, setToken, clearToken, ApiError } from '../services/dataService';
 
 interface AuthContextType {
   user: User | null;
@@ -13,60 +13,90 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Copie locale du user connecté (le backend ne renvoie pas loginId : on le
+// conserve ici depuis le formulaire de login pour compléter les réponses /me).
+const AUTH_USER_KEY = 'gearbox_auth_user';
+const readStoredUser = (): User | null => {
+  try {
+    const raw = localStorage.getItem(AUTH_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Au chargement : si un token existe, on le valide contre le backend (GET /me).
     const checkAuth = async () => {
-      const userId = localStorage.getItem('gearbox_auth_user_id');
-      if (userId) {
+      if (getToken()) {
         try {
-          const users = await db.getUsers();
-          const foundUser = users.find(u => u.id === userId);
-          if (foundUser) {
-            setUser(foundUser);
-          } else {
-            localStorage.removeItem('gearbox_auth_user_id');
-          }
+          const me = await db.fetchMe();
+          const stored = readStoredUser();
+          const fullUser: User = { loginId: stored?.loginId ?? '', ...stored, ...me } as User;
+          localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUser));
+          setUser(fullUser);
         } catch (e) {
+          // Token invalide/expiré ou serveur injoignable : retour au login.
           console.error('Auth check failed', e);
-          localStorage.removeItem('gearbox_auth_user_id');
+          clearToken();
         }
       }
+      // Nettoyage de l'ancien mécanisme localStorage (pré-branchement).
+      localStorage.removeItem('gearbox_auth_user_id');
       setLoading(false);
     };
     checkAuth();
   }, []);
 
+  useEffect(() => {
+    // Déconnexion propre déclenchée par la couche API sur un 401 (token expiré).
+    const onExpired = () => {
+      sessionStorage.clear();
+      setUser(null);
+    };
+    window.addEventListener('gearbox-auth-expired', onExpired);
+    return () => window.removeEventListener('gearbox-auth-expired', onExpired);
+  }, []);
+
   const login = async (loginId: string, password?: string) => {
+    if (!password) return false;
     try {
-      if (!password) return false;
-      const foundUser = await db.authenticate(loginId, password);
-      if (foundUser) {
-        localStorage.setItem('gearbox_auth_user_id', foundUser.id);
-        setUser(foundUser);
-        return true;
-      }
-      return false;
+      const { token, user: apiUser } = await db.login(loginId, password);
+      const fullUser: User = { ...apiUser, loginId } as User;
+      setToken(token);
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUser));
+      setUser(fullUser);
+      return true;
     } catch (e) {
-      console.error('Login failed', e);
-      return false;
+      if (e instanceof ApiError && e.status === 401) {
+        return false; // identifiants incorrects — message géré par Login.tsx
+      }
+      // Réseau/serveur injoignable : on laisse remonter pour un message distinct.
+      throw e;
     }
   };
 
   const logout = () => {
-    localStorage.removeItem('gearbox_auth_user_id');
+    clearToken();
     sessionStorage.clear();
     setUser(null);
   };
 
+  // Profil du user CONNECTÉ uniquement — passe par PUT /api/auth/me.
   const updateProfile = async (updatedUser: User) => {
     try {
-      const users = await db.getUsers();
-      const newUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
-      await db.saveUsers(newUsers);
-      setUser(updatedUser);
+      const me = await db.updateMe({
+        name: updatedUser.name,
+        avatarColor: updatedUser.avatarColor,
+        ...(updatedUser.password ? { password: updatedUser.password } : {})
+      });
+      const fullUser: User = { ...updatedUser, ...me, password: undefined } as User;
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUser));
+      setUser(fullUser);
     } catch (e) {
       console.error('Update profile failed', e);
       throw e;

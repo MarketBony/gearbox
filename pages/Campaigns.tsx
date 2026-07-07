@@ -135,7 +135,18 @@ const Campaigns: React.FC = () => {
         return { ...p, tasks: updatedTasks };
     });
     setProjects(updatedProjects);
-    await db.saveProjects(updatedProjects);
+    // PUT unitaire du seul projet modifié (API réelle — le diff des tâches est géré côté serveur).
+    const changed = updatedProjects.find(p => p.id === projectId);
+    if (changed) {
+        try {
+            await db.updateProject(changed);
+        } catch (error) {
+            console.error('Task field update failed:', error);
+            alert('Échec de la sauvegarde (serveur injoignable ?).');
+            const fresh = await db.getProjects().catch(() => null);
+            if (fresh) setProjects(fresh);
+        }
+    }
     if (field === 'status' && user) {
         const project = projects.find(p => p.id === projectId);
         const task = project?.tasks.find(t => t.id === taskId);

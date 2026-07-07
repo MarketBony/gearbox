@@ -346,12 +346,17 @@ const TodoList: React.FC = () => {
   const moveTask = useCallback(async (taskId: string, projectId: string, newStatus: TaskStatus) => {
     setSaving(true);
     const projects = await db.getProjects();
-    const updated = projects.map(p => {
-      if (p.id !== projectId) return p;
-      const newTasks = p.tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
-      return recalcProject({ ...p, tasks: newTasks });
-    });
-    await db.saveProjects(updated);
+    const target = projects.find(p => p.id === projectId);
+    if (target) {
+      const newTasks = target.tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
+      // PUT unitaire du seul projet concerné (API réelle).
+      try {
+        await db.updateProject(recalcProject({ ...target, tasks: newTasks }));
+      } catch (error) {
+        console.error('Task move failed:', error);
+        alert('Échec de la sauvegarde (serveur injoignable ?).');
+      }
+    }
     setSaving(false);
     await loadTasks();
   }, [loadTasks]);

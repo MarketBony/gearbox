@@ -95,6 +95,71 @@ const MOCK_SOCIAL_POSTS: SocialPost[] = [
     }
 ];
 
+// =====================================================================
+// COUCHE API — branchement progressif sur le backend Express (étape 7).
+// Pattern unique réutilisé par chaque module au fil des bascules.
+// =====================================================================
+const API_BASE = '/api'; // proxifié par vite vers le backend (vite.config.ts)
+const TOKEN_KEY = 'gearbox_token';
+const AUTH_USER_KEY = 'gearbox_auth_user';
+
+export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY);
+export const setToken = (token: string) => localStorage.setItem(TOKEN_KEY, token);
+export const clearToken = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+};
+
+export class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
+// Wrapper fetch central : JWT attaché automatiquement, erreurs typées.
+// Sur 401 (token absent/expiré côté serveur) : purge du token + événement
+// global 'gearbox-auth-expired' (écouté par AuthContext -> déconnexion propre).
+// Un 403 (rôle insuffisant) ne déconnecte PAS.
+async function apiFetch<T = any>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {})
+      }
+    });
+  } catch (e) {
+    // Serveur/réseau injoignable (backend éteint, hotspot coupé...)
+    throw new ApiError(0, 'Serveur injoignable');
+  }
+
+  if (res.status === 401) {
+    clearToken();
+    window.dispatchEvent(new CustomEvent('gearbox-auth-expired'));
+    throw new ApiError(401, 'Session expirée');
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as any));
+    throw new ApiError(res.status, body.error || body.message || `Erreur ${res.status}`);
+  }
+  if (res.status === 204) return null as T;
+  return res.json();
+}
+
+// Le backend renvoie des DateTime ISO complets ; le frontend manipule du
+// 'yyyy-MM-dd' partout (DatePicker, comparaisons de chaînes) — on normalise
+// à la réception, sans toucher les pages.
+const toDay = (v: any): string => (typeof v === 'string' && v.length > 10 ? v.slice(0, 10) : v);
+const normalizeProject = (p: any): Project => ({
+  ...p,
+  startDate: toDay(p.startDate),
+  endDate: toDay(p.endDate)
+});
+
 class DataService {
   private isElectron = !!window.electron;
 
@@ -163,9 +228,22 @@ class DataService {
     await new Promise(r => setTimeout(r, 200)); 
   }
 
-  // --- Projects ---
-  async getProjects(): Promise<Project[]> { return this.get('projects'); }
-  async saveProjects(projects: Project[]) { await this.save('projects', projects); }
+  // --- Projects (BRANCHÉ BACKEND — étape 7.1) ---
+  // CRUD unitaire aligné sur l'API REST (le PUT gère le diff des tâches côté
+  // serveur). L'ancien saveProjects(tableau complet) n'existe plus.
+  async getProjects(): Promise<Project[]> {
+    const projects = await apiFetch<any[]>('/projects');
+    return projects.map(normalizeProject);
+  }
+  async createProject(project: Project): Promise<Project> {
+    return normalizeProject(await apiFetch('/projects', { method: 'POST', body: JSON.stringify(project) }));
+  }
+  async updateProject(project: Project): Promise<Project> {
+    return normalizeProject(await apiFetch(`/projects/${project.id}`, { method: 'PUT', body: JSON.stringify(project) }));
+  }
+  async deleteProject(id: string): Promise<void> {
+    await apiFetch(`/projects/${id}`, { method: 'DELETE' });
+  }
   
   // --- Campaigns ---
   async getCampaigns(): Promise<Campaign[]> { return this.get('campaigns'); }
@@ -281,11 +359,16 @@ class DataService {
     window.dispatchEvent(new CustomEvent('gearbox-activity-updated'));
   }
 
-  async authenticate(loginId: string, password: string): Promise<User | null> {
-      const users = await this.getUsers();
-      // Case insensitive login ID
-      const user = users.find(u => u.loginId.toLowerCase() === loginId.toLowerCase() && u.password === password);
-      return user || null;
+  // --- AUTH (BRANCHÉE BACKEND — étape 7.1) ---
+  // Remplace l'ancien authenticate() localStorage (comparaison en clair).
+  async login(loginId: string, password: string): Promise<{ token: string; user: Omit<User, 'loginId'> }> {
+    return apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ loginId, password }) });
+  }
+  async fetchMe(): Promise<Omit<User, 'loginId'>> {
+    return apiFetch('/auth/me');
+  }
+  async updateMe(data: { name?: string; password?: string; avatarColor?: string }): Promise<Omit<User, 'loginId'>> {
+    return apiFetch('/auth/me', { method: 'PUT', body: JSON.stringify(data) });
   }
 }
 

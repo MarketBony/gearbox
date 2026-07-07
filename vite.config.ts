@@ -8,6 +8,12 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        // Backend Express sur :3001 (cd backend && npm run dev) — l'app appelle
+        // /api en relatif ; le ws servira au Chat temps réel (passe ultérieure).
+        proxy: {
+          '/api': 'http://localhost:3001',
+          '/socket.io': { target: 'http://localhost:3001', ws: true },
+        },
       },
       plugins: [react()],
       define: {

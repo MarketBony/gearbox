@@ -401,12 +401,21 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
     }
     updated.budgetActual = updated.tasks.reduce((sum, t) => sum + (t.cost || 0), 0);
 
+    // Update optimiste local, puis PUT unitaire vers l'API (le backend gère
+    // le diff des tâches). En cas d'échec : resynchronisation depuis la base.
     setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
     setSelectedProject(updated);
-    
-    await db.saveProjects(projects.map(p => p.id === updated.id ? updated : p));
+
+    try {
+      await db.updateProject(updated);
+    } catch (error) {
+      console.error('Project update failed:', error);
+      alert('Échec de la sauvegarde du projet (serveur injoignable ?). Rechargement des données.');
+      const fresh = await db.getProjects().catch(() => null);
+      if (fresh) setProjects(fresh);
+    }
     setTimeout(() => setSaving(false), 500);
-  }, [projects, canEdit]);
+  }, [canEdit]);
 
   const handleStatusChange = async (newStatus: string) => {
       if (!selectedProject || !canEdit) return;
@@ -439,11 +448,9 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
 
   const handleDeleteProject = async (id: string) => {
       try {
-          const currentProjects = await db.getProjects();
-          const deletedProject = currentProjects.find(p => p.id === id);
-          const updatedProjects = currentProjects.filter(p => p.id !== id);
-          await db.saveProjects(updatedProjects);
-          setProjects(updatedProjects);
+          const deletedProject = projects.find(p => p.id === id);
+          await db.deleteProject(id);
+          setProjects(prev => prev.filter(p => p.id !== id));
           setSelectedProject(null);
           if (user && deletedProject) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé le projet', entity: 'project', entityName: deletedProject.name, entityId: deletedProject.id, timestamp: new Date().toISOString() });
       } catch (error) {
@@ -482,10 +489,15 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
       tasks: [],
       assignedUsers: user ? [user.id] : [],
     };
-    const updated = [...projects, newProject];
-    setProjects(updated);
-    await db.saveProjects(updated);
-    setSelectedProject(newProject);
+    try {
+      const created = await db.createProject(newProject);
+      setProjects(prev => [...prev, created]);
+      setSelectedProject(created);
+    } catch (error) {
+      console.error('Project creation failed:', error);
+      alert('Échec de la création du projet (serveur injoignable ?).');
+      return;
+    }
     if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a créé le projet', entity: 'project', entityName: newProject.name, entityId: newProject.id, timestamp: new Date().toISOString() });
   };
 

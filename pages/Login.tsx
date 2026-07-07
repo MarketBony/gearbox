@@ -267,9 +267,16 @@ const Login: React.FC = () => {
     setError('');
     setIsLoading(true);
     setTimeout(async () => {
-      const success = await login(loginId, password);
-      if (!success) {
-        setError('Identifiant ou mot de passe incorrect.');
+      try {
+        const success = await login(loginId, password);
+        if (!success) {
+          setError('Identifiant ou mot de passe incorrect.');
+          setIsLoading(false);
+        }
+      } catch {
+        // Erreur réseau (backend éteint, base Supabase injoignable...) —
+        // distincte du refus d'identifiants.
+        setError('Serveur injoignable — vérifiez que le backend tourne et que la connexion (hotspot) est active.');
         setIsLoading(false);
       }
     }, 800);

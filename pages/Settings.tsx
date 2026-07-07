@@ -280,10 +280,8 @@ const Settings: React.FC = () => {
     if (!user) return;
 
     if (newPassword || oldPassword) {
-      if (oldPassword !== user.password) {
-        setProfileMsg({ type: 'error', text: 'Ancien mot de passe incorrect.' });
-        return;
-      }
+      // Le mot de passe n'est plus disponible côté client (auth backend, hash
+      // bcrypt en base) : plus de vérification locale de l'ancien mot de passe.
       if (newPassword !== confirmPassword) {
         setProfileMsg({ type: 'error', text: 'Les nouveaux mots de passe ne correspondent pas.' });
         return;
@@ -294,11 +292,15 @@ const Settings: React.FC = () => {
       }
     }
 
-    const updatedUser: User = { ...user, name, password: newPassword ? newPassword : user.password };
-    await updateProfile(updatedUser);
-    saveUserPrefs(user.id, { city: userCity, birthdate: userBirthdate });
-    setProfileMsg({ type: 'success', text: 'Profil mis à jour avec succès.' });
-    setOldPassword(''); setNewPassword(''); setConfirmPassword('');
+    try {
+      const updatedUser: User = { ...user, name, password: newPassword || undefined };
+      await updateProfile(updatedUser); // PUT /api/auth/me
+      saveUserPrefs(user.id, { city: userCity, birthdate: userBirthdate });
+      setProfileMsg({ type: 'success', text: 'Profil mis à jour avec succès.' });
+      setOldPassword(''); setNewPassword(''); setConfirmPassword('');
+    } catch {
+      setProfileMsg({ type: 'error', text: 'Échec de la mise à jour (serveur injoignable ?).' });
+    }
   };
 
   const startEdit = (targetUser: User) => {
