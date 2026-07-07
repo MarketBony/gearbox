@@ -14,6 +14,7 @@ import expenseRoutes from './routes/expenses';
 import fixedExpenseRoutes from './routes/fixedExpenses';
 import equipmentRoutes from './routes/equipment';
 import equipmentBookingRoutes from './routes/equipmentBookings';
+import chatRoutes from './routes/chat';
 import userRoutes from './routes/users';
 import seedRoutes from './routes/seed';
 import { setupRealtime } from './realtime';
@@ -46,6 +47,7 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/fixed-expenses', fixedExpenseRoutes);
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/equipment-bookings', equipmentBookingRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Realtime
 setupRealtime(io);
