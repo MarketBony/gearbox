@@ -16,12 +16,35 @@ const reply = (ack: Ack, data: any) => { if (typeof ack === 'function') ack(data
 // personnelle + les rooms de toutes ses conversations.
 export const joinUserRooms = async (socket: Socket) => {
   const userId: string = socket.data.user.id;
+  const role: string | undefined = socket.data.user.role;
   socket.join(userRoom(userId));
   const conversations = await prisma.chatConversation.findMany({
     where: { participants: { has: userId } },
     select: { id: true }
   });
   conversations.forEach(c => socket.join(convRoom(c.id)));
+  // Chat Général : appartenance implicite — tout socket authentifié non-External
+  // rejoint sa room à la connexion (aucun participants[] à synchroniser).
+  if (role !== 'External') socket.join(convRoom('general'));
+};
+
+// Seed idempotent du Chat Général : une seule conversation système, créée au
+// premier démarrage. participants reste vide — l'accès est géré par type='general'
+// dans les handlers socket et les routes REST (appartenance implicite).
+export const ensureGeneralConversation = async () => {
+  await prisma.chatConversation.upsert({
+    where: { id: 'general' },
+    create: {
+      id: 'general',
+      type: 'general',
+      name: 'Chat Général',
+      participants: [],
+      adminIds: [],
+      pinnedBy: [],
+      unreadCounts: {}
+    },
+    update: {}
+  });
 };
 
 // Appelé par la route REST de création : les sockets déjà connectées des
@@ -50,6 +73,7 @@ const bumpUnread = (unreadCounts: any, participants: string[], senderId: string)
 
 export const registerChatHandlers = (io: Server, socket: Socket) => {
   const userId: string = socket.data.user.id;
+  const role: string | undefined = socket.data.user.role;
 
   // Envoi d'un message : persiste PUIS diffuse à la room de la conversation.
   socket.on('chat:message:send', async (payload: any, ack: Ack) => {
@@ -68,7 +92,9 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
 
       const conversation = await prisma.chatConversation.findUnique({ where: { id: conversationId } });
       if (!conversation) return reply(ack, { error: 'Conversation introuvable.' });
-      if (!conversation.participants.includes(userId)) {
+      const isGeneral = conversation.type === 'general';
+      // Général : appartenance implicite (tout non-External) ; sinon check participant.
+      if (isGeneral ? role === 'External' : !conversation.participants.includes(userId)) {
         return reply(ack, { error: "Vous n'êtes pas participant de cette conversation." });
       }
 
@@ -92,13 +118,21 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
         }
       });
 
+      // Cibles unread : participants normaux, ou tous les utilisateurs non-External
+      // (sauf l'émetteur) pour le Général — qui n'a pas de liste de participants.
+      let unreadTargets = conversation.participants;
+      if (isGeneral) {
+        const allUsers = await prisma.user.findMany({ select: { id: true, role: true } });
+        unreadTargets = allUsers.filter(u => u.role !== 'External').map(u => u.id);
+      }
+
       // lastMessage tronqué à 60 / '📷 Image' : même logique que Chat.tsx.
       const updatedConv = await prisma.chatConversation.update({
         where: { id: conversationId },
         data: {
           lastMessage: msgType === 'image' ? '📷 Image' : content.slice(0, 60),
           lastMessageAt: now,
-          unreadCounts: bumpUnread(conversation.unreadCounts, conversation.participants, userId)
+          unreadCounts: bumpUnread(conversation.unreadCounts, unreadTargets, userId)
         }
       });
 
@@ -165,7 +199,9 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       if (!existing) return reply(ack, { error: 'Message introuvable.' });
 
       const conversation = await prisma.chatConversation.findUnique({ where: { id: existing.conversationId } });
-      if (!conversation || !conversation.participants.includes(userId)) {
+      if (!conversation) return reply(ack, { error: "Vous n'êtes pas participant de cette conversation." });
+      // Général : appartenance implicite (tout non-External) ; sinon check participant.
+      if (conversation.type === 'general' ? role === 'External' : !conversation.participants.includes(userId)) {
         return reply(ack, { error: "Vous n'êtes pas participant de cette conversation." });
       }
 
@@ -194,7 +230,8 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       if (typeof conversationId !== 'string') return reply(ack, { error: 'Champ "conversationId" requis.' });
       const conversation = await prisma.chatConversation.findUnique({ where: { id: conversationId } });
       if (!conversation) return reply(ack, { error: 'Conversation introuvable.' });
-      if (!conversation.participants.includes(userId)) {
+      // Général : appartenance implicite (tout non-External) ; sinon check participant.
+      if (conversation.type === 'general' ? role === 'External' : !conversation.participants.includes(userId)) {
         return reply(ack, { error: "Vous n'êtes pas participant de cette conversation." });
       }
 

@@ -1,7 +1,9 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChatConversation, ChatMessage, User } from '../types';
-import { db } from '../services/dataService';
+import { db, ApiError } from '../services/dataService';
+import { getSocket, connectSocket, emitWithAck } from '../services/socket';
+import { chatStore } from '../services/chatStore';
 import { useAuth } from '../contexts/AuthContext';
 import {
   MessageSquare, Plus, Send, Star, StarOff, ArrowLeft,
@@ -13,7 +15,36 @@ import Cropper from 'react-easy-crop';
 
 const REACTIONS = ['👍', '❤️', '😂', '😮'];
 const MAX_IMAGE_SIZE = 300 * 1024;
-const genId = () => Math.random().toString(36).substr(2, 9);
+
+// Overlay client-only pour les features HORS PÉRIMÈTRE (épingle, renommage et
+// membres de groupe) : le backend n'expose aucun événement pour elles. Stocké
+// par navigateur et ré-appliqué sur les conversations du store à l'affichage,
+// pour survivre aux chat:conversation:updated du backend. Comportement identique
+// à aujourd'hui (par navigateur, non propagé aux autres utilisateurs).
+type ConvOverlay = { pinnedBy?: string[]; name?: string; participants?: string[] };
+const OVERLAY_KEY = 'gearbox_chat_overlay';
+const readOverlay = (): Record<string, ConvOverlay> => {
+  try { const d = localStorage.getItem(OVERLAY_KEY); return d ? JSON.parse(d) : {}; }
+  catch { return {}; }
+};
+const updateOverlay = (convId: string, patch: ConvOverlay) => {
+  const all = readOverlay();
+  all[convId] = { ...all[convId], ...patch };
+  localStorage.setItem(OVERLAY_KEY, JSON.stringify(all));
+};
+const applyOverlay = (convs: ChatConversation[]): ChatConversation[] => {
+  const overlay = readOverlay();
+  return convs.map(c => {
+    const o = overlay[c.id];
+    if (!o) return c;
+    return {
+      ...c,
+      pinnedBy: o.pinnedBy ?? c.pinnedBy,
+      name: o.name ?? c.name,
+      participants: o.participants ?? c.participants
+    };
+  });
+};
 
 // --- Helpers ---
 const relativeTime = (iso: string): string => {
@@ -280,15 +311,59 @@ const Chat: React.FC = () => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeConvIdRef = useRef<string | null>(null);
+  useEffect(() => { activeConvIdRef.current = activeConvId; }, [activeConvId]);
 
+  // Chargement initial + abonnement au store partagé (source unique des
+  // conversations) + listeners socket pour les messages de la conv ouverte.
   useEffect(() => {
-    db.getUsers().then(setUsers);
-    const all = db.getConversations();
-    setConversations(all);
-    // Auto-open first visible conv
-    const visible = filterVisible(all);
-    if (visible.length > 0) openConversation(visible[0].id, all);
+    db.getUsers().then(setUsers).catch(() => {});
+    const s = getSocket() ?? connectSocket(); // idempotent
+    const sync = () => setConversations(applyOverlay(chatStore.getConversations()));
+    const unsub = chatStore.subscribe(sync);
+    sync(); // état courant immédiat (le store peut déjà être peuplé par le connect)
+    // Refresh REST : le socket recharge aussi au connect, mais ceci garantit le
+    // chargement même en arrivant directement sur la page.
+    db.getConversations().then(c => chatStore.setConversations(c)).catch(() => {});
+
+    if (!s) return unsub;
+
+    const onNew = (msg: ChatMessage) => {
+      if (msg.conversationId !== activeConvIdRef.current) return;
+      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      // Je regarde cette conversation : mon compteur non-lu retombe à 0.
+      if (msg.senderId !== me?.id) {
+        emitWithAck('chat:conversation:read', { conversationId: msg.conversationId }).catch(() => {});
+      }
+    };
+    const onUpdated = (msg: ChatMessage) => {
+      if (msg.conversationId !== activeConvIdRef.current) return;
+      setMessages(prev => prev.map(m => (m.id === msg.id ? msg : m)));
+    };
+    // Reconnexion réseau : recharge l'historique de la conversation ouverte.
+    const onReconnect = () => {
+      const id = activeConvIdRef.current;
+      if (id) db.getMessages(id).then(setMessages).catch(() => {});
+    };
+    s.on('chat:message:new', onNew);
+    s.on('chat:message:updated', onUpdated);
+    window.addEventListener('gearbox-chat-reconnected', onReconnect);
+    return () => {
+      unsub();
+      s.off('chat:message:new', onNew);
+      s.off('chat:message:updated', onUpdated);
+      window.removeEventListener('gearbox-chat-reconnected', onReconnect);
+    };
   }, []);
+
+  // Auto-ouverture de la 1re conversation visible une fois la liste chargée.
+  useEffect(() => {
+    if (activeConvId || !me || conversations.length === 0) return;
+    const visible = filterVisible(conversations);
+    if (visible.length > 0) openConversation(visible[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversations, activeConvId, me]);
 
   // Load group avatar photos from localStorage + listen for updates
   useEffect(() => {
@@ -329,27 +404,26 @@ const Chat: React.FC = () => {
     return others.map(u => u.name).join(', ');
   };
 
-  const openConversation = (id: string, all?: ChatConversation[]) => {
+  const openConversation = async (id: string, all?: ChatConversation[]) => {
     const convList = all || conversations;
     const conv = convList.find(c => c.id === id);
     if (!conv || !me) return;
-    // Security: External cannot see general; non-participants cannot see private/group
+    // Sécurité : External ne voit pas le général ; non-participant ne voit pas privé/groupe.
     if (conv.type === 'general' && isExternal) return;
     if (conv.type !== 'general' && !conv.participants.includes(me.id)) return;
 
     setActiveConvId(id);
-    setMessages(db.getMessages(id));
     setReplyTo(null);
     setEditingId(null);
     setShowMembersPanel(false);
-
-    // Mark as read
-    const updated = convList.map(c =>
-      c.id === id ? { ...c, unreadCounts: { ...c.unreadCounts, [me.id]: 0 } } : c
-    );
-    db.saveConversations(updated);
-    setConversations(updated);
-    window.dispatchEvent(new CustomEvent('gearbox-chat-unread-updated'));
+    try {
+      setMessages(await db.getMessages(id));
+    } catch {
+      setMessages([]);
+    }
+    // Marquage lu via socket : le backend remet le compteur à 0 et diffuse
+    // chat:conversation:updated (le store met à jour la liste + le badge Sidebar).
+    emitWithAck('chat:conversation:read', { conversationId: id }).catch(() => {});
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
   };
 
@@ -367,36 +441,15 @@ const Chat: React.FC = () => {
   // ---- SEND ----
   const sendMessage = useCallback((content: string, type: 'text' | 'image' = 'text') => {
     if (!activeConvId || !me || !content.trim()) return;
-    const msg: ChatMessage = {
-      id: genId(),
-      conversationId: activeConvId,
-      senderId: me.id,
-      senderName: me.name,
-      senderColor: me.avatarColor ?? '#64748b',
-      content, type,
-      timestamp: new Date().toISOString(),
-      edited: false, deleted: false, reactions: {},
-      replyToId: replyTo?.id,
-    };
-    const updatedMsgs = [...messages, msg];
-    db.saveMessages(activeConvId, updatedMsgs);
-    setMessages(updatedMsgs);
-
-    const updatedConvs = conversations.map(c => {
-      if (c.id !== activeConvId) return c;
-      const newUnread = { ...c.unreadCounts };
-      const targets = c.type === 'general' ? users.map(u => u.id) : c.participants;
-      targets.forEach(uid => { if (uid !== me.id) newUnread[uid] = (newUnread[uid] ?? 0) + 1; });
-      newUnread[me.id] = 0;
-      return { ...c, lastMessage: type === 'image' ? '📷 Image' : content.slice(0, 60), lastMessageAt: msg.timestamp, unreadCounts: newUnread };
-    });
-    db.saveConversations(updatedConvs);
-    setConversations(updatedConvs);
-    window.dispatchEvent(new CustomEvent('gearbox-chat-unread-updated'));
+    const replyToId = replyTo?.id;
     setReplyTo(null);
     setInput('');
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-  }, [activeConvId, me, messages, conversations, replyTo, users]);
+    // Envoi via socket : l'ajout à la liste se fait à la réception de
+    // chat:message:new (l'émetteur est dans la room et reçoit sa diffusion).
+    // Le backend gère identité/timestamp/unread/lastMessage. Erreur via l'ack.
+    emitWithAck('chat:message:send', { conversationId: activeConvId, content, type, replyToId })
+      .catch(err => alert(err instanceof Error ? err.message : "Échec de l'envoi du message."));
+  }, [activeConvId, me, replyTo]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
@@ -406,46 +459,42 @@ const Chat: React.FC = () => {
   const startEdit = (msg: ChatMessage) => { setEditingId(msg.id); setEditContent(msg.content); setMenuMsgId(null); };
   const saveEdit = () => {
     if (!editingId || !editContent.trim()) return;
-    const updated = messages.map(m =>
-      m.id === editingId ? { ...m, content: editContent, edited: true, editedAt: new Date().toISOString() } : m
-    );
-    db.saveMessages(activeConvId!, updated);
-    setMessages(updated);
+    const messageId = editingId;
+    const content = editContent;
     setEditingId(null);
+    // Mise à jour reçue via chat:message:updated (auteur uniquement, côté serveur).
+    emitWithAck('chat:message:edit', { messageId, content })
+      .catch(err => alert(err instanceof Error ? err.message : 'Échec de la modification.'));
   };
 
   // ---- DELETE ----
   const deleteMsg = (id: string) => {
     if (!confirm('Supprimer ce message ?')) return;
-    const updated = messages.map(m => m.id === id ? { ...m, deleted: true, content: '' } : m);
-    db.saveMessages(activeConvId!, updated);
-    setMessages(updated);
     setMenuMsgId(null);
+    // Suppression (soft delete) reçue via chat:message:updated (auteur uniquement).
+    emitWithAck('chat:message:delete', { messageId: id })
+      .catch(err => alert(err instanceof Error ? err.message : 'Échec de la suppression.'));
   };
 
   // ---- REACTION ----
   const toggleReaction = (msgId: string, emoji: string) => {
     if (!me) return;
-    const updated = messages.map(m => {
-      if (m.id !== msgId) return m;
-      const existing = m.reactions[emoji] ?? [];
-      const has = existing.includes(me.id);
-      return { ...m, reactions: { ...m.reactions, [emoji]: has ? existing.filter(id => id !== me.id) : [...existing, me.id] } };
-    });
-    db.saveMessages(activeConvId!, updated);
-    setMessages(updated);
+    // Toggle géré côté serveur ; mise à jour reçue via chat:message:updated.
+    emitWithAck('chat:message:react', { messageId: msgId, emoji })
+      .catch(err => alert(err instanceof Error ? err.message : 'Échec de la réaction.'));
   };
 
   // ---- PIN ----
   const togglePin = (convId: string) => {
     if (!me) return;
-    const updated = conversations.map(c => {
-      if (c.id !== convId) return c;
-      const pinned = c.pinnedBy.includes(me.id);
-      return { ...c, pinnedBy: pinned ? c.pinnedBy.filter(id => id !== me.id) : [...c.pinnedBy, me.id] };
+    // HORS PÉRIMÈTRE — overlay client-only (aucun événement backend pour l'épingle).
+    const conv = conversations.find(c => c.id === convId);
+    const currentPinned = conv?.pinnedBy ?? [];
+    const pinned = currentPinned.includes(me.id);
+    updateOverlay(convId, {
+      pinnedBy: pinned ? currentPinned.filter(id => id !== me.id) : [...currentPinned, me.id]
     });
-    db.saveConversations(updated);
-    setConversations(updated);
+    setConversations(applyOverlay(chatStore.getConversations()));
   };
 
   // ---- IMAGE ----
@@ -462,73 +511,65 @@ const Chat: React.FC = () => {
   };
 
   // ---- NEW PRIVATE CONVERSATION ----
-  const startPrivateConv = (userId: string) => {
+  const startPrivateConv = async (userId: string) => {
     if (!me) return;
     const existing = conversations.find(
       c => c.type === 'private' && c.participants.length === 2 &&
         c.participants.includes(me.id) && c.participants.includes(userId)
     );
     if (existing) { handleSelectConv(existing.id); setShowNewModal('none'); return; }
-    const newConv: ChatConversation = {
-      id: genId(), type: 'private',
-      participants: [me.id, userId],
-      pinnedBy: [], unreadCounts: {}
-    };
-    const updated = [...conversations, newConv];
-    db.saveConversations(updated);
-    setConversations(updated);
-    openConversation(newConv.id, updated);
-    setShowNewModal('none');
-    setShowMobileChat(true);
+    try {
+      // Création via REST (idempotence privée gérée serveur). Le backend émet
+      // chat:conversation:created -> le store l'ajoute ; on ouvre tout de suite.
+      const conv = await db.createConversation({ type: 'private', participants: [me.id, userId] });
+      chatStore.upsertConversation(conv);
+      setShowNewModal('none');
+      setShowMobileChat(true);
+      openConversation(conv.id, [conv]);
+    } catch (e) {
+      alert(e instanceof ApiError ? e.message : 'Échec de la création de la conversation.');
+    }
   };
 
   // ---- CREATE GROUP ----
-  const createGroup = () => {
+  const createGroup = async () => {
     if (!me || !newGroupName.trim() || newGroupMembers.length < 2) return;
-    const allMembers = [...new Set([me.id, ...newGroupMembers])];
-    const newConv: ChatConversation = {
-      id: genId(), type: 'group',
-      name: newGroupName.trim(),
-      participants: allMembers,
-      adminIds: [me.id],
-      pinnedBy: [], unreadCounts: {}
-    };
-    const updated = [...conversations, newConv];
-    db.saveConversations(updated);
-    setConversations(updated);
-    openConversation(newConv.id, updated);
-    setShowNewModal('none');
-    setNewGroupName('');
-    setNewGroupMembers([]);
-    setShowMobileChat(true);
+    try {
+      const conv = await db.createConversation({
+        type: 'group',
+        name: newGroupName.trim(),
+        participants: [...new Set([me.id, ...newGroupMembers])],
+        adminIds: [me.id]
+      });
+      chatStore.upsertConversation(conv);
+      setShowNewModal('none');
+      setNewGroupName('');
+      setNewGroupMembers([]);
+      setShowMobileChat(true);
+      openConversation(conv.id, [conv]);
+    } catch (e) {
+      alert(e instanceof ApiError ? e.message : 'Échec de la création du groupe.');
+    }
   };
 
-  // ---- GROUP MANAGEMENT ----
+  // ---- GROUP MANAGEMENT (HORS PÉRIMÈTRE — overlay client-only, aucun backend) ----
   const addMemberToGroup = (userId: string) => {
     if (!activeConv || activeConv.type !== 'group') return;
-    const updated = conversations.map(c =>
-      c.id === activeConv.id ? { ...c, participants: [...c.participants, userId] } : c
-    );
-    db.saveConversations(updated);
-    setConversations(updated);
+    if (activeConv.participants.includes(userId)) return;
+    updateOverlay(activeConv.id, { participants: [...activeConv.participants, userId] });
+    setConversations(applyOverlay(chatStore.getConversations()));
   };
 
   const removeMemberFromGroup = (userId: string) => {
     if (!activeConv || activeConv.type !== 'group' || !me || userId === me.id) return;
-    const updated = conversations.map(c =>
-      c.id === activeConv.id ? { ...c, participants: c.participants.filter(id => id !== userId) } : c
-    );
-    db.saveConversations(updated);
-    setConversations(updated);
+    updateOverlay(activeConv.id, { participants: activeConv.participants.filter(id => id !== userId) });
+    setConversations(applyOverlay(chatStore.getConversations()));
   };
 
   const renameGroup = () => {
     if (!activeConv || !tempGroupName.trim()) return;
-    const updated = conversations.map(c =>
-      c.id === activeConv.id ? { ...c, name: tempGroupName.trim() } : c
-    );
-    db.saveConversations(updated);
-    setConversations(updated);
+    updateOverlay(activeConv.id, { name: tempGroupName.trim() });
+    setConversations(applyOverlay(chatStore.getConversations()));
     setEditingGroupName(false);
   };
 

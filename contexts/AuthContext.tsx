@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
 import { db, getToken, setToken, clearToken, ApiError } from '../services/dataService';
+import { connectSocket, disconnectSocket } from '../services/socket';
 
 interface AuthContextType {
   user: User | null;
@@ -39,6 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const fullUser: User = { loginId: stored?.loginId ?? '', ...stored, ...me } as User;
           localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUser));
           setUser(fullUser);
+          connectSocket(); // session restaurée : ouvre le socket chat (JWT au handshake)
         } catch (e) {
           // Token invalide/expiré ou serveur injoignable : retour au login.
           console.error('Auth check failed', e);
@@ -55,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Déconnexion propre déclenchée par la couche API sur un 401 (token expiré).
     const onExpired = () => {
+      disconnectSocket();
       sessionStorage.clear();
       setUser(null);
     };
@@ -70,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(token);
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUser));
       setUser(fullUser);
+      connectSocket(); // login réussi : ouvre le socket chat (JWT au handshake)
       return true;
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
@@ -81,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    disconnectSocket(); // fermeture propre du socket : pas de connexion fantôme
     clearToken();
     sessionStorage.clear();
     setUser(null);

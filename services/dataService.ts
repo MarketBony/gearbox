@@ -416,33 +416,25 @@ class DataService {
       await new Promise(r => setTimeout(r, 200));
   }
 
-  // --- CHAT ---
-  getConversations(): ChatConversation[] {
-    const data = localStorage.getItem('gearbox_conversations');
-    const convs: ChatConversation[] = data ? JSON.parse(data) : [];
-    // Ensure general conversation exists
-    if (!convs.find(c => c.id === 'general')) {
-      const general: ChatConversation = {
-        id: 'general', type: 'general', participants: [],
-        name: 'Chat Général', pinnedBy: [], unreadCounts: {}
-      };
-      convs.unshift(general);
-      localStorage.setItem('gearbox_conversations', JSON.stringify(convs));
-    }
-    return convs;
+  // --- CHAT (BRANCHÉ BACKEND — étape 7) ---
+  // Chargement initial via REST uniquement. Les mutations de MESSAGE
+  // (envoi/édition/suppression/réaction) et le marquage lu passent par
+  // Socket.IO (services/socket.ts), pas par REST. Le Chat Général est servi par
+  // le backend (appartenance implicite) — plus de synthèse client. Timestamps
+  // ISO complets, utilisés tels quels (pas de normalisation yyyy-MM-dd).
+  async getConversations(): Promise<ChatConversation[]> {
+    return apiFetch<ChatConversation[]>('/chat/conversations');
   }
-
-  saveConversations(convs: ChatConversation[]) {
-    localStorage.setItem('gearbox_conversations', JSON.stringify(convs));
+  async getMessages(conversationId: string): Promise<ChatMessage[]> {
+    return apiFetch<ChatMessage[]>(`/chat/conversations/${conversationId}/messages`);
   }
-
-  getMessages(conversationId: string): ChatMessage[] {
-    const data = localStorage.getItem(`gearbox_messages_${conversationId}`);
-    return data ? JSON.parse(data) : [];
-  }
-
-  saveMessages(conversationId: string, messages: ChatMessage[]) {
-    localStorage.setItem(`gearbox_messages_${conversationId}`, JSON.stringify(messages));
+  async createConversation(input: {
+    type: 'private' | 'group';
+    participants: string[];
+    name?: string;
+    adminIds?: string[];
+  }): Promise<ChatConversation> {
+    return apiFetch('/chat/conversations', { method: 'POST', body: JSON.stringify(input) });
   }
 
   // --- ACTIVITY LOG (BRANCHÉ BACKEND — étape 7.4) ---

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { authenticateToken, AuthRequest } from '../auth/middleware';
 import { joinConversationRooms, notifyConversationCreated } from '../realtime';
 
@@ -11,11 +11,16 @@ const prisma = new PrismaClient();
 // (temps réel) — pas de route REST de secours : aucun consommateur aujourd'hui,
 // à réévaluer au branchement frontend si un fallback hors-ligne s'avère utile.
 
-// GET /api/chat/conversations — uniquement celles de l'utilisateur connecté
+// GET /api/chat/conversations — celles de l'utilisateur + le Chat Général
+// (appartenance implicite : visible par tout authentifié SAUF le rôle External,
+// aligné sur le gate UI de Chat.tsx).
 router.get('/conversations', authenticateToken, async (req: AuthRequest, res) => {
   const userId = req.user!.id;
+  const role = req.user!.role;
+  const or: Prisma.ChatConversationWhereInput[] = [{ participants: { has: userId } }];
+  if (role !== 'External') or.push({ type: 'general' });
   const conversations = await prisma.chatConversation.findMany({
-    where: { participants: { has: userId } },
+    where: { OR: or },
     orderBy: { updatedAt: 'desc' }
   });
   res.json(conversations);
@@ -26,13 +31,19 @@ router.get('/conversations', authenticateToken, async (req: AuthRequest, res) =>
 // comme le frontend qui charge tout le fil en mémoire).
 router.get('/conversations/:id/messages', authenticateToken, async (req: AuthRequest, res) => {
   const userId = req.user!.id;
+  const role = req.user!.role;
   const { id } = req.params;
 
   const conversation = await prisma.chatConversation.findUnique({ where: { id } });
   if (!conversation) {
     return res.status(404).json({ error: 'Conversation introuvable.' });
   }
-  if (!conversation.participants.includes(userId)) {
+  // Général : accessible à tout authentifié non-External (appartenance implicite) ;
+  // sinon, réservé aux participants.
+  const allowed = conversation.type === 'general'
+    ? role !== 'External'
+    : conversation.participants.includes(userId);
+  if (!allowed) {
     return res.status(403).json({ error: "Vous n'êtes pas participant de cette conversation." });
   }
 
