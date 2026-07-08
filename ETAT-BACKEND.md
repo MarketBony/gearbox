@@ -30,7 +30,7 @@ et fallback des anciennes photos de profil base64 (avant bascule uploads).
 
 - **`POST /api/uploads/:type`** (`chat|avatar|calendar`), auth JWT, `multer` disque, nom **uuid**,
   renvoie `{ url: "/uploads/<type>/<uuid>.<ext>" }`. **`GET /uploads/...`** en `express.static`.
-  Monté sur les 2 entrypoints (`backend/src/index.ts` + `server.ts`), proxy Vite `/uploads`.
+  Monté sur l'entrypoint `backend/src/index.ts`, proxy Vite `/uploads`.
 - Formats/tailles **figés** : avatar jpeg/png/gif/webp 5 Mo · chat idem 10 Mo · calendar
   jpeg/png/webp/mp4/mov 2 Go. Refus → 415 (format) / 413 (taille) / 400 (type) / 401 (sans token).
 - **Purge automatique CALENDAR uniquement, ancrée sur `SocialPost.archivedAt`** (jamais la date du
@@ -46,9 +46,11 @@ et fallback des anciennes photos de profil base64 (avant bascule uploads).
 
 ## 🔜 Seul chantier restant
 
-- **Déploiement VPS** — rien côté code applicatif. Prévoir : build (`vite build` + `tsc` backend),
-  service backend, `express.static` du `dist/` (déjà géré par `server.ts` en prod), reverse-proxy
-  (Caddyfile présent), volume persistant pour `backend/uploads/` (gitignoré), variables `.env`.
+- **Déploiement VPS** — rien côté code applicatif. Architecture conteneurisée split : `api`
+  (backend/Dockerfile multi-stage, `prisma migrate deploy` au démarrage) + `web` (nginx servant
+  le build Vite) + `caddy` (reverse-proxy `/api`, `/socket.io`, `/uploads` → api, reste → web,
+  HTTPS auto). Volume persistant `uploads_data` pour les uploads, variables dans `.env` racine
+  (voir `.env.example`). `server.ts` (ancien monolithe racine) supprimé — code mort.
 
 ## Rappels d'environnement (contrainte TOUJOURS active)
 

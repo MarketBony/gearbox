@@ -9,6 +9,11 @@ const prisma = new PrismaClient();
 // Relance du seed = action sensible (reset des mots de passe démo) :
 // authentification + rôles Master/Administrator exigés.
 router.get('/', authenticateToken, requireRole(['Master', 'Administrator']), async (req, res) => {
+  // Bloqué en prod : le seed écraserait les mots de passe réels par les valeurs
+  // démo faibles ('admin'/'password'). Réservé aux environnements de dev.
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Seed désactivé en production.' });
+  }
   try {
     // Rôles = chaînes libres alignées sur types.ts (l'enum Prisma UserRole a été supprimé).
     const users = [

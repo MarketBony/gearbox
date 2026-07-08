@@ -1,46 +1,33 @@
-version: '3.8'
-
 services:
-  db:
-    image: postgres:15-alpine
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: gearbox
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-
   api:
     build: ./backend
     restart: always
     environment:
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/gearbox
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
       JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: production
       PORT: 3000
-    ports:
-      - "3000:3000"
-    depends_on:
-      - db
+    volumes:
+      - uploads_data:/app/uploads
     networks:
       - app-network
-    command: sh -c "npx prisma db push && npm start"
+    command: sh -c "npx prisma migrate deploy && node dist/index.js"
 
   web:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.frontend
     restart: always
-    ports:
-      - "8080:80"
     networks:
       - app-network
 
   caddy:
     image: caddy:2-alpine
     restart: always
+    environment:
+      DOMAIN: ${DOMAIN}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
     ports:
       - "80:80"
       - "443:443"
@@ -55,7 +42,7 @@ services:
       - app-network
 
 volumes:
-  db_data:
+  uploads_data:
   caddy_data:
   caddy_config:
 

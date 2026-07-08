@@ -1,0 +1,9 @@
+# Contexte de build de backend/Dockerfile.
+# node_modules : recréés par npm ci dans l'image. uploads : données runtime (volume en prod).
+node_modules
+dist
+uploads
+.env
+.env.*
+!.env.example
+*.log
