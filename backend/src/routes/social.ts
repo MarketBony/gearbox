@@ -6,7 +6,10 @@ import { withDates } from '../utils/dates';
 
 const router = Router();
 const prisma = new PrismaClient();
-const EDIT_ROLES = ['Master', 'Administrator', 'DigitalManager'];
+// Aligné sur le gating de Digital.tsx (canEdit + External sur le calendrier
+// éditorial — pas de granularité par onglet côté API). Corrige au passage
+// l'ancien 'DigitalManager' sans espace qui ne matchait jamais le vrai rôle.
+const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Digital Manager', 'External'];
 
 router.get('/', authenticateToken, async (req, res) => {
   const posts = await prisma.socialPost.findMany();

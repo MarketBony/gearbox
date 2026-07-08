@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSessionState } from '../hooks/useSessionState';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../services/dataService';
+import { db, ApiError } from '../services/dataService';
 import { SocialPost, SocialStatus, SocialNetwork, BrandType, ServiceType, SocialTarget, Site, PlaqueName, DigitalTags, ActivityLog } from '../types';
 import { SOCIAL_STATUS_COLORS, BRANDS, SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTIONS, SITES, BRAND_COLORS } from '../constants';
 import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload } from 'lucide-react';
@@ -880,19 +880,30 @@ const Digital: React.FC = () => {
           setMediaCounts(prev => ({ ...prev, [updatedPost.id]: 0 }));
       }
       setSaving(true);
-      const newPosts = posts.map(p => p.id === updatedPost.id ? updatedPost : p);
-      setPosts(newPosts);
-      await db.saveSocialPosts(newPosts);
-      if (isArchiving && user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a archivé la publication', entity: 'post', entityName: updatedPost.title || '(sans titre)', timestamp: new Date().toISOString() });
+      // Optimistic update : l'UI reflète le changement immédiatement, rollback si l'API refuse.
+      const previousPosts = posts;
+      setPosts(posts.map(p => p.id === updatedPost.id ? updatedPost : p));
+      try {
+          const saved = await db.updateSocialPost(updatedPost);
+          setPosts(prev => prev.map(p => p.id === saved.id ? saved : p));
+          if (isArchiving && user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a archivé la publication', entity: 'post', entityName: updatedPost.title || '(sans titre)', timestamp: new Date().toISOString() });
+      } catch (e) {
+          setPosts(previousPosts);
+          alert(e instanceof ApiError ? e.message : "Échec de l'enregistrement (serveur injoignable ?).");
+      }
       setTimeout(() => setSaving(false), 500);
   };
 
   const handleDeletePost = async (post: SocialPost) => {
+      try {
+          await db.deleteSocialPost(post.id);
+      } catch (e) {
+          alert(e instanceof ApiError ? e.message : 'Échec de la suppression (serveur injoignable ?).');
+          return;
+      }
       localStorage.removeItem(mediaKey(post.id));
       setMediaCounts(prev => { const next = { ...prev }; delete next[post.id]; return next; });
-      const newPosts = posts.filter(p => p.id !== post.id);
-      setPosts(newPosts);
-      await db.saveSocialPosts(newPosts);
+      setPosts(posts.filter(p => p.id !== post.id));
       if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé la publication', entity: 'post', entityName: post.title || '(sans titre)', entityId: post.id, timestamp: new Date().toISOString() });
   };
 
@@ -919,27 +930,29 @@ const Digital: React.FC = () => {
       if (!trimmed) return;
       setShowCreatePostModal(false);
       setNewPostTitle('');
-      const newPost: SocialPost = {
-          id: `sp-${Date.now()}`,
-          title: trimmed,
-          status: 'À venir',
-          date: new Date().toISOString().split('T')[0],
-          targets: [],
-          brands: [],
-          service: 'Tous Services',
-          networks: [],
-          concessions: [],
-          mediaFiles: [],
-          link: '',
-          wording: '',
-          lom: '',
-          co2: '',
-          archived: false
-      };
-      const newPosts = [newPost, ...posts];
-      setPosts(newPosts);
-      await db.saveSocialPosts(newPosts);
-      if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a créé la publication', entity: 'post', entityName: trimmed, entityId: newPost.id, timestamp: new Date().toISOString() });
+      try {
+          // L'id est généré par le backend.
+          const created = await db.createSocialPost({
+              title: trimmed,
+              status: 'À venir',
+              date: new Date().toISOString().split('T')[0],
+              targets: [],
+              brands: [],
+              service: 'Tous Services',
+              networks: [],
+              concessions: [],
+              mediaFiles: [],
+              link: '',
+              wording: '',
+              lom: '',
+              co2: '',
+              archived: false
+          });
+          setPosts([created, ...posts]);
+          if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a créé la publication', entity: 'post', entityName: trimmed, entityId: created.id, timestamp: new Date().toISOString() });
+      } catch (e) {
+          alert(e instanceof ApiError ? e.message : "Échec de la création (serveur injoignable ?).");
+      }
   };
 
   const filteredPosts = useMemo(() => {

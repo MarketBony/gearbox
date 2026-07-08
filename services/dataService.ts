@@ -21,61 +21,6 @@ const DEFAULT_USERS: User[] = [
     { id: 'u10', name: 'Lucy Bohere', loginId: 'Lucy', password: 'admin', role: 'Coordinator', avatarColor: '#14b8a6' }, // Teal
 ];
 
-// MOCK SOCIAL POSTS
-const MOCK_SOCIAL_POSTS: SocialPost[] = [
-    {
-        id: 'sp-1',
-        title: 'Lancement R5 E-Tech',
-        status: 'Programmed',
-        date: new Date().toISOString().split('T')[0],
-        targets: ['Internet'],
-        brands: ['Renault'],
-        service: 'VN',
-        networks: ['Instagram', 'Facebook', 'LinkedIn'],
-        concessions: ['Clermont', 'Issoire'],
-        mediaFiles: [],
-        link: 'https://renault-clermont.fr/r5',
-        wording: 'La révolution est en marche ! Découvrez la nouvelle R5 E-Tech 100% électrique dans nos concessions. #R5 #Renault #Electric',
-        lom: 'Non nécessaire',
-        co2: 'R5 - A0',
-        archived: false
-    },
-    {
-        id: 'sp-2',
-        title: 'Offre Pneus Hiver',
-        status: 'Validé',
-        date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-        targets: ['Internet'],
-        brands: ['Groupe'],
-        service: 'APV',
-        networks: ['Facebook', 'GMB'],
-        concessions: ['GROUPE BONY'],
-        mediaFiles: [],
-        link: '',
-        wording: 'Préparez votre hiver en toute sérénité. Profitez de -30% sur le 2ème pneu Michelin.',
-        lom: 'Pensez à covoiturer #SeDéplacerMoinsPolluer',
-        co2: '',
-        archived: false
-    },
-    {
-        id: 'sp-3',
-        title: 'Recrutement Mécanicien',
-        status: 'Publié',
-        date: new Date(Date.now() - 86400000 * 5).toISOString().split('T')[0],
-        targets: ['Internet', 'Collaborateurs'],
-        brands: ['Groupe'],
-        service: 'Tous Services',
-        networks: ['LinkedIn', 'Facebook'],
-        concessions: ['Ussel'],
-        mediaFiles: [],
-        link: 'https://bony-automobiles.com/carrieres',
-        wording: 'Nous recrutons un Mécanicien H/F pour notre site d\'Ussel. Rejoignez une équipe dynamique !',
-        lom: 'Non nécessaire',
-        co2: '',
-        archived: true // Archived example
-    }
-];
-
 // =====================================================================
 // COUCHE API — branchement progressif sur le backend Express (étape 7).
 // Pattern unique réutilisé par chaque module au fil des bascules.
@@ -154,6 +99,10 @@ const normalizeBooking = (b: any): EquipmentBooking => ({
   startDate: toDay(b.startDate),
   endDate: toDay(b.endDate)
 });
+const normalizeSocialPost = (p: any): SocialPost => ({
+  ...p,
+  date: toDay(p.date)
+});
 // Le backend génère les ids et gère createdAt/updatedAt : on ne les renvoie
 // pas dans les corps de mutation (les routes social/campaigns passent le body
 // brut à Prisma).
@@ -206,10 +155,6 @@ class DataService {
              const toAdd = DEFAULT_USERS.filter(u => !existingIds.has(u.id));
              localStorage.setItem('gearbox_users', JSON.stringify([...currentUsers, ...toAdd]));
         }
-    }
-    // Ensure Social Posts exist
-    if (!localStorage.getItem('gearbox_social_posts')) {
-        localStorage.setItem('gearbox_social_posts', JSON.stringify(MOCK_SOCIAL_POSTS));
     }
     // Ensure Digital Tags exist
     if (!localStorage.getItem('gearbox_digital_tags')) {
@@ -423,9 +368,43 @@ class DataService {
   async getUsers(): Promise<User[]> { return this.get('users'); }
   async saveUsers(users: User[]) { await this.save('users', users); }
   
-  // --- SOCIAL POSTS (DIGITAL) ---
-  async getSocialPosts(): Promise<SocialPost[]> { return this.get('social_posts'); }
-  async saveSocialPosts(posts: SocialPost[]) { await this.save('social_posts', posts); }
+  // --- Social Posts / Digital (BRANCHÉS BACKEND — étape 7.4) ---
+  // Écritures : Master/Administrator/Director/Digital Manager/External
+  // (EDIT_ROLES de routes/social.ts, aligné sur le gating de Digital.tsx).
+  // networks/co2/concessions sont des chaînes libres : stockage brut,
+  // aucune validation d'enum côté serveur.
+  async getSocialPosts(): Promise<SocialPost[]> {
+    let posts = await apiFetch<any[]>('/social');
+    posts = await this.migrateSocialPostsIfNeeded(posts);
+    return posts.map(normalizeSocialPost);
+  }
+  async createSocialPost(post: Omit<SocialPost, 'id'>): Promise<SocialPost> {
+    return normalizeSocialPost(await apiFetch('/social', { method: 'POST', body: JSON.stringify(stripMeta(post)) }));
+  }
+  async updateSocialPost(post: SocialPost): Promise<SocialPost> {
+    return normalizeSocialPost(await apiFetch(`/social/${post.id}`, { method: 'PUT', body: JSON.stringify(stripMeta(post)) }));
+  }
+  async deleteSocialPost(id: string): Promise<void> {
+    await apiFetch(`/social/${id}`, { method: 'DELETE' });
+  }
+  // Migration one-shot : on CONSERVE les ids d'origine (le backend accepte
+  // l'id fourni) car les médias sont stockés en localStorage sous une clé
+  // dérivée de l'id du post — de nouveaux ids casseraient ces associations.
+  private async migrateSocialPostsIfNeeded(apiPosts: any[]): Promise<any[]> {
+    const FLAG = 'gearbox_migrated_social_posts';
+    if (apiPosts.length > 0 || localStorage.getItem(FLAG) || !isStoredUserAdmin()) return apiPosts;
+    const local = readLocalStore<SocialPost>('social_posts');
+    if (local.length === 0) {
+      localStorage.setItem(FLAG, '1');
+      return apiPosts;
+    }
+    for (const post of local) {
+      await apiFetch('/social', { method: 'POST', body: JSON.stringify(post) });
+    }
+    localStorage.setItem(FLAG, '1');
+    console.info(`[migration] ${local.length} publication(s) localStorage poussée(s) vers Supabase.`);
+    return apiFetch<any[]>('/social');
+  }
 
   // --- DIGITAL TAGS ---
   async getDigitalTags(): Promise<DigitalTags> {
