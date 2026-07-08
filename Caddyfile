@@ -1,9 +1,10 @@
 {
-    email ${ADMIN_EMAIL}
+    email {$ADMIN_EMAIL}
 }
 
-${DOMAIN} {
+{$DOMAIN} {
     reverse_proxy /api/* api:3000
     reverse_proxy /socket.io/* api:3000
+    reverse_proxy /uploads/* api:3000
     reverse_proxy * web:80
 }
