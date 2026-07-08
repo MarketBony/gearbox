@@ -283,12 +283,12 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-full relative overflow-hidden flex items-center justify-center">
+    <div className="h-screen w-full relative overflow-hidden flex items-center justify-center p-4">
       {/* CANVAS BACKGROUND */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ zIndex: 0 }} />
 
       {/* LOGIN CARD */}
-      <div className="relative z-10 w-full max-w-md p-8 backdrop-blur-xl bg-black/60 border border-white/10 rounded-2xl shadow-2xl animate-in fade-in zoom-in duration-700">
+      <div className="relative z-10 w-full max-w-md p-6 md:p-8 backdrop-blur-xl bg-black/60 border border-white/10 rounded-2xl shadow-2xl animate-in fade-in zoom-in duration-700">
 
         {/* LOGO */}
         <div className="flex flex-col items-center mb-10">

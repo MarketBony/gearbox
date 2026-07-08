@@ -648,12 +648,12 @@ const Budget: React.FC = () => {
 
       return (
           <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar pb-20 p-3 md:p-0">
-             <div className="gx-card p-6 mb-6 flex items-center justify-between">
+             <div className="gx-card p-4 md:p-6 mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                  <div>
                      <h3 className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-1">Budget Prévisionnel Groupe (Annuel)</h3>
-                     <div className="text-4xl font-title text-slate-900 dark:text-white">{totalAnnualGroup.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</div>
+                     <div className="text-2xl md:text-4xl font-title text-slate-900 dark:text-white">{totalAnnualGroup.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</div>
                  </div>
-                 <div className="flex items-center gap-4">
+                 <div className="flex flex-wrap items-center gap-2 md:gap-4">
                      {!canEditProvisions && (
                          <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-lg text-red-400">
                              <Lock size={16}/>
@@ -689,11 +689,11 @@ const Budget: React.FC = () => {
                                             onClick={() => toggleSite(budget.site)}
                                             className="p-4 flex items-center justify-between cursor-pointer bg-slate-50 hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 transition-colors"
                                          >
-                                             <div className="flex items-center gap-4">
-                                                 {isExpanded ? <ChevronDown size={18} className="text-bony-orange"/> : <ChevronRight size={18} className="text-slate-500"/>}
-                                                 <div>
-                                                     <div className="flex items-baseline gap-2">
-                                                         <h4 className="text-lg font-bold text-slate-900 dark:text-white uppercase tracking-wide">{budget.site}</h4>
+                                             <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                                                 {isExpanded ? <ChevronDown size={18} className="text-bony-orange shrink-0"/> : <ChevronRight size={18} className="text-slate-500 shrink-0"/>}
+                                                 <div className="min-w-0">
+                                                     <div className="flex flex-wrap items-baseline gap-2">
+                                                         <h4 className="text-base md:text-lg font-bold text-slate-900 dark:text-white uppercase tracking-wide truncate">{budget.site}</h4>
                                                          <span className="text-[9px] font-bold text-slate-500 bg-slate-200 dark:bg-black/40 px-1.5 rounded uppercase border border-bony-border">
                                                              {plaqueName}
                                                          </span>
@@ -707,14 +707,14 @@ const Budget: React.FC = () => {
                                                      </div>
                                                  </div>
                                              </div>
-                                             <div className="flex items-center gap-8 text-right">
-                                                 <div>
+                                             <div className="flex items-center gap-4 md:gap-8 text-right shrink-0 pl-2">
+                                                 <div className="hidden sm:block">
                                                      <div className="text-[10px] text-slate-500 uppercase font-bold">Mensuel Moy.</div>
                                                      <div className="text-sm font-sans text-slate-600 dark:text-slate-300">{(totalAnnualSite/12).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €</div>
                                                  </div>
                                                  <div>
                                                      <div className="text-[10px] text-slate-500 uppercase font-bold">Annuel Prévu</div>
-                                                     <div className="text-xl font-sans font-bold text-bony-gradient-text bg-clip-text text-transparent bg-bony-gradient">
+                                                     <div className="text-base md:text-xl font-sans font-bold text-bony-gradient-text bg-clip-text text-transparent bg-bony-gradient whitespace-nowrap">
                                                          {totalAnnualSite.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} €
                                                      </div>
                                                  </div>
@@ -832,10 +832,10 @@ const Budget: React.FC = () => {
                       </h3>
                       <div className="flex-1 min-h-[200px]">
                           <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-                              <ComposedChart data={chartData} margin={{top:10, right:10, left:-20, bottom:0}}>
+                              <ComposedChart data={chartData} margin={{top:10, right:10, left:0, bottom:0}}>
                                   <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#e2e8f0'} vertical={false}/>
                                   <XAxis dataKey="name" stroke={theme === 'dark' ? '#64748b' : '#94a3b8'} fontSize={10} tickLine={false} axisLine={false}/>
-                                  <YAxis stroke={theme === 'dark' ? '#64748b' : '#94a3b8'} fontSize={10} tickLine={false} axisLine={false}/>
+                                  <YAxis stroke={theme === 'dark' ? '#64748b' : '#94a3b8'} fontSize={10} tickLine={false} axisLine={false} width={38} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}/>
                                   <Tooltip 
                                     contentStyle={{
                                         backgroundColor: theme === 'dark' ? '#1e1e1e' : '#ffffff', 
@@ -866,8 +866,8 @@ const Budget: React.FC = () => {
                                Données filtrées : {periodLabel}. {filterServices.length > 0 ? `Services : ${filterServices.join(', ')}.` : 'Tous services.'}
                            </p>
                       </div>
-                      <div className="flex-1 overflow-y-auto custom-scrollbar">
-                          <table className="w-full text-left border-collapse">
+                      <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar">
+                          <table className="w-full min-w-[560px] text-left border-collapse">
                               <thead className="bg-slate-100 dark:bg-black/20 text-[10px] uppercase font-bold text-slate-500 sticky top-0 z-10 backdrop-blur-sm">
                                   <tr>
                                       <th className="p-3 border-b border-bony-border">Site / Plaque</th>
@@ -938,14 +938,14 @@ const Budget: React.FC = () => {
   };
 
   return (
-    <div className="p-3 md:p-6 h-screen flex flex-col overflow-hidden animate-fade-in">
+    <div className="p-3 md:p-6 h-full flex flex-col overflow-hidden animate-fade-in">
       {/* Header */}
-      <div className="flex justify-between items-end mb-6 border-b border-bony-border pb-4 shrink-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end mb-6 border-b border-bony-border pb-4 shrink-0">
           <div>
-            <h2 className="text-3xl text-slate-900 dark:text-white mb-1">Budget & Prévisionnel</h2>
+            <h2 className="text-2xl md:text-3xl text-slate-900 dark:text-white mb-1">Budget & Prévisionnel</h2>
             <p className="text-xs text-slate-500 font-sans">PILOTAGE FINANCIER PAR CONCESSION</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
               {saving && (
                   <span className="text-bony-orange flex items-center text-xs animate-pulse font-bold mr-4">
                       <Save size={14} className="mr-1"/> SAUVEGARDE AUTO...

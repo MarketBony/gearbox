@@ -396,13 +396,13 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
     };
 
     return (
-        <div className={`group relative flex items-start gap-4 gx-glass-panel rounded-xl hover:bg-slate-50 dark:hover:bg-[#252525] transition-colors p-3 ${post.archived ? 'opacity-60 grayscale' : ''}`}>
+        <div className={`group relative flex flex-col md:flex-row md:items-start gap-3 md:gap-4 gx-glass-panel rounded-xl hover:bg-slate-50 dark:hover:bg-[#252525] transition-colors p-3 ${post.archived ? 'opacity-60 grayscale' : ''}`}>
             
             {/* Status Strip */}
-            <div className={`w-1.5 self-stretch rounded-full ${stripColor} shrink-0 shadow-[0_0_10px_rgba(0,0,0,0.5)]`}></div>
+            <div className={`h-1.5 w-full md:h-auto md:w-1.5 md:self-stretch rounded-full ${stripColor} shrink-0 shadow-[0_0_10px_rgba(0,0,0,0.5)]`}></div>
 
             {/* COL 1: Date & Status */}
-            <div className="w-32 flex flex-col gap-2 shrink-0">
+            <div className="w-full grid grid-cols-2 gap-2 md:w-32 md:flex md:flex-col md:shrink-0">
                 <div className="relative">
                     <label className="text-[9px] text-slate-500 uppercase font-bold mb-0.5 block">Date</label>
                     {canEdit ? (
@@ -428,7 +428,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
             </div>
 
             {/* COL 2: Content (Title, Link, Wording) */}
-            <div className="flex-1 flex flex-col gap-3 min-w-[250px]">
+            <div className="flex-1 flex flex-col gap-3 min-w-0 md:min-w-[250px]">
                 <div className="flex flex-col gap-1">
                     <input 
                         type="text" 
@@ -466,7 +466,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
             </div>
 
             {/* COL 3: Context (Brands, Services, Sites, Networks) */}
-            <div className="w-56 flex flex-col gap-2 shrink-0">
+            <div className="w-full md:w-56 flex flex-col gap-2 md:shrink-0">
                 <VisualMultiSelect 
                     label="Choisir Marques..." 
                     options={BRANDS} 
@@ -494,7 +494,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
             </div>
 
             {/* COL 4: Details (Service, LOM, CO2, Target) */}
-            <div className="w-40 flex flex-col gap-2 shrink-0">
+            <div className="w-full md:w-40 flex flex-col gap-2 md:shrink-0">
                  <Select
                     value={post.service}
                     disabled={!canEdit}
@@ -539,7 +539,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
             </div>
 
             {/* COL 5: Media & Actions */}
-            <div className="w-12 flex flex-col items-center gap-3 shrink-0 border-l border-bony-border pl-2 py-2">
+            <div className="w-full flex flex-row md:w-12 md:flex-col items-center gap-3 md:shrink-0 border-t md:border-t-0 md:border-l border-bony-border pt-2 md:pt-0 md:pl-2 md:py-2">
                 <button
                     onClick={() => onOpenMedia(post.id)}
                     className={`relative w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${mediaCount > 0 ? 'bg-bony-orange/10 border-bony-orange text-bony-orange shadow-[0_0_10px_rgba(247,86,50,0.15)]' : 'bg-slate-100 dark:bg-black/40 border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-600 hover:text-slate-900 dark:hover:text-white hover:border-bony-orange/50'}`}

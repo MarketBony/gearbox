@@ -1190,7 +1190,7 @@ const HelloMarketing: React.FC = () => {
   );
 
   return (
-    <div className="h-screen overflow-y-auto custom-scrollbar pb-20">
+    <div className="h-full overflow-y-auto custom-scrollbar pb-20">
       {/* Header */}
       <div className="px-5 md:px-8 pt-6 pb-5 border-b border-slate-200 dark:border-bony-border glass-strong">
         <div className="max-w-7xl mx-auto">

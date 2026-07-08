@@ -61,8 +61,11 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
     left = Math.min(left, vw - M - w);
     left = Math.max(M, left);
 
-    // Vertical : sous le trigger, ou au-dessus si plus de place
-    const spaceBelow = vh - r.bottom - gap - M;
+    // Vertical : sous le trigger, ou au-dessus si plus de place.
+    // Sur mobile (< md), la nav fixe en bas occupe 64px : on les réserve pour
+    // que le panneau ne s'ouvre pas par-dessus la barre.
+    const bottomNavReserve = vw < 768 ? 64 : 0;
+    const spaceBelow = vh - bottomNavReserve - r.bottom - gap - M;
     const spaceAbove = r.top - gap - M;
     const placeTop = spaceBelow < Math.min(maxHeight, 220) && spaceAbove > spaceBelow;
     const avail = placeTop ? spaceAbove : spaceBelow;

@@ -615,7 +615,7 @@ const Chat: React.FC = () => {
   // RENDER
   // ========================
   return (
-    <div className="flex h-screen overflow-hidden text-bony-text" onClick={() => setMenuMsgId(null)}>
+    <div className="flex h-full overflow-hidden text-bony-text" onClick={() => setMenuMsgId(null)}>
 
       {/* ===== LEFT: CONVERSATION LIST ===== */}
       <div className={`${showMobileChat ? 'hidden md:flex' : 'flex'} w-full md:w-[280px] md:min-w-[280px] border-r border-bony-border flex-col glass-strong h-full shrink-0`}>
@@ -844,7 +844,7 @@ const Chat: React.FC = () => {
             </div>
 
             {/* Content row: messages + members panel */}
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1 overflow-hidden relative">
 
               {/* Messages */}
               <div className="flex-1 flex flex-col overflow-hidden">
@@ -916,10 +916,12 @@ const Chat: React.FC = () => {
                                     </div>
                                   )}
                                   {/* Hover actions */}
-                                  <div className={`absolute ${isMe ? 'right-full mr-1' : 'left-full ml-1'} top-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
-                                    {REACTIONS.map(emoji => (
-                                      <button key={emoji} onClick={e => { e.stopPropagation(); toggleReaction(msg.id, emoji); }} className="text-sm hover:scale-125 transition-transform leading-none">{emoji}</button>
-                                    ))}
+                                  <div className={`absolute ${isMe ? 'right-full mr-1' : 'left-full ml-1'} top-0 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10`}>
+                                    <div className="hidden md:flex items-center gap-1">
+                                      {REACTIONS.map(emoji => (
+                                        <button key={emoji} onClick={e => { e.stopPropagation(); toggleReaction(msg.id, emoji); }} className="text-sm hover:scale-125 transition-transform leading-none">{emoji}</button>
+                                      ))}
+                                    </div>
                                     <button onClick={e => { e.stopPropagation(); setReplyTo(msg); inputRef.current?.focus(); }} className="p-1 rounded text-slate-400 hover:text-bony-blue transition" title="Répondre">
                                       <Reply size={13} />
                                     </button>
@@ -1007,7 +1009,7 @@ const Chat: React.FC = () => {
 
               {/* Members panel (group) */}
               {showMembersPanel && activeConv.type === 'group' && (
-                <div className="w-60 border-l border-bony-border gx-glass-panel flex flex-col shrink-0 overflow-hidden">
+                <div className="absolute inset-y-0 right-0 z-30 w-full max-w-[300px] md:static md:w-60 md:max-w-none border-l border-bony-border gx-glass-panel flex flex-col shrink-0 overflow-hidden">
                   <div className="p-4 border-b border-bony-border flex items-center justify-between shrink-0">
                     <h4 className="font-title text-sm text-bony-text">Membres ({activeMembers.length})</h4>
                     <button onClick={() => setShowMembersPanel(false)} className="text-slate-400 hover:text-bony-text"><X size={16} /></button>

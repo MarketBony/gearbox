@@ -98,7 +98,7 @@ const GridDisplay: React.FC<{
                 return (
                   <div
                     key={c}
-                    className={`w-7 h-7 border border-blue-900/40 flex items-center justify-center cursor-pointer transition-colors ${bg}`}
+                    className={`w-8 h-8 md:w-7 md:h-7 border border-blue-900/40 flex items-center justify-center cursor-pointer transition-colors ${bg}`}
                     onClick={() => interactive && !shot && onShoot?.(r, c)}
                     onMouseEnter={() => onHover?.(r, c)}
                   >
@@ -241,7 +241,7 @@ const Battleship: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
                 return (
                   <div
                     key={c}
-                    className={`w-7 h-7 border border-slate-200 dark:border-white/5 cursor-pointer transition-colors ${bg}`}
+                    className={`w-8 h-8 md:w-7 md:h-7 border border-slate-200 dark:border-white/5 cursor-pointer transition-colors ${bg}`}
                     onClick={() => handlePlaceClick(r, c)}
                     onMouseEnter={() => setHoverCell([r, c])}
                   />

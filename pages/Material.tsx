@@ -350,11 +350,11 @@ const Material: React.FC = () => {
     );
 
     return (
-        <div className="flex h-screen overflow-hidden relative">
+        <div className="flex h-full overflow-hidden relative">
             <div className="flex-1 flex flex-col h-full overflow-hidden">
                 
                 {/* Header */}
-                <div className="h-16 border-b border-bony-border flex items-center justify-between px-3 md:px-6 glass-strong shrink-0">
+                <div className="min-h-16 py-2 border-b border-bony-border flex flex-wrap items-center justify-between gap-2 px-3 md:px-6 glass-strong shrink-0">
                     <h2 className="text-base md:text-xl font-title text-bony-text flex items-center gap-2">
                         <div className="p-2 bg-bony-orange/10 rounded-lg">
                             <Package size={24} className="text-bony-orange"/>
@@ -379,18 +379,18 @@ const Material: React.FC = () => {
                         {activeTab === 'planning' ? (
                             <button
                                 onClick={() => openBookingModal()}
-                                className="flex items-center gap-2 bg-bony-gradient text-white px-4 py-2 min-h-[44px] rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20"
+                                className="flex items-center gap-2 bg-bony-gradient text-white px-3 md:px-4 py-2 min-h-[44px] rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20"
                             >
                                 <Plus size={18} />
-                                RÉSERVER
+                                <span className="hidden sm:inline">RÉSERVER</span>
                             </button>
                         ) : canManageCatalog ? (
                             <button
                                 onClick={() => openInventoryModal()}
-                                className="flex items-center gap-2 bg-bony-gradient text-white px-4 py-2 min-h-[44px] rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20"
+                                className="flex items-center gap-2 bg-bony-gradient text-white px-3 md:px-4 py-2 min-h-[44px] rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20"
                             >
                                 <Plus size={18} />
-                                AJOUTER MATÉRIEL
+                                <span className="hidden sm:inline">AJOUTER MATÉRIEL</span>
                             </button>
                         ) : null}
                     </div>
@@ -445,8 +445,8 @@ const Material: React.FC = () => {
                             </div>
 
                             {/* Planning Grid */}
-                            <div className="flex-1 overflow-hidden p-4 overflow-x-auto md:overflow-hidden">
-                                <div className="min-w-[600px] md:min-w-0 h-full">
+                            <div className="flex-1 overflow-hidden p-2 md:p-4">
+                                <div className="h-full">
                                     {viewMode === 'week' ? renderWeekView() : renderMonthView()}
                                 </div>
                             </div>

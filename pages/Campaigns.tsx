@@ -323,15 +323,15 @@ const Campaigns: React.FC = () => {
   );
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
       
       {/* --- GLOBAL CHART CONTROLS --- */}
-      <div className="px-3 md:px-6 py-2 glass-strong border-b border-bony-border flex items-center justify-between shrink-0">
-         <div className="flex items-center gap-4">
+      <div className="px-3 md:px-6 py-2 glass-strong border-b border-bony-border flex flex-wrap items-center justify-between gap-2 shrink-0">
+         <div className="flex flex-wrap items-center gap-2 md:gap-4">
              {/* DATE PICKERS */}
-             <div className="flex items-center gap-2 bg-slate-100 dark:bg-black/30 p-1 rounded border border-bony-border">
+             <div className="flex flex-wrap items-center gap-2 bg-slate-100 dark:bg-black/30 p-1 rounded border border-bony-border">
                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest pl-1">Du</span>
-                 <div className="w-36">
+                 <div className="w-32 md:w-36">
                      <DatePicker
                         value={chartStartDate}
                         onChange={(v) => setChartStartDate(v)}
@@ -339,7 +339,7 @@ const Campaigns: React.FC = () => {
                      />
                  </div>
                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Au</span>
-                 <div className="w-36">
+                 <div className="w-32 md:w-36">
                      <DatePicker
                         value={chartEndDate}
                         onChange={(v) => setChartEndDate(v)}
@@ -348,14 +348,14 @@ const Campaigns: React.FC = () => {
                  </div>
              </div>
              
-             <div className="w-px h-4 bg-bony-border"></div>
-             
+             <div className="w-px h-4 bg-bony-border hidden md:block"></div>
+
              <div className="flex items-center gap-2">
                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Type</span>
                  <FilterSelect value={globalType} onChange={setGlobalType} options={['Tout', 'SMS', 'E-mail']} />
              </div>
          </div>
-         <div className="text-[9px] text-slate-600 font-sans">
+         <div className="text-[9px] text-slate-600 font-sans hidden sm:block">
             ANALYSE STATISTIQUE
          </div>
       </div>
