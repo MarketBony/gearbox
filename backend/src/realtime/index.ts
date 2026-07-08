@@ -4,6 +4,7 @@ import { JWT_SECRET } from '../auth/secret';
 import {
   joinUserRooms,
   registerChatHandlers,
+  ensureGeneralConversation,
   joinConversationRooms as chatJoinConversationRooms,
   notifyConversationCreated as chatNotifyConversationCreated
 } from './chat';
@@ -24,6 +25,9 @@ const extractToken = (socket: Socket): string | undefined => {
 
 export const setupRealtime = (socketIo: Server) => {
   io = socketIo;
+
+  // Seed idempotent du Chat Général (une seule ligne système, appartenance implicite).
+  ensureGeneralConversation().catch(err => console.error('ensureGeneralConversation failed', err));
 
   // Authentification au handshake : aucune connexion socket acceptée sans JWT valide.
   // Couche transport uniquement — la logique métier (chat, rooms) viendra plus tard,

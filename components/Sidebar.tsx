@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import Avatar from './Avatar';
 import { db } from '../services/dataService';
+import { chatStore } from '../services/chatStore';
 import { ActivityLog } from '../types';
 import {
   LayoutDashboard,
@@ -62,10 +63,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
 
   const loadChatUnread = () => {
     if (!user) return;
-    const data = localStorage.getItem('gearbox_conversations');
-    const convs: any[] = data ? JSON.parse(data) : [];
-    const total = convs.reduce((sum: number, c: any) => sum + (c.unreadCounts?.[user.id] ?? 0), 0);
-    setChatUnreadCount(total);
+    // Source unique : le store chat alimenté par le socket (temps réel), plus de localStorage.
+    setChatUnreadCount(chatStore.getUnreadTotal(user.id));
   };
 
   const loadGamesChallenges = () => {
