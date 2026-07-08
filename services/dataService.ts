@@ -1,6 +1,7 @@
 
 import { Project, Campaign, Equipment, EquipmentBooking, Expense, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog } from '../types';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS } from '../constants';
+import { primeAvatarCache } from './avatarCache';
 
 // In a real scenario, this connects to the Electron preload script exposed via window.electron
 // For this demo, it uses LocalStorage to simulate persistence in the browser.
@@ -344,7 +345,40 @@ class DataService {
   // transite EN CLAIR dans la requête (HTTPS) — le hash bcrypt est fait
   // côté serveur, jamais côté client. L'API ne renvoie jamais de hash.
   async getUsers(): Promise<User[]> {
-    return apiFetch<User[]>('/users');
+    const users = await apiFetch<User[]>('/users');
+    // Alimente le cache d'avatars (photos de profil) consommé par <Avatar/>.
+    primeAvatarCache(users);
+    window.dispatchEvent(new CustomEvent('gearbox-avatar-updated'));
+    return users;
+  }
+  // Upload d'un fichier (chat|avatar|calendar) via POST /api/uploads/:type.
+  // multipart/form-data : on NE fixe PAS Content-Type (le navigateur ajoute la
+  // boundary). Renvoie l'URL relative servie par le backend.
+  async uploadFile(type: 'chat' | 'avatar' | 'calendar', file: File): Promise<string> {
+    const form = new FormData();
+    form.append('file', file);
+    const token = getToken();
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/uploads/${type}`, {
+        method: 'POST',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: form
+      });
+    } catch {
+      throw new ApiError(0, 'Serveur injoignable');
+    }
+    if (res.status === 401) {
+      clearToken();
+      window.dispatchEvent(new CustomEvent('gearbox-auth-expired'));
+      throw new ApiError(401, 'Session expirée');
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({} as any));
+      throw new ApiError(res.status, body.error || body.message || `Erreur ${res.status}`);
+    }
+    const { url } = await res.json();
+    return url as string;
   }
   async createUser(user: Omit<User, 'id'>): Promise<User> {
     return apiFetch('/users', { method: 'POST', body: JSON.stringify(user) });
@@ -355,6 +389,11 @@ class DataService {
   }
   async deleteUser(id: string): Promise<void> {
     await apiFetch(`/users/${id}`, { method: 'DELETE' });
+  }
+  // Met à jour uniquement la photo de profil d'un utilisateur (Master éditant un
+  // autre compte). null = suppression. Les autres champs restent inchangés.
+  async setUserAvatar(userId: string, avatarUrl: string | null): Promise<User> {
+    return apiFetch(`/users/${userId}`, { method: 'PUT', body: JSON.stringify({ avatarUrl }) });
   }
 
   // --- Social Posts / Digital (BRANCHÉS BACKEND — étape 7.4) ---
@@ -460,7 +499,7 @@ class DataService {
   async fetchMe(): Promise<Omit<User, 'loginId'>> {
     return apiFetch('/auth/me');
   }
-  async updateMe(data: { name?: string; password?: string; avatarColor?: string }): Promise<Omit<User, 'loginId'>> {
+  async updateMe(data: { name?: string; password?: string; avatarColor?: string; avatarUrl?: string | null }): Promise<Omit<User, 'loginId'>> {
     return apiFetch('/auth/me', { method: 'PUT', body: JSON.stringify(data) });
   }
 }

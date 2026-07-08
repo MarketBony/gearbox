@@ -16,12 +16,12 @@ const invalidRoleMessage = (role: unknown) =>
 // GET all users — lecture ouverte à tout utilisateur authentifié (liste utilisée par l'UI)
 router.get('/', authenticateToken, async (req, res) => {
   const users = await prisma.user.findMany();
-  res.json(users.map(u => ({ id: u.id, name: u.name, loginId: u.loginId, role: u.role, avatarColor: u.avatarColor })));
+  res.json(users.map(u => ({ id: u.id, name: u.name, loginId: u.loginId, role: u.role, avatarColor: u.avatarColor, avatarUrl: u.avatarUrl })));
 });
 
 // POST create user
 router.post('/', authenticateToken, requireRole(ADMIN_ROLES), async (req, res) => {
-  const { name, loginId, password, role, avatarColor } = req.body;
+  const { name, loginId, password, role, avatarColor, avatarUrl } = req.body;
 
   // role est un String libre en base (plus d'enum) : validation explicite obligatoire.
   if (!isValidRole(role)) {
@@ -31,9 +31,9 @@ router.post('/', authenticateToken, requireRole(ADMIN_ROLES), async (req, res) =
   const passwordHash = await bcrypt.hash(password, 10);
   try {
     const user = await prisma.user.create({
-      data: { name, loginId, passwordHash, role, avatarColor }
+      data: { name, loginId, passwordHash, role, avatarColor, avatarUrl }
     });
-    res.json({ id: user.id, name: user.name, loginId: user.loginId, role: user.role, avatarColor: user.avatarColor });
+    res.json({ id: user.id, name: user.name, loginId: user.loginId, role: user.role, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl });
   } catch (e) {
     res.status(400).json({ error: 'User creation failed' });
   }
@@ -42,7 +42,7 @@ router.post('/', authenticateToken, requireRole(ADMIN_ROLES), async (req, res) =
 // PUT update user
 router.put('/:id', authenticateToken, requireRole(ADMIN_ROLES), async (req, res) => {
   const { id } = req.params;
-  const { name, loginId, password, role, avatarColor } = req.body;
+  const { name, loginId, password, role, avatarColor, avatarUrl } = req.body;
 
   // role optionnel en mise à jour, mais s'il est fourni il doit être valide.
   if (role !== undefined && !isValidRole(role)) {
@@ -50,6 +50,7 @@ router.put('/:id', authenticateToken, requireRole(ADMIN_ROLES), async (req, res)
   }
 
   const updateData: any = { name, loginId, role, avatarColor };
+  if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl; // null = suppression
   if (password) {
     updateData.passwordHash = await bcrypt.hash(password, 10);
   }
@@ -59,7 +60,7 @@ router.put('/:id', authenticateToken, requireRole(ADMIN_ROLES), async (req, res)
       where: { id },
       data: updateData
     });
-    res.json({ id: user.id, name: user.name, loginId: user.loginId, role: user.role, avatarColor: user.avatarColor });
+    res.json({ id: user.id, name: user.name, loginId: user.loginId, role: user.role, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl });
   } catch (e) {
     res.status(400).json({ error: 'User update failed' });
   }

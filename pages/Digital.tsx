@@ -147,92 +147,73 @@ const VisualMultiSelect: React.FC<VisualMultiSelectProps> = ({ label, options, s
     );
 };
 
-// --- MEDIA TYPES & HELPERS ---
-interface PostMediaItem {
-    id: string;
-    postId: string;
-    name: string;
-    type: string;
-    size: number;
-    base64: string;
-    uploadedAt: string;
-    uploadedBy: string;
-}
-
-const MEDIA_MAX_SIZE = 2 * 1024 * 1024; // 2 MB
-const MEDIA_ACCEPTED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const mediaKey = (postId: string) => `gearbox_media_${postId}`;
-const loadPostMedias = (postId: string): PostMediaItem[] => {
-    try { return JSON.parse(localStorage.getItem(mediaKey(postId)) ?? '[]'); } catch { return []; }
-};
-const savePostMedias = (postId: string, items: PostMediaItem[]) =>
-    localStorage.setItem(mediaKey(postId), JSON.stringify(items));
+// --- MEDIA HELPERS (branchés uploads : les médias sont des URLs stockées dans
+// post.mediaFiles ; upload via POST /api/uploads/calendar). ---
+const MEDIA_MAX_SIZE = 2 * 1024 * 1024 * 1024; // 2 Go
+const MEDIA_ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime'];
+const isVideoUrl = (url: string) => /\.(mp4|mov)$/i.test(url);
+const mediaFilename = (url: string) => url.split('/').pop() ?? url;
 
 // --- COMPONENT: MEDIA MANAGER MODAL ---
 interface MediaManagerModalProps {
     post: SocialPost;
     canEdit: boolean;
-    uploaderName: string;
     onClose: () => void;
-    onCountChange: (postId: string, count: number) => void;
+    // Persiste la nouvelle liste d'URLs (post.mediaFiles) via db.updateSocialPost.
+    onSaveMedia: (postId: string, mediaFiles: string[]) => Promise<void>;
 }
 
-const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, uploaderName, onClose, onCountChange }) => {
-    const [medias, setMedias] = useState<PostMediaItem[]>(() => loadPostMedias(post.id));
+const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, onClose, onSaveMedia }) => {
+    const [medias, setMedias] = useState<string[]>(post.mediaFiles ?? []);
     const [dragging, setDragging] = useState(false);
     const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const persist = (items: PostMediaItem[]) => {
-        savePostMedias(post.id, items);
-        setMedias(items);
-        onCountChange(post.id, items.length);
-    };
-
-    const processFiles = (files: FileList | File[]) => {
+    // Upload séquentiel : chaque fichier -> POST /api/uploads/calendar -> URL
+    // ajoutée à post.mediaFiles (persisté à chaque ajout).
+    const processFiles = async (files: FileList | File[]) => {
         setError(null);
-        Array.from(files).forEach(file => {
+        let current = [...medias];
+        for (const file of Array.from(files)) {
             if (!MEDIA_ACCEPTED.includes(file.type)) {
-                setError(`Format non supporté : "${file.name}". Accepté : JPG, PNG, GIF, WebP.`);
-                return;
+                setError(`Format non supporté : "${file.name}". Accepté : JPG, PNG, WebP, MP4, MOV.`);
+                continue;
             }
             if (file.size > MEDIA_MAX_SIZE) {
-                setError(`"${file.name}" dépasse la limite de 2 Mo (${(file.size / 1024 / 1024).toFixed(1)} Mo). Compresse le fichier avant envoi.`);
-                return;
+                setError(`"${file.name}" dépasse la limite de 2 Go.`);
+                continue;
             }
-            const reader = new FileReader();
-            reader.onload = e => {
-                const item: PostMediaItem = {
-                    id: Math.random().toString(36).substr(2, 9),
-                    postId: post.id,
-                    name: file.name,
-                    type: file.type,
-                    size: file.size,
-                    base64: e.target!.result as string,
-                    uploadedAt: new Date().toISOString(),
-                    uploadedBy: uploaderName,
-                };
-                setMedias(prev => {
-                    const updated = [...prev, item];
-                    savePostMedias(post.id, updated);
-                    onCountChange(post.id, updated.length);
-                    return updated;
-                });
-            };
-            reader.readAsDataURL(file);
-        });
+            try {
+                setUploading(true);
+                const url = await db.uploadFile('calendar', file);
+                current = [...current, url];
+                await onSaveMedia(post.id, current);
+                setMedias(current);
+            } catch (e) {
+                setError(e instanceof ApiError ? e.message : `Échec de l'upload de "${file.name}".`);
+            } finally {
+                setUploading(false);
+            }
+        }
     };
 
-    const handleDelete = (id: string) => {
-        if (!confirm('Supprimer ce média définitivement ?')) return;
-        persist(medias.filter(m => m.id !== id));
+    const handleDelete = async (url: string) => {
+        if (!confirm('Retirer ce média du post ?')) return;
+        const updated = medias.filter(m => m !== url);
+        try {
+            await onSaveMedia(post.id, updated);
+            setMedias(updated);
+        } catch (e) {
+            setError(e instanceof ApiError ? e.message : 'Échec de la suppression.');
+        }
     };
 
-    const handleDownload = (m: PostMediaItem) => {
+    const handleDownload = (url: string) => {
         const a = document.createElement('a');
-        a.href = m.base64;
-        a.download = m.name;
+        a.href = url;
+        a.download = mediaFilename(url);
         a.click();
     };
 
@@ -268,10 +249,13 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, up
                         >
                             <Upload size={24} className={`mx-auto mb-2 transition-colors ${dragging ? 'text-bony-orange' : 'text-slate-400'}`} />
                             <p className="text-sm text-bony-muted">
-                                Glisse des images ici ou{' '}
-                                <span className="text-bony-orange font-bold">clique pour parcourir</span>
+                                {uploading ? (
+                                    'Envoi en cours…'
+                                ) : (
+                                    <>Glisse des fichiers ici ou <span className="text-bony-orange font-bold">clique pour parcourir</span></>
+                                )}
                             </p>
-                            <p className="text-[10px] text-bony-muted mt-1 uppercase tracking-widest">JPG · PNG · GIF · WebP — max 2 Mo</p>
+                            <p className="text-[10px] text-bony-muted mt-1 uppercase tracking-widest">JPG · PNG · WebP · MP4 · MOV — max 2 Go</p>
                             <input
                                 ref={fileInputRef}
                                 type="file"
@@ -300,36 +284,45 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, up
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {medias.map(m => (
-                                    <div key={m.id} className="group relative rounded-xl overflow-hidden border border-bony-border bg-bony-dark aspect-square">
-                                        <img
-                                            src={m.base64}
-                                            alt={m.name}
-                                            className="w-full h-full object-cover cursor-zoom-in hover:opacity-90 transition"
-                                            onClick={() => setLightboxSrc(m.base64)}
-                                        />
-                                        {/* Overlay on hover */}
-                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/55 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                                {medias.map(url => (
+                                    <div key={url} className="group relative rounded-xl overflow-hidden border border-bony-border bg-bony-dark aspect-square">
+                                        {isVideoUrl(url) ? (
+                                            <video
+                                                src={url}
+                                                className="w-full h-full object-cover"
+                                                controls
+                                                preload="metadata"
+                                            />
+                                        ) : (
+                                            <img
+                                                src={url}
+                                                alt={mediaFilename(url)}
+                                                className="w-full h-full object-cover cursor-zoom-in hover:opacity-90 transition"
+                                                onClick={() => setLightboxSrc(url)}
+                                            />
+                                        )}
+                                        {/* Overlay on hover (pointer-events-none pour laisser les contrôles vidéo cliquables) */}
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/55 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 pointer-events-none">
                                             <button
-                                                onClick={e => { e.stopPropagation(); handleDownload(m); }}
-                                                className="p-2 bg-bony-panel/90 rounded-lg text-bony-blue hover:bg-bony-panel transition"
+                                                onClick={e => { e.stopPropagation(); handleDownload(url); }}
+                                                className="p-2 bg-bony-panel/90 rounded-lg text-bony-blue hover:bg-bony-panel transition pointer-events-auto"
                                                 title="Télécharger"
                                             >
                                                 <Download size={16} />
                                             </button>
                                             {canEdit && (
                                                 <button
-                                                    onClick={e => { e.stopPropagation(); handleDelete(m.id); }}
-                                                    className="p-2 bg-bony-panel/90 rounded-lg text-red-400 hover:bg-red-500/20 transition"
-                                                    title="Supprimer"
+                                                    onClick={e => { e.stopPropagation(); handleDelete(url); }}
+                                                    className="p-2 bg-bony-panel/90 rounded-lg text-red-400 hover:bg-red-500/20 transition pointer-events-auto"
+                                                    title="Retirer"
                                                 >
                                                     <Trash2 size={16} />
                                                 </button>
                                             )}
                                         </div>
                                         {/* Filename bar */}
-                                        <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-gradient-to-t from-black/80 to-transparent text-[9px] text-white truncate">
-                                            {m.name}
+                                        <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-gradient-to-t from-black/80 to-transparent text-[9px] text-white truncate pointer-events-none">
+                                            {mediaFilename(url)}
                                         </div>
                                     </div>
                                 ))}
@@ -861,9 +854,9 @@ const Digital: React.FC = () => {
           db.getSocialPosts(),
           db.getDigitalTags()
       ]);
-      // Init media counts from localStorage
+      // Compteurs de médias dérivés de post.mediaFiles (URLs uploadées).
       const counts: Record<string, number> = {};
-      pData.forEach(p => { counts[p.id] = loadPostMedias(p.id).length; });
+      pData.forEach(p => { counts[p.id] = p.mediaFiles?.length ?? 0; });
       setMediaCounts(counts);
       setPosts(pData);
       setTags(tData);
@@ -872,13 +865,10 @@ const Digital: React.FC = () => {
 
   const handleUpdatePost = async (updatedPost: SocialPost) => {
       if (!canEditCalendar) return;
-      // Suppression automatique des médias lors de l'archivage
+      // Les médias ne sont PLUS supprimés à l'archivage : le backend renseigne
+      // archivedAt et la purge serveur supprime les fichiers 30 jours plus tard.
       const oldPost = posts.find(p => p.id === updatedPost.id);
       const isArchiving = oldPost && !oldPost.archived && updatedPost.archived;
-      if (isArchiving) {
-          localStorage.removeItem(mediaKey(updatedPost.id));
-          setMediaCounts(prev => ({ ...prev, [updatedPost.id]: 0 }));
-      }
       setSaving(true);
       // Optimistic update : l'UI reflète le changement immédiatement, rollback si l'API refuse.
       const previousPosts = posts;
@@ -901,14 +891,26 @@ const Digital: React.FC = () => {
           alert(e instanceof ApiError ? e.message : 'Échec de la suppression (serveur injoignable ?).');
           return;
       }
-      localStorage.removeItem(mediaKey(post.id));
+      // Les fichiers calendar du post sont nettoyés côté backend (route DELETE /api/social).
       setMediaCounts(prev => { const next = { ...prev }; delete next[post.id]; return next; });
       setPosts(posts.filter(p => p.id !== post.id));
       if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé la publication', entity: 'post', entityName: post.title || '(sans titre)', entityId: post.id, timestamp: new Date().toISOString() });
   };
 
-  const handleMediaCountChange = (postId: string, count: number) => {
-      setMediaCounts(prev => ({ ...prev, [postId]: count }));
+  // Persiste la nouvelle liste de médias (URLs) d'un post via db.updateSocialPost.
+  const handleSaveMedia = async (postId: string, mediaFiles: string[]) => {
+      const target = posts.find(p => p.id === postId);
+      if (!target) return;
+      const updated = { ...target, mediaFiles };
+      setPosts(prev => prev.map(p => p.id === postId ? updated : p)); // optimistic
+      try {
+          const saved = await db.updateSocialPost(updated);
+          setPosts(prev => prev.map(p => p.id === saved.id ? saved : p));
+          setMediaCounts(prev => ({ ...prev, [postId]: mediaFiles.length }));
+      } catch (e) {
+          setPosts(prev => prev.map(p => p.id === postId ? target : p)); // rollback
+          throw e; // remonte au modal pour affichage de l'erreur
+      }
   };
 
   const handleUpdateTags = async (newTags: DigitalTags) => {
@@ -1514,9 +1516,8 @@ const Digital: React.FC = () => {
                 <MediaManagerModal
                     post={post}
                     canEdit={canEditCalendar && !post.archived}
-                    uploaderName={user?.name ?? 'Utilisateur'}
                     onClose={() => setMediaModalPostId(null)}
-                    onCountChange={handleMediaCountChange}
+                    onSaveMedia={handleSaveMedia}
                 />
             );
         })()}

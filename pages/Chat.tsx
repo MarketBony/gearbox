@@ -14,7 +14,8 @@ import Avatar from '../components/Avatar';
 import Cropper from 'react-easy-crop';
 
 const REACTIONS = ['👍', '❤️', '😂', '😮'];
-const MAX_IMAGE_SIZE = 300 * 1024;
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 Mo (aligné backend uploads chat)
+const CHAT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 // Overlay client-only pour les features HORS PÉRIMÈTRE (épingle, renommage et
 // membres de groupe) : le backend n'expose aucun événement pour elles. Stocké
@@ -498,11 +499,17 @@ const Chat: React.FC = () => {
   };
 
   // ---- IMAGE ----
-  const handleImage = (file: File) => {
-    if (file.size > MAX_IMAGE_SIZE) { alert('Image trop lourde (max 300 Ko). Compresse-la avant envoi.'); return; }
-    const reader = new FileReader();
-    reader.onload = e => sendMessage(e.target?.result as string, 'image');
-    reader.readAsDataURL(file);
+  // Upload préalable (POST /api/uploads/chat) puis le message socket transporte
+  // l'URL (plus de base64). Formats et taille alignés sur les règles backend.
+  const handleImage = async (file: File) => {
+    if (!CHAT_IMAGE_TYPES.includes(file.type)) { alert('Format non accepté (JPEG, PNG, GIF, WebP).'); return; }
+    if (file.size > MAX_IMAGE_SIZE) { alert('Image trop lourde (max 10 Mo).'); return; }
+    try {
+      const url = await db.uploadFile('chat', file);
+      sendMessage(url, 'image');
+    } catch (e) {
+      alert(e instanceof ApiError ? e.message : "Échec de l'upload de l'image.");
+    }
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
@@ -994,7 +1001,7 @@ const Chat: React.FC = () => {
                       <Send size={16} />
                     </button>
                   </div>
-                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImage(f); e.target.value = ''; }} />
+                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImage(f); e.target.value = ''; }} />
                 </div>
               </div>
 

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { getAvatarUrl } from '../services/avatarCache';
 
 export const avatarKey = (userId: string) => `gearbox_avatar_${userId}`;
 
@@ -10,18 +11,22 @@ interface AvatarProps {
   size?: number;
 }
 
+// Priorité : URL serveur (cache alimenté par l'API) puis photo base64 localStorage
+// (legacy, pré-branchement uploads), sinon initiale colorée.
+const resolveSrc = (userId: string): string | null =>
+  userId ? (getAvatarUrl(userId) || localStorage.getItem(avatarKey(userId))) : null;
+
 const Avatar: React.FC<AvatarProps> = ({ userId, name, color = '#64748b', size = 32 }) => {
-  const [photo, setPhoto] = useState<string | null>(() =>
-    userId ? localStorage.getItem(avatarKey(userId)) : null
-  );
+  const [photo, setPhoto] = useState<string | null>(() => resolveSrc(userId));
 
   useEffect(() => {
-    setPhoto(userId ? localStorage.getItem(avatarKey(userId)) : null);
+    setPhoto(resolveSrc(userId));
 
     const handleUpdate = (e: Event) => {
+      // Event ciblé (detail.userId) ou global (prime du cache sans detail) -> on rafraîchit.
       const detail = (e as CustomEvent).detail;
-      if (detail?.userId === userId) {
-        setPhoto(localStorage.getItem(avatarKey(userId)));
+      if (!detail || detail.userId === undefined || detail.userId === userId) {
+        setPhoto(resolveSrc(userId));
       }
     };
     window.addEventListener('gearbox-avatar-updated', handleUpdate);

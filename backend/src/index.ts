@@ -20,7 +20,9 @@ import chatRoutes from './routes/chat';
 import activityLogRoutes from './routes/activityLog';
 import userRoutes from './routes/users';
 import seedRoutes from './routes/seed';
+import uploadsRoutes, { UPLOADS_ROOT } from './routes/uploads';
 import { setupRealtime } from './realtime';
+import { startPurgeJob } from './jobs/purge';
 
 dotenv.config();
 
@@ -52,12 +54,19 @@ app.use('/api/equipment', equipmentRoutes);
 app.use('/api/equipment-bookings', equipmentBookingRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/activity-log', activityLogRoutes);
+app.use('/api/uploads', uploadsRoutes);
+
+// Fichiers uploadés servis en statique (URLs relatives renvoyées par la route).
+app.use('/uploads', express.static(UPLOADS_ROOT));
 
 // Middleware d'erreur global — après toutes les routes.
 app.use(errorHandler);
 
 // Realtime
 setupRealtime(io);
+
+// Job de purge des médias calendar archivés depuis > 30j.
+startPurgeJob();
 
 const PORT = process.env.PORT || 3000;
 
