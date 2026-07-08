@@ -252,29 +252,29 @@ const FixedExpenses: React.FC = () => {
     };
 
     return (
-        <div className="flex h-screen overflow-hidden relative">
+        <div className="flex h-full overflow-hidden relative">
             <div className="flex-1 flex flex-col h-full overflow-hidden">
                 
                 {/* Header */}
-                <div className="h-16 border-b border-bony-border flex items-center justify-between px-6 glass-strong shrink-0">
-                    <h2 className="text-xl font-title text-bony-text flex items-center gap-2">
+                <div className="min-h-16 py-2 border-b border-bony-border flex flex-wrap items-center justify-between gap-2 px-3 md:px-6 glass-strong shrink-0">
+                    <h2 className="text-base md:text-xl font-title text-bony-text flex items-center gap-2">
                         <div className="p-2 bg-bony-orange/10 rounded-lg">
                             <Euro size={24} className="text-bony-orange"/>
                         </div>
                         Dépenses Fixes
                     </h2>
-                    <div className="flex items-center gap-4">
-                        <div className="bg-bony-panel border border-bony-border px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm">
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Période</span>
-                            <span className="text-bony-text text-lg font-bold font-sans">{totalAmount.toLocaleString()} €</span>
+                    <div className="flex items-center gap-2 md:gap-4">
+                        <div className="bg-bony-panel border border-bony-border px-2.5 md:px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">Total Période</span>
+                            <span className="text-bony-text text-sm md:text-lg font-bold font-sans">{totalAmount.toLocaleString()} €</span>
                         </div>
                         {canEdit && (
                             <button
                                 onClick={() => openModal()}
-                                className="flex items-center gap-2 bg-bony-gradient text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20 min-h-[44px]"
+                                className="flex items-center gap-2 bg-bony-gradient text-white px-3 md:px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition shadow-lg shadow-bony-orange/20 min-h-[44px]"
                             >
                                 <Plus size={18} />
-                                NOUVELLE DÉPENSE
+                                <span className="hidden sm:inline">NOUVELLE DÉPENSE</span>
                             </button>
                         )}
                     </div>
@@ -295,7 +295,7 @@ const FixedExpenses: React.FC = () => {
 
                     <div className="h-8 w-px bg-bony-border mx-2 hidden md:block"></div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Filter size={16} className="text-slate-500"/>
                         <Select
                             size="sm"
@@ -320,9 +320,9 @@ const FixedExpenses: React.FC = () => {
 
                         <div className="h-8 w-px bg-bony-border mx-2 hidden md:block"></div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-bold text-slate-500 uppercase">Du</span>
-                            <div className="w-40">
+                            <div className="w-36 md:w-40">
                                 <DatePicker
                                     size="sm"
                                     value={filterStartDate}
@@ -330,7 +330,7 @@ const FixedExpenses: React.FC = () => {
                                 />
                             </div>
                             <span className="text-xs font-bold text-slate-500 uppercase">Au</span>
-                            <div className="w-40">
+                            <div className="w-36 md:w-40">
                                 <DatePicker
                                     size="sm"
                                     value={filterEndDate}
@@ -342,7 +342,7 @@ const FixedExpenses: React.FC = () => {
                 </div>
 
                 {/* Table */}
-                <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-6">
+                <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-3 pb-8 md:p-6">
                     {/* Mobile card list */}
                     <div className="md:hidden space-y-3">
                         {filteredExpenses.length === 0 ? (

@@ -382,21 +382,21 @@ const Agenda: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col p-3 md:p-6 animate-fade-in">
+    <div className="h-full flex flex-col p-3 md:p-6 animate-fade-in">
       
       {/* HEADER CONTROLS */}
       <div className="flex flex-col gap-4 mb-4 shrink-0">
-          <div className="flex justify-between items-end">
-                <div className="flex items-center gap-4">
-                    <h2 className="text-3xl text-slate-900 dark:text-white font-title capitalize">{getTitle()}</h2>
+          <div className="flex flex-col gap-3 lg:flex-row lg:justify-between lg:items-end">
+                <div className="flex flex-wrap items-center gap-3 md:gap-4">
+                    <h2 className="text-lg md:text-3xl leading-tight text-slate-900 dark:text-white font-title capitalize">{getTitle()}</h2>
                     <div className="flex gap-1 bg-bony-panel p-1 rounded-lg border border-bony-border">
-                        <button onClick={handlePrev} className="p-1 hover:text-bony-orange text-slate-400 transition"><ChevronLeft/></button>
+                        <button onClick={handlePrev} className="p-2 md:p-1 hover:text-bony-orange text-slate-400 transition"><ChevronLeft/></button>
                         <button onClick={handleToday} className="px-3 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition uppercase border-x border-bony-border/50">Aujourd'hui</button>
-                        <button onClick={handleNext} className="p-1 hover:text-bony-orange text-slate-400 transition"><ChevronRight/></button>
+                        <button onClick={handleNext} className="p-2 md:p-1 hover:text-bony-orange text-slate-400 transition"><ChevronRight/></button>
                     </div>
                 </div>
 
-                <div className="flex gap-4">
+                <div className="flex flex-wrap gap-2 md:gap-4">
                     <button
                         onClick={() => setShowFilters(!showFilters)}
                         className={`flex items-center gap-2 px-3 py-1.5 min-h-[44px] rounded-lg transition border ${
@@ -408,7 +408,7 @@ const Agenda: React.FC = () => {
                         {showFilters ? <X size={14} /> : <Filter size={14} />}
                         <span className="text-[10px] font-bold uppercase">Filtres</span>
                     </button>
-                    <div className="flex bg-bony-panel p-1 rounded-lg border border-bony-border">
+                    <div className="flex bg-bony-panel p-1 rounded-lg border border-bony-border overflow-x-auto max-w-full">
                         {(['Semaine', 'Mois', 'Trimestre', 'Semestre', 'Année'] as ViewMode[]).map(v => (
                             <button
                                 key={v}

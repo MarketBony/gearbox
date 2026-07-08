@@ -131,11 +131,11 @@ const Expenses: React.FC = () => {
   ];
 
   return (
-    <div className="p-3 md:p-6 h-screen flex flex-col overflow-hidden animate-fade-in">
+    <div className="p-3 md:p-6 h-full flex flex-col overflow-hidden animate-fade-in">
       {/* Header */}
-      <div className="flex justify-between items-end mb-6 border-b border-bony-border pb-4 shrink-0">
+      <div className="flex flex-wrap justify-between items-end gap-3 mb-6 border-b border-bony-border pb-4 shrink-0">
         <div>
-          <h2 className="text-3xl text-slate-900 dark:text-white mb-1 flex items-center gap-3">
+          <h2 className="text-xl md:text-3xl text-slate-900 dark:text-white mb-1 flex items-center gap-3">
             <CreditCard className="text-bony-orange" size={32} />
             Dépenses Ponctuelles
           </h2>
@@ -145,7 +145,7 @@ const Expenses: React.FC = () => {
           onClick={() => handleOpenModal()}
           className="bg-bony-gradient text-white px-4 py-2 rounded-lg text-sm font-bold uppercase shadow-lg hover:shadow-bony-orange/20 transition-all flex items-center gap-2 min-h-[44px]"
         >
-          <Plus size={18} /> Ajouter une dépense
+          <Plus size={18} /> <span className="hidden sm:inline">Ajouter une dépense</span><span className="sm:hidden">Ajouter</span>
         </button>
       </div>
 
@@ -316,8 +316,8 @@ const Expenses: React.FC = () => {
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date</label>
                   <DatePicker
@@ -339,7 +339,7 @@ const Expenses: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Site / Plaque</label>
                   <Select

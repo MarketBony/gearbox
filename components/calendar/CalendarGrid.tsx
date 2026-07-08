@@ -97,6 +97,66 @@ function CalendarGrid<T extends CalendarSpan>({ view, currentDate, items, render
         );
     };
 
+    // ------------------------------------------------------------ LISTE MOBILE
+    // Sous md, les grilles 7 colonnes sont illisibles (~48px/colonne) : on rend
+    // à la place une liste agenda verticale — un bloc par jour, événements en
+    // pleine largeur. Semaine : les 7 jours ; Mois : uniquement les jours occupés.
+    const renderMobileList = () => {
+        const days = view === 'week'
+            ? Array.from({ length: 7 }, (_, i) => addDays(getStartOfWeek(currentDate), i))
+            : getMonthDays(currentDate.getFullYear(), currentDate.getMonth());
+
+        const eventsOfDay = (day: Date) => {
+            const d = normalizeDate(day);
+            return items.filter(it => normalizeDate(it.startDate) <= d && normalizeDate(it.endDate) >= d);
+        };
+
+        const visibleDays = view === 'week' ? days : days.filter(d => eventsOfDay(d).length > 0);
+
+        return (
+            <div className="md:hidden flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-xl overflow-hidden">
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2">
+                    {visibleDays.length === 0 && (
+                        <div className="text-center py-12 text-slate-500 text-sm">
+                            Aucun événement sur cette période.
+                        </div>
+                    )}
+                    {visibleDays.map((day, i) => {
+                        const isToday = isSameDay(day, new Date());
+                        const dayEvents = eventsOfDay(day);
+                        return (
+                            <div
+                                key={i}
+                                className={dayCellClass({ isToday, isCurrentMonth: true, clickable: !!onDayClick }) + ' p-2'}
+                                onClick={onDayClick ? () => onDayClick(day) : undefined}
+                            >
+                                <div className="flex items-baseline gap-2 mb-1.5">
+                                    <span className={`text-lg font-title font-bold leading-none ${isToday ? 'text-bony-orange' : 'text-slate-700 dark:text-white'}`}>
+                                        {day.getDate()}
+                                    </span>
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                        {day.toLocaleDateString('fr-FR', { weekday: 'long' })}
+                                    </span>
+                                </div>
+                                {dayEvents.length > 0 ? (
+                                    <div className="space-y-1.5" onClick={e => e.stopPropagation()}>
+                                        {dayEvents.map(it => (
+                                            <div key={it.id} style={{ height: `${LANE_HEIGHT_WEEK - 6}px` }}>
+                                                {renderEvent(it, { view: 'week', clipLeft: false, clipRight: false })}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-[10px] text-slate-400/70 italic">—</div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
     // ------------------------------------------------------------------ MOIS
     const renderMonth = () => {
         const year = currentDate.getFullYear();
@@ -123,7 +183,7 @@ function CalendarGrid<T extends CalendarSpan>({ view, currentDate, items, render
         const dayNumberOffset = 24; // hauteur réservée au numéro de jour
 
         return (
-            <div className="flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-xl overflow-hidden">
+            <div className="hidden md:flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-xl overflow-hidden">
                 {/* En-tête jours */}
                 <div className="grid grid-cols-7 gap-1.5 px-1.5 pt-1.5 shrink-0">
                     {WEEKDAY_LABELS.map(d => (
@@ -193,7 +253,7 @@ function CalendarGrid<T extends CalendarSpan>({ view, currentDate, items, render
         const totalHeight = Math.max(480, (maxLane + 1) * LANE_HEIGHT_WEEK + 16);
 
         return (
-            <div className="flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-xl overflow-hidden">
+            <div className="hidden md:flex flex-col h-full bg-slate-50/40 dark:bg-black/10 border border-bony-border rounded-xl overflow-hidden">
                 {/* En-tête jours + date */}
                 <div className="grid grid-cols-7 gap-1.5 px-1.5 pt-1.5 shrink-0">
                     {days.map((day, i) => {
@@ -240,7 +300,12 @@ function CalendarGrid<T extends CalendarSpan>({ view, currentDate, items, render
         );
     };
 
-    return view === 'month' ? renderMonth() : renderWeek();
+    return (
+        <>
+            {renderMobileList()}
+            {view === 'month' ? renderMonth() : renderWeek()}
+        </>
+    );
 }
 
 export default CalendarGrid;

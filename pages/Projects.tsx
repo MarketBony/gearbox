@@ -717,7 +717,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden relative">
+    <div className="flex h-full overflow-hidden relative">
       
       {showCreateModal && (
           <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1471,8 +1471,8 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                             )}
                         </div>
 
-                        <div className="gx-glass-panel rounded-xl border border-bony-border overflow-hidden shadow-sm">
-                            <table className="w-full text-left">
+                        <div className="gx-glass-panel rounded-xl border border-bony-border overflow-x-auto shadow-sm">
+                            <table className="w-full min-w-[760px] text-left">
                                 <thead className="bg-slate-100 dark:bg-black/20 text-[10px] uppercase font-bold text-slate-500">
                                     <tr>
                                         <th className="p-3 w-10"></th>
@@ -1565,7 +1565,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                             </td>
                                             <td className="p-3 text-center">
                                                 {canEdit && (
-                                                    <button onClick={() => removeTask(task.id)} className="text-slate-400 hover:text-red-500 transition opacity-0 group-hover:opacity-100">
+                                                    <button onClick={() => removeTask(task.id)} className="p-2 text-slate-400 hover:text-red-500 transition opacity-100 md:opacity-0 md:group-hover:opacity-100">
                                                         <Trash2 size={14} />
                                                     </button>
                                                 )}

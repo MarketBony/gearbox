@@ -391,7 +391,7 @@ const Settings: React.FC = () => {
   const tableInputCls = 'bg-white dark:bg-black/40 border border-bony-orange/50 rounded p-1 text-slate-900 dark:text-white w-full text-sm';
 
   return (
-    <div className="p-3 md:p-8 h-screen overflow-y-auto custom-scrollbar animate-fade-in pb-20">
+    <div className="p-3 md:p-8 h-full overflow-y-auto custom-scrollbar animate-fade-in pb-20">
       <h2 className="text-xl md:text-3xl text-slate-900 dark:text-white font-title mb-8 flex items-center gap-3">
         <UserIcon className="text-bony-violet" size={32} /> Paramètres du Compte
       </h2>
@@ -514,8 +514,8 @@ const Settings: React.FC = () => {
             </p>
           )}
 
-          <div className="gx-card p-0 overflow-hidden overflow-x-auto">
-            <table className="w-full text-left">
+          <div className="gx-card p-0 overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left">
               <thead className="bg-slate-50 dark:bg-black/30 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 dark:border-bony-border">
                 <tr>
                   <th className="p-4 w-16"></th>
@@ -572,8 +572,8 @@ const Settings: React.FC = () => {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <button onClick={saveUser} className="p-1.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded hover:bg-emerald-500/30"><Check size={16} /></button>
-                        <button onClick={cancelEdit} className="p-1.5 bg-red-500/20 text-red-500 rounded hover:bg-red-500/30"><X size={16} /></button>
+                        <button onClick={saveUser} className="p-2.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded hover:bg-emerald-500/30"><Check size={16} /></button>
+                        <button onClick={cancelEdit} className="p-2.5 bg-red-500/20 text-red-500 rounded hover:bg-red-500/30"><X size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -664,12 +664,12 @@ const Settings: React.FC = () => {
                       </td>
                       <td className="p-4 text-slate-400 dark:text-slate-600 font-sans text-xs">••••••</td>
                       <td className="p-4 text-right">
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition">
-                          <button onClick={() => startEdit(u)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded text-slate-500 dark:text-slate-300">
+                        <div className="flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition">
+                          <button onClick={() => startEdit(u)} className="p-2.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded text-slate-500 dark:text-slate-300">
                             <Edit2 size={16} />
                           </button>
                           {u.role !== 'Master' && (
-                            <button onClick={() => deleteUser(u.id)} className="p-1.5 hover:bg-red-500/20 rounded text-red-500">
+                            <button onClick={() => deleteUser(u.id)} className="p-2.5 hover:bg-red-500/20 rounded text-red-500">
                               <Trash2 size={16} />
                             </button>
                           )}

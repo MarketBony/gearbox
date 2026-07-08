@@ -269,14 +269,14 @@ const TaskCard: React.FC<{
         <button
           onClick={() => canGoLeft && onMove(task.id, task.projectId, KANBAN_ORDER[colIndex - 1])}
           disabled={!canGoLeft}
-          className="flex-1 flex items-center justify-center gap-1 py-1 rounded text-xs text-slate-500 dark:text-bony-text/50 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 flex items-center justify-center gap-1 py-2.5 md:py-1 rounded text-xs text-slate-500 dark:text-bony-text/50 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft size={13} />
         </button>
         <button
           onClick={() => canGoRight && onMove(task.id, task.projectId, KANBAN_ORDER[colIndex + 1])}
           disabled={!canGoRight}
-          className="flex-1 flex items-center justify-center gap-1 py-1 rounded text-xs text-slate-500 dark:text-bony-text/50 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 flex items-center justify-center gap-1 py-2.5 md:py-1 rounded text-xs text-slate-500 dark:text-bony-text/50 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronRight size={13} />
         </button>
