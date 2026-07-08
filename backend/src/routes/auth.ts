@@ -9,6 +9,13 @@ const prisma = new PrismaClient();
 
 router.post('/login', async (req, res) => {
   const { loginId, password } = req.body;
+
+  // Body vide ou partiel (scanner, client mal formé) : 400 explicite plutôt
+  // qu'un 500 Prisma (findUnique refuse un where sans loginId).
+  if (!loginId || !password) {
+    return res.status(400).json({ error: 'Identifiant et mot de passe requis.' });
+  }
+
   const user = await prisma.user.findUnique({ where: { loginId } });
 
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
