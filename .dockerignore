@@ -1,0 +1,13 @@
+# Contexte de build de Dockerfile.frontend (racine).
+# node_modules : ne JAMAIS copier ceux de l'hôte (binaires natifs Windows) — npm install les recrée.
+node_modules
+dist
+backend
+backups
+electron
+.env
+.env.*
+!.env.example
+*.log
+.git
+.claude
