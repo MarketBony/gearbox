@@ -5,7 +5,8 @@ import { emitEvent } from '../realtime';
 
 const router = Router();
 const prisma = new PrismaClient();
-const EDIT_ROLES = ['Master', 'Administrator', 'DigitalManager'];
+// 'Digital Manager' avec espace (rôle réel en base) — 'DigitalManager' ne matchait jamais.
+const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Digital Manager'];
 
 router.get('/', authenticateToken, async (req, res) => {
   const tags = await prisma.digitalTags.findFirst();

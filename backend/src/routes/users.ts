@@ -7,8 +7,9 @@ import { VALID_ROLES, isValidRole } from '../auth/roles';
 const router = Router();
 const prisma = new PrismaClient();
 
-// Gestion des comptes = action sensible : mutations réservées Master/Administrator.
-const ADMIN_ROLES = ['Master', 'Administrator'];
+// Gestion des comptes = action sensible : mutations réservées Master/Administrator/Director
+// (Director = parité Administrator, décision du 8 juillet 2026).
+const ADMIN_ROLES = ['Master', 'Administrator', 'Director'];
 
 const invalidRoleMessage = (role: unknown) =>
   `Rôle invalide: "${String(role)}". Valeurs acceptées: ${VALID_ROLES.join(', ')}.`;
