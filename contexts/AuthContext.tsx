@@ -2,12 +2,14 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
 import { db, getToken, setToken, clearToken, ApiError } from '../services/dataService';
 import { connectSocket, disconnectSocket } from '../services/socket';
+import { setAvatarUrl } from '../services/avatarCache';
 
 interface AuthContextType {
   user: User | null;
   login: (loginId: string, password?: string) => Promise<boolean>;
   logout: () => void;
   updateProfile: (updatedUser: User) => Promise<void>;
+  setAvatarPhoto: (url: string | null) => Promise<void>;
   loading: boolean;
   isAuthenticated: boolean;
 }
@@ -40,6 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const fullUser: User = { loginId: stored?.loginId ?? '', ...stored, ...me } as User;
           localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUser));
           setUser(fullUser);
+          setAvatarUrl(fullUser.id, fullUser.avatarUrl); // photo de profil pour <Avatar/>
           connectSocket(); // session restaurée : ouvre le socket chat (JWT au handshake)
         } catch (e) {
           // Token invalide/expiré ou serveur injoignable : retour au login.
@@ -73,6 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(token);
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUser));
       setUser(fullUser);
+      setAvatarUrl(fullUser.id, fullUser.avatarUrl); // photo de profil pour <Avatar/>
       connectSocket(); // login réussi : ouvre le socket chat (JWT au handshake)
       return true;
     } catch (e) {
@@ -108,8 +112,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Photo de profil du user CONNECTÉ : url d'un fichier uploadé, ou null pour la retirer.
+  const setAvatarPhoto = async (url: string | null) => {
+    if (!user) return;
+    const me = await db.updateMe({ avatarUrl: url });
+    const fullUser: User = { ...user, avatarUrl: me.avatarUrl } as User;
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUser));
+    setUser(fullUser);
+    setAvatarUrl(fullUser.id, me.avatarUrl);
+    window.dispatchEvent(new CustomEvent('gearbox-avatar-updated', { detail: { userId: fullUser.id } }));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateProfile, loading, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, updateProfile, setAvatarPhoto, loading, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

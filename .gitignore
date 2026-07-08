@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Fichiers uploadés (données runtime, recréés au démarrage par la route uploads)
+backend/uploads/
+
 # Variables d'environnement (secrets, URLs base de données)
 .env
 .env.*

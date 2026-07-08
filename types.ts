@@ -35,6 +35,7 @@ export interface User {
   password?: string; // Optional when retrieving public profile, mandatory for auth check
   role: UserRole;
   avatarColor?: string; // Hex code for avatar background
+  avatarUrl?: string; // URL relative de la photo de profil uploadée (/uploads/avatar/...)
 }
 
 export interface Task {
@@ -112,6 +113,7 @@ export interface SocialPost {
   lom: string;
   co2: string;
   archived: boolean;
+  archivedAt?: string; // Renseigné par le backend à l'archivage ; ancre la purge des médias
 }
 
 export interface DigitalTags {

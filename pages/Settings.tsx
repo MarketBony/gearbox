@@ -6,6 +6,7 @@ import { User, UserRole, ActivityLog } from '../types';
 import { Save, User as UserIcon, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn, MapPin, Cake } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import Avatar, { avatarKey } from '../components/Avatar';
+import { getAvatarUrl, setAvatarUrl } from '../services/avatarCache';
 import Select from '../components/Select';
 import DatePicker from '../components/DatePicker';
 import { SITES } from '../constants';
@@ -39,8 +40,11 @@ interface AvatarModalProps {
   userId: string;
   userName: string;
   onClose: () => void;
+  // Persiste l'URL de la photo uploadée (ou null pour la retirer). Fourni par le
+  // parent selon le contexte : profil propre (PUT /me) ou autre compte (PUT /users/:id).
+  onSave: (url: string | null) => Promise<void>;
 }
-const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, userName, onClose }) => {
+const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, userName, onClose, onSave }) => {
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState<CropPoint>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -49,16 +53,17 @@ const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, userName, onClo
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const hasExistingPhoto = !!localStorage.getItem(avatarKey(userId));
+  const [saving, setSaving] = useState(false);
+  const hasExistingPhoto = !!(getAvatarUrl(userId) || localStorage.getItem(avatarKey(userId)));
 
   const handleFile = (file: File | null | undefined) => {
     if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setError('Format non supporté. Utilisez jpg, png ou webp.');
+    if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
+      setError('Format non supporté. Utilisez jpg, png, gif ou webp.');
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Fichier trop lourd (max 2 Mo).');
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Fichier trop lourd (max 5 Mo).');
       return;
     }
     setError('');
@@ -74,21 +79,34 @@ const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, userName, onClo
   };
 
   const handleValidate = useCallback(async () => {
-    if (!cropSrc || !croppedAreaPixels) return;
+    if (!cropSrc || !croppedAreaPixels || saving) return;
+    setSaving(true);
     try {
+      // Recadrage 200x200 -> Blob JPEG -> upload (POST /api/uploads/avatar) -> persist URL.
       const base64 = await getCroppedImg(cropSrc, croppedAreaPixels);
-      localStorage.setItem(avatarKey(userId), base64);
-      window.dispatchEvent(new CustomEvent('gearbox-avatar-updated', { detail: { userId } }));
+      const blob = await (await fetch(base64)).blob();
+      const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+      const url = await db.uploadFile('avatar', file);
+      await onSave(url);
+      localStorage.removeItem(avatarKey(userId)); // purge d'une éventuelle photo base64 legacy
       onClose();
-    } catch {
-      setError('Erreur lors du recadrage. Réessayez.');
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Erreur lors de l\'enregistrement. Réessayez.');
+      setSaving(false);
     }
-  }, [cropSrc, croppedAreaPixels, userId, onClose]);
+  }, [cropSrc, croppedAreaPixels, userId, onClose, onSave, saving]);
 
-  const handleDelete = () => {
-    localStorage.removeItem(avatarKey(userId));
-    window.dispatchEvent(new CustomEvent('gearbox-avatar-updated', { detail: { userId } }));
-    onClose();
+  const handleDelete = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onSave(null);
+      localStorage.removeItem(avatarKey(userId)); // purge legacy locale
+      onClose();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Échec de la suppression.');
+      setSaving(false);
+    }
   };
 
   return (
@@ -127,12 +145,12 @@ const AvatarUploadModal: React.FC<AvatarModalProps> = ({ userId, userName, onClo
               <div className="text-center">
                 <p className="text-sm font-bold text-slate-700 dark:text-bony-text">Glisser une photo ici</p>
                 <p className="text-[11px] text-slate-500 dark:text-bony-muted mt-0.5">ou cliquer pour parcourir</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-1">jpg, png, webp — max 2 Mo</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-1">jpg, png, gif, webp — max 5 Mo</p>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/gif,image/webp"
                 className="hidden"
                 onChange={e => handleFile(e.target.files?.[0])}
               />
@@ -235,7 +253,7 @@ const saveUserPrefs = (id: string, prefs: UserPrefs) =>
 
 // --- Main Settings ---
 const Settings: React.FC = () => {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, setAvatarPhoto } = useAuth();
 
   const [name, setName] = useState(user?.name || '');
   const [oldPassword, setOldPassword] = useState('');
@@ -666,21 +684,27 @@ const Settings: React.FC = () => {
         </div>
       )}
 
-      {/* Avatar modal — own profile */}
+      {/* Avatar modal — own profile (PUT /me) */}
       {showAvatarModal && (
         <AvatarUploadModal
           userId={user.id}
           userName={user.name}
           onClose={() => setShowAvatarModal(false)}
+          onSave={(url) => setAvatarPhoto(url)}
         />
       )}
 
-      {/* Avatar modal — master editing another user */}
+      {/* Avatar modal — master editing another user (PUT /users/:id) */}
       {avatarTargetUser && (
         <AvatarUploadModal
           userId={avatarTargetUser.id}
           userName={avatarTargetUser.name}
           onClose={() => setAvatarTargetUser(null)}
+          onSave={async (url) => {
+            await db.setUserAvatar(avatarTargetUser.id, url);
+            setAvatarUrl(avatarTargetUser.id, url);
+            window.dispatchEvent(new CustomEvent('gearbox-avatar-updated', { detail: { userId: avatarTargetUser.id } }));
+          }}
         />
       )}
     </div>

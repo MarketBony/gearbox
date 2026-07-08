@@ -24,7 +24,9 @@ import chatRoutes from './backend/src/routes/chat';
 import activityLogRoutes from './backend/src/routes/activityLog';
 import userRoutes from './backend/src/routes/users';
 import seedRoutes from './backend/src/routes/seed';
+import uploadsRoutes, { UPLOADS_ROOT } from './backend/src/routes/uploads';
 import { setupRealtime } from './backend/src/realtime';
+import { startPurgeJob } from './backend/src/jobs/purge';
 import { errorHandler } from './backend/src/middleware/errorHandler';
 
 dotenv.config();
@@ -60,12 +62,19 @@ async function startServer() {
   app.use('/api/equipment-bookings', equipmentBookingRoutes);
   app.use('/api/chat', chatRoutes);
   app.use('/api/activity-log', activityLogRoutes);
+  app.use('/api/uploads', uploadsRoutes);
+
+  // Fichiers uploadés servis en statique (URLs relatives renvoyées par la route).
+  app.use('/uploads', express.static(UPLOADS_ROOT));
 
   // Middleware d'erreur global — après toutes les routes API.
   app.use(errorHandler);
 
   // Realtime
   setupRealtime(io);
+
+  // Job de purge des médias calendar archivés depuis > 30j.
+  startPurgeJob();
 
   // Vite middleware
   if (process.env.NODE_ENV !== 'production') {

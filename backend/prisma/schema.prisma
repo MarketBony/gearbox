@@ -18,6 +18,7 @@ model User {
   name         String
   role         String // 7 valeurs valides côté frontend (types.ts UserRole)
   avatarColor  String?
+  avatarUrl    String? // URL relative de la photo de profil uploadée (/uploads/avatar/...)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -98,6 +99,7 @@ model SocialPost {
   lom         String
   co2         String
   archived    Boolean  @default(false)
+  archivedAt  DateTime? // Renseigné à la bascule archived->true ; ancre la purge des médias (30j)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

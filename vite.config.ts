@@ -13,6 +13,7 @@ export default defineConfig(({ mode }) => {
         proxy: {
           '/api': 'http://localhost:3001',
           '/socket.io': { target: 'http://localhost:3001', ws: true },
+          '/uploads': 'http://localhost:3001', // fichiers uploadés servis par le backend
         },
       },
       plugins: [react()],

@@ -16,7 +16,7 @@ router.post('/login', async (req, res) => {
   }
 
   const token = jwt.sign({ id: user.id, role: user.role }, SECRET, { expiresIn: '24h' });
-  res.json({ token, user: { id: user.id, name: user.name, role: user.role, avatarColor: user.avatarColor } });
+  res.json({ token, user: { id: user.id, name: user.name, role: user.role, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl } });
 });
 
 router.get('/me', async (req, res) => {
@@ -28,7 +28,7 @@ router.get('/me', async (req, res) => {
     if (err) return res.sendStatus(403);
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
     if (!user) return res.sendStatus(404);
-    res.json({ id: user.id, name: user.name, role: user.role, avatarColor: user.avatarColor });
+    res.json({ id: user.id, name: user.name, role: user.role, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl });
   });
 });
 
@@ -39,9 +39,11 @@ router.put('/me', async (req, res) => {
 
   jwt.verify(token, SECRET, async (err: any, decoded: any) => {
     if (err) return res.sendStatus(403);
-    const { name, password, avatarColor } = req.body;
-    
+    const { name, password, avatarColor, avatarUrl } = req.body;
+
+    // avatarUrl : undefined = champ absent (non modifié) ; null = suppression de la photo.
     const updateData: any = { name, avatarColor };
+    if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
     if (password) {
       updateData.passwordHash = await bcrypt.hash(password, 10);
     }
@@ -51,7 +53,7 @@ router.put('/me', async (req, res) => {
       data: updateData
     });
 
-    res.json({ id: updatedUser.id, name: updatedUser.name, role: updatedUser.role, avatarColor: updatedUser.avatarColor });
+    res.json({ id: updatedUser.id, name: updatedUser.name, role: updatedUser.role, avatarColor: updatedUser.avatarColor, avatarUrl: updatedUser.avatarUrl });
   });
 });
 
