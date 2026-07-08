@@ -8,7 +8,7 @@ const router = Router();
 const prisma = new PrismaClient();
 
 // Roles allowed to edit
-const EDIT_ROLES = ['Master', 'Administrator', 'Coordinator'];
+const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator'];
 
 router.get('/', authenticateToken, async (req, res) => {
   const projects = await prisma.project.findMany({ include: { tasks: true } });

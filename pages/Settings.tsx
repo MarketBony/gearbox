@@ -277,9 +277,9 @@ const Settings: React.FC = () => {
   // Map userId -> prefs for display in user table
   const [allUserPrefs, setAllUserPrefs] = useState<Record<string, UserPrefs>>({});
 
-  // Gestion des comptes réservée Master/Administrator (aligné sur ADMIN_ROLES
-  // du backend routes/users.ts — les mutations y sont déjà protégées).
-  const canManageUsers = user?.role === 'Master' || user?.role === 'Administrator';
+  // Gestion des comptes réservée Master/Administrator/Director (aligné sur
+  // ADMIN_ROLES du backend routes/users.ts — les mutations y sont déjà protégées).
+  const canManageUsers = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director';
 
   useEffect(() => {
     if (user) {

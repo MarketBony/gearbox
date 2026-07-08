@@ -6,7 +6,7 @@ import { withDates } from '../utils/dates';
 
 const router = Router();
 const prisma = new PrismaClient();
-const EDIT_ROLES = ['Master', 'Administrator', 'Coordinator'];
+const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator'];
 
 router.get('/', authenticateToken, async (req, res) => {
   const campaigns = await prisma.campaign.findMany();

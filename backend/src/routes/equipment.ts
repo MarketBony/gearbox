@@ -6,10 +6,9 @@ import { emitEvent } from '../realtime';
 const router = Router();
 const prisma = new PrismaClient();
 
-// Catalogue matériel : gestion réservée Master/Administrator (aucune règle de rôle
-// spécifique au module côté frontend — Material.tsx ne gate rien — donc on reprend
-// la règle des ressources de gestion, comme budget.ts / fixedExpenses.ts).
-const MANAGE_ROLES = ['Master', 'Administrator'];
+// Catalogue matériel : gestion réservée Master/Administrator/Director,
+// aligné sur canManageCatalog de Material.tsx (Director = parité Administrator).
+const MANAGE_ROLES = ['Master', 'Administrator', 'Director'];
 
 // Contrat aligné sur le frontend (types.ts Equipment + pages/Material.tsx) :
 // { name, totalQuantity, category? }. Stockage brut, aucun calcul de

@@ -65,10 +65,10 @@ const BookingTooltipContent: React.FC<{ booking: EquipmentBooking; equipmentName
 
 const Material: React.FC = () => {
     const { user } = useAuth();
-    // Gestion du catalogue réservée Master/Administrator (aligné sur
+    // Gestion du catalogue réservée Master/Administrator/Director (aligné sur
     // MANAGE_ROLES de routes/equipment.ts) ; les réservations restent
     // ouvertes à tout utilisateur authentifié (routes/equipmentBookings.ts).
-    const canManageCatalog = user?.role === 'Master' || user?.role === 'Administrator';
+    const canManageCatalog = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director';
     const [activeTab, setActiveTab] = useSessionState<'planning' | 'inventory'>('material_activeTab', 'planning');
     const [equipment, setEquipment] = useState<Equipment[]>([]);
     const [bookings, setBookings] = useState<EquipmentBooking[]>([]);
