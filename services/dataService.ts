@@ -7,20 +7,6 @@ import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPT
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-const DEFAULT_USERS: User[] = [
-    { id: 'u1', name: 'Théo Labonne', loginId: 'Theo', password: 'admin', role: 'Master', avatarColor: '#f75632' },
-    { id: 'u2', name: 'Claire Richard', loginId: 'Claire', password: 'admin', role: 'Administrator', avatarColor: '#8f12ab' },
-    { id: 'u3', name: 'Christian Charlier', loginId: 'Christian', password: 'admin', role: 'Administrator', avatarColor: '#293f74' },
-    { id: 'u4', name: 'Bastien Fuziol', loginId: 'Bastien', password: 'admin', role: 'Coordinator', avatarColor: '#10b981' },
-    { id: 'u5', name: 'Alexis Perz', loginId: 'Alexis', password: 'admin', role: 'Coordinator', avatarColor: '#0ea5e9' },
-    { id: 'u6', name: 'Romane Chambon', loginId: 'Romane', password: 'admin', role: 'Coordinator', avatarColor: '#f43f5e' },
-    // Nouveaux utilisateurs
-    { id: 'u7', name: 'Morgane Barthe', loginId: 'Morgane', password: 'admin', role: 'Digital Manager', avatarColor: '#ec4899' }, // Pink
-    { id: 'u8', name: 'Hugo Culetto', loginId: 'Hugo', password: 'admin', role: 'Digital Manager', avatarColor: '#8b5cf6' }, // Violet light
-    { id: 'u9', name: 'Ludivine Roux', loginId: 'Ludivine', password: 'admin', role: 'Guest', avatarColor: '#64748b' }, // Slate
-    { id: 'u10', name: 'Lucy Bohere', loginId: 'Lucy', password: 'admin', role: 'Coordinator', avatarColor: '#14b8a6' }, // Teal
-];
-
 // =====================================================================
 // COUCHE API — branchement progressif sur le backend Express (étape 7).
 // Pattern unique réutilisé par chaque module au fil des bascules.
@@ -143,18 +129,6 @@ class DataService {
     // Ensure budgets exist if adding this feature later
     if (!localStorage.getItem('gearbox_budgets')) {
         localStorage.setItem('gearbox_budgets', JSON.stringify(INITIAL_BUDGET_SCENARIO));
-    }
-    // Ensure Users exist
-    if (!localStorage.getItem('gearbox_users')) {
-        localStorage.setItem('gearbox_users', JSON.stringify(DEFAULT_USERS));
-    } else {
-        // QUICK FIX FOR DEMO: If users exist but are missing the new ones, merge them.
-        const currentUsers: User[] = JSON.parse(localStorage.getItem('gearbox_users') || '[]');
-        if (currentUsers.length < 10) {
-             const existingIds = new Set(currentUsers.map(u => u.id));
-             const toAdd = DEFAULT_USERS.filter(u => !existingIds.has(u.id));
-             localStorage.setItem('gearbox_users', JSON.stringify([...currentUsers, ...toAdd]));
-        }
     }
     // Ensure Digital Tags exist
     if (!localStorage.getItem('gearbox_digital_tags')) {
@@ -364,10 +338,25 @@ class DataService {
     return apiFetch<any[]>('/budget');
   }
 
-  // --- USERS ---
-  async getUsers(): Promise<User[]> { return this.get('users'); }
-  async saveUsers(users: User[]) { await this.save('users', users); }
-  
+  // --- Users (BRANCHÉS BACKEND — étape 7.3) ---
+  // GET ouvert à tout utilisateur authentifié ; mutations réservées
+  // Master/Administrator (règle backend routes/users.ts). Le mot de passe
+  // transite EN CLAIR dans la requête (HTTPS) — le hash bcrypt est fait
+  // côté serveur, jamais côté client. L'API ne renvoie jamais de hash.
+  async getUsers(): Promise<User[]> {
+    return apiFetch<User[]>('/users');
+  }
+  async createUser(user: Omit<User, 'id'>): Promise<User> {
+    return apiFetch('/users', { method: 'POST', body: JSON.stringify(user) });
+  }
+  async updateUser(user: User): Promise<User> {
+    const { id, ...data } = user;
+    return apiFetch(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteUser(id: string): Promise<void> {
+    await apiFetch(`/users/${id}`, { method: 'DELETE' });
+  }
+
   // --- Social Posts / Digital (BRANCHÉS BACKEND — étape 7.4) ---
   // Écritures : Master/Administrator/Director/Digital Manager/External
   // (EDIT_ROLES de routes/social.ts, aligné sur le gating de Digital.tsx).
@@ -454,20 +443,6 @@ class DataService {
 
   saveMessages(conversationId: string, messages: ChatMessage[]) {
     localStorage.setItem(`gearbox_messages_${conversationId}`, JSON.stringify(messages));
-  }
-
-  // --- USER CRUD ---
-  async saveUser(user: User) {
-    const users = await this.getUsers();
-    const idx = users.findIndex(u => u.id === user.id);
-    if (idx >= 0) users[idx] = user;
-    else users.push(user);
-    await this.saveUsers(users);
-  }
-
-  async deleteUser(id: string) {
-    const users = await this.getUsers();
-    await this.saveUsers(users.filter(u => u.id !== id));
   }
 
   // --- ACTIVITY LOG (BRANCHÉ BACKEND — étape 7.4) ---
