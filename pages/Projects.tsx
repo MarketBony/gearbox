@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Task, TaskStatus, ServiceType, PlaqueName, Site, BrandType, ProjectType, User, ActivityLog } from '../types';
 import { db } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, PROJECT_TYPES, TASK_CHANNELS, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, ALPINE_SITES, NISSAN_SITES } from '../constants';
 import {
@@ -356,6 +357,14 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
     window.addEventListener('gearbox-navigate' as any, handleNavigation);
     return () => window.removeEventListener('gearbox-navigate' as any, handleNavigation);
   }, []);
+
+  // Temps réel : projets (+ liste des utilisateurs, utilisée pour l'affectation
+  // des tâches). loadProjects re-synchronise aussi le projet ouvert par son id,
+  // donc la sélection n'est pas perdue quand un collègue modifie ce projet.
+  useRealtimeSync([...RT_EVENTS.projects, ...RT_EVENTS.users], () => {
+    loadProjects();
+    db.getUsers().then(setUsers).catch(() => {});
+  });
 
   useEffect(() => {
       setSelectedProject(null);

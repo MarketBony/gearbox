@@ -3,6 +3,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Task, Site, ServiceType, BrandType, PlaqueName, TaskChannel, ActivityLog } from '../types';
 import { db } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS } from '../constants';
 import { Search, Filter, X, Mail, MessageSquare, Megaphone, Save, Euro, BarChart3, Percent, Hash, FileText, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
@@ -93,6 +94,9 @@ const Campaigns: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Temps réel : les campagnes sont dérivées des tâches SMS/E-mail des projets.
+  useRealtimeSync(RT_EVENTS.projects, () => loadData());
 
   const loadData = async () => {
     const data = await db.getProjects();

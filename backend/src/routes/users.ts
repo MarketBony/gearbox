@@ -3,9 +3,23 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { authenticateToken, requireRole } from '../auth/middleware';
 import { VALID_ROLES, isValidRole } from '../auth/roles';
+import { emitEvent } from '../realtime';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+// Projection publique d'un utilisateur : SEULE forme qui sort de ce module, que
+// ce soit en réponse HTTP ou en événement socket. Ne jamais renvoyer l'objet
+// Prisma brut — il contient `passwordHash`, qui serait diffusé à tous les
+// clients connectés par emitEvent (io.emit = broadcast global).
+const publicUser = (u: any) => ({
+  id: u.id,
+  name: u.name,
+  loginId: u.loginId,
+  role: u.role,
+  avatarColor: u.avatarColor,
+  avatarUrl: u.avatarUrl
+});
 
 // Gestion des comptes = action sensible : mutations réservées Master/Administrator/Director
 // (Director = parité Administrator, décision du 8 juillet 2026).
@@ -17,7 +31,7 @@ const invalidRoleMessage = (role: unknown) =>
 // GET all users — lecture ouverte à tout utilisateur authentifié (liste utilisée par l'UI)
 router.get('/', authenticateToken, async (req, res) => {
   const users = await prisma.user.findMany();
-  res.json(users.map(u => ({ id: u.id, name: u.name, loginId: u.loginId, role: u.role, avatarColor: u.avatarColor, avatarUrl: u.avatarUrl })));
+  res.json(users.map(publicUser));
 });
 
 // POST create user
@@ -34,7 +48,8 @@ router.post('/', authenticateToken, requireRole(ADMIN_ROLES), async (req, res) =
     const user = await prisma.user.create({
       data: { name, loginId, passwordHash, role, avatarColor, avatarUrl }
     });
-    res.json({ id: user.id, name: user.name, loginId: user.loginId, role: user.role, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl });
+    emitEvent('users:updated', publicUser(user));
+    res.json(publicUser(user));
   } catch (e) {
     res.status(400).json({ error: 'User creation failed' });
   }
@@ -61,7 +76,8 @@ router.put('/:id', authenticateToken, requireRole(ADMIN_ROLES), async (req, res)
       where: { id },
       data: updateData
     });
-    res.json({ id: user.id, name: user.name, loginId: user.loginId, role: user.role, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl });
+    emitEvent('users:updated', publicUser(user));
+    res.json(publicUser(user));
   } catch (e) {
     res.status(400).json({ error: 'User update failed' });
   }
@@ -72,6 +88,7 @@ router.delete('/:id', authenticateToken, requireRole(ADMIN_ROLES), async (req, r
   const { id } = req.params;
   try {
     await prisma.user.delete({ where: { id } });
+    emitEvent('users:deleted', id);
     res.sendStatus(204);
   } catch (e) {
     res.status(400).json({ error: 'User deletion failed' });

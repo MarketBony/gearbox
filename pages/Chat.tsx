@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChatConversation, ChatMessage, User } from '../types';
 import { db, ApiError } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { getSocket, connectSocket, emitWithAck } from '../services/socket';
 import { chatStore } from '../services/chatStore';
 import { useAuth } from '../contexts/AuthContext';
@@ -357,6 +358,11 @@ const Chat: React.FC = () => {
       window.removeEventListener('gearbox-chat-reconnected', onReconnect);
     };
   }, []);
+
+  // Temps réel de la liste des utilisateurs (les messages, eux, passent déjà
+  // par les listeners chat:* ci-dessus) : un nouveau collègue devient
+  // sélectionnable dans une conversation sans rechargement.
+  useRealtimeSync(RT_EVENTS.users, () => { db.getUsers().then(setUsers).catch(() => {}); });
 
   // Auto-ouverture de la 1re conversation visible une fois la liste chargée.
   useEffect(() => {

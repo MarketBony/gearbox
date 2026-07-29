@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSessionState } from '../hooks/useSessionState';
 import { useAuth } from '../contexts/AuthContext';
 import { db, ApiError } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { SocialPost, SocialStatus, SocialNetwork, BrandType, ServiceType, SocialTarget, Site, PlaqueName, DigitalTags, ActivityLog } from '../types';
 import { SOCIAL_STATUS_COLORS, BRANDS, SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTIONS, SITES, BRAND_COLORS } from '../constants';
 import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload } from 'lucide-react';
@@ -848,8 +849,15 @@ const Digital: React.FC = () => {
       return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const loadData = async () => {
-      setLoading(true);
+  // Temps réel : posts du calendrier + tags (réseaux/CO2). `silent` = pas de
+  // squelette de chargement pendant le refetch.
+  useRealtimeSync(
+      [...RT_EVENTS.social, ...RT_EVENTS.tags],
+      () => loadData(true)
+  );
+
+  const loadData = async (silent = false) => {
+      if (!silent) setLoading(true);
       const [pData, tData] = await Promise.all([
           db.getSocialPosts(),
           db.getDigitalTags()
@@ -860,7 +868,7 @@ const Digital: React.FC = () => {
       setMediaCounts(counts);
       setPosts(pData);
       setTags(tData);
-      setLoading(false);
+      if (!silent) setLoading(false);
   };
 
   const handleUpdatePost = async (updatedPost: SocialPost) => {

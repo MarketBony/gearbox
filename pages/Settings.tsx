@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db, ApiError } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { User, UserRole, ActivityLog } from '../types';
 import { Save, User as UserIcon, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn, MapPin, Cake } from 'lucide-react';
 import Cropper from 'react-easy-crop';
@@ -289,6 +290,11 @@ const Settings: React.FC = () => {
     }
     if (canManageUsers) loadAllUsers();
   }, [user]);
+
+  // Temps réel : la Gestion des Utilisateurs reflète les créations/modifications
+  // /suppressions faites par les autres administrateurs. Ne s'abonne que si
+  // l'écran est accessible (les autres rôles n'affichent pas cette liste).
+  useRealtimeSync(canManageUsers ? RT_EVENTS.users : [], () => loadAllUsers());
 
   const loadAllUsers = async () => {
     try {
