@@ -86,9 +86,16 @@
      agrège la présence des 8 rubriques masquées sur mobile.
    - Responsive vérifié par mesure des rectangles (pas à l'œil) à 320, 375, 820,
      1440 px : aucun débordement de bouton, aucun scroll horizontal de page,
-     aucun libellé tronqué. Piège rencontré : le bouton de nav desktop porte
-     `overflow-hidden`, il faut `flex-1 min-w-0` sur le libellé (et non `ml-auto`
-     sur les avatars) sinon la rangée déborde et les bulles sont rognées.
+     aucun libellé tronqué. **Deux pièges enchaînés** sur la nav desktop, à
+     retenir avant de retoucher ces boutons :
+     1. le bouton porte `overflow-hidden` → il faut `flex-1 min-w-0` sur le
+        libellé (et non `ml-auto` sur les avatars), sinon la rangée déborde et
+        les bulles sont rognées ;
+     2. mais `flex-1` rend le span plus large que son texte, et un `<button>`
+        est **centré par défaut** (feuille de style du navigateur) → le libellé
+        s'est retrouvé centré en production. `text-left` est donc obligatoire sur
+        ce span. Régression repérée par Théo sur capture d'écran, corrigée dans
+        le même lot.
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - **Catalogue matériel dupliqué en base** : 16 noms uniques mais 32 lignes, chaque
