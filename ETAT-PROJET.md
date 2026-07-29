@@ -1,4 +1,4 @@
-# ÉTAT PROJET GEARBOX — synthèse au 9 juillet 2026
+# ÉTAT PROJET GEARBOX — synthèse au 29 juillet 2026
 
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
@@ -10,8 +10,13 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés (SHA actuel : `cb7669b` — Merge fix/responsive-mobile)
+- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : `33107c4`
+  (Merge feat/realtime-modules, 29 juillet). Des commits de doc ou de backup
+  automatique peuvent suivre sans nécessiter de redéploiement.
 - Procédure complète de déploiement à jour dans DEPLOIEMENT.md
+- Sauvegardes automatiques : `.github/workflows/backup.yml` pousse un dump Supabase
+  dans `backups/` chaque semaine (commits `github-actions[bot]`) — penser à
+  `git pull` avant de pousser, le local est vite en retard de quelques commits
 
 ## Historique des correctifs post-déploiement (par ordre chronologique)
 1. Prep déploiement : Supabase branché dans docker-compose, Dockerfile backend créé,
@@ -28,6 +33,30 @@
    tableaux scrollables (Projects, Settings), rows empilées (Digital), headers
    wrap (Budget, FixedExpenses, Material, Agenda, Expenses), vue liste mobile pour
    les calendriers (Agenda + Material), zones tactiles agrandies (jeux, Settings)
+7. **Temps réel étendu à tous les modules** (`feat/realtime-modules`, 29 juillet).
+   Le backend émettait déjà un événement par mutation, mais aucune page ne les
+   écoutait : il fallait un F5 pour voir le travail des autres. Cause racine
+   exclusivement côté front.
+   - `services/realtime.ts` (nouveau) : `RT_EVENTS` (table unique des noms
+     d'événements) + hook `useRealtimeSync(events, reload)` — debounce 300 ms,
+     et rejeu sur `connect` pour rattraper ce qui a été manqué pendant une
+     coupure réseau (le serveur ne rejoue pas les événements).
+   - Stratégie d'**invalidation, pas de patch de state** : le payload est ignoré,
+     on rappelle le loader existant de la page. Raison : le backend émet l'objet
+     Prisma brut (dates ISO) alors que `dataService` normalise en `yyyy-MM-dd`
+     via des normaliseurs privés au module. Ignorer le payload rend aussi sans
+     objet l'hétérogénéité des formes (`expense:deleted` envoie `{ id }`, les
+     autres l'id brut).
+   - `backend/src/routes/users.ts` : seule route métier sans émission (3 mutations,
+     0 emit) alors que `users` est lu par 5 pages → `users:updated` / `users:deleted`
+     ajoutés. Helper `publicUser` extrait au passage : émettre l'objet Prisma brut
+     aurait diffusé `passwordHash` à tous les clients (`emitEvent` = `io.emit`,
+     broadcast global).
+   - 16 abonnements sur 13 pages + Sidebar. Cas particuliers : migration de buckets
+     de `Budget.loadData` neutralisée en mode silencieux (sinon boucle upsert →
+     `budget:updated` → refetch) ; polling 30 s de TodoList supprimé ; polling 3 s
+     de Games conservé (défis en localStorage, hors de portée du socket) ; Export
+     non câblé (il lit les données au moment de générer l'export, déjà à jour).
 
 ## Comptes
 - Comptes de démo du seed (theo/admin, admin/password, etc.) recréés par Bastien
@@ -35,12 +64,20 @@
 - Route /api/seed bloquée en production (403) — ne peut plus être redéclenchée
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
+- **Catalogue matériel dupliqué en base** : 16 noms uniques mais 32 lignes, chaque
+  équipement en double depuis le 8 juillet ~22:07 (double exécution de
+  `migrateEquipmentIfNeeded`). Nettoyage délicat — les `EquipmentBooking` pointent
+  sur l'un des deux ids via une FK. Voir BUGS-CONNUS.md.
+- **Aucun en-tête `Cache-Control` servi en prod** (nginx par défaut) : rien ne
+  garantit qu'un navigateur revalide `index.html` après un déploiement, donc un
+  utilisateur peut rester sur un ancien bundle sans le savoir. Correctif court
+  dans `nginx.conf` : `no-cache` sur `index.html`, `immutable` sur `/assets`
+  (noms déjà hashés par Vite).
 - PWA (manifest.json + service worker) — prévu "juste avant déploiement" dans le
   brief d'origine, jamais fait, toujours pertinent (HTTPS dispo, condition remplie)
-- Nettoyage des branches locales déjà mergées : chore/deploy-vps-prep,
-  fix/dockerfile-openssl, fix/logos-public, fix/director-roles,
-  chore/post-deploy-cleanup, fix/responsive-mobile (+ docs/etat-projet une fois
-  mergée)
+- Nettoyage des branches locales déjà mergées (`git branch` en liste une dizaine :
+  feat/backend-*, feat/frontend-wire-*, fix/backend-dates-and-errors,
+  chore/supabase-safety, chore/versionne-claude-md, feat/realtime-modules)
 - Réactions emoji du Chat non accessibles sur mobile (masquées au survol) — laissé
   de côté volontairement lors du lot responsive, nécessite un appui long ou un menu
 - Vues Trimestre/Semestre/Année de l'Agenda : pas de vue mobile dédiée (contrairement
@@ -48,6 +85,21 @@
 - Point technique à garder en tête : Tailwind est chargé en CDN Play → les variantes
   md:/lg: ne fonctionnent pas sur les classes custom (gx-*, glass-*), seulement sur
   les utilitaires Tailwind standards
+
+## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Après un déploiement, recharger complètement la page** : un onglet resté ouvert
+  continue de tourner sur l'ancien bundle. Symptôme trompeur du 29 juillet — le
+  temps réel semblait ne marcher qu'après un aller-retour de rubrique (le remontage
+  du composant refaisait le chargement initial) et la Sidebar, jamais démontée, ne
+  se mettait jamais à jour. Le code était bon.
+- **Les actions du rôle Master ne sont JAMAIS journalisées** (`activityLog.ts`,
+  204 silencieux, règle métier volontaire répliquée du frontend). Le compte de Théo
+  étant Master, il ne verra jamais sa propre activité dans la cloche — tester le fil
+  d'actualité exige une action faite par un compte non-Master.
+- **Le backend local pointe sur la base Supabase de PRODUCTION** (pas de base de
+  dev) : tout test local écrit dans les vraies données et est visible des
+  utilisateurs connectés. Créer une entité clairement nommée, la supprimer juste
+  après, vérifier qu'il ne reste aucun résidu.
 
 ## Contraintes d'environnement toujours actives
 - Réseau bureau bloque les ports sortants 22 (SSH) et 5432/6543 (Postgres/Supabase)

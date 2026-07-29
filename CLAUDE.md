@@ -31,6 +31,13 @@ métier ci-dessous.
    - Si le changement touche le schéma Prisma : migration en local d'abord
      (`npx prisma migrate dev`), jamais direct en prod.
 3. **Si les tests locaux sont OK** :
+   - **RÈGLE D'OR — mettre à jour les `.md` de suivi AVANT de pousser.**
+     `ETAT-PROJET.md` (SHA courant, historique des correctifs, backlog),
+     `ETAT-BACKEND.md` si le backend bouge, `BUGS-CONNUS.md` (cocher ce qui est
+     corrigé, ajouter ce qui a été découvert), `DEPLOIEMENT.md` si la procédure
+     change. La doc fait partie du lot déployé — **jamais** « je documenterai
+     après », c'est trop tard : un déploiement non documenté fait repartir la
+     session suivante sur de fausses bases.
    - commit, merge sur `master` en local,
    - **STOP avant le push** : montre à Théo le diff / le résumé du commit et
      attends son OK explicite. Ne lance `git push` qu'après confirmation — ne

@@ -1,4 +1,4 @@
-# ÉTAT BACKEND — synthèse au 8 juillet 2026 (ÉTAT FINAL)
+# ÉTAT BACKEND — synthèse au 29 juillet 2026
 
 Étape 7 (branchement frontend↔backend) **terminée**. Tous les modules de données **et** la
 gestion des fichiers uploadés sont branchés sur le backend Express/Supabase et **vérifiés en
@@ -44,9 +44,38 @@ et fallback des anciennes photos de profil base64 (avant bascule uploads).
   `archivedAt` set à l'archivage / null au désarchivage, purge supprime fichier disque + référence
   base, taille > limite → 413. Données de test nettoyées.
 
-## 🔜 Seul chantier restant
+## ✅ Diffusion temps réel des mutations (29 juillet 2026)
 
-- **Déploiement VPS** — rien côté code applicatif. Architecture conteneurisée split : `api`
+Chaque route métier émet un événement Socket.IO via `emitEvent` (`src/realtime/index.ts`,
+`io.emit` = **broadcast global**, tous clients authentifiés confondus) :
+
+| Ressource | Événements |
+|---|---|
+| projects · campaigns · budget · contacts · social | `<res>:updated`, `<res>:deleted` |
+| users | `users:updated`, `users:deleted` |
+| equipment · equipment-booking · expense · fixed-expense | `<res>:created`, `:updated`, `:deleted` |
+| tags | `tags:updated` |
+| activity | `activity:created` |
+
+Nommage volontairement laissé hétérogène (pluriel/singulier, `created` présent ou non) :
+le front ignore le payload et ne se sert que du nom, la table de référence côté
+consommateur est `services/realtime.ts` (`RT_EVENTS`).
+
+⚠️ **`users.ts` : ne jamais émettre l'objet Prisma brut** — il contient `passwordHash`,
+qui serait diffusé à tous les clients connectés. Le helper `publicUser` est la seule
+forme qui sort du module, réponse HTTP comme événement socket.
+
+⚠️ Les routes émettent **aussi vers l'auteur** de la mutation (pas d'exclusion du
+socket émetteur). Assumé : l'auteur refetch une donnée qu'il vient d'écrire. Si du
+scintillement apparaît côté UI, la piste est un header `x-socket-id` + `io.except(id)`,
+avec un `AsyncLocalStorage` pour éviter de toucher les ~35 sites d'appel.
+
+## ✅ Déploiement VPS — FAIT (8 juillet 2026, en production depuis)
+
+En ligne sur https://gearbox.bonyauto-mobile.com. Détail de l'architecture ci-dessous,
+procédure opérationnelle dans `DEPLOIEMENT.md`, état global dans `ETAT-PROJET.md`.
+
+- Architecture conteneurisée split : `api`
   (backend/Dockerfile multi-stage, `prisma migrate deploy` au démarrage) + `web` (nginx servant
   le build Vite) + `caddy` (reverse-proxy `/api`, `/socket.io`, `/uploads` → api, reste → web,
   HTTPS auto). Volume persistant `uploads_data` pour les uploads, variables dans `.env` racine
