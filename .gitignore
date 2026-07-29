@@ -20,6 +20,13 @@ backend/uploads/
 .env.*
 !.env.example
 
+# Secrets d'infra (accès VPS/GitHub/Supabase) — jamais versionné
+ACCES-INFRA-SECRET.md
+*SECRET*.md
+
+# Captures de travail (non versionnées)
+screenshots/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
