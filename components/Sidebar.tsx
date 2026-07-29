@@ -3,9 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import Avatar from './Avatar';
+import PresenceBubbles from './PresenceBubbles';
 import { db } from '../services/dataService';
 import { chatStore } from '../services/chatStore';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
+import { usePresence } from '../services/presenceStore';
 import { ActivityLog } from '../types';
 import {
   LayoutDashboard,
@@ -151,6 +153,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     lastReadTs ? new Date(e.timestamp) > new Date(lastReadTs) : true
   ).length;
 
+  // Présence des AUTRES utilisateurs par rubrique (soi-même exclu : on sait
+  // déjà où on est, et ça économise une place précieuse sur mobile).
+  const presence = usePresence(user?.id);
+
   const isExternal = user?.role === 'External';
   const canAccessGames = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Coordinator' || user?.role === 'Digital Manager';
   const canExport = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Coordinator';
@@ -193,6 +199,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   };
 
   const isMoreActive = moreNavItems.some(i => i.id === activeTab);
+
+  // Sur mobile, 8 rubriques sur 13 sont derrière le bouton « Plus » : sans ça,
+  // la présence y serait invisible. Le serveur ne place un utilisateur que dans
+  // une seule rubrique, mais on déduplique par sécurité.
+  const hiddenPresence = Array.from(
+    new Map(
+      moreNavItems.flatMap(i => presence[i.id] || []).map(u => [u.userId, u])
+    ).values()
+  );
 
   return (
     <>
@@ -275,7 +290,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                         }`}
                       >
                         {isActive && <div className="absolute inset-0 bg-bony-gradient opacity-90" />}
-                        <div className="relative z-10 flex items-center gap-2.5 w-full">
+                        {/* min-w-0 indispensable : le bouton porte overflow-hidden,
+                            sans ça la rangée dépasse sa largeur et les avatars de
+                            présence sont rognés au lieu de comprimer le libellé. */}
+                        <div className="relative z-10 flex items-center gap-2.5 w-full min-w-0">
                           <div className="relative shrink-0">
                             <Icon size={16} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-white' : 'group-hover:text-bony-orange transition-colors'} />
                             {item.id === 'chat' && chatUnreadCount > 0 && (
@@ -289,8 +307,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                               </span>
                             )}
                           </div>
-                          <span className={`text-[13px] font-medium truncate ${isActive ? 'font-semibold' : ''}`}>
+                          {/* flex-1 + min-w-0 : le libellé occupe la place restante et
+                              se tronque, ce qui pousse la présence à droite sans jamais
+                              la faire déborder (recette standard, plus fiable que ml-auto
+                              qui n'empêche pas le débordement). */}
+                          <span className={`flex-1 min-w-0 text-[13px] font-medium truncate ${isActive ? 'font-semibold' : ''}`}>
                             {item.label}
+                          </span>
+                          <span className="shrink-0">
+                            <PresenceBubbles users={presence[item.id] || []} size={18} max={2} />
                           </span>
                         </div>
                       </button>
@@ -328,6 +353,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                       {gamesChallengeCount > 9 ? '9+' : gamesChallengeCount}
                     </span>
                   )}
+                  {/* Présence : ancrée en BAS (les badges non-lus occupent le haut
+                      à droite), centrée sous l'icône pour ne pas déborder du
+                      bouton de 44px quelle que soit la largeur des bulles. */}
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2">
+                    <PresenceBubbles users={presence[item.id] || []} size={13} max={2} />
+                  </div>
                 </div>
               </button>
             );
@@ -446,10 +477,18 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors min-h-[44px] ${
+              className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors min-h-[44px] ${
                 isActive ? 'text-bony-orange' : 'text-slate-400 dark:text-slate-500'
               }`}
             >
+              {/* Présence : dans l'espace libre en haut de la barre (64px pour
+                  ~32px de contenu), centrée sur le bouton. Évite le badge
+                  non-lus (coin haut-droit de l'icône) et le label (en bas).
+                  Avatars à 12px : 2 + compteur tiennent dans un onglet de la
+                  barre même sur un écran de 320px. */}
+              <div className="absolute top-0.5 left-1/2 -translate-x-1/2">
+                <PresenceBubbles users={presence[item.id] || []} size={12} max={2} />
+              </div>
               <div className="relative">
                 <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
                 {item.id === 'chat' && chatUnreadCount > 0 && (
@@ -473,10 +512,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
         {/* More button */}
         <button
           onClick={() => setShowMoreMenu(true)}
-          className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors min-h-[44px] ${
+          className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors min-h-[44px] ${
             isMoreActive ? 'text-bony-orange' : 'text-slate-400 dark:text-slate-500'
           }`}
         >
+          {/* Présence agrégée des rubriques masquées derrière ce menu. */}
+          <div className="absolute top-0.5 left-1/2 -translate-x-1/2">
+            <PresenceBubbles users={hiddenPresence} size={12} max={2} />
+          </div>
           <MoreHorizontal size={20} />
           <span className="text-[9px] font-bold leading-none">Plus</span>
         </button>
@@ -567,12 +610,17 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                   <button
                     key={item.id}
                     onClick={() => handleMoreItemClick(item.id)}
-                    className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl transition-colors min-h-[64px] ${
+                    className={`relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl transition-colors min-h-[64px] ${
                       isActive
                         ? 'bg-bony-gradient text-white shadow-lg'
                         : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400'
                     }`}
                   >
+                    {/* Détail de la présence, rubrique par rubrique : le bouton
+                        « Plus » n'en donne que l'agrégat. */}
+                    <div className="absolute top-1 right-1">
+                      <PresenceBubbles users={presence[item.id] || []} size={14} max={2} />
+                    </div>
                     <Icon size={22} />
                     <span className="text-[10px] font-bold text-center leading-tight">{item.label}</span>
                   </button>

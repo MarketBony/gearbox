@@ -1,6 +1,7 @@
 import { io, type Socket } from 'socket.io-client';
 import { db, getToken } from './dataService';
 import { chatStore } from './chatStore';
+import { presenceStore, type PresenceState } from './presenceStore';
 
 // =====================================================================
 // COUCHE SOCKET.IO (étape 7 — branchement Chat)
@@ -10,6 +11,25 @@ import { chatStore } from './chatStore';
 // =====================================================================
 
 let socket: Socket | null = null;
+
+// Dernière rubrique annoncée au serveur. Conservée hors du socket pour pouvoir
+// se réannoncer après une reconnexion, et pour absorber les appels émis avant
+// que le socket n'existe (au tout premier rendu).
+let mySection: string | null = null;
+
+const announcePresence = (section: string) => {
+  socket?.emit('presence:set', { section });
+};
+
+/**
+ * Déclare la rubrique courante de l'utilisateur (appelé par App.tsx sur l'onglet
+ * réellement affiché). Idempotent : ne réémet rien si la rubrique n'a pas changé.
+ */
+export const setMySection = (section: string) => {
+  if (section === mySection) return;
+  mySection = section;
+  announcePresence(section);
+};
 
 // Recharge la liste des conversations dans le store. Appelé au connect ET à
 // chaque reconnexion (rattrape les événements manqués pendant une coupure).
@@ -34,7 +54,12 @@ export const connectSocket = (): Socket | null => {
   });
 
   // 'connect' se déclenche au 1er établissement ET après chaque reconnexion.
-  socket.on('connect', () => { refreshConversations(); });
+  socket.on('connect', () => {
+    refreshConversations();
+    // La présence serveur est en mémoire : après une reconnexion (ou un
+    // redémarrage de l'api) notre entrée a disparu, on se réannonce.
+    if (mySection) announcePresence(mySection);
+  });
 
   // Reconnexion après coupure réseau : recharge aussi l'historique de la conv
   // ouverte côté Chat.tsx (qui écoute cet event).
@@ -47,6 +72,10 @@ export const connectSocket = (): Socket | null => {
   socket.on('chat:conversation:updated', (conv: any) => chatStore.upsertConversation(conv));
   socket.on('chat:conversation:created', (conv: any) => chatStore.upsertConversation(conv));
 
+  // Présence : instantané complet rubrique -> utilisateurs, rediffusé par le
+  // serveur à chaque changement (connexion, changement d'onglet, déconnexion).
+  socket.on('presence:state', (state: PresenceState) => presenceStore.set(state));
+
   return socket;
 };
 
@@ -56,7 +85,9 @@ export const disconnectSocket = () => {
     socket.disconnect();
     socket = null;
   }
+  mySection = null; // sinon la prochaine session réannoncerait l'ancienne rubrique
   chatStore.clear();
+  presenceStore.clear();
 };
 
 export const getSocket = (): Socket | null => socket;
