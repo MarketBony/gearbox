@@ -1,5 +1,5 @@
 
-import { Project, Campaign, Equipment, EquipmentBooking, OneOffExpense, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog } from '../types';
+import { Project, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog } from '../types';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
 
@@ -89,10 +89,6 @@ const normalizeBooking = (b: any): EquipmentBooking => ({
 const normalizeSocialPost = (p: any): SocialPost => ({
   ...p,
   date: toDay(p.date)
-});
-const normalizeOneOffExpense = (e: any): OneOffExpense => ({
-  ...e,
-  date: toDay(e.date)
 });
 // Le backend génère les ids et gère createdAt/updatedAt : on ne les renvoie
 // pas dans les corps de mutation (les routes social/campaigns passent le body
@@ -270,24 +266,12 @@ class DataService {
   }
 
 
-  // --- Dépenses ponctuelles (BRANCHÉES BACKEND — 29 juillet 2026) ---
-  // Dernier module de données à être passé de localStorage à l'API : la page
-  // existait, la route et le modèle Prisma aussi, mais rien ne les reliait.
-  // Écritures ouvertes à tout utilisateur authentifié (routes/expenses.ts ne
-  // pose pas de requireRole) — comportement conservé tel quel.
-  async getExpenses(): Promise<OneOffExpense[]> {
-    const expenses = await apiFetch<any[]>('/expenses');
-    return expenses.map(normalizeOneOffExpense);
-  }
-  async createExpense(expense: Omit<OneOffExpense, 'id'>): Promise<OneOffExpense> {
-    return normalizeOneOffExpense(await apiFetch('/expenses', { method: 'POST', body: JSON.stringify(expense) }));
-  }
-  async updateExpense(expense: OneOffExpense): Promise<OneOffExpense> {
-    return normalizeOneOffExpense(await apiFetch(`/expenses/${expense.id}`, { method: 'PUT', body: JSON.stringify(stripMeta(expense)) }));
-  }
-  async deleteExpense(id: string): Promise<void> {
-    await apiFetch(`/expenses/${id}`, { method: 'DELETE' });
-  }
+  // --- Dépenses ponctuelles : PAS de couche client ---
+  // La route /api/expenses et le modèle Prisma OneOffExpense existent mais sont
+  // DORMANTS (table vide). Une dépense ponctuelle se saisit dans la rubrique
+  // « Dépenses » (FixedExpense avec isAnnual = false) : le montant ne pèse que
+  // sur le mois de sa date, et ce modèle offre en plus le multi-sites, la
+  // répartition %/€, les marques et PRO+. Ne pas recréer de second chemin ici.
 
   // --- Fixed Expenses (BRANCHÉES BACKEND — étape 7.2) ---
   // CRUD unitaire ; isAnnual/alpineShare/budgetDistribution transitent BRUTS

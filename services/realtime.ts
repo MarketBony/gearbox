@@ -38,6 +38,10 @@ export const RT_EVENTS = {
     'equipment-booking:updated',
     'equipment-booking:deleted'
   ],
+  // Émis par le backend mais AUCUN écran ne les consomme : la route
+  // /api/expenses est dormante, les dépenses ponctuelles passent par
+  // FixedExpense (isAnnual = false). Conservé comme référence, au même titre
+  // que `contacts`.
   expenses: ['expense:created', 'expense:updated', 'expense:deleted'],
   fixedExpenses: ['fixed-expense:created', 'fixed-expense:updated', 'fixed-expense:deleted'],
   social: ['social:updated', 'social:deleted'],

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense, OneOffExpense } from '../types';
+import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense } from '../types';
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS } from '../constants';
@@ -396,7 +396,6 @@ const Dashboard: React.FC = () => {
   const [budgets, setBudgets] = useState<BudgetLine[]>([]);
   const [socialPosts, setSocialPosts] = useState<SocialPost[]>([]); // New State
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
-  const [oneOffExpenses, setOneOffExpenses] = useState<OneOffExpense[]>([]);
   const [loading, setLoading] = useState(true);
 
   // --- FILTER STATES ---
@@ -416,20 +415,18 @@ const Dashboard: React.FC = () => {
   // page reste affichée pendant le refetch).
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    const [pData, cData, bData, sData, feData, ooData] = await Promise.all([
+    const [pData, cData, bData, sData, feData] = await Promise.all([
       db.getProjects(),
       db.getCampaigns(),
       db.getBudgets(),
       db.getSocialPosts(),
-      db.getFixedExpenses(),
-      db.getExpenses()
+      db.getFixedExpenses()
     ]);
     setProjects(pData);
     setCampaigns(cData);
     setBudgets(bData);
     setSocialPosts(sData);
     setFixedExpenses(feData);
-    setOneOffExpenses(ooData);
     if (!silent) setLoading(false);
   }, []);
 
@@ -445,8 +442,7 @@ const Dashboard: React.FC = () => {
       ...RT_EVENTS.campaigns,
       ...RT_EVENTS.budget,
       ...RT_EVENTS.social,
-      ...RT_EVENTS.fixedExpenses,
-      ...RT_EVENTS.expenses
+      ...RT_EVENTS.fixedExpenses
     ],
     () => load(true)
   );
@@ -579,35 +575,45 @@ const Dashboard: React.FC = () => {
         }
     });
 
-    // 3bis. Process FIXED EXPENSES (Actuals) — même scope et même niveau de détail
-    // que les projets ci-dessus (site principal remappé, pas de routage bucket
-    // Alpine/Nissan ni de split par site : le Dashboard ne le fait pas pour les projets).
+    // 3bis. Process FIXED EXPENSES (Actuals) — VENTILÉES PAR SITE.
+    //
+    // Correctif du 29 juillet 2026. Avant, ce bloc testait `isSiteInScope(e.site)`
+    // sur le champ `site` brut. Or pour une dépense MULTI-SITES ce champ contient le
+    // libellé concaténé ("Clermont, Ussel, Mozac, …"), qui ne correspond à aucun site
+    // du filtre : la dépense était donc écartée en totalité dès qu'un périmètre était
+    // sélectionné. Mesuré avant correctif : périmètre Clermont → consommé 0 € au
+    // Dashboard, alors que Budget affichait 9 259 € pour ce même site.
+    //
+    // On ventile désormais par site avec la MÊME source de parts que Budget.tsx
+    // (bloc 4) : budgetDistribution si la dépense est multi-sites, sinon 100 % sur le
+    // site unique (repli legacy). Sans filtre, la somme des parts vaut 100 % → le
+    // total affiché est inchangé.
+    //
+    // Choix assumés, différents de Budget.tsx :
+    // - PAS de routage bucket Alpine/Nissan : Budget en a besoin pour placer le coût
+    //   dans la bonne LIGNE de son tableau ; ici on ne fait qu'un total comparé au
+    //   périmètre choisi, où le site réel est la bonne réponse — cohérent avec le
+    //   traitement des projets juste au-dessus.
+    // - pourcentages utilisés tels quels, sans renormalisation (comme Budget.tsx).
     fixedExpenses.forEach(e => {
         if (!isProPlusInScope(e.proPlus)) return;
-
-        let eSite = e.site;
-        if (eSite === 'Thiers' || eSite === 'Ambert') eSite = 'Ricoux';
-        if (eSite === 'Riom') eSite = 'Mozac';
-        if (!isSiteInScope(eSite)) return;
 
         const eBrands = e.brands || (e.brand ? [e.brand] : []);
         if (!isBrandInScope(eBrands)) return;
 
         if (!isServiceInScope([e.service])) return;
 
-        const cost = e.amount || 0;
-        if (cost === 0) return;
+        const totalCost = e.amount || 0;
+        if (totalCost === 0) return;
+
+        const siteShares: Record<string, number> =
+            (e.sites && e.sites.length > 0 && e.budgetDistribution)
+                ? e.budgetDistribution
+                : { [e.site as string]: 100 };
 
         const expDate = new Date(e.date);
         const expYear = expDate.getFullYear();
 
-        // Dépense ANNUELLE : même principe que l'agrégation Budget.tsx — le mois de
-        // expDate est ignoré, le montant contribue cost/12 sur chacun des 12 mois de
-        // l'année civile de référence. Dépense mensuelle : tout sur le mois de expDate.
-        const monthlyContributions = e.isAnnual
-            ? Array.from({ length: 12 }, (_, m) => ({ monthIdx: m, mCost: cost / 12 }))
-            : [{ monthIdx: expDate.getMonth(), mCost: cost }];
-
         let servicesToHit: string[] = [];
         if (e.service === 'Tous Services') {
             servicesToHit = ['VN', 'VO', 'APV', 'PR'];
@@ -615,71 +621,43 @@ const Dashboard: React.FC = () => {
             servicesToHit = [e.service];
         }
 
-        monthlyContributions.forEach(({ monthIdx, mCost }) => {
-            if (expYear === chartYear) {
-                monthlyTrend[monthIdx].reel += mCost;
-            }
+        Object.entries(siteShares).forEach(([rawSite, sharePct]) => {
+            if (sharePct <= 0) return;
 
-            // Fenêtre de période : la contribution mensuelle d'une annuelle est testée
-            // au 15 du mois (même convention que la section budgets ci-dessus) ;
-            // une mensuelle est testée sur sa date réelle, comme les projets.
-            const checkDate = e.isAnnual ? new Date(expYear, monthIdx, 15) : expDate;
-            if (checkDate >= dStart && checkDate <= dEnd) {
-                totalActual += mCost;
-                if (servicesToHit.length > 0) {
-                    const splitAmount = mCost / servicesToHit.length;
-                    servicesToHit.forEach(s => {
-                        if (serviceMix[s] !== undefined) serviceMix[s] += splitAmount;
-                    });
+            let eSite = rawSite;
+            if (eSite === 'Thiers' || eSite === 'Ambert') eSite = 'Ricoux';
+            if (eSite === 'Riom') eSite = 'Mozac';
+            if (!isSiteInScope(eSite)) return;
+
+            const cost = totalCost * (sharePct / 100);
+
+            // Dépense ANNUELLE : même principe que l'agrégation Budget.tsx — le mois de
+            // expDate est ignoré, le montant contribue cost/12 sur chacun des 12 mois de
+            // l'année civile de référence. Dépense mensuelle : tout sur le mois de expDate.
+            const monthlyContributions = e.isAnnual
+                ? Array.from({ length: 12 }, (_, m) => ({ monthIdx: m, mCost: cost / 12 }))
+                : [{ monthIdx: expDate.getMonth(), mCost: cost }];
+
+            monthlyContributions.forEach(({ monthIdx, mCost }) => {
+                if (expYear === chartYear) {
+                    monthlyTrend[monthIdx].reel += mCost;
                 }
-            }
+
+                // Fenêtre de période : la contribution mensuelle d'une annuelle est testée
+                // au 15 du mois (même convention que la section budgets ci-dessus) ;
+                // une mensuelle est testée sur sa date réelle, comme les projets.
+                const checkDate = e.isAnnual ? new Date(expYear, monthIdx, 15) : expDate;
+                if (checkDate >= dStart && checkDate <= dEnd) {
+                    totalActual += mCost;
+                    if (servicesToHit.length > 0) {
+                        const splitAmount = mCost / servicesToHit.length;
+                        servicesToHit.forEach(s => {
+                            if (serviceMix[s] !== undefined) serviceMix[s] += splitAmount;
+                        });
+                    }
+                }
+            });
         });
-    });
-
-    // 3ter. Process DÉPENSES PONCTUELLES (one-off) — même scope et même niveau de
-    // détail que les dépenses fixes ci-dessus, en plus simple : le modèle
-    // OneOffExpense n'a ni `isAnnual` (tout sur le mois de la dépense) ni marque.
-    // L'absence de marque est passée à isBrandInScope sous forme de tableau vide,
-    // exactement comme une dépense fixe sans marque : sans filtre marque actif
-    // elle compte, avec un filtre marque actif elle est écartée (on ne peut pas
-    // l'attribuer). Comportement cohérent avec l'existant, pas une règle inventée.
-    oneOffExpenses.forEach(e => {
-        if (!isProPlusInScope(e.proPlus)) return;
-
-        let eSite = e.site as string;
-        if (eSite === 'Thiers' || eSite === 'Ambert') eSite = 'Ricoux';
-        if (eSite === 'Riom') eSite = 'Mozac';
-        if (!isSiteInScope(eSite)) return;
-
-        if (!isBrandInScope([])) return;
-        if (!isServiceInScope([e.service])) return;
-
-        const cost = e.amount || 0;
-        if (cost === 0) return;
-
-        const expDate = new Date(e.date);
-        const monthIdx = expDate.getMonth();
-
-        let servicesToHit: string[] = [];
-        if (e.service === 'Tous Services') {
-            servicesToHit = ['VN', 'VO', 'APV', 'PR'];
-        } else if (['VN', 'VO', 'APV', 'PR'].includes(e.service)) {
-            servicesToHit = [e.service];
-        }
-
-        if (expDate.getFullYear() === chartYear) {
-            monthlyTrend[monthIdx].reel += cost;
-        }
-
-        if (expDate >= dStart && expDate <= dEnd) {
-            totalActual += cost;
-            if (servicesToHit.length > 0) {
-                const splitAmount = cost / servicesToHit.length;
-                servicesToHit.forEach(s => {
-                    if (serviceMix[s] !== undefined) serviceMix[s] += splitAmount;
-                });
-            }
-        }
     });
 
     let accReel = 0;
@@ -741,7 +719,7 @@ const Dashboard: React.FC = () => {
         upcomingPosts
     };
 
-  }, [projects, budgets, socialPosts, fixedExpenses, oneOffExpenses, dateStart, dateEnd, filterContexts, filterBrands, filterServices, filterProPlus]);
+  }, [projects, budgets, socialPosts, fixedExpenses, dateStart, dateEnd, filterContexts, filterBrands, filterServices, filterProPlus]);
 
   // --- RENDER HELPERS ---
   const formatCurrency = (val: number) => val.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });

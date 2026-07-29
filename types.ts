@@ -140,21 +140,13 @@ export interface EquipmentBooking {
   description: string;
 }
 
-// Dépense ponctuelle (hors projet). Aligné sur le modèle Prisma `OneOffExpense`
-// (backend/prisma/schema.prisma) et sur le contrat de /api/expenses.
-// Ne PAS confondre avec FixedExpense : pas de `isAnnual`, pas de `brands`, pas de
-// ventilation multi-sites — une dépense ponctuelle porte sur un site et un mois.
+// Pas d'interface pour les dépenses ponctuelles : elles se saisissent comme une
+// `FixedExpense` avec `isAnnual = false` (montant imputé sur le seul mois de sa
+// date). Le modèle Prisma `OneOffExpense` et la route /api/expenses existent
+// encore mais sont DORMANTS — ne pas les rebrancher sans en discuter, ce serait
+// un second chemin plus pauvre vers un besoin déjà couvert.
 // L'ancienne interface `Expense` (name/category/parentId, ère localStorage) a été
-// supprimée : aucun code ne l'utilisait, et sa forme divergeait de la base.
-export interface OneOffExpense {
-  id: string;
-  date: string; // 'yyyy-MM-dd' côté frontend (normalisé à la réception)
-  service: ServiceType;
-  site: Site | PlaqueName | 'GROUPE BONY';
-  comment?: string;
-  amount: number;
-  proPlus?: boolean;
-}
+// supprimée le 29/07/2026 : aucun code ne l'utilisait et sa forme divergeait.
 
 export interface FixedExpense {
   id: string;

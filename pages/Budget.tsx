@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { BudgetLine, ServiceType, BrandType, Project, PlaqueName, Site, FixedExpense, OneOffExpense } from '../types';
+import { BudgetLine, ServiceType, BrandType, Project, PlaqueName, Site, FixedExpense } from '../types';
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
@@ -197,7 +197,6 @@ const Budget: React.FC = () => {
   const [budgets, setBudgets] = useState<BudgetLine[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
-  const [oneOffExpenses, setOneOffExpenses] = useState<OneOffExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -244,17 +243,16 @@ const Budget: React.FC = () => {
   // Temps réel : le prévisionnel dépend des lignes de budget, des projets et
   // des dépenses fixes. `silent` = pas de squelette de chargement.
   useRealtimeSync(
-    [...RT_EVENTS.budget, ...RT_EVENTS.projects, ...RT_EVENTS.fixedExpenses, ...RT_EVENTS.expenses],
+    [...RT_EVENTS.budget, ...RT_EVENTS.projects, ...RT_EVENTS.fixedExpenses],
     () => loadData(true)
   );
 
   const loadData = async (silent = false) => {
     if (!silent) setLoading(true);
-    let [budgetData, projectData, fixedExpensesData, oneOffExpensesData] = await Promise.all([
+    let [budgetData, projectData, fixedExpensesData] = await Promise.all([
         db.getBudgets(),
         db.getProjects(),
-        db.getFixedExpenses(),
-        db.getExpenses()
+        db.getFixedExpenses()
     ]);
 
     // Migration silencieuse : buckets Alpine distincts par site + Nissan.
@@ -301,7 +299,6 @@ const Budget: React.FC = () => {
     setBudgets(budgetData);
     setProjects(projectData);
     setFixedExpenses(fixedExpensesData);
-    setOneOffExpenses(oneOffExpensesData);
     if (!silent) setLoading(false);
   };
 
@@ -580,50 +577,6 @@ const Budget: React.FC = () => {
           });
       });
 
-      // 4bis. Process DÉPENSES PONCTUELLES (one-off) — même logique que les
-      // dépenses fixes ci-dessus, en plus simple : le modèle OneOffExpense n'a ni
-      // `sites`/`budgetDistribution` (un seul site, 100 %), ni `brand` (donc pas
-      // de routage vers les buckets Alpine/Nissan), ni `isAnnual` (tout le
-      // montant sur le mois de la dépense).
-      // Le garde `if (!siteStats[targetSite]) return` écarte au passage les
-      // dépenses saisies sur 'GROUPE BONY' ou sur une plaque : conforme à la
-      // règle métier « Groupe/Holding ne remonte jamais dans le budget ».
-      oneOffExpenses.forEach(exp => {
-          if (!isProPlusInScope(exp.proPlus)) return;
-
-          let targetSite = exp.site as string;
-          if (targetSite === 'Thiers' || targetSite === 'Ambert') targetSite = 'Ricoux';
-          if (targetSite === 'Riom') targetSite = 'Mozac';
-          if (!siteStats[targetSite]) return;
-
-          const expDate = new Date(exp.date);
-          if (expDate.getFullYear() !== filterYear) return;
-
-          const cost = exp.amount || 0;
-          if (cost === 0) return;
-
-          let servicesToHit: string[] = [];
-          if (exp.service === 'Tous Services') {
-              servicesToHit = ['VN', 'VO', 'PR', 'APV'];
-          } else if (['VN', 'VO', 'PR', 'APV'].includes(exp.service)) {
-              servicesToHit = [exp.service];
-          }
-          if (servicesToHit.length === 0) return;
-
-          const monthIdx = expDate.getMonth();
-          if (monthIdx < filterMonthStart || monthIdx > filterMonthEnd) return;
-
-          const costPerSvc = cost / servicesToHit.length;
-          servicesToHit.forEach(svc => {
-              if (servicesToProcess.includes(svc as any)) {
-                  if (siteStats[targetSite].actual[svc] !== undefined) {
-                      siteStats[targetSite].actual[svc] += costPerSvc;
-                  }
-                  siteStats[targetSite].actualMonthly[monthIdx] += costPerSvc;
-              }
-          });
-      });
-
       // 5. Final Aggregation
       let finalForecastMonthly = new Array(12).fill(0);
       let finalActualMonthly = new Array(12).fill(0);
@@ -677,7 +630,7 @@ const Budget: React.FC = () => {
           totalForecast,
           totalActual
       };
-  }, [budgets, projects, fixedExpenses, oneOffExpenses, filterSites, filterBrands, filterServices, filterYear, filterMonthStart, filterMonthEnd, filterProPlus]);
+  }, [budgets, projects, fixedExpenses, filterSites, filterBrands, filterServices, filterYear, filterMonthStart, filterMonthEnd, filterProPlus]);
 
 
   // --- RENDERERS ---

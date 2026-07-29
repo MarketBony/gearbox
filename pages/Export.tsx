@@ -153,7 +153,7 @@ const Export: React.FC = () => {
       styleSheet(wsProj, projHeaders, [34, 22, 18, 16, 16, 12, 8, 12, 12, 18, 16, 14, 50], [9, 10]);
       XLSX.utils.book_append_sheet(wb, wsProj, 'Projets');
 
-      // ---- Onglet Dépenses Fixes ----
+      // ---- Onglet Dépenses ----
       const expHeaders = ['Date', 'Site(s)', 'Marque(s)', 'Service', 'Commentaire', 'Montant', 'PRO+'];
       const expData = expInRange.map(e => [
         fmtDateFr(e.date),
@@ -166,7 +166,7 @@ const Export: React.FC = () => {
       ]);
       const wsExp = XLSX.utils.aoa_to_sheet([expHeaders, ...expData]);
       styleSheet(wsExp, expHeaders, [12, 22, 18, 14, 50, 16, 8], [5]);
-      XLSX.utils.book_append_sheet(wb, wsExp, 'Dépenses Fixes');
+      XLSX.utils.book_append_sheet(wb, wsExp, 'Dépenses');
 
       const fileName = `GEARBOX_Export_${from || 'debut'}_${to || 'fin'}.xlsx`;
       XLSX.writeFile(wb, fileName);
@@ -223,8 +223,8 @@ const Export: React.FC = () => {
               </div>
             </div>
             <p className="text-[11px] text-bony-muted mt-2 leading-relaxed">
-              Les <strong>projets</strong> sont filtrés sur leur date de début, les <strong>dépenses fixes</strong> sur leur date.
-              Le fichier contient 2 onglets : <em>Projets</em> et <em>Dépenses Fixes</em>.
+              Les <strong>projets</strong> sont filtrés sur leur date de début, les <strong>dépenses</strong> sur leur date.
+              Le fichier contient 2 onglets : <em>Projets</em> et <em>Dépenses</em>.
             </p>
           </div>
 
