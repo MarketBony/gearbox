@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { OneOffExpense, ServiceType, Site, PlaqueName } from '../types';
 import { db } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Trash2, Edit, Save, X, Filter, Calendar, CreditCard, Search } from 'lucide-react';
 import { SITES, SERVICES, PLAQUES_STRUCTURE } from '../constants';
@@ -35,15 +36,20 @@ const Expenses: React.FC = () => {
     loadData();
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
+  // Temps réel : les dépenses ponctuelles créées/modifiées/supprimées par les
+  // autres utilisateurs apparaissent sans rechargement. `silent` évite le
+  // squelette de chargement à chaque événement reçu.
+  useRealtimeSync(RT_EVENTS.expenses, () => loadData(true));
+
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await db.getExpenses();
       setExpenses(data);
     } catch (error) {
       console.error("Failed to load expenses", error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -79,21 +85,31 @@ const Expenses: React.FC = () => {
     e.preventDefault();
     if (!formData.date || !formData.service || !formData.site || formData.amount === undefined) return;
 
-    const payload: OneOffExpense = {
-      id: editingExpense ? editingExpense.id : `temp-${Date.now()}`,
-      date: new Date(formData.date).toISOString(),
+    // La date reste en 'yyyy-MM-dd' : le backend la convertit (new Date(...)) et
+    // dataService la renormalise à la lecture. Pas de conversion ISO ici, qui
+    // introduirait un décalage de fuseau sur les dates sans heure.
+    const payload = {
+      date: formData.date,
       service: formData.service as ServiceType,
       site: formData.site as Site | PlaqueName | 'GROUPE BONY',
       amount: Number(formData.amount),
-      comment: formData.comment
+      comment: formData.comment,
+      proPlus: formData.proPlus ?? false
     };
 
     try {
-      await db.saveExpense(payload);
+      // Création : l'id est généré par la base (plus d'id `temp-` inventé côté
+      // client, qui n'aurait jamais correspondu à la ligne réelle).
+      if (editingExpense) {
+        await db.updateExpense({ ...payload, id: editingExpense.id });
+      } else {
+        await db.createExpense(payload);
+      }
       await loadData();
       handleCloseModal();
     } catch (error) {
       console.error("Failed to save expense", error);
+      alert("Échec de l'enregistrement de la dépense (serveur injoignable ?).");
     }
   };
 

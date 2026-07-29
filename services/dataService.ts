@@ -1,5 +1,5 @@
 
-import { Project, Campaign, Equipment, EquipmentBooking, Expense, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog } from '../types';
+import { Project, Campaign, Equipment, EquipmentBooking, OneOffExpense, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog } from '../types';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
 
@@ -90,6 +90,10 @@ const normalizeSocialPost = (p: any): SocialPost => ({
   ...p,
   date: toDay(p.date)
 });
+const normalizeOneOffExpense = (e: any): OneOffExpense => ({
+  ...e,
+  date: toDay(e.date)
+});
 // Le backend génère les ids et gère createdAt/updatedAt : on ne les renvoie
 // pas dans les corps de mutation (les routes social/campaigns passent le body
 // brut à Prisma).
@@ -124,7 +128,7 @@ class DataService {
     if (!localStorage.getItem('gearbox_projects')) {
       localStorage.setItem('gearbox_projects', JSON.stringify(MOCK_PROJECTS));
       localStorage.setItem('gearbox_campaigns', JSON.stringify([]));
-      localStorage.setItem('gearbox_expenses', JSON.stringify([]));
+      // plus de 'gearbox_expenses' : les dépenses ponctuelles viennent de l'API
       localStorage.setItem('gearbox_budgets', JSON.stringify(INITIAL_BUDGET_SCENARIO));
     }
     // Ensure budgets exist if adding this feature later
@@ -266,9 +270,24 @@ class DataService {
   }
 
 
-  // --- Expenses (Actuals) ---
-  async getExpenses(): Promise<Expense[]> { return this.get('expenses'); }
-  async saveExpenses(expenses: Expense[]) { await this.save('expenses', expenses); }
+  // --- Dépenses ponctuelles (BRANCHÉES BACKEND — 29 juillet 2026) ---
+  // Dernier module de données à être passé de localStorage à l'API : la page
+  // existait, la route et le modèle Prisma aussi, mais rien ne les reliait.
+  // Écritures ouvertes à tout utilisateur authentifié (routes/expenses.ts ne
+  // pose pas de requireRole) — comportement conservé tel quel.
+  async getExpenses(): Promise<OneOffExpense[]> {
+    const expenses = await apiFetch<any[]>('/expenses');
+    return expenses.map(normalizeOneOffExpense);
+  }
+  async createExpense(expense: Omit<OneOffExpense, 'id'>): Promise<OneOffExpense> {
+    return normalizeOneOffExpense(await apiFetch('/expenses', { method: 'POST', body: JSON.stringify(expense) }));
+  }
+  async updateExpense(expense: OneOffExpense): Promise<OneOffExpense> {
+    return normalizeOneOffExpense(await apiFetch(`/expenses/${expense.id}`, { method: 'PUT', body: JSON.stringify(stripMeta(expense)) }));
+  }
+  async deleteExpense(id: string): Promise<void> {
+    await apiFetch(`/expenses/${id}`, { method: 'DELETE' });
+  }
 
   // --- Fixed Expenses (BRANCHÉES BACKEND — étape 7.2) ---
   // CRUD unitaire ; isAnnual/alpineShare/budgetDistribution transitent BRUTS

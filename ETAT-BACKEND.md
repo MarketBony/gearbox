@@ -17,7 +17,12 @@ Migrations Prisma appliquées sur Supabase : `20260706160559_init` + `2026070811
 6. **Campagnes** — `/api/campaigns` CRUD.
 7. **Digital / Social** — `/api/social` CRUD ; `mediaFiles` = URLs de fichiers uploadés (voir Uploads).
 8. **Journal d'activité** — `/api/activity-log` (GET plafonné 200, POST fire-and-forget, Master non journalisé).
-9. **Chat** — `/api/chat` REST (chargement) + Socket.IO temps réel (`chat:message:send/edit/delete/react`,
+9. **Dépenses ponctuelles** — `/api/expenses` CRUD (modèle Prisma `OneOffExpense` :
+   date, service, site, comment?, amount, proPlus). Branché le 29 juillet 2026 —
+   c'était le dernier module encore sur localStorage, la route existait déjà mais
+   la page n'était routée nulle part. Écritures ouvertes à tout utilisateur
+   authentifié (pas de `requireRole`, comportement d'origine conservé).
+10. **Chat** — `/api/chat` REST (chargement) + Socket.IO temps réel (`chat:message:send/edit/delete/react`,
    `chat:conversation:read` → `chat:message:new/updated`, `chat:conversation:updated/created`). Chat
    Général = appartenance implicite (seed idempotent, non-External).
 

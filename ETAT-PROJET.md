@@ -107,6 +107,36 @@
    nginx. Syntaxe validée dans un conteneur nginx jetable **avant** déploiement
    (une config invalide empêcherait `web` de démarrer et couperait le site).
 
+10. **Dépenses ponctuelles branchées, rubrique créée** (`feat/expenses-branchement`,
+    29 juillet). `pages/Expenses.tsx` existait mais n'était **routée nulle part** :
+    code mort inatteignable, alors que la route `/api/expenses` et le modèle
+    Prisma `OneOffExpense` existaient déjà et fonctionnaient. C'était le dernier
+    module de données encore sur localStorage.
+    - `types.ts` : ajout de `OneOffExpense` (aligné sur le modèle Prisma) et
+      **suppression** de l'ancienne interface `Expense` (name/category/parentId,
+      ère localStorage) — forme divergente, plus aucun code ne l'utilisait.
+    - `dataService.ts` : `getExpenses` bascule sur `/api/expenses` + ajout de
+      `createExpense`/`updateExpense`/`deleteExpense`, avec normalisation de date
+      (`normalizeOneOffExpense`). Suppression de `saveExpenses` (localStorage).
+    - La page ne fabrique plus d'id `temp-...` : POST pour créer, PUT pour
+      modifier, l'id vient de la base. Date envoyée en `yyyy-MM-dd` sans
+      conversion ISO, qui décalait d'un fuseau une date sans heure.
+    - Routage : `case 'expenses'` dans `App.tsx` + entrée « Dépenses Ponctuelles »
+      dans le groupe OUTILS de la Sidebar (icône CreditCard), visible partout sauf
+      pour les comptes External. Droits inchangés : tout utilisateur authentifié
+      peut saisir (`routes/expenses.ts` ne pose pas de `requireRole`).
+    - **Agrégation budgétaire** : les dépenses ponctuelles comptent désormais dans
+      le consommé de `Budget.tsx` (bloc « 4bis ») et de `Dashboard.tsx` (bloc
+      « 3ter »), sur le même motif que les dépenses fixes mais en plus simple
+      (un seul site à 100 %, pas de marque donc pas de routage bucket
+      Alpine/Nissan, pas d'`isAnnual`). Le garde `if (!siteStats[targetSite])`
+      écarte au passage les dépenses saisies sur 'GROUPE BONY' ou une plaque —
+      conforme à la règle « Groupe/Holding ne remonte jamais dans le budget ».
+    - Vérifié en base réelle : dépense de 1 234 € (Clermont/VN) → consommé
+      Dashboard 185 184 → 186 418 €, ligne Clermont du Budget 10 493 → 9 259 € à
+      la suppression, et colonne VN seule impactée (−1 234). Les deux écrans se
+      sont mis à jour **sans rechargement** (temps réel). Donnée de test supprimée.
+
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - **Catalogue matériel dupliqué en base** : 16 noms uniques mais 32 lignes, chaque
   équipement en double depuis le 8 juillet ~22:07 (double exécution de
