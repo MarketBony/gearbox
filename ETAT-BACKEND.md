@@ -17,12 +17,7 @@ Migrations Prisma appliquées sur Supabase : `20260706160559_init` + `2026070811
 6. **Campagnes** — `/api/campaigns` CRUD.
 7. **Digital / Social** — `/api/social` CRUD ; `mediaFiles` = URLs de fichiers uploadés (voir Uploads).
 8. **Journal d'activité** — `/api/activity-log` (GET plafonné 200, POST fire-and-forget, Master non journalisé).
-9. **Dépenses ponctuelles** — `/api/expenses` CRUD (modèle Prisma `OneOffExpense` :
-   date, service, site, comment?, amount, proPlus). Branché le 29 juillet 2026 —
-   c'était le dernier module encore sur localStorage, la route existait déjà mais
-   la page n'était routée nulle part. Écritures ouvertes à tout utilisateur
-   authentifié (pas de `requireRole`, comportement d'origine conservé).
-10. **Chat** — `/api/chat` REST (chargement) + Socket.IO temps réel (`chat:message:send/edit/delete/react`,
+9. **Chat** — `/api/chat` REST (chargement) + Socket.IO temps réel (`chat:message:send/edit/delete/react`,
    `chat:conversation:read` → `chat:message:new/updated`, `chat:conversation:updated/created`). Chat
    Général = appartenance implicite (seed idempotent, non-External).
 
@@ -30,6 +25,19 @@ Le frontend utilise la couche unique `services/dataService.ts` (`apiFetch` + JWT
 `localStorage` **assumés et hors périmètre** (pas des données serveur) : overlay client-only chat
 (épingle / renommage / membres de groupe), avatars de groupe du chat, prefs UI (ville/anniversaire),
 et fallback des anciennes photos de profil base64 (avant bascule uploads).
+
+## ⚠️ Route DORMANTE — `/api/expenses` (modèle `OneOffExpense`)
+
+Route CRUD complète et fonctionnelle (émissions `expense:*` incluses), mais
+**aucun écran ne l'utilise et la table est vide**. Les dépenses ponctuelles se
+saisissent comme une `FixedExpense` avec `isAnnual = false` : le montant n'est
+imputé que sur le mois de sa date, et ce modèle offre en plus le multi-sites, la
+répartition %/€, les marques et PRO+.
+
+Une rubrique dédiée a été créée puis retirée le 29 juillet 2026 : c'était un
+second chemin plus pauvre vers un besoin déjà couvert (voir correctif 10 dans
+`ETAT-PROJET.md`). **Ne pas rebrancher sans arbitrage produit.** Route et modèle
+conservés en l'état, sans migration.
 
 ## ✅ Uploads de fichiers (`feat/backend-uploads`) — vérifiés en base + sur disque
 

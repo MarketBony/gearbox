@@ -107,35 +107,44 @@
    nginx. Syntaxe validée dans un conteneur nginx jetable **avant** déploiement
    (une config invalide empêcherait `web` de démarrer et couperait le site).
 
-10. **Dépenses ponctuelles branchées, rubrique créée** (`feat/expenses-branchement`,
-    29 juillet). `pages/Expenses.tsx` existait mais n'était **routée nulle part** :
-    code mort inatteignable, alors que la route `/api/expenses` et le modèle
-    Prisma `OneOffExpense` existaient déjà et fonctionnaient. C'était le dernier
-    module de données encore sur localStorage.
-    - `types.ts` : ajout de `OneOffExpense` (aligné sur le modèle Prisma) et
-      **suppression** de l'ancienne interface `Expense` (name/category/parentId,
-      ère localStorage) — forme divergente, plus aucun code ne l'utilisait.
-    - `dataService.ts` : `getExpenses` bascule sur `/api/expenses` + ajout de
-      `createExpense`/`updateExpense`/`deleteExpense`, avec normalisation de date
-      (`normalizeOneOffExpense`). Suppression de `saveExpenses` (localStorage).
-    - La page ne fabrique plus d'id `temp-...` : POST pour créer, PUT pour
-      modifier, l'id vient de la base. Date envoyée en `yyyy-MM-dd` sans
-      conversion ISO, qui décalait d'un fuseau une date sans heure.
-    - Routage : `case 'expenses'` dans `App.tsx` + entrée « Dépenses Ponctuelles »
-      dans le groupe OUTILS de la Sidebar (icône CreditCard), visible partout sauf
-      pour les comptes External. Droits inchangés : tout utilisateur authentifié
-      peut saisir (`routes/expenses.ts` ne pose pas de `requireRole`).
-    - **Agrégation budgétaire** : les dépenses ponctuelles comptent désormais dans
-      le consommé de `Budget.tsx` (bloc « 4bis ») et de `Dashboard.tsx` (bloc
-      « 3ter »), sur le même motif que les dépenses fixes mais en plus simple
-      (un seul site à 100 %, pas de marque donc pas de routage bucket
-      Alpine/Nissan, pas d'`isAnnual`). Le garde `if (!siteStats[targetSite])`
-      écarte au passage les dépenses saisies sur 'GROUPE BONY' ou une plaque —
-      conforme à la règle « Groupe/Holding ne remonte jamais dans le budget ».
-    - Vérifié en base réelle : dépense de 1 234 € (Clermont/VN) → consommé
-      Dashboard 185 184 → 186 418 €, ligne Clermont du Budget 10 493 → 9 259 € à
-      la suppression, et colonne VN seule impactée (−1 234). Les deux écrans se
-      sont mis à jour **sans rechargement** (temps réel). Donnée de test supprimée.
+10. **Rubrique « Dépenses Ponctuelles » : créée puis RETIRÉE le même jour** —
+    erreur de conception assumée, à ne pas refaire. La page `pages/Expenses.tsx`
+    (présente depuis `1c2c037 v1 originale`, jamais routée, formulaire minimal
+    date/montant/site unique/service/commentaire) a été branchée et routée, alors
+    que **`FixedExpense` avec `isAnnual = false` produit déjà exactement une
+    dépense ponctuelle** (montant imputé sur le seul mois de sa date), avec en
+    plus le multi-sites, la répartition %/€, les marques + routage Alpine/Nissan,
+    `alpineShare` et PRO+. C'était donc un second chemin, plus pauvre, vers un
+    besoin déjà couvert. Retiré dans `fix/dashboard-ventilation-depenses` :
+    `pages/Expenses.tsx` supprimée, routage et entrée Sidebar retirés, blocs
+    d'agrégation `4bis`/`3ter` retirés, méthodes `dataService` et type
+    `OneOffExpense` supprimés. Route `/api/expenses` et modèle Prisma laissés
+    **dormants** (table vide, aucune migration) — ne pas les rebrancher.
+
+11. **Les dépenses fixes multi-sites ne remontaient pas dans le Dashboard**
+    (`fix/dashboard-ventilation-depenses`, 29 juillet) — **le vrai bug de la
+    journée**, signalé par Théo.
+    - Symptôme : dès qu'un périmètre était sélectionné, le consommé du Dashboard
+      tombait à 0 € alors que Budget affichait le bon montant pour le même site.
+    - Cause : pour une dépense multi-sites, le champ `site` contient le libellé
+      **concaténé** (`"Clermont, Ussel, Mozac, …"`), et `isSiteInScope` fait un
+      `filterContexts.includes(site)` → aucune correspondance possible, la
+      dépense était écartée **en totalité**. `Dashboard.tsx` n'utilisait ni
+      `sites[]` ni `budgetDistribution`.
+    - Correctif : le bloc `3bis` ventile désormais par site avec la **même source
+      de parts que `Budget.tsx`** (`budgetDistribution` si multi-sites, sinon
+      100 % sur le site unique). Deux écarts volontaires avec Budget, commentés
+      dans le code : pas de routage bucket Alpine/Nissan (Budget en a besoin pour
+      choisir une *ligne* de tableau, le Dashboard ne fait qu'un total), et
+      pourcentages utilisés sans renormalisation.
+    - Mesuré : Clermont 0 € → **9 259 €** (identique à Budget), Albi **9 259 €**,
+      et total sans filtre **inchangé à 185 184 €** (non-régression).
+    - Rubrique « Dépenses Fixes » **renommée « Dépenses »** (libellés seulement,
+      l'id `'fixed-expenses'` est conservé : il sert de clé `sessionStorage` et de
+      cible de navigation depuis le fil d'actualité), et la case « Annuelle » du
+      formulaire remplacée par un sélecteur **Ponctuelle | Annuelle** sur le même
+      booléen — c'est l'absence de cette indication qui avait fait croire que le
+      cas ponctuel n'était pas couvert.
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - **Catalogue matériel dupliqué en base** : 16 noms uniques mais 32 lignes, chaque
