@@ -3,6 +3,7 @@ import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense } from '../types';
 import { db } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS } from '../constants';
 import {
   TrendingUp,
@@ -410,25 +411,41 @@ const Dashboard: React.FC = () => {
 
   const scrollRef = useScrollRestore('dashboard', !loading);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const [pData, cData, bData, sData, feData] = await Promise.all([
-        db.getProjects(),
-        db.getCampaigns(),
-        db.getBudgets(),
-        db.getSocialPosts(),
-        db.getFixedExpenses()
-      ]);
-      setProjects(pData);
-      setCampaigns(cData);
-      setBudgets(bData);
-      setSocialPosts(sData);
-      setFixedExpenses(feData);
-      setLoading(false);
-    };
-    load();
+  // `silent` : rafraîchissement temps réel (aucun squelette de chargement, la
+  // page reste affichée pendant le refetch).
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    const [pData, cData, bData, sData, feData] = await Promise.all([
+      db.getProjects(),
+      db.getCampaigns(),
+      db.getBudgets(),
+      db.getSocialPosts(),
+      db.getFixedExpenses()
+    ]);
+    setProjects(pData);
+    setCampaigns(cData);
+    setBudgets(bData);
+    setSocialPosts(sData);
+    setFixedExpenses(feData);
+    if (!silent) setLoading(false);
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Temps réel : le Dashboard agrège 5 ressources, il se rafraîchit dès que
+  // l'une d'elles bouge chez un autre utilisateur.
+  useRealtimeSync(
+    [
+      ...RT_EVENTS.projects,
+      ...RT_EVENTS.campaigns,
+      ...RT_EVENTS.budget,
+      ...RT_EVENTS.social,
+      ...RT_EVENTS.fixedExpenses
+    ],
+    () => load(true)
+  );
 
   // --- NAVIGATION HELPER ---
   const handleNavigateToProject = (projectId: string) => {

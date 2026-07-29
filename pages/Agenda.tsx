@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSessionState } from '../hooks/useSessionState';
 import { db } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { Project, ServiceType, BrandType, ProjectType } from '../types';
 import { SERVICE_COLORS, BRANDS, SERVICES, PROJECT_TYPES, BRAND_COLORS } from '../constants';
 import { ChevronLeft, ChevronRight, Calendar, Filter, X } from 'lucide-react';
@@ -218,13 +219,17 @@ const Agenda: React.FC = () => {
   const [filterService, setFilterService] = useSessionState<ServiceType | 'All'>('agenda_filterService', 'All');
   const [filterType, setFilterType] = useSessionState<ProjectType | 'All'>('agenda_filterType', 'All');
 
+  const loadProjects = async () => {
+      const data = await db.getProjects();
+      setProjects(data);
+  };
+
   useEffect(() => {
-    const load = async () => {
-        const data = await db.getProjects();
-        setProjects(data);
-    };
-    load();
+    loadProjects();
   }, []);
+
+  // Temps réel : le planning est une vue des projets.
+  useRealtimeSync(RT_EVENTS.projects, () => loadProjects());
 
   const filteredProjects = useMemo(() => {
       return projects.filter(p => {

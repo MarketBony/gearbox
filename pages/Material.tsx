@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { db, ApiError } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { Equipment, EquipmentBooking, Site, ServiceType, BrandType, ActivityLog } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { Plus, Calendar, Package, Trash2, Edit, ChevronLeft, ChevronRight, Search, Filter, X, AlertCircle } from 'lucide-react';
@@ -112,14 +113,23 @@ const Material: React.FC = () => {
         }
     }, [currentBooking.equipmentId, currentBooking.startDate, currentBooking.endDate, isBookingModalOpen, bookings]);
 
-    const loadData = async () => {
-        setLoading(true);
+    // `silent` : rafraîchissement temps réel, sans squelette de chargement.
+    const loadData = async (silent = false) => {
+        if (!silent) setLoading(true);
         const eq = await db.getEquipment();
         const bk = await db.getEquipmentBookings();
         setEquipment(eq);
         setBookings(bk);
-        setLoading(false);
+        if (!silent) setLoading(false);
     };
+
+    // Temps réel : catalogue matériel + réservations. Important ici, le calcul
+    // de disponibilité se fait côté client à partir de `bookings` — une liste
+    // périmée fait proposer un créneau déjà réservé par quelqu'un d'autre.
+    useRealtimeSync(
+        [...RT_EVENTS.equipment, ...RT_EVENTS.equipmentBookings],
+        () => loadData(true)
+    );
 
     const getAvailability = (equipmentId: string, startDateStr: string, endDateStr: string, excludeBookingId?: string) => {
         const start = normalizeDate(startDateStr);

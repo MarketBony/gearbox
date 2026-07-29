@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Sparkles, RefreshCw, MapPin, Music, Cake, Play, Pause,
   Cloud, ExternalLink, Loader2, ArrowUpRight, CalendarDays, Cookie, Car, Lightbulb
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import Avatar from '../components/Avatar';
 import { User, Project } from '../types';
 
@@ -822,8 +823,7 @@ const BirthdaysSection: React.FC = () => {
   const [entries, setEntries] = useState<BirthdayEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
+  const load = useCallback(async () => {
       const users = await db.getUsers();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -843,8 +843,12 @@ const BirthdaysSection: React.FC = () => {
       result.sort((a, b) => a.daysUntil - b.daysUntil);
       setEntries(result);
       setLoading(false);
-    })();
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Temps réel : un collègue ajouté ou supprimé change la liste.
+  useRealtimeSync(RT_EVENTS.users, load);
 
   return (
     <div className="gx-card p-0 overflow-hidden h-48 flex flex-col">
@@ -917,8 +921,7 @@ const NextEventSection: React.FC = () => {
     return Math.ceil((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   };
 
-  useEffect(() => {
-    (async () => {
+  const load = useCallback(async () => {
       const all = await db.getProjects();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -938,8 +941,12 @@ const NextEventSection: React.FC = () => {
 
       setProjects(upcoming);
       setLoading(false);
-    })();
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Temps réel : les 3 prochains événements suivent les projets.
+  useRealtimeSync(RT_EVENTS.projects, load);
 
   // Rafraîchit le compteur chaque minute
   useEffect(() => {
@@ -1045,8 +1052,7 @@ const ViennoiseriesSection: React.FC = () => {
   const [weekNumber,   setWeekNumber]   = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    (async () => {
+  const load = useCallback(async () => {
       const users = await db.getUsers();
       const eligible = users.filter(u => VIENNOISERIES_ROLES.includes(u.role));
       if (eligible.length === 0) { setLoading(false); return; }
@@ -1072,8 +1078,12 @@ const ViennoiseriesSection: React.FC = () => {
       }
       setHistory(hist);
       setLoading(false);
-    })();
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Temps réel : la désignation est tirée de la liste des rôles éligibles.
+  useRealtimeSync(RT_EVENTS.users, load);
 
   // Bounce à l'apparition
   useEffect(() => {

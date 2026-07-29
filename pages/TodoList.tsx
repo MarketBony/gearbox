@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import DatePicker from '../components/DatePicker';
 import { db } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { Project, Task, TaskStatus, BrandType, ServiceType, PlaqueName } from '../types';
 import { BRAND_COLORS, SERVICE_COLORS, PLAQUES_STRUCTURE, BRANDS, SERVICES } from '../constants';
 
@@ -338,9 +339,12 @@ const TodoList: React.FC = () => {
 
   useEffect(() => {
     loadTasks();
-    const interval = setInterval(loadTasks, 30000);
-    return () => clearInterval(interval);
   }, [loadTasks]);
+
+  // Temps réel : les tâches affichées sont celles des projets. Remplace le
+  // polling toutes les 30 s qui compensait l'absence de temps réel — la mise à
+  // jour est maintenant immédiate, et sans requête quand rien ne bouge.
+  useRealtimeSync(RT_EVENTS.projects, () => loadTasks());
 
   // ---- Update task status ----
   const moveTask = useCallback(async (taskId: string, projectId: string, newStatus: TaskStatus) => {

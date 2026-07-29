@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { User } from '../types';
 import { GameChallenge, GameSession, GameType } from '../components/games/gameTypes';
 import Avatar from '../components/Avatar';
@@ -730,12 +731,24 @@ const Games: React.FC = () => {
     setSessions(loadSessions());
   }, []);
 
+  const loadUsers = useCallback(() => {
+    db.getUsers()
+      .then(all => setUsers(all.filter(u => GAMES_ALLOWED_ROLES.includes(u.role))))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
-    db.getUsers().then(all => setUsers(all.filter(u => GAMES_ALLOWED_ROLES.includes(u.role))));
+    loadUsers();
     refresh();
+    // Le polling 3 s reste nécessaire : défis et sessions vivent dans
+    // localStorage (pas de modèle serveur), le socket ne peut rien y faire.
     const interval = setInterval(refresh, 3000);
     return () => clearInterval(interval);
-  }, [refresh]);
+  }, [refresh, loadUsers]);
+
+  // Temps réel : seule la liste des joueurs vient du serveur — un collègue
+  // créé ou supprimé apparaît/disparaît sans rechargement.
+  useRealtimeSync(RT_EVENTS.users, loadUsers);
 
   const myPendingReceived = challenges.filter(c => c.toUserId === myId && c.status === 'pending');
   const myPendingSent = challenges.filter(c => c.fromUserId === myId && c.status === 'pending');

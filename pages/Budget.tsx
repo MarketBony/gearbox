@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { BudgetLine, ServiceType, BrandType, Project, PlaqueName, Site, FixedExpense } from '../types';
 import { db } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, ChevronDown, ChevronRight, Calculator, PieChart, TrendingUp, TrendingDown, AlertTriangle, Filter, Coins, Calendar, Lock, Search, X, Check } from 'lucide-react';
 import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES } from '../constants';
@@ -239,8 +240,15 @@ const Budget: React.FC = () => {
     loadData();
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
+  // Temps réel : le prévisionnel dépend des lignes de budget, des projets et
+  // des dépenses fixes. `silent` = pas de squelette de chargement.
+  useRealtimeSync(
+    [...RT_EVENTS.budget, ...RT_EVENTS.projects, ...RT_EVENTS.fixedExpenses],
+    () => loadData(true)
+  );
+
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     let [budgetData, projectData, fixedExpensesData] = await Promise.all([
         db.getBudgets(),
         db.getProjects(),
@@ -268,7 +276,12 @@ const Budget: React.FC = () => {
                     APV: new Array(12).fill(0)
                 }
             }));
-            if (canEditProvisions) {
+            // Jamais sur un rafraîchissement temps réel : ces écritures émettent
+            // 'budget:updated', qui redéclencherait ce même loadData — la
+            // migration n'a de sens qu'au montage. La fusion en mémoire
+            // ci-dessous reste appliquée dans tous les cas (affichage cohérent
+            // pour les lecteurs, qui n'écrivent jamais).
+            if (canEditProvisions && !silent) {
                 try {
                     // Upsert des seules nouvelles lignes + purge du bucket générique en base.
                     for (const line of newEntries) await db.upsertBudget(line as any);
@@ -286,7 +299,7 @@ const Budget: React.FC = () => {
     setBudgets(budgetData);
     setProjects(projectData);
     setFixedExpenses(fixedExpensesData);
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
   // Sauvegarde optimiste : état local complet, mais UNE seule requête —

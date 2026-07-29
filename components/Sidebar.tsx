@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import Avatar from './Avatar';
 import { db } from '../services/dataService';
 import { chatStore } from '../services/chatStore';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { ActivityLog } from '../types';
 import {
   LayoutDashboard,
@@ -92,6 +93,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
       clearInterval(gamesInterval);
     };
   }, []);
+
+  // Temps réel du journal d'activité : 'gearbox-activity-updated' ci-dessus est
+  // un événement window, donc limité à l'onglet qui a écrit. La cloche ne
+  // montrait l'activité des autres utilisateurs qu'après un rechargement.
+  useRealtimeSync(RT_EVENTS.activity, loadActivity);
 
   const openActivity = () => {
     setShowActivity(true);

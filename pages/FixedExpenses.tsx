@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { FixedExpense, ServiceType, Site, PlaqueName, BrandType, ActivityLog } from '../types';
 import { db } from '../services/dataService';
+import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN } from '../constants';
 import { Plus, Trash2, Edit2, Save, X, Search, Filter, Euro, Calendar, MapPin, MessageSquare, Briefcase, ArrowUp, ArrowDown, ChevronDown, Check, PieChart } from 'lucide-react';
@@ -38,6 +39,10 @@ const FixedExpenses: React.FC = () => {
     useEffect(() => {
         loadExpenses();
     }, []);
+
+    // Temps réel : dépenses fixes (pas d'indicateur de chargement sur cette
+    // page, le refetch est donc déjà silencieux).
+    useRealtimeSync(RT_EVENTS.fixedExpenses, () => loadExpenses());
 
     const loadExpenses = async () => {
         const data = await db.getFixedExpenses();
