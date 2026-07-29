@@ -310,8 +310,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                           {/* flex-1 + min-w-0 : le libellé occupe la place restante et
                               se tronque, ce qui pousse la présence à droite sans jamais
                               la faire déborder (recette standard, plus fiable que ml-auto
-                              qui n'empêche pas le débordement). */}
-                          <span className={`flex-1 min-w-0 text-[13px] font-medium truncate ${isActive ? 'font-semibold' : ''}`}>
+                              qui n'empêche pas le débordement).
+                              text-left OBLIGATOIRE : un <button> est centré par défaut
+                              (UA stylesheet). Sans flex-1 le span faisait la largeur du
+                              texte et ça ne se voyait pas ; avec flex-1 il est plus large,
+                              donc le texte se centrait. */}
+                          <span className={`flex-1 min-w-0 text-left text-[13px] font-medium truncate ${isActive ? 'font-semibold' : ''}`}>
                             {item.label}
                           </span>
                           <span className="shrink-0">
