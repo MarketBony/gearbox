@@ -30,7 +30,8 @@ import {
   Sparkles,
   Gamepad2,
   CheckSquare,
-  FileSpreadsheet
+  FileSpreadsheet,
+  CreditCard
 } from 'lucide-react';
 
 const relativeTime = (iso: string): string => {
@@ -174,6 +175,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     { id: 'agenda', icon: CalendarDays, label: 'Agenda' },
     { id: 'budget', icon: PiggyBank, label: 'Budget' },
     { id: 'fixed-expenses', icon: Euro, label: 'Dépenses Fixes' },
+    { id: 'expenses', icon: CreditCard, label: 'Dépenses Ponctuelles' },
     ...(canExport ? [{ id: 'export', icon: FileSpreadsheet, label: 'Export' }] : []),
   ];
 
@@ -255,6 +257,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                   items: [
                     { id: 'budget', icon: PiggyBank, label: 'Budget' },
                     { id: 'fixed-expenses', icon: Euro, label: 'Dépenses Fixes' },
+                    { id: 'expenses', icon: CreditCard, label: 'Dépenses Ponctuelles' },
                     { id: 'material', icon: Package, label: 'Matériel' },
                     { id: 'agenda', icon: CalendarDays, label: 'Agenda' },
                     ...(canExport ? [{ id: 'export', icon: FileSpreadsheet, label: 'Export' }] : []),

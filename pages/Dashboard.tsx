@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense } from '../types';
+import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense, OneOffExpense } from '../types';
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS } from '../constants';
@@ -396,6 +396,7 @@ const Dashboard: React.FC = () => {
   const [budgets, setBudgets] = useState<BudgetLine[]>([]);
   const [socialPosts, setSocialPosts] = useState<SocialPost[]>([]); // New State
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
+  const [oneOffExpenses, setOneOffExpenses] = useState<OneOffExpense[]>([]);
   const [loading, setLoading] = useState(true);
 
   // --- FILTER STATES ---
@@ -415,18 +416,20 @@ const Dashboard: React.FC = () => {
   // page reste affichée pendant le refetch).
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    const [pData, cData, bData, sData, feData] = await Promise.all([
+    const [pData, cData, bData, sData, feData, ooData] = await Promise.all([
       db.getProjects(),
       db.getCampaigns(),
       db.getBudgets(),
       db.getSocialPosts(),
-      db.getFixedExpenses()
+      db.getFixedExpenses(),
+      db.getExpenses()
     ]);
     setProjects(pData);
     setCampaigns(cData);
     setBudgets(bData);
     setSocialPosts(sData);
     setFixedExpenses(feData);
+    setOneOffExpenses(ooData);
     if (!silent) setLoading(false);
   }, []);
 
@@ -442,7 +445,8 @@ const Dashboard: React.FC = () => {
       ...RT_EVENTS.campaigns,
       ...RT_EVENTS.budget,
       ...RT_EVENTS.social,
-      ...RT_EVENTS.fixedExpenses
+      ...RT_EVENTS.fixedExpenses,
+      ...RT_EVENTS.expenses
     ],
     () => load(true)
   );
@@ -632,6 +636,52 @@ const Dashboard: React.FC = () => {
         });
     });
 
+    // 3ter. Process DÉPENSES PONCTUELLES (one-off) — même scope et même niveau de
+    // détail que les dépenses fixes ci-dessus, en plus simple : le modèle
+    // OneOffExpense n'a ni `isAnnual` (tout sur le mois de la dépense) ni marque.
+    // L'absence de marque est passée à isBrandInScope sous forme de tableau vide,
+    // exactement comme une dépense fixe sans marque : sans filtre marque actif
+    // elle compte, avec un filtre marque actif elle est écartée (on ne peut pas
+    // l'attribuer). Comportement cohérent avec l'existant, pas une règle inventée.
+    oneOffExpenses.forEach(e => {
+        if (!isProPlusInScope(e.proPlus)) return;
+
+        let eSite = e.site as string;
+        if (eSite === 'Thiers' || eSite === 'Ambert') eSite = 'Ricoux';
+        if (eSite === 'Riom') eSite = 'Mozac';
+        if (!isSiteInScope(eSite)) return;
+
+        if (!isBrandInScope([])) return;
+        if (!isServiceInScope([e.service])) return;
+
+        const cost = e.amount || 0;
+        if (cost === 0) return;
+
+        const expDate = new Date(e.date);
+        const monthIdx = expDate.getMonth();
+
+        let servicesToHit: string[] = [];
+        if (e.service === 'Tous Services') {
+            servicesToHit = ['VN', 'VO', 'APV', 'PR'];
+        } else if (['VN', 'VO', 'APV', 'PR'].includes(e.service)) {
+            servicesToHit = [e.service];
+        }
+
+        if (expDate.getFullYear() === chartYear) {
+            monthlyTrend[monthIdx].reel += cost;
+        }
+
+        if (expDate >= dStart && expDate <= dEnd) {
+            totalActual += cost;
+            if (servicesToHit.length > 0) {
+                const splitAmount = cost / servicesToHit.length;
+                servicesToHit.forEach(s => {
+                    if (serviceMix[s] !== undefined) serviceMix[s] += splitAmount;
+                });
+            }
+        }
+    });
+
     let accReel = 0;
     monthlyTrend.forEach(m => {
         accReel += m.reel;
@@ -691,7 +741,7 @@ const Dashboard: React.FC = () => {
         upcomingPosts
     };
 
-  }, [projects, budgets, socialPosts, fixedExpenses, dateStart, dateEnd, filterContexts, filterBrands, filterServices, filterProPlus]);
+  }, [projects, budgets, socialPosts, fixedExpenses, oneOffExpenses, dateStart, dateEnd, filterContexts, filterBrands, filterServices, filterProPlus]);
 
   // --- RENDER HELPERS ---
   const formatCurrency = (val: number) => val.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });

@@ -9,6 +9,7 @@ import Campaigns from './pages/Campaigns';
 import Material from './pages/Material';
 import Budget from './pages/Budget';
 import FixedExpenses from './pages/FixedExpenses';
+import Expenses from './pages/Expenses';
 import Agenda from './pages/Agenda';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
@@ -85,6 +86,7 @@ const InnerApp: React.FC = () => {
       case 'agenda': return <Agenda />;
       case 'budget': return <Budget />;
       case 'fixed-expenses': return <FixedExpenses />;
+      case 'expenses': return <Expenses />;
       case 'export': return <Export />;
       case 'settings': return <Settings />;
       default: return isExternal ? <Digital /> : <Dashboard />;
