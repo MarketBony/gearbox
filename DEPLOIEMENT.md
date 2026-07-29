@@ -133,6 +133,14 @@ première connexion.
   — cibler un seul service quand la modif ne touche qu'un côté :
   `sudo docker compose up -d --build api` (backend seul) ou `--build web`
   (frontend seul), pour éviter un rebuild inutile de l'autre.
+- **Cache navigateur** : aucune purge manuelle à prévoir. `nginx.conf` sert
+  `/assets/` (noms hashés par Vite) en `immutable` 1 an, et `index.html` en
+  `no-cache, must-revalidate` — un rechargement sert donc toujours le dernier
+  build. Attention : un onglet **déjà ouvert** continue de tourner sur l'ancien
+  bundle jusqu'à son rechargement, c'est normal et sans rapport avec le cache
+  HTTP. Si `nginx.conf` est modifié, valider la syntaxe avant de déployer :
+  `sudo docker run --rm -v /chemin/nginx.conf:/etc/nginx/conf.d/default.conf:ro nginx:alpine nginx -t`
+  (une config invalide empêche `web` de démarrer, donc coupe le site).
 - **Logs** : `sudo docker compose logs -f` (ou `logs -f api`)
 - **État des conteneurs** : `sudo docker compose ps`
 - **Base de données** : gérée par Supabase (backups/PITR côté dashboard Supabase —

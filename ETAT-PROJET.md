@@ -97,16 +97,21 @@
         ce span. Régression repérée par Théo sur capture d'écran, corrigée dans
         le même lot.
 
+9. **En-têtes `Cache-Control` sur le frontend** (`fix/cache-control-nginx`,
+   29 juillet). `nginx.conf` ne servait AUCUN en-tête de cache : les navigateurs
+   appliquaient un cache heuristique et pouvaient resservir un `index.html`
+   périmé après un déploiement, donc charger un ancien bundle. Désormais :
+   `/assets/` (noms hashés par Vite) en `public, max-age=31536000, immutable` ;
+   `index.html` et les fichiers de `public/` (logos, favicon — noms stables) en
+   `no-cache, must-revalidate`, ce qui donne des réponses 304 grâce à l'ETag de
+   nginx. Syntaxe validée dans un conteneur nginx jetable **avant** déploiement
+   (une config invalide empêcherait `web` de démarrer et couperait le site).
+
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - **Catalogue matériel dupliqué en base** : 16 noms uniques mais 32 lignes, chaque
   équipement en double depuis le 8 juillet ~22:07 (double exécution de
   `migrateEquipmentIfNeeded`). Nettoyage délicat — les `EquipmentBooking` pointent
   sur l'un des deux ids via une FK. Voir BUGS-CONNUS.md.
-- **Aucun en-tête `Cache-Control` servi en prod** (nginx par défaut) : rien ne
-  garantit qu'un navigateur revalide `index.html` après un déploiement, donc un
-  utilisateur peut rester sur un ancien bundle sans le savoir. Correctif court
-  dans `nginx.conf` : `no-cache` sur `index.html`, `immutable` sur `/assets`
-  (noms déjà hashés par Vite).
 - PWA (manifest.json + service worker) — prévu "juste avant déploiement" dans le
   brief d'origine, jamais fait, toujours pertinent (HTTPS dispo, condition remplie)
 - Nettoyage des branches locales déjà mergées (`git branch` en liste une dizaine :
@@ -126,6 +131,11 @@
   temps réel semblait ne marcher qu'après un aller-retour de rubrique (le remontage
   du composant refaisait le chargement initial) et la Sidebar, jamais démontée, ne
   se mettait jamais à jour. Le code était bon.
+  ⚠️ Le correctif `Cache-Control` (correctif 9) garantit qu'un **rechargement**
+  sert bien la dernière version, mais il ne fait PAS se mettre à jour un onglet
+  déjà ouvert : le JS déjà exécuté le reste jusqu'au rechargement. Il faudrait
+  pour ça un mécanisme de détection de version côté client (à envisager avec la
+  PWA, si le besoin se confirme).
 - **Les actions du rôle Master ne sont JAMAIS journalisées** (`activityLog.ts`,
   204 silencieux, règle métier volontaire répliquée du frontend). Le compte de Théo
   étant Master, il ne verra jamais sa propre activité dans la cloche — tester le fil
