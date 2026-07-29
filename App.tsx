@@ -18,6 +18,7 @@ import TodoList from './pages/TodoList';
 import Export, { EXPORT_ALLOWED_ROLES } from './pages/Export';
 import AnimatedBackground from './components/AnimatedBackground';
 import { db } from './services/dataService';
+import { setMySection } from './services/socket';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -43,12 +44,6 @@ const InnerApp: React.FC = () => {
     return () => window.removeEventListener('gearbox-navigate' as any, handleNavigation);
   }, []);
 
-  if (loading || !dbReady) return <div className="h-screen bg-black flex items-center justify-center text-bony-orange animate-pulse font-title">INITIALISATION...</div>;
-
-  if (!user) {
-      return <Login />;
-  }
-
   const EXTERNAL_ALLOWED_TABS = ['digital', 'chat', 'hello-marketing', 'games'];
   const GAMES_ALLOWED_ROLES = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'];
 
@@ -59,6 +54,21 @@ const InnerApp: React.FC = () => {
   let resolvedTab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(activeTab)) ? 'digital' : activeTab;
   if (resolvedTab === 'games' && !canAccessGames) resolvedTab = 'dashboard';
   if (resolvedTab === 'export' && !canExport) resolvedTab = 'dashboard';
+
+  // Présence : on annonce la rubrique RÉELLEMENT affichée (`resolvedTab`), pas
+  // `activeTab` brut qui peut être redirigé par les droits — sinon un External
+  // apparaîtrait sur une rubrique qu'il ne voit pas.
+  // Ce hook doit rester AU-DESSUS des retours anticipés ci-dessous : un hook ne
+  // peut pas être appelé conditionnellement.
+  useEffect(() => {
+    if (user) setMySection(resolvedTab);
+  }, [user, resolvedTab]);
+
+  if (loading || !dbReady) return <div className="h-screen bg-black flex items-center justify-center text-bony-orange animate-pulse font-title">INITIALISATION...</div>;
+
+  if (!user) {
+      return <Login />;
+  }
 
   const renderContent = (tab: string) => {
     switch (tab) {

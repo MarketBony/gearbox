@@ -63,6 +63,33 @@
   avec de vrais comptes/mots de passe via la Gestion des Utilisateurs
 - Route /api/seed bloquée en production (403) — ne peut plus être redéclenchée
 
+8. **Présence des utilisateurs en temps réel** (`feat/presence-sidebar`, 29 juillet).
+   L'avatar de chaque utilisateur s'affiche en bulle sur la rubrique où il se
+   trouve, dans la Sidebar — « qui est où sur l'ERP ».
+   - Serveur : `backend/src/realtime/presence.ts`, état **en mémoire** (pas de
+     table Prisma : la présence est éphémère et liée à la durée de vie du
+     socket). Le client annonce `presence:set { section }`, le serveur diffuse
+     un instantané complet `presence:state` (rubrique → utilisateurs).
+   - Un utilisateur n'apparaît que dans **une seule** rubrique, celle de son
+     onglet le plus récent (arbitrage par horodatage), sinon il se dédoublerait.
+   - Le nom/couleur/photo sont résolus **côté serveur** (le JWT ne porte que
+     `{ id, role }`, et la Sidebar ne charge pas la liste des utilisateurs) et
+     mis en cache ; `routes/users.ts` appelle `notifyUserChanged` pour recharger
+     ce cache après une modification de profil et purger la présence d'un compte
+     supprimé.
+   - Après un redémarrage de l'`api` l'état est vide : les clients se
+     réannoncent sur l'événement socket `connect`.
+   - UI : `components/PresenceBubbles.tsx`, 2 avatars superposés max puis une
+     pastille `+N`. Son propre avatar est exclu (on sait où on est, et ça
+     économise de la place sur mobile). Câblé sur les 3 variantes de nav
+     (desktop groupé, tablette icônes, barre mobile) + le menu « Plus », qui
+     agrège la présence des 8 rubriques masquées sur mobile.
+   - Responsive vérifié par mesure des rectangles (pas à l'œil) à 320, 375, 820,
+     1440 px : aucun débordement de bouton, aucun scroll horizontal de page,
+     aucun libellé tronqué. Piège rencontré : le bouton de nav desktop porte
+     `overflow-hidden`, il faut `flex-1 min-w-0` sur le libellé (et non `ml-auto`
+     sur les avatars) sinon la rangée déborde et les bulles sont rognées.
+
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - **Catalogue matériel dupliqué en base** : 16 noms uniques mais 32 lignes, chaque
   équipement en double depuis le 8 juillet ~22:07 (double exécution de

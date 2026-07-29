@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { authenticateToken, requireRole } from '../auth/middleware';
 import { VALID_ROLES, isValidRole } from '../auth/roles';
-import { emitEvent } from '../realtime';
+import { emitEvent, notifyUserChanged } from '../realtime';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -77,6 +77,7 @@ router.put('/:id', authenticateToken, requireRole(ADMIN_ROLES), async (req, res)
       data: updateData
     });
     emitEvent('users:updated', publicUser(user));
+    notifyUserChanged(id); // nom/couleur/photo affichés par la présence
     res.json(publicUser(user));
   } catch (e) {
     res.status(400).json({ error: 'User update failed' });
@@ -89,6 +90,7 @@ router.delete('/:id', authenticateToken, requireRole(ADMIN_ROLES), async (req, r
   try {
     await prisma.user.delete({ where: { id } });
     emitEvent('users:deleted', id);
+    notifyUserChanged(id); // purge la présence du compte supprimé
     res.sendStatus(204);
   } catch (e) {
     res.status(400).json({ error: 'User deletion failed' });

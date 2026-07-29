@@ -70,6 +70,27 @@ socket émetteur). Assumé : l'auteur refetch une donnée qu'il vient d'écrire.
 scintillement apparaît côté UI, la piste est un header `x-socket-id` + `io.except(id)`,
 avec un `AsyncLocalStorage` pour éviter de toucher les ~35 sites d'appel.
 
+## ✅ Présence en temps réel (29 juillet 2026)
+
+`src/realtime/presence.ts` — état **en mémoire uniquement**, aucune table Prisma : la
+présence est éphémère et liée à la durée de vie d'une connexion socket.
+
+| Sens | Événement | Charge |
+|---|---|---|
+| client → serveur | `presence:set` | `{ section: string }` (borné à 40 caractères, pas de liste blanche pour ne pas resynchroniser ce fichier à chaque nouvelle rubrique du frontend) |
+| serveur → tous | `presence:state` | instantané complet `{ [section]: PresenceUser[] }` |
+
+- **Un utilisateur = une seule rubrique** : plusieurs onglets produisent plusieurs
+  entrées `socket.id`, l'instantané ne retient que la plus récente (`at`).
+- **Identité résolue serveur** (`name`, `avatarColor`, `avatarUrl`) et mise en cache :
+  le JWT ne porte que `{ id, role }`, insuffisant pour rendre un avatar.
+  `routes/users.ts` appelle `notifyUserChanged(userId)` après PUT et DELETE →
+  recharge le cache, ou purge les présences si le compte n'existe plus.
+- **Pas de persistance volontaire** : au redémarrage du conteneur `api` l'état est
+  vide, les clients se réannoncent sur leur événement `connect`.
+- Pas de diffs, uniquement des instantanés complets : à l'échelle d'une dizaine
+  d'utilisateurs c'est moins coûteux à raisonner qu'une synchro incrémentale.
+
 ## ✅ Déploiement VPS — FAIT (8 juillet 2026, en production depuis)
 
 En ligne sur https://gearbox.bonyauto-mobile.com. Détail de l'architecture ci-dessous,

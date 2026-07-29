@@ -8,6 +8,7 @@ import {
   joinConversationRooms as chatJoinConversationRooms,
   notifyConversationCreated as chatNotifyConversationCreated
 } from './chat';
+import { registerPresenceHandlers, handleUserChanged } from './presence';
 
 let io: Server;
 
@@ -56,6 +57,10 @@ export const setupRealtime = (socketIo: Server) => {
     joinUserRooms(socket).catch(err => console.error('joinUserRooms failed', err));
     registerChatHandlers(io, socket);
 
+    // Présence : le client annonce sa rubrique via 'presence:set' (au connect
+    // puis à chaque changement d'onglet) et reçoit 'presence:state'.
+    registerPresenceHandlers(io, socket);
+
     socket.on('disconnect', () => {
       console.log('Client disconnected', socket.id);
     });
@@ -76,4 +81,14 @@ export const joinConversationRooms = async (conversationId: string, participantI
 
 export const notifyConversationCreated = (conversation: { participants: string[] }) => {
   if (io) chatNotifyConversationCreated(io, conversation);
+};
+
+// Appelé par routes/users.ts après une mutation de compte : recharge l'identité
+// d'affichage utilisée par la présence (nom/couleur/photo), ou purge les
+// présences du compte s'il a été supprimé. Best-effort : n'interrompt jamais la
+// réponse HTTP de la route appelante.
+export const notifyUserChanged = (userId: string) => {
+  handleUserChanged(io, userId).catch(err =>
+    console.error('notifyUserChanged failed', err)
+  );
 };
