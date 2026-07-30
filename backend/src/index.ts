@@ -73,6 +73,21 @@ setupRealtime(io);
 // Job de purge des médias calendar archivés depuis > 30j.
 startPurgeJob();
 
+// Filet de dernier recours. Une promesse rejetée hors de portée d'Express (rappel
+// détaché, handler socket sans try/catch, timer) ne doit PAS tuer l'API : depuis
+// Node 15, une « unhandled rejection » termine le process par défaut, et chaque
+// redémarrage coupe toutes les connexions Socket.IO de tous les utilisateurs.
+// On journalise et on continue : perdre une requête vaut mieux que déconnecter
+// tout le monde. Ce n'est PAS une excuse pour ne pas traiter l'erreur à la source
+// (voir la règle en tête de routes/auth.ts).
+//
+// Volontairement pas de handler 'uncaughtException' : une exception synchrone non
+// rattrapée laisse le process dans un état imprévisible, et là redémarrer est le
+// bon comportement — `restart: always` s'en charge côté Docker.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection] promesse rejetée non gérée :', reason);
+});
+
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
