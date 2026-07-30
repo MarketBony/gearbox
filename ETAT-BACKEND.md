@@ -20,8 +20,12 @@ Migrations Prisma appliquées sur Supabase : `20260706160559_init` + `2026070811
 7. **Digital / Social** — `/api/social` CRUD ; `mediaFiles` = URLs de fichiers uploadés (voir Uploads).
 8. **Journal d'activité** — `/api/activity-log` (GET plafonné 200, POST fire-and-forget, Master non journalisé).
 9. **Chat** — `/api/chat` REST (chargement) + Socket.IO temps réel (`chat:message:send/edit/delete/react`,
-   `chat:conversation:read` → `chat:message:new/updated`, `chat:conversation:updated/created`). Chat
-   Général = appartenance implicite (seed idempotent, non-External).
+   `chat:conversation:read`, **`chat:conversation:mute`** → `chat:message:new/updated`,
+   `chat:conversation:updated/created`). Chat Général = appartenance implicite
+   (seed idempotent, non-External). Un message envoyé déclenche aussi les
+   **notifications push** — voir la section dédiée plus bas.
+10. **Notifications push** — `/api/push` (clé publique VAPID + abonnements) et
+    `PushSubscription`. Voir la section dédiée.
 
 Le frontend utilise la couche unique `services/dataService.ts` (`apiFetch` + JWT). Résidus
 `localStorage` **assumés et hors périmètre** (pas des données serveur) : overlay client-only chat
@@ -67,6 +71,58 @@ Corrigé au passage : un **PUT partiel ne portant que `endDate`** pouvait la pla
 avant `startDate`, le contrôle croisé n'existant que dans le POST. La
 disponibilité est désormais évaluée sur les valeurs **effectives après fusion**,
 et non sur le corps de la requête.
+
+## 🔔 Notifications push (Web Push) — 30/07/2026
+
+`/api/push` (`src/routes/push.ts`) + `src/utils/pushSender.ts`. Fonctionne sur
+Windows/Mac (Chrome, Edge), Android, et **iOS 16.4+ mais uniquement si l'app est
+ajoutée à l'écran d'accueil** — contrainte d'Apple, pas un choix. Le payload est
+chiffré avec les clés de l'abonnement : Apple et Google relaient sans pouvoir lire.
+
+**Modèle `PushSubscription`** : un abonnement appartient à un **navigateur**, pas à
+un utilisateur (autant de lignes que d'appareils installés). `endpoint` est
+`@unique` — c'est la clé naturelle, un navigateur qui se réabonne renvoie le même
+endpoint. Sans cette contrainte, chaque rechargement créerait un doublon et
+l'utilisateur recevrait N fois la même notification.
+
+**Routes** : `GET /public-key` (non authentifiée, la clé publique l'est par
+nature), `POST /subscribe` (upsert sur `endpoint`, réaffecte le `userId` — un poste
+partagé change de titulaire), `DELETE /subscribe` (idempotent).
+
+**Configuration — piège à deux temps.** `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` et
+`VAPID_SUBJECT` doivent être **à la fois** :
+1. valorisées dans `~/gearbox/.env` sur le VPS (hors git, permissions `600`) ;
+2. **déclarées dans le bloc `environment:` du service `api`** de
+   `docker-compose.yml`.
+Une variable présente dans le `.env` mais absente de cette liste **n'atteint pas le
+conteneur**. `pushSender.ts` trace un avertissement au démarrage si les clés
+manquent — sans lui, un push non configuré est indiscernable d'un push qui
+n'intéresse personne.
+
+**Qui reçoit quoi** : `resolvePushRecipients()` (dans `pushSender.ts`, extrait pour
+être testable) applique trois exclusions à `unreadTargets` — l'émetteur, ceux qui
+ont mis la conversation en sourdine (`ChatConversation.mutedBy`), et ceux que
+`presence.ts` voit sur la rubrique `chat`. Limite assumée : la présence connaît la
+rubrique, pas la conversation ouverte ; quelqu'un dans une autre conversation ne
+reçoit pas de push mais voit le compteur non-lu.
+
+**Nettoyage automatique** : un envoi qui répond **404 ou 410** (navigateur
+désinstallé, abonnement expiré) supprime la ligne. Sans ça la table se remplit de
+fantômes et chaque envoi retente dans le vide. Toute autre erreur est tracée sans
+faire échouer l'envoi du message lui-même.
+
+**Sourdine — `chat:conversation:mute`** (`{conversationId, muted}`), calqué sur
+`chat:conversation:read` : même contrôle d'appartenance, puis
+`chat:conversation:updated`. ⚠️ Ne pas confondre avec `pinnedBy`, qui existe en
+colonne mais **n'est jamais écrit** (l'épinglage est un overlay `localStorage` côté
+client). La sourdine, elle, est bien en base : c'est le serveur qui décide d'envoyer
+le push. Elle coupe le push, **pas** le compteur non-lu (comportement Messenger).
+
+**Service worker** (`public/sw.js`, servi par le front) : `push` +
+`notificationclick` uniquement, **aucun gestionnaire `fetch`**. C'est délibéré et à
+ne pas modifier — un service worker qui met en cache fige les utilisateurs sur une
+vieille version qu'on ne peut plus corriger à distance. Sans `fetch`, les en-têtes
+`Cache-Control` de nginx pilotent seuls la fraîcheur.
 
 ## ⚠️ Route DORMANTE — `/api/expenses` (modèle `OneOffExpense`)
 

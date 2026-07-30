@@ -86,6 +86,29 @@ const broadcast = (io: Server) => {
   io.emit('presence:state', buildSnapshot());
 };
 
+/**
+ * Utilisateurs actuellement sur une rubrique donnée (ex. 'chat').
+ * Sert à ne PAS envoyer de notification push à quelqu'un qui a déjà l'écran
+ * sous les yeux. Même règle de dédoublonnage que l'instantané : un utilisateur
+ * compte pour sa rubrique la plus récente, pas pour tous ses onglets.
+ *
+ * Limite assumée : la présence connaît la rubrique, pas la conversation ouverte.
+ * Quelqu'un dans une AUTRE conversation du Chat ne recevra pas de push, mais
+ * verra le compteur non-lu se mettre à jour immédiatement.
+ */
+export const getUserIdsOnSection = (section: string): Set<string> => {
+  const latestByUser = new Map<string, Entry>();
+  for (const entry of bySocket.values()) {
+    const current = latestByUser.get(entry.userId);
+    if (!current || entry.at > current.at) latestByUser.set(entry.userId, entry);
+  }
+  const ids = new Set<string>();
+  for (const entry of latestByUser.values()) {
+    if (entry.section === section) ids.add(entry.userId);
+  }
+  return ids;
+};
+
 // Charge l'identité d'affichage si absente du cache.
 const ensureIdentity = async (userId: string) => {
   if (identities.has(userId)) return;

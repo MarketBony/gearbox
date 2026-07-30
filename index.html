@@ -15,6 +15,26 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" href="/favicon.png" />
 
+    <!-- ===================== PWA (30/07/2026) =====================
+         Rend l'app installable sur Windows/Mac (Chrome, Edge), Android et iOS.
+         Aucun service worker n'est requis pour l'installation ; celui de
+         public/sw.js ne sert qu'aux notifications push et n'intercepte PAS
+         `fetch`, pour ne jamais figer une version chez les utilisateurs. -->
+    <link rel="manifest" href="/manifest.json" />
+    <!-- Valeur initiale (thème sombre par défaut) ; ThemeContext la met ensuite
+         à jour à chaque bascule clair/sombre. -->
+    <meta name="theme-color" content="#121212" />
+
+    <!-- iOS : ne lit pas les icônes du manifeste et ne gère pas la
+         transparence — d'où un PNG à fond opaque dédié. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="GEARBOX" />
+    <!-- `black` et NON `black-translucent` : ce dernier fait passer le contenu
+         SOUS la barre d'état, ce qui décalerait toutes les racines de page
+         (qui sont en h-full) de la hauteur du notch. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+
     <script>
       tailwind.config = {
         darkMode: 'class', // Activation manuelle via classe 'dark'

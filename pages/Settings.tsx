@@ -4,12 +4,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { db, ApiError } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { User, UserRole, ActivityLog } from '../types';
-import { Save, User as UserIcon, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn, MapPin, Cake } from 'lucide-react';
+import { Save, User as UserIcon, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn, MapPin, Cake, Download, Smartphone } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import Avatar, { avatarKey } from '../components/Avatar';
 import { getAvatarUrl, setAvatarUrl } from '../services/avatarCache';
 import Select from '../components/Select';
 import DatePicker from '../components/DatePicker';
+import InstallAppModal from '../components/InstallAppModal';
+import NotificationsToggle from '../components/NotificationsToggle';
 import { SITES } from '../constants';
 
 // --- Types for react-easy-crop ---
@@ -262,6 +264,7 @@ const Settings: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [profileMsg, setProfileMsg] = useState({ type: '', text: '' });
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
 
   // User prefs (city + birthdate) for own profile
   const [userCity, setUserCity] = useState('');
@@ -499,6 +502,33 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
+      {/* SECTION 1bis : APPLICATION (PWA) — visible par TOUS les rôles, comme le
+           profil au-dessus, et non réservée aux admins comme la section suivante. */}
+      <div className="max-w-4xl mx-auto gx-card p-6 mb-10">
+        <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-200 dark:border-white/5 pb-2 mb-4 flex items-center gap-2">
+          <Smartphone size={15} className="text-bony-violet" /> Application
+        </h4>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <p className="text-xs text-slate-600 dark:text-bony-muted leading-relaxed flex-1">
+            Installe Gearbox comme une application sur ton ordinateur ou ton téléphone :
+            icône dédiée, fenêtre propre, et les mises à jour arrivent toutes seules.
+            <span className="block mt-1 text-slate-500 dark:text-slate-500">
+              Aucun fichier à télécharger, aucun store.
+            </span>
+          </p>
+          <button
+            onClick={() => setShowInstallModal(true)}
+            className="shrink-0 px-5 py-2.5 min-h-[44px] bg-bony-gradient text-white font-bold rounded-lg shadow hover:opacity-90 transition flex items-center justify-center gap-2 text-sm"
+          >
+            <Download size={16} /> Installer l'application
+          </button>
+        </div>
+
+        <div className="mt-5 pt-5 border-t border-slate-200 dark:border-white/5">
+          <NotificationsToggle />
+        </div>
+      </div>
+
       {/* SECTION 2: USER MANAGEMENT (MASTER/ADMINISTRATOR) */}
       {canManageUsers && (
         <div className="max-w-6xl mx-auto mt-12">
@@ -688,6 +718,24 @@ const Settings: React.FC = () => {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Modale d'installation de la PWA */}
+      {showInstallModal && (
+        <InstallAppModal
+          onClose={() => setShowInstallModal(false)}
+          // Proposé dans la foulée de l'installation : c'est le moment où l'accord
+          // est le plus naturel, et sur iOS c'est le seul ordre qui fonctionne
+          // (l'abonnement exige l'app déjà installée).
+          footer={
+            <div className="pt-4 mt-1 border-t border-slate-200 dark:border-bony-border">
+              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                Notifications
+              </h4>
+              <NotificationsToggle compact />
+            </div>
+          }
+        />
       )}
 
       {/* Avatar modal — own profile (PUT /me) */}

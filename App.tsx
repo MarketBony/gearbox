@@ -19,6 +19,7 @@ import Export, { EXPORT_ALLOWED_ROLES } from './pages/Export';
 import AnimatedBackground from './components/AnimatedBackground';
 import { db } from './services/dataService';
 import { setMySection } from './services/socket';
+import { refreshPushSubscription } from './services/pushNotifications';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -63,6 +64,29 @@ const InnerApp: React.FC = () => {
   useEffect(() => {
     if (user) setMySection(resolvedTab);
   }, [user, resolvedTab]);
+
+  // Notifications push : si la permission est déjà accordée, on renvoie
+  // l'abonnement au serveur à chaque démarrage. Un navigateur peut renouveler un
+  // abonnement de lui-même, laissant l'ancien endpoint muet sans que personne ne
+  // le sache ; le serveur faisant un upsert, ce rappel répare ce cas. Aucune
+  // permission n'est demandée ici (ce serait sans effet, et interdit sur iOS
+  // hors geste utilisateur).
+  useEffect(() => {
+    if (user) void refreshPushSubscription();
+  }, [user]);
+
+  // Clic sur une notification système : le service worker refocalise la fenêtre
+  // puis nous envoie la rubrique à ouvrir.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'gearbox-notification-click' && e.data.section) {
+        setActiveTab(e.data.section);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, []);
 
   if (loading || !dbReady) return <div className="h-screen bg-black flex items-center justify-center text-bony-orange animate-pulse font-title">INITIALISATION...</div>;
 

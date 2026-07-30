@@ -12,15 +12,34 @@ generator client {
 // Pas d'enum Prisma : "Digital Manager" contient un espace, et on ne veut aucune
 // couche de traduction entre frontend et base (convention déjà en place ailleurs).
 model User {
-  id           String   @id @default(uuid())
-  loginId      String   @unique
-  passwordHash String
-  name         String
-  role         String // 7 valeurs valides côté frontend (types.ts UserRole)
-  avatarColor  String?
-  avatarUrl    String? // URL relative de la photo de profil uploadée (/uploads/avatar/...)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String             @id @default(uuid())
+  loginId           String             @unique
+  passwordHash      String
+  name              String
+  role              String // 7 valeurs valides côté frontend (types.ts UserRole)
+  avatarColor       String?
+  avatarUrl         String? // URL relative de la photo de profil uploadée (/uploads/avatar/...)
+  pushSubscriptions PushSubscription[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+// Abonnement Web Push d'un NAVIGATEUR (pas d'un utilisateur) : un même
+// utilisateur en a autant qu'il a d'appareils/navigateurs installés.
+model PushSubscription {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Clé naturelle de l'abonnement : un navigateur qui se réabonne renvoie le
+  // même endpoint. Sans @unique, chaque rechargement créerait un doublon et
+  // l'utilisateur recevrait N fois la même notification.
+  endpoint  String   @unique
+  p256dh    String // clé publique du client (chiffrement du payload)
+  auth      String // secret d'authentification du client
+  userAgent String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Project {
@@ -204,6 +223,12 @@ model ChatConversation {
   adminIds      String[]      @default([])
   name          String?
   pinnedBy      String[]      @default([])
+  // Sourdine par utilisateur. ⚠️ Contrairement à `pinnedBy`, qui n'est JAMAIS
+  // écrit en base (l'épinglage est un overlay localStorage côté client), ce
+  // champ est bien la source de vérité : c'est le serveur qui décide d'envoyer
+  // ou non la notification push, il doit donc la connaître.
+  // La sourdine coupe le push, PAS le compteur non-lu (comportement Messenger).
+  mutedBy       String[]      @default([])
   lastMessage   String?
   lastMessageAt DateTime?
   unreadCounts  Json          @default("{}") // Record<userId, number>

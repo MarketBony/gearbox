@@ -9,7 +9,8 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   MessageSquare, Plus, Send, Star, StarOff, ArrowLeft,
   MoreHorizontal, Pencil, Trash2, X, Image, Reply, Check,
-  Users, UserPlus, UserMinus, ChevronRight, Hash, Camera, Upload, ZoomIn
+  Users, UserPlus, UserMinus, ChevronRight, Hash, Camera, Upload, ZoomIn,
+  Bell, BellOff
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import Cropper from 'react-easy-crop';
@@ -504,6 +505,22 @@ const Chat: React.FC = () => {
     setConversations(applyOverlay(chatStore.getConversations()));
   };
 
+  // ---- SOURDINE ----
+  // ⚠️ NE PAS calquer sur togglePin ci-dessus : l'épinglage est un overlay
+  // localStorage, alors que la sourdine doit passer par le SERVEUR, seul à
+  // décider d'envoyer ou non une notification push. Bénéfice : elle est
+  // synchronisée entre tous les appareils, et le `chat:conversation:updated`
+  // renvoyé par le serveur met l'interface à jour tout seul.
+  //
+  // La sourdine coupe le push, PAS le compteur non-lu (comportement Messenger).
+  const toggleMute = (convId: string) => {
+    if (!me) return;
+    const conv = conversations.find(c => c.id === convId);
+    const enSourdine = (conv?.mutedBy ?? []).includes(me.id);
+    emitWithAck('chat:conversation:mute', { conversationId: convId, muted: !enSourdine })
+      .catch(() => alert('Échec de la mise en sourdine (serveur injoignable ?).'));
+  };
+
   // ---- IMAGE ----
   // Upload préalable (POST /api/uploads/chat) puis le message socket transporte
   // l'URL (plus de base64). Formats et taille alignés sur les règles backend.
@@ -651,6 +668,7 @@ const Chat: React.FC = () => {
               {generalConvs.map(conv => {
                 const isActive = conv.id === activeConvId;
                 const pinned = conv.pinnedBy.includes(me?.id ?? '');
+                const muted = (conv.mutedBy ?? []).includes(me?.id ?? '');
                 const unread = unreadCount(conv);
                 const members = getConvMembers(conv);
                 return (
@@ -673,6 +691,9 @@ const Chat: React.FC = () => {
                         {unread > 0 && <span className="ml-1 shrink-0 min-w-[18px] h-[18px] bg-bony-orange text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">{unread > 99 ? '99+' : unread}</span>}
                       </div>
                     </div>
+                    <button onClick={e => { e.stopPropagation(); toggleMute(conv.id); }} title={muted ? 'Réactiver les notifications' : 'Mettre en sourdine'} className={`shrink-0 p-1 rounded transition-opacity ${muted ? 'opacity-100 text-bony-orange' : 'opacity-0 group-hover:opacity-100'} ${isActive && !muted ? 'text-white/70 hover:text-white' : muted ? '' : 'text-slate-400 hover:text-bony-orange'}`}>
+                      {muted ? <BellOff size={13} /> : <Bell size={13} />}
+                    </button>
                     <button onClick={e => { e.stopPropagation(); togglePin(conv.id); }} className={`shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity ${isActive ? 'text-white/70 hover:text-white' : 'text-slate-400 hover:text-bony-orange'}`}>
                       {pinned ? <StarOff size={13} /> : <Star size={13} />}
                     </button>
@@ -691,6 +712,7 @@ const Chat: React.FC = () => {
                 : groupConvs.map(conv => {
                     const isActive = conv.id === activeConvId;
                     const pinned = conv.pinnedBy.includes(me?.id ?? '');
+                    const muted = (conv.mutedBy ?? []).includes(me?.id ?? '');
                     const unread = unreadCount(conv);
                     const members = getConvMembers(conv);
                     return (
@@ -713,6 +735,9 @@ const Chat: React.FC = () => {
                             {unread > 0 && <span className="ml-1 shrink-0 min-w-[18px] h-[18px] bg-bony-orange text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">{unread > 99 ? '99+' : unread}</span>}
                           </div>
                         </div>
+                        <button onClick={e => { e.stopPropagation(); toggleMute(conv.id); }} title={muted ? 'Réactiver les notifications' : 'Mettre en sourdine'} className={`shrink-0 p-1 rounded transition-opacity ${muted ? 'opacity-100 text-bony-orange' : 'opacity-0 group-hover:opacity-100'} ${isActive && !muted ? 'text-white/70 hover:text-white' : muted ? '' : 'text-slate-400 hover:text-bony-orange'}`}>
+                          {muted ? <BellOff size={13} /> : <Bell size={13} />}
+                        </button>
                         <button onClick={e => { e.stopPropagation(); togglePin(conv.id); }} className={`shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity ${isActive ? 'text-white/70 hover:text-white' : 'text-slate-400 hover:text-bony-orange'}`}>
                           {pinned ? <StarOff size={13} /> : <Star size={13} />}
                         </button>
@@ -730,6 +755,7 @@ const Chat: React.FC = () => {
             : privateConvs.map(conv => {
                 const isActive = conv.id === activeConvId;
                 const pinned = conv.pinnedBy.includes(me?.id ?? '');
+                const muted = (conv.mutedBy ?? []).includes(me?.id ?? '');
                 const unread = unreadCount(conv);
                 const members = getConvMembers(conv);
                 return (
@@ -752,6 +778,9 @@ const Chat: React.FC = () => {
                         {unread > 0 && <span className="ml-1 shrink-0 min-w-[18px] h-[18px] bg-bony-orange text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">{unread > 99 ? '99+' : unread}</span>}
                       </div>
                     </div>
+                    <button onClick={e => { e.stopPropagation(); toggleMute(conv.id); }} title={muted ? 'Réactiver les notifications' : 'Mettre en sourdine'} className={`shrink-0 p-1 rounded transition-opacity ${muted ? 'opacity-100 text-bony-orange' : 'opacity-0 group-hover:opacity-100'} ${isActive && !muted ? 'text-white/70 hover:text-white' : muted ? '' : 'text-slate-400 hover:text-bony-orange'}`}>
+                      {muted ? <BellOff size={13} /> : <Bell size={13} />}
+                    </button>
                     <button onClick={e => { e.stopPropagation(); togglePin(conv.id); }} className={`shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity ${isActive ? 'text-white/70 hover:text-white' : 'text-slate-400 hover:text-bony-orange'}`}>
                       {pinned ? <StarOff size={13} /> : <Star size={13} />}
                     </button>
