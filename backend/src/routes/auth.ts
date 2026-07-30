@@ -26,17 +26,37 @@ router.post('/login', async (req, res) => {
   res.json({ token, user: { id: user.id, name: user.name, role: user.role, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl } });
 });
 
+// ⚠️ RÈGLE À NE PAS ENFREINDRE ICI : jamais d'accès base dans un rappel passé à
+// une API non promise (`jwt.verify(token, secret, cb)`, `setTimeout`, un handler
+// socket sans try/catch). Un tel rappel s'exécute APRÈS que le handler Express a
+// rendu la main : la promesse qu'il renvoie n'est attendue par personne, donc ni
+// express-async-errors ni middleware/errorHandler.ts ne peuvent la voir. Node la
+// classe en « unhandled rejection » et TERMINE le process — une coupure Supabase
+// de deux secondes a ainsi tué l'API le 30/07/2026.
+// On utilise donc la forme SYNCHRONE de jwt.verify (elle lève si le jeton est
+// invalide) et on garde l'accès base dans le handler async, sous le filet.
+const decodeToken = (req: { headers: Record<string, any> }): { id: string; role: string } | null => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return null;
+  try {
+    return jwt.verify(token, SECRET) as { id: string; role: string };
+  } catch {
+    return null; // jeton absent, malformé ou expiré
+  }
+};
+
 router.get('/me', async (req, res) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, SECRET, async (err: any, decoded: any) => {
-    if (err) return res.sendStatus(403);
-    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-    if (!user) return res.sendStatus(404);
-    res.json({ id: user.id, name: user.name, role: user.role, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl });
-  });
+  const decoded = decodeToken(req);
+  if (!decoded) return res.sendStatus(403);
+
+  const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+  if (!user) return res.sendStatus(404);
+  res.json({ id: user.id, name: user.name, role: user.role, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl });
 });
 
 router.put('/me', async (req, res) => {
@@ -44,24 +64,24 @@ router.put('/me', async (req, res) => {
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, SECRET, async (err: any, decoded: any) => {
-    if (err) return res.sendStatus(403);
-    const { name, password, avatarColor, avatarUrl } = req.body;
+  const decoded = decodeToken(req);
+  if (!decoded) return res.sendStatus(403);
 
-    // avatarUrl : undefined = champ absent (non modifié) ; null = suppression de la photo.
-    const updateData: any = { name, avatarColor };
-    if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
-    if (password) {
-      updateData.passwordHash = await bcrypt.hash(password, 10);
-    }
+  const { name, password, avatarColor, avatarUrl } = req.body;
 
-    const updatedUser = await prisma.user.update({
-      where: { id: decoded.id },
-      data: updateData
-    });
+  // avatarUrl : undefined = champ absent (non modifié) ; null = suppression de la photo.
+  const updateData: any = { name, avatarColor };
+  if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
+  if (password) {
+    updateData.passwordHash = await bcrypt.hash(password, 10);
+  }
 
-    res.json({ id: updatedUser.id, name: updatedUser.name, role: updatedUser.role, avatarColor: updatedUser.avatarColor, avatarUrl: updatedUser.avatarUrl });
+  const updatedUser = await prisma.user.update({
+    where: { id: decoded.id },
+    data: updateData
   });
+
+  res.json({ id: updatedUser.id, name: updatedUser.name, role: updatedUser.role, avatarColor: updatedUser.avatarColor, avatarUrl: updatedUser.avatarUrl });
 });
 
 export default router;

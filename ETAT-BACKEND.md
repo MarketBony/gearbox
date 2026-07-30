@@ -121,6 +121,33 @@ procédure opérationnelle dans `DEPLOIEMENT.md`, état global dans `ETAT-PROJET
   HTTPS auto). Volume persistant `uploads_data` pour les uploads, variables dans `.env` racine
   (voir `.env.example`). `server.ts` (ancien monolithe racine) supprimé — code mort.
 
+## ⚠️ Règle de robustesse — accès base et rappels détachés
+
+**Ne JAMAIS faire d'accès base (ni aucun `await` susceptible d'échouer) dans un
+rappel passé à une API qui ne l'attend pas** : `jwt.verify(token, secret, cb)`,
+`setTimeout`, `setInterval`, un handler Socket.IO sans `try/catch`.
+
+Pourquoi : un tel rappel s'exécute **après** que le handler Express a rendu la
+main. La promesse qu'il renvoie n'est attendue par personne — ni Express, ni
+`express-async-errors`, ni `middleware/errorHandler.ts` ne peuvent la voir. Node
+la classe en *unhandled rejection* et **termine le process** (défaut depuis Node
+15). Une coupure Supabase de deux secondes a ainsi tué l'API le 30/07/2026, et
+chaque redémarrage coupe **toutes** les connexions Socket.IO des utilisateurs.
+
+Formes correctes :
+- `jwt.verify` **synchrone** dans un `try/catch` (voir le helper `decodeToken` de
+  `routes/auth.ts`), puis l'accès base dans le handler async ;
+- handler Socket.IO : `try/catch` couvrant tout le corps (c'est déjà le cas des
+  5 handlers de `realtime/chat.ts` et de `realtime/presence.ts`) ;
+- timer : encapsuler dans une fonction qui gère ses erreurs (`runSafe` de
+  `jobs/purge.ts`).
+
+Filet de dernier recours dans `index.ts` : `process.on('unhandledRejection')`
+journalise sans tuer le process. **Ce n'est pas une excuse** pour ne pas traiter
+l'erreur à la source. Pas de handler `uncaughtException` volontairement : une
+exception synchrone non rattrapée laisse un état imprévisible, et là redémarrer
+est le bon comportement (`restart: always` côté Docker).
+
 ## Rappels d'environnement (contrainte TOUJOURS active)
 
 - **Réseau bureau : ports PostgreSQL 5432/6543 bloqués → hotspot 4G obligatoire** pour toucher

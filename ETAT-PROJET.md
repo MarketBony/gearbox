@@ -204,6 +204,29 @@
       brouillon) sont donc vérifiées **indépendamment**. Brouillon également
       absent de l'Agenda et des Campagnes. Projet restauré à l'identique après test.
 
+15. **L'API survit désormais à une base injoignable**
+    (`fix/api-resiliente-base-injoignable`, 30 juillet). Une coupure de quelques
+    secondes vers Supabase tuait le process backend : l'accès base de `GET /me` et
+    `PUT /me` était dans le callback de `jwt.verify`, donc hors de portée du filet
+    d'erreur Express — Node terminait le process sur la promesse rejetée. En prod,
+    `restart: always` relançait le conteneur mais coupait **toutes** les connexions
+    Socket.IO au passage.
+    - Helper `decodeToken` avec la forme **synchrone** de `jwt.verify` (qui lève) ;
+      l'accès base revient dans le handler async, couvert par
+      `express-async-errors` + `middleware/errorHandler.ts`.
+    - Filet global `process.on('unhandledRejection')` dans `index.ts` : journalise
+      sans tuer. Pas de `uncaughtException` volontairement.
+    - Périmètre vérifié : le schéma dangereux n'existait que dans ces 2 routes.
+      Le middleware d'auth et le handshake socket utilisent des rappels
+      non-async ; les 5 handlers chat, la présence et le job de purge sont déjà
+      protégés.
+    - **Prouvé** sur une instance jetable (port 3999, `DATABASE_URL` pointée sur
+      une base inatteignable) : 3 appels → 3 × 500 JSON propre, process toujours
+      vivant, zéro trace de crash. Avant le correctif, le premier appel suffisait.
+    - Non-régression : 401 sans jeton, 403 jeton invalide, 200 avec le vrai jeton ;
+      `PUT /me` renvoyant les valeurs actuelles → 200 et profil strictement
+      inchangé. La règle est consignée dans `ETAT-BACKEND.md`.
+
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - **Catalogue matériel dupliqué en base** : 16 noms uniques mais 32 lignes, chaque
   équipement en double depuis le 8 juillet ~22:07 (double exécution de
