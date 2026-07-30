@@ -1,4 +1,4 @@
-# ÉTAT PROJET GEARBOX — synthèse au 29 juillet 2026
+# ÉTAT PROJET GEARBOX — synthèse au 30 juillet 2026
 
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
@@ -10,9 +10,11 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : `33107c4`
-  (Merge feat/realtime-modules, 29 juillet). Des commits de doc ou de backup
-  automatique peuvent suivre sans nécessiter de redéploiement.
+- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 14
+  (`fix/draft-hors-agregation`, 30 juillet — brouillons hors agrégation). Le SHA
+  exact se lit avec `git log --oneline -1` plutôt que d'être recopié ici, où il
+  devenait périmé à chaque lot. Des commits de doc ou de backup automatique
+  peuvent suivre sans nécessiter de redéploiement.
 - Procédure complète de déploiement à jour dans DEPLOIEMENT.md
 - Sauvegardes automatiques : `.github/workflows/backup.yml` pousse un dump Supabase
   dans `backups/` chaque semaine (commits `github-actions[bot]`) — penser à
