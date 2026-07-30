@@ -293,6 +293,15 @@
       }
       .custom-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(120,120,128,0.3) transparent; }
 
+      /* ===================== CHAMPS NUMÉRIQUES COMPACTS =====================
+         Les flèches natives de <input type="number"> occupent ~13 px À L'INTÉRIEUR
+         du champ. Dans un tableau dense (Campagnes : 8 colonnes de saisie), c'est
+         ce qui tronquait « 9500 » en « 95 » alors que la place textuelle suffisait.
+         Classe volontairement OPT-IN : elle ne change rien aux autres écrans. */
+      .gx-num-tight::-webkit-outer-spin-button,
+      .gx-num-tight::-webkit-inner-spin-button { -webkit-appearance: none; appearance: none; margin: 0; }
+      .gx-num-tight { -moz-appearance: textfield; appearance: textfield; }
+
       /* ===================== ANIMATIONS UTILITAIRES ===================== */
       @keyframes gx-fade-in { from { opacity: 0; } to { opacity: 1; } }
       @keyframes gx-fade-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }

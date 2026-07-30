@@ -40,135 +40,13 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
 import Avatar from '../components/Avatar';
-import DatePicker from '../components/DatePicker';
 import FloatingPanel from '../components/FloatingPanel';
+import DateRangePicker, { toLocalIso, parseLocalDate, getPeriodRanges } from '../components/DateRangePicker';
 
-// --- DATE HELPERS ---
-const toLocalIso = (d: Date): string =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+// Les aides de date et le sélecteur de période vivent désormais dans
+// components/DateRangePicker.tsx : la page Campagnes en a besoin aussi, et les
+// raccourcis semestre y ont été ajoutés au passage (30/07/2026).
 
-const formatDateBtn = (iso: string): string => {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-};
-
-// Parse local (anti-décalage J+1) : 'YYYY-MM-DD' → Date à minuit local.
-const parseLocalDate = (iso: string): Date => {
-  const [y, m, d] = (iso || '').split('-').map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-};
-
-const getPeriodRanges = () => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const mo = now.getMonth();
-  const day = now.getDay();
-  const monOffset = day === 0 ? -6 : 1 - day;
-  const mon = new Date(now); mon.setDate(now.getDate() + monOffset);
-  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-  const q = Math.floor(mo / 3);
-  const prevQ = q === 0 ? 3 : q - 1;
-  const prevQYear = q === 0 ? y - 1 : y;
-  return {
-    today:       { start: toLocalIso(now), end: toLocalIso(now) },
-    week:        { start: toLocalIso(mon), end: toLocalIso(sun) },
-    month:       { start: toLocalIso(new Date(y, mo, 1)), end: toLocalIso(new Date(y, mo + 1, 0)) },
-    quarter:     { start: toLocalIso(new Date(y, q * 3, 1)), end: toLocalIso(new Date(y, q * 3 + 3, 0)) },
-    prevQuarter: { start: toLocalIso(new Date(prevQYear, prevQ * 3, 1)), end: toLocalIso(new Date(prevQYear, prevQ * 3 + 3, 0)) },
-    year:        { start: `${y}-01-01`, end: `${y}-12-31` },
-    prevYear:    { start: `${y - 1}-01-01`, end: `${y - 1}-12-31` },
-  };
-};
-
-// --- COMPONENT: DATE RANGE PICKER ---
-interface DateRangePickerProps {
-  startDate: string; endDate: string;
-  onStartChange: (v: string) => void; onEndChange: (v: string) => void;
-}
-const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, onStartChange, onEndChange }) => {
-  const [open, setOpen] = useState(false);
-  const [customMode, setCustomMode] = useState(false);
-  const triggerRef = useRef<HTMLDivElement>(null);
-
-  const handleOpen = () => {
-    setOpen(v => !v);
-    setCustomMode(false);
-  };
-
-  const close = () => { setOpen(false); setCustomMode(false); };
-
-  const shortcuts = [
-    { label: "Aujourd'hui",         apply: () => { const r = getPeriodRanges(); onStartChange(r.today.start);       onEndChange(r.today.end);       close(); } },
-    { label: 'Cette semaine',        apply: () => { const r = getPeriodRanges(); onStartChange(r.week.start);        onEndChange(r.week.end);        close(); } },
-    { label: 'Ce mois',              apply: () => { const r = getPeriodRanges(); onStartChange(r.month.start);       onEndChange(r.month.end);       close(); } },
-    { label: 'Ce trimestre',         apply: () => { const r = getPeriodRanges(); onStartChange(r.quarter.start);     onEndChange(r.quarter.end);     close(); } },
-    { label: 'Le trimestre dernier', apply: () => { const r = getPeriodRanges(); onStartChange(r.prevQuarter.start); onEndChange(r.prevQuarter.end); close(); } },
-    { label: 'Cette année',          apply: () => { const r = getPeriodRanges(); onStartChange(r.year.start);        onEndChange(r.year.end);        close(); } },
-    { label: "L'année dernière",     apply: () => { const r = getPeriodRanges(); onStartChange(r.prevYear.start);    onEndChange(r.prevYear.end);    close(); } },
-    { label: 'Personnalisé',         apply: () => setCustomMode(true) },
-  ];
-
-  const shortcutList = (
-    <div className="p-1">
-      {shortcuts.map(s => (
-        <button key={s.label} onClick={s.apply}
-          className="w-full text-left px-3 py-2.5 text-xs font-bold text-bony-text hover:bg-white/5 rounded-lg transition flex items-center justify-between gap-2 min-w-0">
-          <span className="truncate min-w-0">{s.label}</span>
-          {s.label === 'Personnalisé' && <ChevronRight size={14} className="text-slate-500 shrink-0" />}
-        </button>
-      ))}
-    </div>
-  );
-
-  const customForm = (
-    <div className="p-4 space-y-3">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Période personnalisée</span>
-        <button onClick={() => setCustomMode(false)} className="text-slate-400 hover:text-bony-text"><X size={14} /></button>
-      </div>
-      <div className="space-y-2">
-        <div>
-          <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Du</label>
-          <DatePicker value={startDate} onChange={v => onStartChange(v)} size="sm" />
-        </div>
-        <div>
-          <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Au</label>
-          <DatePicker value={endDate} onChange={v => onEndChange(v)} size="sm" />
-        </div>
-      </div>
-      <button onClick={close} className="w-full py-2 rounded-lg bg-bony-gradient text-white text-xs font-bold mt-1">
-        Appliquer
-      </button>
-    </div>
-  );
-
-  return (
-    <div ref={triggerRef} className="relative">
-      {/* Trigger */}
-      <div className="flex items-center gap-1.5">
-        <div className="flex flex-col">
-          <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Du</span>
-          <button onClick={handleOpen}
-            className="flex items-center gap-1.5 text-xs font-bold text-bony-text hover:text-bony-orange transition whitespace-nowrap">
-            {formatDateBtn(startDate)} <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
-        <span className="text-slate-400 text-xs mt-3">→</span>
-        <div className="flex flex-col">
-          <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Au</span>
-          <button onClick={handleOpen}
-            className="flex items-center gap-1.5 text-xs font-bold text-bony-text hover:text-bony-orange transition whitespace-nowrap">
-            {formatDateBtn(endDate)} <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      <FloatingPanel open={open} onClose={close} triggerRef={triggerRef} width={208} maxHeight={360} className="rounded-xl">
-        {customMode ? customForm : shortcutList}
-      </FloatingPanel>
-    </div>
-  );
-};
 
 // --- COMPONENT: SITE CONTEXT PICKER ---
 const ALL_PLAQUE_SITES = Object.values(PLAQUES_STRUCTURE).flat();

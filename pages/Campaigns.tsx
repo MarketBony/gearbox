@@ -6,14 +6,14 @@ import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS } from '../constants';
-import { Search, Filter, X, Mail, MessageSquare, Megaphone, Save, Euro, BarChart3, Percent, Hash, FileText, Calendar, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Filter, X, Mail, MessageSquare, Megaphone, Save, Euro, BarChart3, Percent, Hash, FileText, Calendar, ArrowUpDown, ArrowUp, ArrowDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { 
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList 
 } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
-import DatePicker from '../components/DatePicker';
+import DateRangePicker from '../components/DateRangePicker';
 
 // --- TYPES ---
 interface CampaignTask extends Task {
@@ -25,7 +25,6 @@ interface CampaignTask extends Task {
   parentStartDate: string;
 }
 
-type ChartTypeFilter = 'Tout' | 'SMS' | 'E-mail';
 type MetricFilter = 'Volume' | 'Ouverture' | 'Clics';
 
 // --- COLORS ---
@@ -47,18 +46,14 @@ const PIE_COLORS: Record<string, string> = {
 };
 
 // --- HELPERS ---
-const formatDateShort = (dateString: string) => {
+
+// Date sur UNE seule ligne (10/09/26) pour les lignes desktop : la version
+// jour/mois + année sur deux lignes coûtait de la hauteur pour rien.
+const formatDateCompact = (dateString: string) => {
   if (!dateString) return '-';
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return '-';
-  return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short' }).format(date);
-};
-
-const formatYear = (dateString: string) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return '';
-  return date.getFullYear().toString();
+  return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }).format(date);
 };
 
 const Campaigns: React.FC = () => {
@@ -70,23 +65,27 @@ const Campaigns: React.FC = () => {
 
   const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Coordinator';
 
-  // --- GLOBAL CHART FILTERS ---
+  // --- FILTRES UNIFIÉS (refonte du 30/07/2026) ---
+  // Avant : DEUX périodes indépendantes (chartStartDate/chartEndDate pour les
+  // graphiques, filterStartDate/filterEndDate pour la liste) et DEUX filtres de
+  // canal (globalType pour les graphiques, filterChannel pour la liste) sur le
+  // même écran. Un seul jeu pilote désormais les deux.
   const currentYear = new Date().getFullYear();
-  const [chartStartDate, setChartStartDate] = useSessionState<string>('campaigns_chartStartDate', `${currentYear}-01-01`);
-  const [chartEndDate, setChartEndDate] = useSessionState<string>('campaigns_chartEndDate', `${currentYear}-12-31`);
-  const [globalType, setGlobalType] = useSessionState<ChartTypeFilter>('campaigns_globalType', 'Tout');
+  const [startDate, setStartDate] = useSessionState<string>('campaigns_start', `${currentYear}-01-01`);
+  const [endDate, setEndDate] = useSessionState<string>('campaigns_end', `${currentYear}-12-31`);
+  const [filterChannel, setFilterChannel] = useSessionState<'All' | 'SMS' | 'E-mail'>('campaigns_filterChannel', 'All');
 
-  // Specific toggle for Chart 2 metric
+  // Réglage d'AFFICHAGE du graphique 2 : ne filtre rien, reste près du graphique.
   const [c2Metric, setC2Metric] = useSessionState<MetricFilter>('campaigns_c2Metric', 'Volume');
 
-  // --- MAIN LIST FILTER STATES ---
+  // Graphiques repliables : ils vivent maintenant DANS la zone de défilement, donc
+  // ils s'effacent au scroll ; ce réglage permet en plus de les masquer d'emblée.
+  const [chartsOuverts, setChartsOuverts] = useSessionState<boolean>('campaigns_chartsOuverts', true);
+
   const [searchTerm, setSearchTerm] = useSessionState<string>('campaigns_searchTerm', '');
   const [filterContext, setFilterContext] = useSessionState<string>('campaigns_filterContext', 'All');
   const [filterService, setFilterService] = useSessionState<ServiceType | 'All'>('campaigns_filterService', 'All');
   const [filterBrand, setFilterBrand] = useSessionState<BrandType | 'All'>('campaigns_filterBrand', 'All');
-  const [filterChannel, setFilterChannel] = useSessionState<'All' | 'SMS' | 'E-mail'>('campaigns_filterChannel', 'All');
-  const [filterStartDate, setFilterStartDate] = useSessionState<string>('campaigns_filterStartDate', '');
-  const [filterEndDate, setFilterEndDate] = useSessionState<string>('campaigns_filterEndDate', '');
   const [sortOrder, setSortOrder] = useSessionState<'asc' | 'desc'>('campaigns_sortOrder', 'desc');
 
   const scrollRef = useScrollRestore('campaigns');
@@ -165,14 +164,16 @@ const Campaigns: React.FC = () => {
 
   // --- CHART HELPERS --- (Simplified for brevity, logic unchanged)
   // ... (Chart logic remains identical to previous file, reused here)
-  const filterChartData = (tasks: CampaignTask[], start: string, end: string, type: ChartTypeFilter) => {
+  // Le canal vient désormais du filtre UNIQUE de la page ('All' | 'SMS' | 'E-mail'),
+  // plus d'un sélecteur propre aux graphiques ('Tout' | 'SMS' | 'E-mail').
+  const filterChartData = (tasks: CampaignTask[], start: string, end: string, type: 'All' | 'SMS' | 'E-mail') => {
       const dStart = new Date(start);
       const dEnd = new Date(end);
       dEnd.setHours(23, 59, 59, 999);
-      
+
       return tasks.filter(t => {
           const tDate = new Date(t.parentStartDate);
-          const typeMatch = type === 'Tout' ? true : t.channel === type;
+          const typeMatch = type === 'All' ? true : t.channel === type;
           return tDate >= dStart && tDate <= dEnd && typeMatch;
       });
   };
@@ -187,9 +188,9 @@ const Campaigns: React.FC = () => {
 
   // --- CHART 1 DATA GENERATOR (Count campaigns over time) ---
   const chart1Data = useMemo(() => {
-      const filtered = filterChartData(allCampaigns, chartStartDate, chartEndDate, globalType);
+      const filtered = filterChartData(allCampaigns, startDate, endDate, filterChannel);
       const groups: Record<string, number> = {};
-      const formatOpts = getDateFormatOptions(chartStartDate, chartEndDate);
+      const formatOpts = getDateFormatOptions(startDate, endDate);
       const format = new Intl.DateTimeFormat('fr-FR', formatOpts);
 
       filtered.sort((a,b) => new Date(a.parentStartDate).getTime() - new Date(b.parentStartDate).getTime());
@@ -200,13 +201,13 @@ const Campaigns: React.FC = () => {
       });
 
       return Object.entries(groups).map(([name, value]) => ({ name, value }));
-  }, [allCampaigns, chartStartDate, chartEndDate, globalType]);
+  }, [allCampaigns, startDate, endDate, filterChannel]);
 
   // --- CHART 2 DATA GENERATOR (Performance) ---
   const chart2Data = useMemo(() => {
-      const filtered = filterChartData(allCampaigns, chartStartDate, chartEndDate, globalType);
+      const filtered = filterChartData(allCampaigns, startDate, endDate, filterChannel);
       const groups: Record<string, { sum: number, count: number }> = {};
-      const formatOpts = getDateFormatOptions(chartStartDate, chartEndDate);
+      const formatOpts = getDateFormatOptions(startDate, endDate);
       const format = new Intl.DateTimeFormat('fr-FR', formatOpts);
 
       filtered.sort((a,b) => new Date(a.parentStartDate).getTime() - new Date(b.parentStartDate).getTime());
@@ -228,11 +229,11 @@ const Campaigns: React.FC = () => {
           name,
           value: c2Metric === 'Volume' ? data.sum : Math.round(data.sum / data.count) 
       }));
-  }, [allCampaigns, chartStartDate, chartEndDate, globalType, c2Metric]);
+  }, [allCampaigns, startDate, endDate, filterChannel, c2Metric]);
 
   // --- CHART 3 DATA GENERATOR (Budget Pie) ---
   const chart3Data = useMemo(() => {
-      const filtered = filterChartData(allCampaigns, chartStartDate, chartEndDate, globalType);
+      const filtered = filterChartData(allCampaigns, startDate, endDate, filterChannel);
       
       const groups: Record<string, number> = { 'VN': 0, 'VO': 0, 'APV': 0, 'PR': 0 };
       let total = 0;
@@ -261,7 +262,7 @@ const Campaigns: React.FC = () => {
         }))
         .filter(d => d.value > 0)
         .sort((a, b) => b.value - a.value); 
-  }, [allCampaigns, chartStartDate, chartEndDate, globalType]);
+  }, [allCampaigns, startDate, endDate, filterChannel]);
 
 
   // --- MAIN LIST FILTERING & SORTING ---
@@ -297,8 +298,8 @@ const Campaigns: React.FC = () => {
              if (!hasBrand) return false;
         }
 
-        if (filterStartDate && item.parentStartDate < filterStartDate) return false;
-        if (filterEndDate && item.parentStartDate > filterEndDate) return false;
+        if (startDate && item.parentStartDate < startDate) return false;
+        if (endDate && item.parentStartDate > endDate) return false;
 
         return true;
     });
@@ -308,7 +309,7 @@ const Campaigns: React.FC = () => {
         const dateB = new Date(b.parentStartDate).getTime();
         return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
     });
-  }, [allCampaigns, searchTerm, filterChannel, filterContext, filterService, filterBrand, filterStartDate, filterEndDate, sortOrder]);
+  }, [allCampaigns, searchTerm, filterChannel, filterContext, filterService, filterBrand, startDate, endDate, sortOrder]);
 
   const resetFilters = () => {
       setSearchTerm('');
@@ -316,8 +317,10 @@ const Campaigns: React.FC = () => {
       setFilterService('All');
       setFilterBrand('All');
       setFilterChannel('All');
-      setFilterStartDate('');
-      setFilterEndDate('');
+      // La période revient à l'année en cours (défaut), et non à une valeur vide :
+      // elle pilote aussi les graphiques, qui ont besoin de bornes.
+      setStartDate(`${currentYear}-01-01`);
+      setEndDate(`${currentYear}-12-31`);
       setSortOrder('desc');
   };
 
@@ -333,43 +336,131 @@ const Campaigns: React.FC = () => {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       
-      {/* --- GLOBAL CHART CONTROLS --- */}
-      <div className="px-3 md:px-6 py-2 glass-strong border-b border-bony-border flex flex-wrap items-center justify-between gap-2 shrink-0">
-         <div className="flex flex-wrap items-center gap-2 md:gap-4">
-             {/* DATE PICKERS */}
-             <div className="flex flex-wrap items-center gap-2 bg-slate-100 dark:bg-black/30 p-1 rounded border border-bony-border">
-                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest pl-1">Du</span>
-                 <div className="w-32 md:w-36">
-                     <DatePicker
-                        value={chartStartDate}
-                        onChange={(v) => setChartStartDate(v)}
-                        size="sm"
-                     />
-                 </div>
-                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Au</span>
-                 <div className="w-32 md:w-36">
-                     <DatePicker
-                        value={chartEndDate}
-                        onChange={(v) => setChartEndDate(v)}
-                        size="sm"
-                     />
-                 </div>
-             </div>
-             
-             <div className="w-px h-4 bg-bony-border hidden md:block"></div>
-
-             <div className="flex items-center gap-2">
-                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Type</span>
-                 <FilterSelect value={globalType} onChange={setGlobalType} options={['Tout', 'SMS', 'E-mail']} />
-             </div>
-         </div>
-         <div className="text-[9px] text-slate-600 font-sans hidden sm:block">
-            ANALYSE STATISTIQUE
-         </div>
+      {/* --- EN-TÊTE : période unique + repli des graphiques ---
+           Une seule période pilote désormais les graphiques ET la liste. Le
+           sélecteur est celui du Dashboard (components/DateRangePicker), avec ses
+           raccourcis semaine / mois / trimestre / semestre / année / personnalisé.
+           L'ancien filtre « Type » a disparu : il faisait doublon avec le filtre
+           Canal de la liste, qui pilote maintenant les deux. */}
+      <div className="px-3 md:px-6 py-2 glass-strong border-b border-bony-border flex flex-wrap items-center justify-between gap-3 shrink-0">
+         <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onStartChange={setStartDate}
+            onEndChange={setEndDate}
+         />
+         <button
+            onClick={() => setChartsOuverts(!chartsOuverts)}
+            className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-lg border border-bony-border text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-bony-text hover:bg-white/5 transition"
+            title={chartsOuverts ? 'Masquer les graphiques pour gagner de la place' : 'Afficher les graphiques d\'analyse'}
+         >
+            <BarChart3 size={13} className="text-bony-violet" />
+            <span className="hidden sm:inline">{chartsOuverts ? 'Masquer l\'analyse' : 'Afficher l\'analyse'}</span>
+            {chartsOuverts ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+         </button>
       </div>
 
-      {/* --- DASHBOARD GRAPHIQUE (Fixed Height) --- */}
-      <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-bony-border shrink-0 md:h-64 h-auto">
+
+
+      {/* HEADER & FILTERS
+           Recherche, témoin d'enregistrement et bouton de filtres sur UNE ligne :
+           le titre « LISTING & ÉDITION EN MASSE » occupait une ligne entière pour
+           une information que la page donne déjà. ~40 px de mobilier fixe gagnés. */}
+      <div className="px-3 md:px-6 py-2 border-b border-bony-border glass-strong glass-sheen relative overflow-hidden z-20 shadow-md shrink-0">
+          <div className="flex items-center gap-2">
+                <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Filtrer la liste..."
+                        className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet transition-colors"
+                    />
+                </div>
+                {saving && <span className="hidden md:flex text-bony-orange items-center text-[10px] animate-pulse font-bold shrink-0"><Save size={10} className="mr-1"/> ENREGISTREMENT...</span>}
+                <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`shrink-0 flex items-center gap-2 px-3 py-1.5 min-h-[44px] rounded-lg transition border ${
+                        showFilters
+                        ? 'bg-bony-orange text-white border-bony-orange'
+                        : 'bg-slate-100 dark:bg-black/30 text-slate-500 dark:text-slate-300 border-bony-border hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                >
+                    {showFilters ? <X size={14} /> : <Filter size={14} />}
+                    <span className="text-[10px] font-bold uppercase hidden sm:inline">Filtres Liste</span>
+                </button>
+          </div>
+
+          {/* EXPANDABLE FILTER PANEL */}
+          {showFilters && (
+            <div className="bg-slate-50 dark:bg-black/40 border border-bony-border rounded-lg p-4 mt-2 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                {/* Filters Content (Same as before) */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Canal */}
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Canal</label>
+                        <div className="flex gap-2">
+                             <button onClick={() => setFilterChannel('All')} className={`flex-1 py-1.5 text-[10px] font-bold rounded border ${filterChannel === 'All' ? 'bg-white dark:bg-white text-black border-slate-300' : 'bg-transparent text-slate-500 border-slate-300 dark:border-slate-700'}`}>TOUT</button>
+                             <button onClick={() => setFilterChannel('E-mail')} className={`flex-1 py-1.5 text-[10px] font-bold rounded border ${filterChannel === 'E-mail' ? 'bg-bony-orange/20 text-bony-orange border-bony-orange' : 'bg-transparent text-slate-500 border-slate-300 dark:border-slate-700'}`}>E-MAIL</button>
+                             <button onClick={() => setFilterChannel('SMS')} className={`flex-1 py-1.5 text-[10px] font-bold rounded border ${filterChannel === 'SMS' ? 'bg-bony-blue/20 text-blue-400 border-bony-blue' : 'bg-transparent text-slate-500 border-slate-300 dark:border-slate-700'}`}>SMS</button>
+                        </div>
+                    </div>
+                    {/* Context */}
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Plaque / Site</label>
+                        <Select
+                            value={filterContext}
+                            onChange={(v) => setFilterContext(v)}
+                            size="sm"
+                            options={[
+                                { value: 'All', label: 'TOUT LE RÉSEAU' },
+                                ...Object.entries(PLAQUES_STRUCTURE).flatMap(([plaqueName, sites]) => [
+                                    { value: plaqueName, label: `★ ${plaqueName}` },
+                                    ...sites.map(site => ({ value: site, label: site })),
+                                ]),
+                            ]}
+                        />
+                    </div>
+                    {/* La « Période Liste » a été retirée le 30/07/2026 : elle
+                        faisait doublon avec la période de l'en-tête, qui pilote
+                        désormais les graphiques ET la liste. */}
+                    {/* Brand */}
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Marque</label>
+                        <div className="flex flex-wrap gap-1">
+                            <button onClick={() => setFilterBrand('All')} className={`px-2 py-1 text-[9px] font-bold rounded border ${filterBrand === 'All' ? 'bg-white text-black border-slate-300' : 'border-slate-300 dark:border-slate-700 text-slate-500'}`}>TOUT</button>
+                            {BRANDS.filter(b => b !== 'Holding').map(b => (
+                                <button key={b} onClick={() => setFilterBrand(b)} className={`px-2 py-1 text-[9px] font-bold rounded border ${filterBrand === b ? 'bg-bony-panel text-bony-orange border-bony-orange' : 'border-slate-300 dark:border-slate-700 text-slate-500'}`}>{b}</button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-bony-border">
+                    <button onClick={resetFilters} className="text-[10px] font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white underline">
+                        RÉINITIALISER TOUT
+                    </button>
+                    <div className="text-[10px] font-sans text-bony-violet">
+                        {filteredCampaigns.length} RÉSULTAT(S)
+                    </div>
+                </div>
+            </div>
+          )}
+      </div>
+
+      {/* CAMPAIGN LIST - TABLE HEADER */}
+
+      {/* CAMPAIGN LIST - ROWS */}
+      {/* Padding vertical HAUT à zéro, et paddings écrits sans raccourci `p-*` :
+          `p-3 md:p-6 pt-2` donnait en réalité 24 px en haut (md:p-6 est émis
+          APRÈS pt-2 et l'écrasait), et l'en-tête de colonnes `sticky top-0` se
+          collait donc 24 px trop bas — les lignes défilaient au-dessus de lui. */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar px-3 md:px-6 pt-0 pb-3 md:pb-6">
+          {/* Graphiques DANS la zone de défilement : ils s'effacent dès qu'on
+              scrolle, au lieu d'occuper 28 % de l'écran en permanence. Le bouton
+              de l'en-tête permet en plus de les masquer d'emblée. */}
+          {chartsOuverts && (
+      <div className="pt-3 md:pt-4 pb-4 mb-2 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-bony-border md:h-64 h-auto">
           
           {/* CHART 1: Nb Campagnes */}
           <div className="gx-card p-3 flex flex-col relative">
@@ -519,129 +610,19 @@ const Campaigns: React.FC = () => {
                </div>
           </div>
       </div>
-
-
-      {/* HEADER & FILTERS */}
-      <div className="px-6 py-4 border-b border-bony-border glass-strong glass-sheen relative overflow-hidden z-20 shadow-md shrink-0">
-          <div className="flex justify-between items-end mb-2">
-              <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-3">
-                      <p className="text-xs text-slate-400 font-sans">LISTING & ÉDITION EN MASSE</p>
-                      {saving && <span className="text-bony-orange flex items-center text-[10px] animate-pulse font-bold"><Save size={10} className="mr-1"/> ENREGISTREMENT...</span>}
-                  </div>
-              </div>
-              <div className="flex gap-2">
-                  <button
-                      onClick={() => setShowFilters(!showFilters)}
-                      className={`flex items-center gap-2 px-3 py-1.5 min-h-[44px] rounded-lg transition border ${
-                          showFilters
-                          ? 'bg-bony-orange text-white border-bony-orange'
-                          : 'bg-slate-100 dark:bg-black/30 text-slate-500 dark:text-slate-300 border-bony-border hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                  >
-                      {showFilters ? <X size={14} /> : <Filter size={14} />}
-                      <span className="text-[10px] font-bold uppercase">Filtres Liste</span>
-                  </button>
-              </div>
-          </div>
-
-          {/* SEARCH & ACTIVE FILTERS */}
-          <div className="relative mb-2">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-                <input 
-                    type="text" 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Filtrer la liste..."
-                    className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet transition-colors"
-                />
-          </div>
-
-          {/* EXPANDABLE FILTER PANEL */}
-          {showFilters && (
-            <div className="bg-slate-50 dark:bg-black/40 border border-bony-border rounded-lg p-4 mt-2 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                {/* Filters Content (Same as before) */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {/* Canal */}
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Canal</label>
-                        <div className="flex gap-2">
-                             <button onClick={() => setFilterChannel('All')} className={`flex-1 py-1.5 text-[10px] font-bold rounded border ${filterChannel === 'All' ? 'bg-white dark:bg-white text-black border-slate-300' : 'bg-transparent text-slate-500 border-slate-300 dark:border-slate-700'}`}>TOUT</button>
-                             <button onClick={() => setFilterChannel('E-mail')} className={`flex-1 py-1.5 text-[10px] font-bold rounded border ${filterChannel === 'E-mail' ? 'bg-bony-orange/20 text-bony-orange border-bony-orange' : 'bg-transparent text-slate-500 border-slate-300 dark:border-slate-700'}`}>E-MAIL</button>
-                             <button onClick={() => setFilterChannel('SMS')} className={`flex-1 py-1.5 text-[10px] font-bold rounded border ${filterChannel === 'SMS' ? 'bg-bony-blue/20 text-blue-400 border-bony-blue' : 'bg-transparent text-slate-500 border-slate-300 dark:border-slate-700'}`}>SMS</button>
-                        </div>
-                    </div>
-                    {/* Context */}
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Plaque / Site</label>
-                        <Select
-                            value={filterContext}
-                            onChange={(v) => setFilterContext(v)}
-                            size="sm"
-                            options={[
-                                { value: 'All', label: 'TOUT LE RÉSEAU' },
-                                ...Object.entries(PLAQUES_STRUCTURE).flatMap(([plaqueName, sites]) => [
-                                    { value: plaqueName, label: `★ ${plaqueName}` },
-                                    ...sites.map(site => ({ value: site, label: site })),
-                                ]),
-                            ]}
-                        />
-                    </div>
-                    {/* Dates */}
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Période Liste</label>
-                        <div className="flex gap-2">
-                            <div className="flex-1">
-                                <DatePicker
-                                    value={filterStartDate}
-                                    onChange={(v) => setFilterStartDate(v)}
-                                    size="sm"
-                                />
-                            </div>
-                            <div className="flex-1">
-                                <DatePicker
-                                    value={filterEndDate}
-                                    onChange={(v) => setFilterEndDate(v)}
-                                    size="sm"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    {/* Brand */}
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Marque</label>
-                        <div className="flex flex-wrap gap-1">
-                            <button onClick={() => setFilterBrand('All')} className={`px-2 py-1 text-[9px] font-bold rounded border ${filterBrand === 'All' ? 'bg-white text-black border-slate-300' : 'border-slate-300 dark:border-slate-700 text-slate-500'}`}>TOUT</button>
-                            {BRANDS.filter(b => b !== 'Holding').map(b => (
-                                <button key={b} onClick={() => setFilterBrand(b)} className={`px-2 py-1 text-[9px] font-bold rounded border ${filterBrand === b ? 'bg-bony-panel text-bony-orange border-bony-orange' : 'border-slate-300 dark:border-slate-700 text-slate-500'}`}>{b}</button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-                <div className="flex justify-between items-center pt-2 border-t border-bony-border">
-                    <button onClick={resetFilters} className="text-[10px] font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white underline">
-                        RÉINITIALISER TOUT
-                    </button>
-                    <div className="text-[10px] font-sans text-bony-violet">
-                        {filteredCampaigns.length} RÉSULTAT(S)
-                    </div>
-                </div>
-            </div>
           )}
-      </div>
 
-      {/* CAMPAIGN LIST - TABLE HEADER */}
-      <div className="hidden md:flex px-6 py-2 border-b border-bony-border bg-slate-100 dark:bg-black/20 gap-4 text-[9px] font-bold text-slate-500 uppercase tracking-widest shrink-0">
+      <div className="hidden md:flex sticky top-0 z-10 -mx-6 px-6 py-2 mb-2 border-b border-bony-border bg-slate-100 dark:bg-bony-dark gap-4 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
           <button 
             onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-            className="w-20 text-center flex items-center justify-center gap-1 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+            className="w-[5.5rem] text-center flex items-center justify-center gap-1 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
           >
               Date
               {sortOrder === 'asc' ? <ArrowUp size={10}/> : <ArrowDown size={10}/>}
           </button>
           <div className="w-[25%]">Campagne / Projet</div>
-          <div className="flex-1 grid grid-cols-8 gap-2 text-center">
-              <div className="flex items-center justify-center gap-1"><Euro size={10}/> Coût</div>
+          <div className="flex-1 grid grid-cols-9 gap-2 text-center">
+              <div className="col-span-2 flex items-center justify-center gap-1"><Euro size={10}/> Coût</div>
               <div className="flex items-center justify-center gap-1"><BarChart3 size={10}/> Vol.</div>
               <div className="flex items-center justify-center gap-1"><Percent size={10}/> Ouv.</div>
               <div className="flex items-center justify-center gap-1"><Percent size={10}/> NPAI</div>
@@ -651,9 +632,6 @@ const Campaigns: React.FC = () => {
               <div className="flex items-center justify-center gap-1"><FileText size={10}/> Factu</div>
           </div>
       </div>
-
-      {/* CAMPAIGN LIST - ROWS */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-6 pt-2">
           {filteredCampaigns.length > 0 ? (
             <>
               {/* Mobile card view */}
@@ -675,7 +653,7 @@ const Campaigns: React.FC = () => {
               </div>
 
               {/* Desktop table view */}
-              <div className="hidden md:block space-y-2">
+              <div className="hidden md:block space-y-1.5">
                 {filteredCampaigns.map((task, idx) => {
                     const isEmail = task.channel === 'E-mail';
                     const ChannelIcon = isEmail ? Mail : MessageSquare;
@@ -683,34 +661,32 @@ const Campaigns: React.FC = () => {
                     const borderHover = isEmail ? 'hover:border-bony-orange/50' : 'hover:border-bony-blue/50';
 
                     return (
-                        <div key={`${task.parentProjectId}-${task.id}-${idx}`} className={`gx-glass-panel border border-bony-border rounded-lg p-3 flex items-center gap-4 transition-all group ${borderHover}`}>
-                            
-                            {/* DATE COLUMN */}
-                            <div className="w-20 flex flex-col items-center justify-center border-r border-bony-border pr-4 shrink-0">
-                                <span className="text-sm font-title font-bold text-slate-900 dark:text-white">{formatDateShort(task.parentStartDate)}</span>
-                                <span className="text-[9px] text-slate-500 font-sans">{formatYear(task.parentStartDate)}</span>
+                        <div key={`${task.parentProjectId}-${task.id}-${idx}`} className={`gx-glass-panel border border-bony-border rounded-lg px-3 py-2 flex items-center gap-4 transition-all group ${borderHover}`}>
+
+                            {/* DATE COLUMN — une seule ligne (voir formatDateCompact) */}
+                            <div className="w-16 flex items-center justify-center border-r border-bony-border pr-3 shrink-0">
+                                <span className="text-xs font-title font-bold text-slate-900 dark:text-white whitespace-nowrap">{formatDateCompact(task.parentStartDate)}</span>
                             </div>
 
-                            {/* INFO BLOCK (25%) */}
-                            <div className="w-[25%] flex items-start gap-3 shrink-0">
-                                <div className={`mt-1 p-2 rounded bg-slate-100 dark:bg-black/30 border border-bony-border ${accentColor}`}>
-                                    <ChannelIcon size={16} />
+                            {/* INFO BLOCK (25%) — deux lignes : projet, puis tâche + badges */}
+                            <div className="w-[25%] flex items-center gap-2 shrink-0">
+                                <div className={`p-1.5 rounded bg-slate-100 dark:bg-black/30 border border-bony-border ${accentColor} shrink-0`}>
+                                    <ChannelIcon size={14} />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    {/* Main Title = Project Name */}
-                                    <h3 className="text-slate-900 dark:text-white font-bold truncate text-sm leading-tight mb-0.5" title={task.parentProjectName}>
+                                    {/* Ligne 1 = nom du projet */}
+                                    <h3 className="text-slate-900 dark:text-white font-bold truncate text-sm leading-tight" title={task.parentProjectName}>
                                         {task.parentProjectName}
                                     </h3>
-                                    {/* Subtitle = Task Name */}
-                                    <p className="text-xs text-slate-500 font-medium truncate mb-1" title={task.name}>
-                                        {task.name}
-                                    </p>
-                                    
-                                    {/* Badges */}
-                                    <div className="flex flex-wrap gap-1 mt-1">
-                                        <span className="text-[9px] font-sans text-slate-500 bg-slate-100 dark:bg-black/40 px-1 rounded border border-bony-border">{task.parentProjectSite}</span>
+                                    {/* Ligne 2 = nom de la tâche + badges site/marque, sur la MÊME ligne :
+                                        c'est la troisième ligne qui coûtait le plus de hauteur. */}
+                                    <div className="flex items-center gap-1 min-w-0 leading-tight">
+                                        <span className="text-xs text-slate-500 font-medium truncate min-w-0" title={task.name}>
+                                            {task.name}
+                                        </span>
+                                        <span className="text-[8px] font-sans text-slate-500 bg-slate-100 dark:bg-black/40 px-1 rounded border border-bony-border shrink-0 whitespace-nowrap">{task.parentProjectSite}</span>
                                         {task.parentBrands?.map(b => (
-                                            <span key={b} className={`text-[8px] px-1 rounded border ${BRAND_COLORS[b] || 'border-slate-600 text-slate-500'} scale-90 origin-left`}>
+                                            <span key={b} className={`text-[8px] px-1 rounded border shrink-0 whitespace-nowrap ${BRAND_COLORS[b] || 'border-slate-600 text-slate-500'}`}>
                                                 {b}
                                             </span>
                                         ))}
@@ -718,11 +694,20 @@ const Campaigns: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* RIGHT: DATA BLOCKS (Flex-1) */}
-                            <div className="flex-1 grid grid-cols-8 gap-2 items-center">
-                                {/* 1. Coût (Read Only) */}
-                                <div className="bg-slate-100 dark:bg-black/40 border border-bony-border rounded px-2 py-1.5 text-right">
-                                    <span className="text-slate-700 dark:text-white font-sans text-xs font-bold">{task.cost} €</span>
+                            {/* RIGHT: DATA BLOCKS (Flex-1)
+                                9 colonnes dont 2 pour le Coût : il affiche un montant complet
+                                (« 11425 € ») là où les 7 autres n'ont que 2 à 5 caractères.
+                                ⚠️ On reste sur les classes Tailwind standard (grid-cols-9) et NON
+                                sur un gabarit arbitraire : grid-cols-N vaut minmax(0,1fr), alors
+                                qu'un « 1fr » écrit à la main vaut minmax(auto,1fr) — et les
+                                <input> imposent alors leur largeur intrinsèque (~147 px), ce qui
+                                fait exploser la grille. Même gabarit dans l'en-tête. */}
+                            <div className="flex-1 grid grid-cols-9 gap-2 items-center">
+                                {/* 1. Coût (lecture seule) — whitespace-nowrap OBLIGATOIRE :
+                                    sans lui « 600 € » passe à la ligne dans une colonne de 51 px
+                                    et c'est CETTE case qui imposait 80 px à toute la ligne. */}
+                                <div className="col-span-2 bg-slate-100 dark:bg-black/40 border border-bony-border rounded px-2 py-1.5 text-right overflow-hidden">
+                                    <span className="block text-slate-700 dark:text-white font-sans text-xs font-bold whitespace-nowrap truncate" title={`${task.cost} €`}>{task.cost} €</span>
                                 </div>
 
                                 {/* 2. Volumétrie (Number) */}
@@ -732,7 +717,7 @@ const Campaigns: React.FC = () => {
                                     placeholder="0"
                                     value={task.volumetry || ''}
                                     onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'volumetry', Number(e.target.value))}
-                                    className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded px-2 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
+                                    className="bg-slate-100 dark:bg-black/20 gx-num-tight border border-bony-border rounded px-1.5 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
                                 />
 
                                 {/* 3. % Ouverture (0-100) */}
@@ -744,9 +729,8 @@ const Campaigns: React.FC = () => {
                                         min="0" max="100"
                                         value={task.openRate || ''}
                                         onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'openRate', Number(e.target.value))}
-                                        className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded px-2 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
+                                        className="w-full bg-slate-100 dark:bg-black/20 gx-num-tight border border-bony-border rounded px-1.5 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
                                     />
-                                    <span className="absolute right-1 top-1.5 text-[8px] text-slate-500 pointer-events-none">%</span>
                                 </div>
 
                                 {/* 4. % NPAI */}
@@ -758,9 +742,8 @@ const Campaigns: React.FC = () => {
                                         min="0" max="100"
                                         value={task.npaiRate || ''}
                                         onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'npaiRate', Number(e.target.value))}
-                                        className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded px-2 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
+                                        className="w-full bg-slate-100 dark:bg-black/20 gx-num-tight border border-bony-border rounded px-1.5 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
                                     />
-                                    <span className="absolute right-1 top-1.5 text-[8px] text-slate-500 pointer-events-none">%</span>
                                 </div>
 
                                 {/* 5. % STOP */}
@@ -772,9 +755,8 @@ const Campaigns: React.FC = () => {
                                         min="0" max="100"
                                         value={task.stopRate || ''}
                                         onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'stopRate', Number(e.target.value))}
-                                        className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded px-2 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
+                                        className="w-full bg-slate-100 dark:bg-black/20 gx-num-tight border border-bony-border rounded px-1.5 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
                                     />
-                                    <span className="absolute right-1 top-1.5 text-[8px] text-slate-500 pointer-events-none">%</span>
                                 </div>
 
                                 {/* 6. % Clics */}
@@ -786,9 +768,8 @@ const Campaigns: React.FC = () => {
                                         min="0" max="100"
                                         value={task.clickRate || ''}
                                         onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'clickRate', Number(e.target.value))}
-                                        className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded px-2 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
+                                        className="w-full bg-slate-100 dark:bg-black/20 gx-num-tight border border-bony-border rounded px-1.5 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
                                     />
-                                    <span className="absolute right-1 top-1.5 text-[8px] text-slate-500 pointer-events-none">%</span>
                                 </div>
 
                                 {/* 7. COD TXT (Text) */}
@@ -798,7 +779,7 @@ const Campaigns: React.FC = () => {
                                     placeholder="Code..."
                                     value={task.codTxt || ''}
                                     onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'codTxt', e.target.value)}
-                                    className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded px-2 py-1.5 text-center text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors font-sans disabled:opacity-50"
+                                    className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded px-1.5 py-1.5 text-center text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors font-sans disabled:opacity-50"
                                 />
 
                                 {/* 8. Facturation (Number) */}
@@ -809,7 +790,7 @@ const Campaigns: React.FC = () => {
                                         placeholder="0"
                                         value={task.billedAmount || ''}
                                         onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'billedAmount', Number(e.target.value))}
-                                        className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded px-2 py-1.5 text-right text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-bony-orange focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
+                                        className="w-full bg-slate-100 dark:bg-black/20 gx-num-tight border border-bony-border rounded px-1.5 py-1.5 text-right text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-bony-orange focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
                                     />
                                     <span className="absolute right-6 top-1.5 text-[8px] text-slate-500 pointer-events-none">€</span>
                                 </div>

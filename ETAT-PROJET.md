@@ -10,8 +10,10 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 14
-  (`fix/draft-hors-agregation`, 30 juillet — brouillons hors agrégation). Le SHA
+- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 17
+  (`feat/dashboard-pilotage`, 30 juillet — Dashboard). Le correctif 18
+  (`feat/campagnes-ergonomie`) est prêt en local, **service `web` seul** à
+  reconstruire (aucun changement backend). Le SHA
   exact se lit avec `git log --oneline -1` plutôt que d'être recopié ici, où il
   devenait périmé à chaque lot. Des commits de doc ou de backup automatique
   peuvent suivre sans nécessiter de redéploiement.
@@ -284,6 +286,62 @@
       mesuré à 320 et 375 px : aucun débordement, tableau de performance à scroll
       interne, zones tactiles ≥ 44 px.
 
+18. **Campagnes : refonte de l'écran (espace, filtres, densité)**
+    (`feat/campagnes-ergonomie`, 30 juillet). Aucun changement backend.
+    - **Un seul jeu de filtres.** La page avait **deux périodes indépendantes**
+      (une pour les graphiques, une pour la liste) et **deux filtres de canal**
+      pour la même notion. Une période unique pilote désormais les deux. Ne reste
+      près des graphiques que le sélecteur de métrique (Volume / Ouverture /
+      Clics), qui ne filtre rien.
+      ⚠️ **Changement de comportement assumé** : la liste n'avait aucun filtre de
+      date et montrait tout l'historique ; elle est maintenant bornée par la
+      période, avec l'année en cours par défaut.
+    - **Sélecteur de période partagé** extrait dans
+      `components/DateRangePicker.tsx` (il était local à `Dashboard.tsx` et non
+      exporté), avec **deux raccourcis en plus** : « Ce semestre » et « Le
+      semestre dernier » — le Dashboard en profite aussi.
+    - **Graphiques repliables et qui défilent** : le bloc est passé *à
+      l'intérieur* de la zone de défilement, et l'en-tête de colonnes est devenu
+      `sticky top-0` pour rester étiqueté une fois la liste atteinte.
+    - **Lignes desktop amincies de 81 à 52 px** : padding `p-3` → `px-3 py-2`,
+      date sur une ligne (`10/09/26`), badges site/marque ramenés en fin de
+      ligne 2 au lieu d'une troisième ligne, icône de canal réduite. **Les champs
+      de saisie gardent leurs 30 px** — la hauteur vient du bloc info, pas d'eux.
+    - Bilan mesuré à 913 × 910 px : mobilier fixe **473 → 168 px**, lignes
+      visibles **5,3 → 8,5** graphiques dépliés et **12,9** repliés.
+    - Trois causes techniques trouvées à la mesure, à retenir :
+      1. La case **Coût** pilotait la hauteur de ligne : « 600 € » passait à la
+         ligne dans 51 px. D'où `whitespace-nowrap` **et** une colonne élargie
+         (`grid-cols-9` + `col-span-2`).
+      2. **Ne pas écrire un gabarit de grille à la main** : `grid-cols-N` de
+         Tailwind vaut `minmax(0,1fr)` (les colonnes peuvent rétrécir), alors
+         qu'un `1fr` écrit dans une valeur arbitraire vaut `minmax(auto,1fr)` —
+         les `<input>` imposent alors leur largeur intrinsèque (~147 px) et la
+         grille explose. Vu aussi que la CDN Play ne génère pas les valeurs
+         arbitraires contenant `repeat(...)`.
+      3. Les **flèches natives de `<input type="number">`** occupent ~13 px *à
+         l'intérieur* du champ : c'est ce qui tronquait « 9500 » en « 95 ».
+         Classe opt-in `.gx-num-tight` ajoutée dans `index.html`.
+      4. `p-3 md:p-6 pt-2` donnait en réalité **24 px** de padding haut
+         (`md:p-6` est émis après `pt-2` et l'écrase) : l'en-tête `sticky top-0`
+         se collait 24 px trop bas et les lignes défilaient au-dessus de lui.
+         Paddings réécrits sans raccourci `p-*`.
+    - Simplifications au passage : pastilles « % » en surimpression retirées des
+      4 champs de taux (l'en-tête dit déjà « % OUV. », « % NPAI »…, et elles
+      chevauchaient la valeur) ; titre « LISTING & ÉDITION EN MASSE » fusionné
+      avec la barre de recherche (une ligne entière pour rien).
+    - Zone tactile des déclencheurs de période portée de 16 à **44 px** via
+      `py-3.5 -my-3.5` (marge négative : la hauteur occupée ne change pas).
+    - Vérifié : les 9 raccourcis donnent les bornes exactes au 30/07/2026, et les
+      totaux se recoupent (S1 9 lignes + S2 5 = 14 = l'année ; côté Dashboard
+      58 700 € + 45 890 € = **104 590 €**, valeur inchangée après extraction du
+      sélecteur). Saisie d'une volumétrie et d'un taux confirmée persistée en
+      base puis **remise à sa valeur d'origine**. Responsive mesuré à 320 et
+      375 px : aucun débordement, cartes mobiles en lecture seule intactes (94 px).
+    - Limite connue : sous ~1000 px de large, les volumétries à 5 chiffres et les
+      noms de projet sont tronqués (avec infobulle). Vérifié propre à partir de
+      ~1300 px. C'était déjà le cas avant, en pire (le texte passait à la ligne).
+
     ⚠️ **JEU DE DONNÉES DE DÉMO EN BASE** — 10 projets, 28 tâches, 6 dépenses fixes
     et 3 réservations matériel, tous préfixés **`DEMO — `**, créés le 30/07/2026 à
     la demande de Théo pour faire vivre les widgets. **Ces montants comptent dans
@@ -308,7 +366,12 @@
   à Semaine/Mois) — les barres Gantt compressent sans déborder, jugé acceptable
 - Point technique à garder en tête : Tailwind est chargé en CDN Play → les variantes
   md:/lg: ne fonctionnent pas sur les classes custom (gx-*, glass-*), seulement sur
-  les utilitaires Tailwind standards
+  les utilitaires Tailwind standards. Deux pièges confirmés le 30/07 sur Campagnes :
+  les **valeurs arbitraires contenant `repeat(...)`** ne sont pas générées, et un
+  raccourci `p-*` **écrase** un `pt-*` écrit après lui dès qu'il est préfixé `md:`
+  (l'ordre des règles générées ne suit pas l'ordre des classes)
+- Composant `Select` à 34 px de haut : sous les 44 px tactiles recommandés. Seul
+  élément restant sous le seuil sur Campagnes et le Dashboard (mesuré le 30/07)
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
 - **Après un déploiement, recharger complètement la page** : un onglet resté ouvert
