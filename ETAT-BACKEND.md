@@ -121,6 +121,35 @@ procédure opérationnelle dans `DEPLOIEMENT.md`, état global dans `ETAT-PROJET
   HTTPS auto). Volume persistant `uploads_data` pour les uploads, variables dans `.env` racine
   (voir `.env.example`). `server.ts` (ancien monolithe racine) supprimé — code mort.
 
+## ✅ Proxy de contenus externes — `/api/feeds` et `/api/music` (30 juillet 2026)
+
+Hello Marketing a besoin de contenus que le navigateur **ne peut pas** aller chercher
+lui-même (CORS) : flux RSS et playlist Deezer. Le frontend passait par le proxy tiers
+`corsproxy.io`, dont l'offre gratuite est réservée à localhost — d'où des blocs qui
+ne fonctionnaient jamais en production. On proxifie donc nous-mêmes.
+
+| Route | Rôle |
+|---|---|
+| `GET /api/feeds` | liste `[{ key, name, color, category }]` — **jamais les URL** |
+| `GET /api/feeds/:key` | contenu brut du flux, `Content-Type` d'origine |
+| `GET /api/music/tracks` | passe-plat JSON de la playlist Deezer |
+
+⚠️ **RÈGLE : jamais de proxy acceptant une URL fournie par le client.** Le registre
+des flux (`backend/src/routes/feeds.ts`) est la seule source des URL, et le client
+n'envoie qu'une **clé**. Un paramètre `?url=` transformerait l'API en relais capable
+d'atteindre le réseau interne Docker ou des endpoints de métadonnées cloud (SSRF).
+Clé inconnue → 404 **sans aucune requête sortante**. Routes protégées par
+`authenticateToken` pour ne pas offrir un relais anonyme.
+
+Autres garde-fous : cache mémoire (15 min les flux, 30 min Deezer), timeout 8 s via
+`AbortController`, en-têtes sortants de navigateur (`User-Agent` + `Accept`) — sans
+eux, Usine Digitale renvoie 403. Échec amont → **502**, le frontend dégrade déjà
+proprement (`Promise.allSettled`).
+
+Bénéfice opérationnel : un flux RSS meurt régulièrement (4 sur 8 l'étaient le
+30/07/2026). Le corriger ne demande plus qu'un redéploiement de `api`, sans toucher
+au frontend.
+
 ## ⚠️ Règle de robustesse — accès base et rappels détachés
 
 **Ne JAMAIS faire d'accès base (ni aucun `await` susceptible d'échouer) dans un
