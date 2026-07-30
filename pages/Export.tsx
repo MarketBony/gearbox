@@ -71,6 +71,9 @@ const Export: React.FC = () => {
 
       // Filtrage période : projets sur la date de début, dépenses sur leur date (parse local anti J+1).
       const projInRange = projects.filter(p => {
+        // Brouillon : ne remonte nulle part (règle métier, cf. CLAUDE.md) — donc
+        // pas non plus dans un export qui sert de référence chiffrée.
+        if (p.status === 'Draft') return false;
         if (!p.startDate) return false;
         const t = parseLocalDate(p.startDate).getTime();
         return t >= fromTime && t <= toTime;

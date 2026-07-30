@@ -1,4 +1,4 @@
-# ÉTAT PROJET GEARBOX — synthèse au 29 juillet 2026
+# ÉTAT PROJET GEARBOX — synthèse au 30 juillet 2026
 
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
@@ -10,9 +10,11 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : `33107c4`
-  (Merge feat/realtime-modules, 29 juillet). Des commits de doc ou de backup
-  automatique peuvent suivre sans nécessiter de redéploiement.
+- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 14
+  (`fix/draft-hors-agregation`, 30 juillet — brouillons hors agrégation). Le SHA
+  exact se lit avec `git log --oneline -1` plutôt que d'être recopié ici, où il
+  devenait périmé à chaque lot. Des commits de doc ou de backup automatique
+  peuvent suivre sans nécessiter de redéploiement.
 - Procédure complète de déploiement à jour dans DEPLOIEMENT.md
 - Sauvegardes automatiques : `.github/workflows/backup.yml` pousse un dump Supabase
   dans `backups/` chaque semaine (commits `github-actions[bot]`) — penser à
@@ -183,6 +185,24 @@
     - Dégradation sûre : sans en-tête (curl, outil externe), diffusion à tous.
     - Vérifié à deux onglets : auteur **0 refetch**, autre client **1 refetch** —
       le temps réel entre utilisateurs est intact.
+
+14. **Les projets en brouillon ne remontent plus nulle part**
+    (`fix/draft-hors-agregation`, 30 juillet). `Budget.tsx` excluait les brouillons,
+    le Dashboard n'avait **aucun filtre de statut** : un brouillon portant un coût
+    gonflait le consommé, la trajectoire, le mix activité et le compteur
+    « campagnes live », sans jamais apparaître dans Budget — les deux écrans se
+    contredisaient. Agenda, Campagnes et Export n'avaient pas de filtre non plus.
+    - Exclusion ajoutée dans `Dashboard.tsx` (en tête du bloc projets),
+      `Agenda.tsx`, `Campaigns.tsx` et `Export.tsx`.
+    - **To-do et Hello Marketing conservent les brouillons** : là, l'inclusion est
+      un choix explicite (`status === 'Active' || status === 'Draft'`) qui sert à
+      préparer un projet avant activation. Arbitré avec Théo.
+    - `Archived` reste compté dans le budget, inchangé (classement visuel, pas une
+      annulation comptable).
+    - Mesuré sur le projet TEST (13 490 €, Clermont) : Renault+Brouillon → 0 €,
+      Renault+Actif → 13 490 €, Holding+Actif → 0 €. Les deux règles (Holding et
+      brouillon) sont donc vérifiées **indépendamment**. Brouillon également
+      absent de l'Agenda et des Campagnes. Projet restauré à l'identique après test.
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - **Catalogue matériel dupliqué en base** : 16 noms uniques mais 32 lignes, chaque

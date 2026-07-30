@@ -130,6 +130,13 @@ que de supposer que ça va passer.
   (`DISTRIBUTION_GROUPE_BONY` / `_RN` dans `constants.ts`). Le tag marque et le
   périmètre sont deux notions distinctes ; les confondre est exactement ce qui a
   laissé ce bug en place des mois.
+- **Statut `Draft` (brouillon) : ne remonte NULLE PART.** Ni budget, ni Dashboard
+  (consommé, trajectoire, mix, campagnes live), ni Agenda, ni Campagnes, ni
+  Export. Seul `Budget.tsx` l'excluait ; corrigé le 30 juillet 2026. Restent
+  volontairement inclus, car c'est un choix explicite pour préparer un projet :
+  la **To-do** et les **prochains événements de Hello Marketing**.
+  À ne pas confondre avec `Archived`, qui reste compté dans le budget
+  (l'archivage est un classement visuel, pas une annulation comptable).
 - Director = mêmes droits qu'Administrator, sauf Jeux.
 - Jeux accessible uniquement à Master, Administrator, Coordinator, Digital
   Manager.
