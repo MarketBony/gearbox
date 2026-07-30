@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import Avatar from '../components/Avatar';
-import { User, Project } from '../types';
+import { User, Project, FeedInfo } from '../types';
 
 // =============================================================================
 // OPENWEATHER API KEY
@@ -46,29 +46,19 @@ const CITY_MAPPING: Record<string, string> = {
   'Montluçon':       'Montlucon',
 };
 
-const CORSPROXY = (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`;
+// Les flux RSS (noms, couleurs et surtout URL) vivent côté SERVEUR
+// (backend/src/routes/feeds.ts), et le contenu est proxifié par /api/feeds.
+// Deux raisons :
+//  - le navigateur ne peut pas appeler ces flux en direct (CORS), et l'ancien
+//    proxy tiers corsproxy.io réservait son offre gratuite à localhost : les
+//    actus ne fonctionnaient donc JAMAIS en production (403 côté service) ;
+//  - un flux RSS meurt régulièrement (4 sur 8 l'étaient le 30/07/2026) ; avec la
+//    liste côté serveur, le réparer ne demande qu'un redéploiement de `api`.
+// Le client ne manipule qu'une clé, jamais une URL.
 
-const RSS_FEEDS = [
-  { name: "L'Argus",    url: 'https://www.largus.fr/rss/actualites.xml',     color: 'bg-red-500' },
-  { name: 'Caradisiac', url: 'https://www.caradisiac.com/rss/actualites.xml', color: 'bg-blue-600' },
-  { name: 'AutoPlus',   url: 'https://www.autoplus.fr/feed',                  color: 'bg-emerald-600' },
-  { name: 'AutoMoto',   url: 'https://www.auto-moto.com/feed',                color: 'bg-purple-600' },
-];
-
-const SOURCE_COLOR: Record<string, string> = Object.fromEntries(
-  RSS_FEEDS.map(f => [f.name, f.color])
-);
-
-const RSS_FEEDS_MARKETING = [
-  { name: 'Influencia',     url: 'https://www.influencia.net/fr/rss',         color: 'bg-pink-600' },
-  { name: 'BDM',            url: 'https://www.blogdumoderateur.com/feed/',     color: 'bg-blue-500' },
-  { name: 'JDN',            url: 'https://www.journaldunet.com/rss/',          color: 'bg-indigo-600' },
-  { name: 'Usine Digitale', url: 'https://www.usine-digitale.fr/rss',          color: 'bg-cyan-700' },
-];
-
-const SOURCE_COLOR_MARKETING: Record<string, string> = Object.fromEntries(
-  RSS_FEEDS_MARKETING.map(f => [f.name, f.color])
-);
+// Couleur du badge d'une source, depuis la liste renvoyée par l'API.
+const couleurSource = (sources: FeedInfo[], nom: string): string =>
+  sources.find(s => s.name === nom)?.color || 'bg-slate-600';
 
 const RSS_MARKETING_CACHE_KEY = 'gearbox_rss_marketing_cache';
 
@@ -232,10 +222,22 @@ const NewsSection: React.FC = () => {
   const [articles,  setArticles]  = useState<RssArticle[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [lastFetch, setLastFetch] = useState('');
+  const [sources,   setSources]   = useState<FeedInfo[]>([]);
 
   const load = async (force = false) => {
     setLoading(true);
     try {
+      // Liste des sources d'abord : elle sert AUSSI à colorer les badges, donc on
+      // la charge même quand les articles viennent du cache. Best-effort : sans
+      // elle, couleurSource retombe sur un gris neutre.
+      let flux: FeedInfo[] = [];
+      try {
+        flux = (await db.getFeeds()).filter(f => f.category === 'auto');
+        setSources(flux);
+      } catch (e) {
+        console.warn('[RSS] liste des sources indisponible :', e);
+      }
+
       if (!force) {
         const cached = localStorage.getItem(RSS_CACHE_KEY);
         if (cached) {
@@ -249,11 +251,9 @@ const NewsSection: React.FC = () => {
         }
       }
 
-      const fetchFeed = async (feed: typeof RSS_FEEDS[0]): Promise<RssArticle[]> => {
+      const fetchFeed = async (feed: FeedInfo): Promise<RssArticle[]> => {
         try {
-          const res = await fetch(CORSPROXY(feed.url));
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const xml = await res.text();
+          const xml = await db.getFeedContent(feed.key);
           const parsed = parseRss(xml, feed.name);
           console.log(`[RSS] ${feed.name} : ${parsed.length} articles`);
           return parsed;
@@ -263,7 +263,7 @@ const NewsSection: React.FC = () => {
         }
       };
 
-      const results = await Promise.allSettled(RSS_FEEDS.map(fetchFeed));
+      const results = await Promise.allSettled(flux.map(fetchFeed));
       const all: RssArticle[] = [];
       results.forEach(r => { if (r.status === 'fulfilled') all.push(...r.value); });
       all.sort((a, b) => {
@@ -340,7 +340,7 @@ const NewsSection: React.FC = () => {
                     {art.source.charAt(0)}
                   </div>
                 )}
-                <span className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold text-white tracking-wider ${SOURCE_COLOR[art.source] || 'bg-slate-600'}`}>
+                <span className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold text-white tracking-wider ${couleurSource(sources, art.source)}`}>
                   {art.source.toUpperCase()}
                 </span>
               </div>
@@ -376,10 +376,21 @@ const MarketingNewsSection: React.FC = () => {
   const [articles,  setArticles]  = useState<RssArticle[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [lastFetch, setLastFetch] = useState('');
+  const [sources,   setSources]   = useState<FeedInfo[]>([]);
 
   const load = async (force = false) => {
     setLoading(true);
     try {
+      // Idem section auto : la liste sert aussi aux couleurs des badges, donc on
+      // la charge avant le court-circuit par le cache.
+      let flux: FeedInfo[] = [];
+      try {
+        flux = (await db.getFeeds()).filter(f => f.category === 'marketing');
+        setSources(flux);
+      } catch (e) {
+        console.warn('[RSS Marketing] liste des sources indisponible :', e);
+      }
+
       if (!force) {
         const cached = localStorage.getItem(RSS_MARKETING_CACHE_KEY);
         if (cached) {
@@ -393,11 +404,9 @@ const MarketingNewsSection: React.FC = () => {
         }
       }
 
-      const fetchFeed = async (feed: typeof RSS_FEEDS_MARKETING[0]): Promise<RssArticle[]> => {
+      const fetchFeed = async (feed: FeedInfo): Promise<RssArticle[]> => {
         try {
-          const res = await fetch(CORSPROXY(feed.url));
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const xml = await res.text();
+          const xml = await db.getFeedContent(feed.key);
           const parsed = parseRss(xml, feed.name);
           console.log(`[RSS Marketing] ${feed.name} : ${parsed.length} articles`);
           return parsed;
@@ -407,7 +416,7 @@ const MarketingNewsSection: React.FC = () => {
         }
       };
 
-      const results = await Promise.allSettled(RSS_FEEDS_MARKETING.map(fetchFeed));
+      const results = await Promise.allSettled(flux.map(fetchFeed));
       const all: RssArticle[] = [];
       results.forEach(r => { if (r.status === 'fulfilled') all.push(...r.value); });
       all.sort((a, b) => {
@@ -481,7 +490,7 @@ const MarketingNewsSection: React.FC = () => {
                     {art.source.charAt(0)}
                   </div>
                 )}
-                <span className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold text-white tracking-wider ${SOURCE_COLOR_MARKETING[art.source] || 'bg-slate-600'}`}>
+                <span className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-bold text-white tracking-wider ${couleurSource(sources, art.source)}`}>
                   {art.source.toUpperCase()}
                 </span>
               </div>
@@ -712,26 +721,18 @@ const MusicSection: React.FC = () => {
         }
       }
 
-      const DEEZER_URL = 'https://api.deezer.com/playlist/15169024043/tracks?limit=100';
+      // Proxifié par notre backend (/api/music/tracks) : l'API Deezer n'envoie
+      // aucun en-tête CORS, elle est donc inappelable depuis un navigateur, quel
+      // que soit l'environnement. L'ancien repli « appel direct » ne pouvait pas
+      // fonctionner et a été supprimé ; l'id de playlist vit côté serveur.
       let tracks: DeezerTrack[] = [];
       try {
-        console.log('[Deezer] Tentative via corsproxy.io...');
-        const res = await fetch(CORSPROXY(DEEZER_URL));
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        tracks = data?.data || [];
+        const data = await db.getMusicTracks();
+        tracks = (data?.data as DeezerTrack[]) || [];
         console.log('[Deezer] OK, pistes :', tracks.length);
-      } catch (e1) {
-        console.warn('[Deezer] corsproxy.io échoué :', e1, '— tentative directe...');
-        try {
-          const res = await fetch(DEEZER_URL);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json();
-          tracks = data?.data || [];
-        } catch (e2) {
-          console.error('[Deezer] Tous les essais ont échoué :', e2);
-          throw new Error("Impossible de joindre l'API Deezer.");
-        }
+      } catch (e) {
+        console.error('[Deezer] échec :', e);
+        throw new Error("Impossible de joindre l'API Deezer.");
       }
 
       if (tracks.length === 0) throw new Error('Playlist vide.');

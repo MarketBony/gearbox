@@ -120,6 +120,17 @@ export interface SocialPost {
   archivedAt?: string; // Renseigné par le backend à l'archivage ; ancre la purge des médias
 }
 
+// Flux RSS de Hello Marketing. Les URL vivent UNIQUEMENT côté serveur
+// (backend/src/routes/feeds.ts) : le client ne manipule qu'une clé, ce qui évite
+// tout détournement du proxy et permet de réparer un flux mort en redéployant
+// `api` seule, sans toucher au frontend.
+export interface FeedInfo {
+  key: string;
+  name: string;
+  color: string;                        // classe Tailwind du badge
+  category: 'auto' | 'marketing';
+}
+
 export interface DigitalTags {
     networks: string[];
     co2: string[];

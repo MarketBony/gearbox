@@ -227,6 +227,34 @@
       `PUT /me` renvoyant les valeurs actuelles → 200 et profil strictement
       inchangé. La règle est consignée dans `ETAT-BACKEND.md`.
 
+16. **Hello Marketing : musique du jour et actus RSS réparées en production**
+    (`fix/feeds-proxy-backend`, 30 juillet). Les deux blocs ne fonctionnaient qu'en
+    local : ils passaient par `corsproxy.io`, dont l'offre gratuite est réservée à
+    localhost — le service répondait lui-même `403 {"error":"Free usage is limited
+    to localhost and development environments"}` depuis l'origine de production.
+    - **Proxy maison** : `GET /api/feeds` (liste), `GET /api/feeds/:key` (contenu),
+      `GET /api/music/tracks`. Registre des flux **côté serveur** : le client
+      n'envoie qu'une clé, jamais une URL — aucune surface de détournement (SSRF).
+      Cache mémoire, timeout 8 s, en-têtes de navigateur sortants.
+    - L'API Deezer n'envoie **aucun** en-tête CORS : elle est inappelable depuis un
+      navigateur, dans tous les environnements. L'ancien repli « appel direct » ne
+      pouvait pas fonctionner, il est supprimé.
+    - **4 flux sur 8 étaient morts**, y compris en local (le front ignore
+      silencieusement un flux en échec) : Caradisiac 410 → `/rss.xml` ; Influencia
+      404 (`/fr/` en trop) → `/feed` ; Usine Digitale 403 → slash final + en-têtes
+      navigateur ; **L'Argus a supprimé son RSS** → remplacé par **Autoactu** (actu
+      de la distribution auto, choix de Théo).
+    - Vérifié par le vrai chemin de l'app : 8 flux sur 8 en 200, **237 articles**
+      parsés, musique 86 pistes. Sécurité : sans jeton 401, clé inconnue 404,
+      tentative d'URL de métadonnées cloud 404 sans requête sortante. Cache :
+      16 ms au second appel contre 845 ms au premier.
+    - Le contrôle visuel des trois blocs reste à faire par Théo : dans mon
+      environnement, le panneau navigateur n'étant pas affiché, la page ne compose
+      pas de frames et `AnimatePresence mode="wait"` bloque tout changement
+      d'onglet (l'animation de sortie ne s'achève jamais). Bon à savoir pour les
+      prochaines vérifications d'interface.
+    - `Caddyfile` inchangé : `/api/*` était déjà routé vers l'api.
+
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - **Catalogue matériel dupliqué en base** : 16 noms uniques mais 32 lignes, chaque
   équipement en double depuis le 8 juillet ~22:07 (double exécution de

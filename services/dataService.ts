@@ -1,5 +1,5 @@
 
-import { Project, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog } from '../types';
+import { Project, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo } from '../types';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
 import { getCurrentSocketId } from './socketId';
@@ -67,6 +67,34 @@ async function apiFetch<T = any>(path: string, options: RequestInit = {}): Promi
   }
   if (res.status === 204) return null as T;
   return res.json();
+}
+
+// Variante de apiFetch renvoyant du TEXTE : les flux RSS sont du XML, pas du JSON.
+// Même gestion du JWT et du 401 que apiFetch (dont la version JSON est utilisée
+// partout ailleurs).
+async function apiFetchText(path: string): Promise<string> {
+  const token = getToken();
+  const socketId = getCurrentSocketId();
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(socketId ? { 'x-socket-id': socketId } : {})
+      }
+    });
+  } catch (e) {
+    throw new ApiError(0, 'Serveur injoignable');
+  }
+  if (res.status === 401) {
+    clearToken();
+    window.dispatchEvent(new CustomEvent('gearbox-auth-expired'));
+    throw new ApiError(401, 'Session expirée');
+  }
+  if (!res.ok) {
+    throw new ApiError(res.status, `Erreur ${res.status}`);
+  }
+  return res.text();
 }
 
 // Le backend renvoie des DateTime ISO complets ; le frontend manipule du
@@ -508,6 +536,23 @@ class DataService {
   async fetchMe(): Promise<Omit<User, 'loginId'>> {
     return apiFetch('/auth/me');
   }
+  // --- Hello Marketing : flux RSS et musique du jour ---
+  // Proxifiés par notre backend (backend/src/routes/feeds.ts et music.ts) : le
+  // navigateur ne peut appeler ni les flux ni Deezer en direct (CORS), et l'ancien
+  // proxy tiers corsproxy.io réservait son offre gratuite à localhost — d'où des
+  // blocs qui ne fonctionnaient jamais en production avant le 30/07/2026.
+  // Le client ne transmet qu'une CLÉ, jamais une URL (voir la note de sécurité
+  // dans routes/feeds.ts).
+  async getFeeds(): Promise<FeedInfo[]> {
+    return apiFetch('/feeds');
+  }
+  async getFeedContent(key: string): Promise<string> {
+    return apiFetchText(`/feeds/${encodeURIComponent(key)}`);
+  }
+  async getMusicTracks(): Promise<{ data?: any[] }> {
+    return apiFetch('/music/tracks');
+  }
+
   async updateMe(data: { name?: string; password?: string; avatarColor?: string; avatarUrl?: string | null }): Promise<Omit<User, 'loginId'>> {
     return apiFetch('/auth/me', { method: 'PUT', body: JSON.stringify(data) });
   }
