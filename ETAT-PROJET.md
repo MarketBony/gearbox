@@ -341,6 +341,32 @@
     - Limite connue : sous ~1000 px de large, les volumétries à 5 chiffres et les
       noms de projet sont tronqués (avec infobulle). Vérifié propre à partir de
       ~1300 px. C'était déjà le cas avant, en pire (le texte passait à la ligne).
+    - **Passe de finition demandée par Théo après relecture** (4 détails, même lot) :
+      1. L'en-tête de colonnes collant était en **fond noir plein**
+         (`dark:bg-bony-dark`), ce qui tranchait sur le thème liquid glass →
+         classe `.gx-sticky-head` (`index.html`) : translucide + flou, **bordure
+         basse seulement** (c'est une barre, pas un panneau).
+      2. **La police de titre Syncopate n'a rien à faire dans une ligne de
+         tableau.** La règle globale `h1..h6 { font-family: 'Syncopate' }` de
+         `index.html` s'appliquait au nom de projet (un `<h3>`), d'où le rendu
+         « grossier » : mesuré **350 px** pour « DEMO — Salon Auto Plaque
+         Sud-Ouest » contre **237 px** en Albert Sans 13 px, soit 32 % de plus.
+         `font-sans` forcé sur la ligne ; Syncopate reste sur les vrais titres —
+         la hiérarchie est même plus nette.
+      3. **Date qui débordait de sa colonne** : `font-title` (Syncopate) rendait
+         « 10/09/26 » sur **71,6 px** dans une colonne de 64. Passée en
+         `font-sans tabular-nums` (54,4 px) et colonne portée à 74 px. L'en-tête
+         de la colonne Date a été recalé à 87 px : il était décalé de 11 px du
+         bloc info des lignes — vérifié à la mesure, les deux commencent
+         maintenant au même pixel (207 px).
+      4. **Sélecteur « Volume » désaligné** : le composant `Select` est en
+         `w-full`, donc en enfant de flex il s'étirait sur toute la place
+         restante. Borné à 104 px, et les **trois** en-têtes de graphique passés
+         en `items-center min-h-[34px]` pour que les titres soient sur la même
+         ligne (vérifié : les 3 à 162 px).
+      Revérifié après coup dans les **deux thèmes** (le verre translucide est
+      blanc à 72 % en clair, gris foncé à 72 % en sombre) et à ~1660 px, la
+      largeur d'écran réelle de Théo : aucun texte tronqué.
 
     ⚠️ **JEU DE DONNÉES DE DÉMO EN BASE** — 10 projets, 28 tâches, 6 dépenses fixes
     et 3 réservations matériel, tous préfixés **`DEMO — `**, créés le 30/07/2026 à
