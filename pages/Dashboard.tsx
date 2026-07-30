@@ -936,6 +936,9 @@ const Dashboard: React.FC = () => {
 
   const burnRate = stats.totalForecast > 0 ? (stats.totalActual / stats.totalForecast) * 100 : 0;
   const remaining = stats.totalForecast - stats.totalActual;
+  // Écart en POINTS entre le budget dépensé et le temps écoulé. Positif = on dépense
+  // plus vite que le calendrier ; négatif = on sous-consomme.
+  const ecartRythme = stats.pctConsomme - stats.pctTempsEcoule;
 
   const getNetworkIcon = (networkName: string) => {
       const n = networkName.toLowerCase();
@@ -1100,21 +1103,43 @@ const Dashboard: React.FC = () => {
               <div className="gx-card p-5 relative overflow-hidden group hover:border-bony-blue/30 transition-all">
                   <div className="flex justify-between items-start">
                       <div>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Rythme de Consommation</p>
-                          <h3 className={`text-2xl font-title ${stats.pctConsomme > stats.pctTempsEcoule + 10 ? 'text-red-500' : (stats.pctConsomme < stats.pctTempsEcoule - 10 ? 'text-amber-500' : 'text-emerald-500')}`}>
-                              {stats.pctConsomme} % <span className="text-sm text-slate-400">/ {stats.pctTempsEcoule} %</span>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Avance / Retard de Budget</p>
+                          {/* On affiche l'ÉCART en points, pas deux pourcentages côte à
+                              côte : « 10 % / 58 % » demandait au lecteur de faire la
+                              soustraction lui-même et n'était pas compris (retour de
+                              Théo, 30/07/2026). L'écart, lui, se lit directement. */}
+                          <h3 className={`text-2xl font-title ${ecartRythme > 10 ? 'text-red-500' : (ecartRythme < -10 ? 'text-amber-500' : 'text-emerald-500')}`}>
+                              {ecartRythme > 0 ? '+' : ''}{ecartRythme} <span className="text-sm text-slate-400">points</span>
                           </h3>
                       </div>
                       <div className="p-2 bg-bony-blue/10 rounded-lg text-bony-blue">
                           <Gauge size={20} />
                       </div>
                   </div>
-                  <div className="mt-4 text-xs text-slate-400">
-                      {stats.pctConsomme > stats.pctTempsEcoule + 10
-                        ? 'Consommation en avance sur le calendrier.'
-                        : stats.pctConsomme < stats.pctTempsEcoule - 10
-                        ? 'Sous-consommation par rapport au temps écoulé.'
-                        : 'Consommation alignée sur le temps écoulé.'}
+                  {/* Deux barres superposées : ce qui est dépensé, ce qui est écoulé.
+                      La comparaison visuelle vaut mieux qu'une explication. */}
+                  <div className="mt-3 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                          <span className="text-[9px] text-slate-500 w-20 shrink-0">Budget dépensé</span>
+                          <div className="flex-1 h-2 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
+                              <div className="h-full bg-bony-orange" style={{ width: `${Math.min(stats.pctConsomme, 100)}%` }} />
+                          </div>
+                          <span className="text-[10px] font-bold text-bony-text w-9 text-right shrink-0">{stats.pctConsomme} %</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <span className="text-[9px] text-slate-500 w-20 shrink-0">Année écoulée</span>
+                          <div className="flex-1 h-2 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
+                              <div className="h-full bg-slate-400 dark:bg-slate-500" style={{ width: `${stats.pctTempsEcoule}%` }} />
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-500 w-9 text-right shrink-0">{stats.pctTempsEcoule} %</span>
+                      </div>
+                  </div>
+                  <div className="mt-3 text-xs text-slate-400">
+                      {ecartRythme > 10
+                        ? 'Vous dépensez plus vite que le temps ne passe : le budget risque de manquer avant la fin de la période.'
+                        : ecartRythme < -10
+                        ? 'Vous dépensez moins vite que le temps ne passe : du budget risque de rester non engagé.'
+                        : 'Dépenses au rythme du calendrier.'}
                   </div>
               </div>
           </div>
@@ -1243,7 +1268,12 @@ const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:h-[400px]">
               
               {/* LEFT: PROJECT DEADLINES */}
-              <div className="gx-card p-5 flex flex-col h-full">
+              {/* min-h-0 + overflow-hidden INDISPENSABLES : un élément de grille a
+                  min-height:auto, il refuse donc de descendre sous la hauteur de son
+                  contenu et déborde de la rangée de 400px. Le débordement tombait
+                  dans du vide avant l'ajout des sections de pilotage — il recouvrait
+                  ensuite la suivante de plus de 200 px (constaté le 30/07/2026). */}
+              <div className="gx-card p-5 flex flex-col h-full min-h-0 overflow-hidden">
                   <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-4 flex items-center gap-2">
                       <Calendar size={16} className="text-bony-text"/> Prochaines Échéances (Projets)
                   </h3>
@@ -1285,7 +1315,12 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* RIGHT: DIGITAL POSTS DEADLINES */}
-              <div className="gx-card p-5 flex flex-col h-full">
+              {/* min-h-0 + overflow-hidden INDISPENSABLES : un élément de grille a
+                  min-height:auto, il refuse donc de descendre sous la hauteur de son
+                  contenu et déborde de la rangée de 400px. Le débordement tombait
+                  dans du vide avant l'ajout des sections de pilotage — il recouvrait
+                  ensuite la suivante de plus de 200 px (constaté le 30/07/2026). */}
+              <div className="gx-card p-5 flex flex-col h-full min-h-0 overflow-hidden">
                   <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-4 flex items-center gap-2">
                       <Globe size={16} className="text-bony-violet"/> Prochaines Publications (Digital)
                   </h3>
