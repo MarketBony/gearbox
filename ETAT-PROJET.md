@@ -10,10 +10,10 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 17
-  (`feat/dashboard-pilotage`, 30 juillet — Dashboard). Le correctif 18
-  (`feat/campagnes-ergonomie`) est prêt en local, **service `web` seul** à
-  reconstruire (aucun changement backend). Le SHA
+- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 18
+  (`feat/campagnes-ergonomie`, 30 juillet — refonte de l'écran Campagnes,
+  service `web` seul). Le correctif 19 (`fix/reservations-anti-surbooking`) est
+  prêt en local et touche le **backend** : rebuild du service `api`. Le SHA
   exact se lit avec `git log --oneline -1` plutôt que d'être recopié ici, où il
   devenait périmé à chaque lot. Des commits de doc ou de backup automatique
   peuvent suivre sans nécessiter de redéploiement.
@@ -368,6 +368,32 @@
       blanc à 72 % en clair, gris foncé à 72 % en sombre) et à ~1660 px, la
       largeur d'écran réelle de Théo : aucun texte tronqué.
 
+19. **Réservations matériel : fin des sur-réservations** (`fix/reservations-anti-surbooking`,
+    30 juillet). Seul changement **backend** de la série. La disponibilité
+    n'était calculée qu'en mémoire côté client, donc deux personnes réservant en
+    même temps validaient chacune sur une liste qui ignorait l'autre.
+    - Contrôle serveur sur POST **et** PUT, dans une transaction
+      (`backend/src/utils/availability.ts`), avec un **verrou consultatif
+      transactionnel par matériel**.
+    - ⚠️ **Le contrôle sans le verrou est décoratif** : mesuré sur 6 requêtes
+      simultanées pour un stock de 2 → sans verrou **6 acceptées, 6 unités
+      engagées** (sur-réservation de 300 %) ; avec, **2 acceptées, 4 refusées**
+      en 409 et exactement 2 unités en base. C'est la ligne de verrou qui fait
+      le travail, pas le calcul.
+    - ⚠️ **Pic jour par jour, pas somme des chevauchements** : vérifié qu'une
+      demande légitime (1 unité sur 01→11 avec 1 prise sur 01→02 et 1 sur 10→11,
+      stock 2) passe bien — une somme naïve l'aurait refusée.
+    - Bug trouvé au passage : un **PUT partiel ne portant que `endDate`** pouvait
+      la placer avant `startDate` (contrôle croisé absent du PUT). Dates et
+      quantité sont désormais évaluées sur les valeurs effectives après fusion.
+    - Vérifié aussi : ligne inchangée en base après un refus (pas d'écriture
+      partielle), message d'erreur chiffré remonté tel quel à l'utilisateur
+      (`Material.tsx` lit déjà `ApiError.message`, **aucun changement
+      frontend**), et base rendue à son état initial après les tests
+      (16 équipements, 7 réservations, zéro résidu).
+    - Catalogue matériel dupliqué : **nettoyé par Théo**, vérifié — 16 lignes
+      pour 16 noms uniques. Sorti du backlog.
+
     ⚠️ **JEU DE DONNÉES DE DÉMO EN BASE** — 10 projets, 28 tâches, 6 dépenses fixes
     et 3 réservations matériel, tous préfixés **`DEMO — `**, créés le 30/07/2026 à
     la demande de Théo pour faire vivre les widgets. **Ces montants comptent dans
@@ -377,10 +403,13 @@
     commence par `DEMO — `.
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
-- **Catalogue matériel dupliqué en base** : 16 noms uniques mais 32 lignes, chaque
-  équipement en double depuis le 8 juillet ~22:07 (double exécution de
-  `migrateEquipmentIfNeeded`). Nettoyage délicat — les `EquipmentBooking` pointent
-  sur l'un des deux ids via une FK. Voir BUGS-CONNUS.md.
+- **📥 SAISIE DES VRAIES DONNÉES MARKETING 2026 — à faire quand Théo les envoie.**
+  Décidé le 30/07/2026 : l'app reste en bêta-test avec le jeu `DEMO — ` le temps
+  de finir les écrans. Quand Théo transmettra l'ensemble des **projets et
+  dépenses du marketing depuis le début de l'année**, les saisir en base. **À
+  cette occasion, et seulement là, supprimer le jeu de démo** (voir l'encart
+  correctif 17) : les deux ne doivent jamais cohabiter, sinon le consommé est
+  faux. Prévoir un dump Supabase avant l'opération.
 - PWA (manifest.json + service worker) — prévu "juste avant déploiement" dans le
   brief d'origine, jamais fait, toujours pertinent (HTTPS dispo, condition remplie)
 - Nettoyage des branches locales déjà mergées (`git branch` en liste une dizaine :
