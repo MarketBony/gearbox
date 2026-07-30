@@ -10,11 +10,10 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 19
-  (`fix/reservations-anti-surbooking`, 30 juillet — contrôle serveur de la
-  disponibilité du matériel). Le correctif 20 (`feat/pwa-install-push`) est prêt en
-  local : il touche le **frontend, le backend ET le schéma** → rebuild `api` **et**
-  `web`, migration appliquée au démarrage du conteneur `api`. Le SHA
+- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 20
+  (`feat/pwa-install-push`, 30 juillet — PWA installable + notifications push,
+  **validé par Théo sur Windows, Pixel 10 Pro et iPhone SE**). Le correctif 21
+  (finitions) est prêt en local, **service `web` seul** à reconstruire. Le SHA
   exact se lit avec `git log --oneline -1` plutôt que d'être recopié ici, où il
   devenait périmé à chaque lot. Des commits de doc ou de backup automatique
   peuvent suivre sans nécessiter de redéploiement.
@@ -458,6 +457,33 @@
       (`localhost` ne sort pas du poste) : ce lot est parti en prod sans essai
       mobile préalable, et c'était le bon arbitrage.
 
+21. **Finitions : zones tactiles, dépendances CDN mortes, ménage des branches**
+    (`chore/finitions`, 30 juillet). Frontend seul, aucun changement backend.
+    - **`Select` tactile sur mobile** : la taille `sm` faisait 34 px, sous le seuil
+      des 44 px. Portée à 44 px **mais uniquement en dessous de `md`** — sur
+      ordinateur elle reste à 34 px, sinon les barres de filtres et les en-têtes de
+      graphiques, calibrés autour de cette hauteur, se retrouveraient gonflés. Même
+      traitement sur les lignes d'options du menu déroulant. Mesuré aux deux
+      largeurs : 44 px à 375 px, 34 px à 1280 px.
+      À retenir : les variantes `md:` **fonctionnent** sur `min-h-[...]` en CDN Play
+      (elles ne marchent pas sur les classes custom `gx-*` / `glass-*`) — vérifié
+      par sonde plutôt que supposé.
+    - **Deux dépendances CDN mortes retirées d'`index.html`** : l'`importmap` vers
+      `esm.sh` (7 entrées) et **Font Awesome** (`cdnjs`), dont **aucune classe
+      `fa-*`** n'existait dans le code. Deux requêtes externes en moins à chaque
+      chargement.
+      ⚠️ **Preuve que l'importmap était inerte** : build réalisé deux fois sur la
+      même machine, avec et sans elle → **fichiers de sortie identiques, mêmes
+      hachages** (`index-BPN454YS.js`, `xlsx.min-BFSYMm_C.js`). Vite résout ces
+      spécificateurs depuis `node_modules` et ignore complètement l'importmap. Ne
+      pas la remettre sans passer à un chargement sans bundler.
+    - **27 branches locales supprimées** après avoir vérifié que la liste des
+      branches non mergées était **vide** — aucune perte possible. Il ne reste que
+      `master`.
+    - Vérifié : app fonctionnelle après retrait des CDN (styles Tailwind appliqués,
+      police Syncopate chargée, zéro erreur JS), `tsc` backend 0 et racine 12 lignes
+      préexistantes.
+
     ⚠️ **JEU DE DONNÉES DE DÉMO EN BASE** — 10 projets, 28 tâches, 6 dépenses fixes
     et 3 réservations matériel, tous préfixés **`DEMO — `**, créés le 30/07/2026 à
     la demande de Théo pour faire vivre les widgets. **Ces montants comptent dans
@@ -474,11 +500,13 @@
   cette occasion, et seulement là, supprimer le jeu de démo** (voir l'encart
   correctif 17) : les deux ne doivent jamais cohabiter, sinon le consommé est
   faux. Prévoir un dump Supabase avant l'opération.
-- **Dépendances CDN mortes dans `index.html`** (constaté le 30/07) : `importmap`
-  vers `esm.sh` (7 entrées) alors que le bundle de prod embarque React et ne
-  contient **zéro** référence à `esm.sh` — Vite bundle tout, ces lignes ne servent
-  plus à rien ; et **Font Awesome** chargé depuis `cdnjs` mais **utilisé nulle part
-  dans le code**. Deux requêtes externes pour rien à chaque chargement.
+- **Build local NON représentatif du build déployé** (constaté le 30/07) : Docker
+  construit le front avec **node:18-alpine** et un `npm install` (pas `npm ci`),
+  alors que le poste de Théo est en **Node 24**. Résultat mesuré sur le même code :
+  bundle local **2 012 Ko** contre **1 363 Ko** en production. Le déploiement n'est
+  donc pas reproductible à l'identique en local. Sans gravité (la prod fonctionne),
+  mais à savoir avant de conclure quoi que ce soit d'une mesure de bundle locale.
+  Correctif propre : aligner la version de Node et passer à `npm ci`.
 - **4 vulnérabilités npm dans le backend** (1 critique, 2 hautes, 1 basse au
   30/07), toutes **préexistantes** et venant de `bcrypt` (→ `@mapbox/node-pre-gyp`
   → `tar`, `rimraf` → `glob` → `minimatch` → `brace-expansion`), `nodemon` (dev) et
@@ -486,9 +514,9 @@
   transitive. La `tar` critique n'est utilisée qu'à l'**installation** de bcrypt,
   pas à l'exécution. `npm audit fix` risquerait de casser bcrypt : à traiter
   explicitement, pas au passage.
-- Nettoyage des branches locales déjà mergées (`git branch` en liste une dizaine :
-  feat/backend-*, feat/frontend-wire-*, fix/backend-dates-and-errors,
-  chore/supabase-safety, chore/versionne-claude-md, feat/realtime-modules)
+- ~~Nettoyage des branches locales mergées~~ — **fait le 30/07** : 27 branches
+  supprimées après vérification qu'aucune n'était non mergée. Il ne reste que
+  `master`.
 - Réactions emoji du Chat non accessibles sur mobile (masquées au survol) — laissé
   de côté volontairement lors du lot responsive, nécessite un appui long ou un menu
 - Vues Trimestre/Semestre/Année de l'Agenda : pas de vue mobile dédiée (contrairement
@@ -499,8 +527,10 @@
   les **valeurs arbitraires contenant `repeat(...)`** ne sont pas générées, et un
   raccourci `p-*` **écrase** un `pt-*` écrit après lui dès qu'il est préfixé `md:`
   (l'ordre des règles générées ne suit pas l'ordre des classes)
-- Composant `Select` à 34 px de haut : sous les 44 px tactiles recommandés. Seul
-  élément restant sous le seuil sur Campagnes et le Dashboard (mesuré le 30/07)
+- ~~Composant `Select` à 34 px~~ — **corrigé le 30/07** (correctif 21) : 44 px sur
+  mobile, 34 px conservés à partir de `md`. Un select de 44 px sur ordinateur
+  gonflerait les barres de filtres denses (en-têtes de graphiques Campagnes,
+  filtres du Dashboard) calibrées autour de 34 px.
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
 - **Après un déploiement, recharger complètement la page** : un onglet resté ouvert
