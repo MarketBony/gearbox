@@ -10,10 +10,11 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 18
-  (`feat/campagnes-ergonomie`, 30 juillet — refonte de l'écran Campagnes,
-  service `web` seul). Le correctif 19 (`fix/reservations-anti-surbooking`) est
-  prêt en local et touche le **backend** : rebuild du service `api`. Le SHA
+- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 19
+  (`fix/reservations-anti-surbooking`, 30 juillet — contrôle serveur de la
+  disponibilité du matériel). Le correctif 20 (`feat/pwa-install-push`) est prêt en
+  local : il touche le **frontend, le backend ET le schéma** → rebuild `api` **et**
+  `web`, migration appliquée au démarrage du conteneur `api`. Le SHA
   exact se lit avec `git log --oneline -1` plutôt que d'être recopié ici, où il
   devenait périmé à chaque lot. Des commits de doc ou de backup automatique
   peuvent suivre sans nécessiter de redéploiement.
@@ -394,6 +395,63 @@
     - Catalogue matériel dupliqué : **nettoyé par Théo**, vérifié — 16 lignes
       pour 16 noms uniques. Sorti du backlog.
 
+20. **PWA : application installable + notifications push + sourdine du chat**
+    (`feat/pwa-install-push`, 30 juillet). Frontend **et** backend, **avec
+    migration** (`20260730184718_add_push_subscriptions_and_chat_mute`).
+    - **Installable** sur Windows/Mac (Chrome, Edge), Android et iOS. Section
+      « Application » dans les Paramètres, visible par **tous** les rôles, avec une
+      modale à trois choix et le picto de chaque OS.
+    - ⚠️ **Un seul des trois cas peut être un vrai bouton.** Windows et Android
+      ont l'invite native (`beforeinstallprompt`) ; **iOS n'expose aucune API**,
+      seule la marche à suivre *Partager → Sur l'écran d'accueil* est possible.
+      Firefox sur ordinateur ne gère pas les manifests : aucune installation.
+    - **Aucune mise à jour de PWA à republier.** L'app installée charge le même
+      code que le site : un `docker compose up -d --build web` suffit, comme avant.
+    - ⚠️ **DÉCISION STRUCTURANTE — le service worker n'intercepte PAS `fetch`.**
+      Un service worker n'est pas requis pour l'installation (vérifié sur MDN) ;
+      celui de `public/sw.js` n'existe que parce que l'API Push l'exige. Sans
+      gestionnaire `fetch`, il ne met rien en cache et ne peut donc jamais figer
+      un utilisateur sur une vieille version — les en-têtes `Cache-Control` de
+      nginx continuent de piloter seuls la fraîcheur. **Ne pas ajouter de `fetch`.**
+    - **Pas de mode hors-ligne, et ce n'est pas un oubli** : Tailwind est chargé
+      depuis `cdn.tailwindcss.com` et génère TOUT le CSS à l'exécution — sans
+      réseau, l'app s'afficherait sans aucun style. Le rendre hors-ligne imposerait
+      d'internaliser Tailwind sur 20+ pages. Et Gearbox lit 100 % de ses données du
+      serveur : on afficherait une coquille vide.
+    - **Notifications de chat** avec expéditeur et contenu, façon Messenger. Sur
+      iOS, possible depuis iOS 16.4 **mais seulement dans l'app installée**, et la
+      permission exige un **vrai geste utilisateur** (d'où un bouton, jamais un
+      appel automatique). Badge de non-lus sur l'icône via `navigator.setAppBadge`.
+    - **Sourdine par conversation** depuis la rubrique Chat (cloche à côté de
+      l'étoile d'épinglage, dans les **trois** rendus de la liste). ⚠️ Contrairement
+      à l'épinglage, qui est un overlay `localStorage`, la sourdine passe par le
+      **serveur** : c'est lui qui décide d'envoyer le push. Elle est donc
+      synchronisée entre appareils, et coupe le push **sans** masquer le compteur
+      non-lu.
+    - **Icônes** : `public/favicon-192.png` faisait en réalité **161×161** (nom
+      trompeur) et Chrome exige du 192 et 512 **réels**. Quatre icônes régénérées
+      depuis la marque vectorielle (le 1er `path` de `logo-color.svg` — le logotype
+      complet fait 440×113, illisible en carré), dont une **maskable** à fond opaque
+      pour Android et un `apple-touch-icon` opaque (iOS ne gère pas la
+      transparence). Faute d'outil d'image sur le poste, générées via le canvas du
+      navigateur et **dimensions revérifiées octet par octet**.
+    - ⚠️ **Piège de configuration à deux temps** : une variable doit être
+      valorisée dans le `.env` du VPS **ET** déclarée dans le bloc `environment:`
+      du service `api` de `docker-compose.yml`. Absente de cette liste, elle
+      n'atteint pas le conteneur — et l'envoi de notifications échouerait
+      silencieusement. Clés VAPID posées dans les deux endroits + `backend/.env`.
+    - Vérifié : manifeste valide et 4 icônes en 200, `beforeinstallprompt` capté
+      et invite native déclenchée (chemin simulé de bout en bout), **6 cas de
+      détection de plateforme** dont l'iPad qui se déclare `Macintosh`, les 4 états
+      de permission dont le refus, service worker enregistré **sans gestionnaire
+      `fetch`**, **7 cas** de filtrage des destinataires, **7 cas** de sourdine
+      dont la préservation du compteur non-lu, abonnement mort (404) **supprimé
+      automatiquement**, réabonnement sans doublon, `theme-color` suivant le thème,
+      responsive mesuré à 320 et 375 px. Base rendue à son état initial.
+    - **Reste à valider par Théo** : l'installation réelle sur un poste Windows et
+      un téléphone, et la réception d'une notification. Mon environnement ne peut
+      ni installer une PWA ni recevoir une notification APNs.
+
     ⚠️ **JEU DE DONNÉES DE DÉMO EN BASE** — 10 projets, 28 tâches, 6 dépenses fixes
     et 3 réservations matériel, tous préfixés **`DEMO — `**, créés le 30/07/2026 à
     la demande de Théo pour faire vivre les widgets. **Ces montants comptent dans
@@ -410,8 +468,18 @@
   cette occasion, et seulement là, supprimer le jeu de démo** (voir l'encart
   correctif 17) : les deux ne doivent jamais cohabiter, sinon le consommé est
   faux. Prévoir un dump Supabase avant l'opération.
-- PWA (manifest.json + service worker) — prévu "juste avant déploiement" dans le
-  brief d'origine, jamais fait, toujours pertinent (HTTPS dispo, condition remplie)
+- **Dépendances CDN mortes dans `index.html`** (constaté le 30/07) : `importmap`
+  vers `esm.sh` (7 entrées) alors que le bundle de prod embarque React et ne
+  contient **zéro** référence à `esm.sh` — Vite bundle tout, ces lignes ne servent
+  plus à rien ; et **Font Awesome** chargé depuis `cdnjs` mais **utilisé nulle part
+  dans le code**. Deux requêtes externes pour rien à chaque chargement.
+- **4 vulnérabilités npm dans le backend** (1 critique, 2 hautes, 1 basse au
+  30/07), toutes **préexistantes** et venant de `bcrypt` (→ `@mapbox/node-pre-gyp`
+  → `tar`, `rimraf` → `glob` → `minimatch` → `brace-expansion`), `nodemon` (dev) et
+  `express` (→ `body-parser`). `web-push`, ajouté ce jour, n'a **aucune** dépendance
+  transitive. La `tar` critique n'est utilisée qu'à l'**installation** de bcrypt,
+  pas à l'exécution. `npm audit fix` risquerait de casser bcrypt : à traiter
+  explicitement, pas au passage.
 - Nettoyage des branches locales déjà mergées (`git branch` en liste une dizaine :
   feat/backend-*, feat/frontend-wire-*, fix/backend-dates-and-errors,
   chore/supabase-safety, chore/versionne-claude-md, feat/realtime-modules)

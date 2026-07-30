@@ -186,7 +186,11 @@ export interface ChatConversation {
   participants: string[]; // userIds
   adminIds?: string[];    // group admins (group type only)
   name?: string;
-  pinnedBy: string[]; // userIds
+  pinnedBy: string[]; // userIds — overlay localStorage, JAMAIS écrit en base
+  // userIds ayant mis la conversation en sourdine. Contrairement à `pinnedBy`,
+  // la source de vérité est la BASE : c'est le serveur qui décide d'envoyer les
+  // notifications push. Coupe le push, pas le compteur non-lu.
+  mutedBy?: string[];
   lastMessage?: string;
   lastMessageAt?: string;
   unreadCounts: Record<string, number>; // userId -> count

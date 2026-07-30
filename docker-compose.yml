@@ -6,6 +6,12 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       DIRECT_URL: ${DIRECT_URL}
       JWT_SECRET: ${JWT_SECRET}
+      # Web Push : les VALEURS vivent dans le .env du VPS (hors git). Une variable
+      # absente de cette liste n'atteint PAS le conteneur, même présente dans le
+      # .env — les deux vont ensemble, sinon l'envoi échoue silencieusement.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT}
       NODE_ENV: production
       PORT: 3000
     volumes:

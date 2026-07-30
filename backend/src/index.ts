@@ -21,6 +21,7 @@ import activityLogRoutes from './routes/activityLog';
 import userRoutes from './routes/users';
 import feedRoutes from './routes/feeds';
 import musicRoutes from './routes/music';
+import pushRoutes from './routes/push';
 import seedRoutes from './routes/seed';
 import uploadsRoutes, { UPLOADS_ROOT } from './routes/uploads';
 import { setupRealtime, withEmitterContext } from './realtime';
@@ -66,6 +67,9 @@ app.use('/api/uploads', uploadsRoutes);
 // peut pas les appeler en direct — CORS ; voir les commentaires de ces routes).
 app.use('/api/feeds', feedRoutes);
 app.use('/api/music', musicRoutes);
+
+// Abonnements aux notifications push (clé publique VAPID + subscribe/unsubscribe).
+app.use('/api/push', pushRoutes);
 
 // Fichiers uploadés servis en statique (URLs relatives renvoyées par la route).
 app.use('/uploads', express.static(UPLOADS_ROOT));

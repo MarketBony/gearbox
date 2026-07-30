@@ -8,6 +8,7 @@ import { db } from '../services/dataService';
 import { chatStore } from '../services/chatStore';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { usePresence } from '../services/presenceStore';
+import { setAppBadge } from '../services/pushNotifications';
 import { ActivityLog } from '../types';
 import {
   LayoutDashboard,
@@ -67,7 +68,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const loadChatUnread = () => {
     if (!user) return;
     // Source unique : le store chat alimenté par le socket (temps réel), plus de localStorage.
-    setChatUnreadCount(chatStore.getUnreadTotal(user.id));
+    const total = chatStore.getUnreadTotal(user.id);
+    setChatUnreadCount(total);
+    // PWA : même compteur sur l'icône de l'application installée (façon
+    // Messenger). Posé ici parce que le total y est déjà calculé — le dupliquer
+    // ailleurs, c'est prendre le risque que les deux divergent.
+    setAppBadge(total);
   };
 
   const loadGamesChallenges = () => {

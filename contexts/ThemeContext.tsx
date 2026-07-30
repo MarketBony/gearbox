@@ -37,6 +37,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } else {
       root.classList.remove('dark');
     }
+    // PWA : la barre de titre de la fenêtre installée (et la barre d'état sur
+    // mobile) prend la couleur de `meta theme-color`. Sans cette ligne, elle
+    // resterait figée sur le sombre déclaré dans index.html même en thème clair.
+    // Valeurs alignées sur --bg-main des deux thèmes.
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#121212' : '#f1f5f9');
     localStorage.setItem(getThemeKey(userId), theme);
   }, [theme, userId]);
 

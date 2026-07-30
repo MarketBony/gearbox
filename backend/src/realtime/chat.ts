@@ -1,5 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
+import { sendPushToUsers, resolvePushRecipients } from '../utils/pushSender';
+import { getUserIdsOnSection } from './presence';
 
 const prisma = new PrismaClient();
 
@@ -139,6 +141,35 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       io.to(convRoom(conversationId)).emit('chat:message:new', message);
       io.to(convRoom(conversationId)).emit('chat:conversation:updated', updatedConv);
       reply(ack, message);
+
+      // --- NOTIFICATIONS PUSH (ajouté le 30/07/2026) ---
+      // Après la réponse au client : un service de push lent ou en échec ne doit
+      // jamais retarder l'envoi du message lui-même.
+      //
+      // Destinataires = `unreadTargets` (déjà privé de l'émetteur), moins :
+      //   - la sourdine posée sur cette conversation (`mutedBy`) ;
+      //   - les personnes actuellement SUR la rubrique Chat, qui n'ont pas
+      //     besoin qu'on fasse sonner leur téléphone.
+      // L'aperçu réutilise volontairement la troncature de `lastMessage`
+      // ci-dessus, pour ne pas entretenir deux règles d'affichage divergentes.
+      const aNotifier = resolvePushRecipients({
+        unreadTargets,
+        senderId: userId,
+        mutedBy: conversation.mutedBy,
+        onSection: getUserIdsOnSection('chat')
+      });
+      if (aNotifier.length > 0) {
+        const titre = isGeneral
+          ? `${user?.name ?? 'Message'} — Chat Général`
+          : (user?.name ?? 'Nouveau message');
+        void sendPushToUsers(aNotifier, {
+          title: titre,
+          body: updatedConv.lastMessage ?? 'Nouveau message',
+          tag: `chat-${conversationId}`,
+          section: 'chat',
+          conversationId
+        });
+      }
     } catch (e) {
       reply(ack, { error: "Échec de l'envoi du message." });
     }
@@ -245,6 +276,45 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       reply(ack, updatedConv);
     } catch (e) {
       reply(ack, { error: 'Échec de la mise à jour de lecture.' });
+    }
+  });
+
+  // Sourdine d'une conversation, par utilisateur. Calqué sur
+  // `chat:conversation:read` : même contrôle d'appartenance, même émission.
+  //
+  // ⚠️ Contrairement à l'épinglage (`pinnedBy`), qui est un overlay localStorage
+  // côté client, la sourdine passe VRAIMENT par le serveur : c'est lui qui
+  // décide d'envoyer le push. Effet de bord bienvenu, elle est synchronisée
+  // entre tous les appareils de l'utilisateur.
+  //
+  // Elle coupe le push, PAS le compteur non-lu (comportement Messenger) : la
+  // conversation reste visible comme non lue dans l'application.
+  socket.on('chat:conversation:mute', async (payload: any, ack: Ack) => {
+    try {
+      const { conversationId, muted } = payload ?? {};
+      if (typeof conversationId !== 'string') return reply(ack, { error: 'Champ "conversationId" requis.' });
+      if (typeof muted !== 'boolean') return reply(ack, { error: 'Champ "muted" requis (booléen).' });
+
+      const conversation = await prisma.chatConversation.findUnique({ where: { id: conversationId } });
+      if (!conversation) return reply(ack, { error: 'Conversation introuvable.' });
+      if (conversation.type === 'general' ? role === 'External' : !conversation.participants.includes(userId)) {
+        return reply(ack, { error: "Vous n'êtes pas participant de cette conversation." });
+      }
+
+      const dejaEnSourdine = conversation.mutedBy.includes(userId);
+      // Idempotent : réémettre le même état ne doit pas dupliquer l'id.
+      const mutedBy = muted
+        ? (dejaEnSourdine ? conversation.mutedBy : [...conversation.mutedBy, userId])
+        : conversation.mutedBy.filter(id => id !== userId);
+
+      const updatedConv = await prisma.chatConversation.update({
+        where: { id: conversationId },
+        data: { mutedBy }
+      });
+      io.to(convRoom(conversationId)).emit('chat:conversation:updated', updatedConv);
+      reply(ack, updatedConv);
+    } catch (e) {
+      reply(ack, { error: 'Échec de la mise à jour de la sourdine.' });
     }
   });
 };
