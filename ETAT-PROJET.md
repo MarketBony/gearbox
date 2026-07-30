@@ -255,6 +255,43 @@
       prochaines vérifications d'interface.
     - `Caddyfile` inchangé : `/api/*` était déjà routé vers l'api.
 
+17. **Dashboard : correction de cohérence + outils de pilotage**
+    (`feat/dashboard-pilotage`, 30 juillet).
+    - **Ventilation des projets par site** : même bug que les dépenses fixes, resté
+      sur les projets. Un projet multi-sites disparaissait sous un filtre de
+      périmètre. Compteurs « projets actifs » et « campagnes » gardés **hors** de
+      la boucle de ventilation. Mesuré : Clermont 50 640 € → **57 640 €**.
+    - « Campagnes Live » → **« Campagnes Programmées »**, comptage des tâches et
+      non des projets.
+    - **6 cartes KPI** (au lieu de 4) : ajout de **Projets en Retard** (échéance
+      dépassée + avancement < 100 %) et **Rythme de Consommation** (% consommé
+      comparé au % de période écoulée — un pourcentage de budget seul n'alerte pas).
+    - **3 nouvelles sections** : *Pilotage projets* (écart prévu/réalisé par projet,
+      liste cliquable des retards, avancement moyen) ; *Performance des campagnes*
+      (volumétrie, ouverture, clic, NPAI, désabo, coût par contact, comparatif
+      SMS/e-mail) ; *Où part l'argent* (budget par canal, top sites et prestataires,
+      charge de l'équipe par collaborateur).
+    - ⚠️ **Taux pondérés par la volumétrie**, jamais des moyennes de taux : une
+      moyenne simple est fausse dès que les envois ont des tailles différentes.
+      Les numérateurs cumulés sont des volumes (`volumétrie × taux`), pas des taux.
+    - Tous les nouveaux indicateurs passent par la **même boucle filtrée** que le
+      budget consommé : périmètre, marque, service, PRO+, `Draft` exclu et
+      `Holding` hors montants mais compté dans le suivi.
+    - Vérifié en recalculant **chaque valeur à la main** : consommé 104 590 €,
+      4 projets en retard, avancement 26 %, 2 campagnes programmées, 204 400
+      contacts sur 13 envois, ouverture pondérée 13,5 %, clic 3,6 %, coût par
+      contact 0,084 € — affichage identique au calcul indépendant. Responsive
+      mesuré à 320 et 375 px : aucun débordement, tableau de performance à scroll
+      interne, zones tactiles ≥ 44 px.
+
+    ⚠️ **JEU DE DONNÉES DE DÉMO EN BASE** — 10 projets, 28 tâches, 6 dépenses fixes
+    et 3 réservations matériel, tous préfixés **`DEMO — `**, créés le 30/07/2026 à
+    la demande de Théo pour faire vivre les widgets. **Ces montants comptent dans
+    le budget consommé réel** (~72 400 € de coûts projets + 18 700 € de dépenses).
+    Ne pas les prendre pour des données de production. Pour les retirer : supprimer
+    tous les projets/dépenses/réservations dont le nom, commentaire ou description
+    commence par `DEMO — `.
+
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - **Catalogue matériel dupliqué en base** : 16 noms uniques mais 32 lignes, chaque
   équipement en double depuis le 8 juillet ~22:07 (double exécution de
