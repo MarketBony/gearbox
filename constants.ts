@@ -24,7 +24,7 @@ export const NISSAN_SITES: Site[] = ['Clermont', 'Montluçon', 'Moulins', 'Le Pu
 
 export const SERVICES: ServiceType[] = ['VN', 'VO', 'APV', 'PR', 'Tous Services'];
 
-export const BRANDS: BrandType[] = ['Renault', 'Dacia', 'Alpine', 'Nissan', 'Mobilize', 'Groupe'];
+export const BRANDS: BrandType[] = ['Renault', 'Dacia', 'Alpine', 'Nissan', 'Mobilize', 'Holding'];
 
 export const PROJECT_TYPES: ProjectType[] = ['Partenariat', 'Expo/Salon', 'Animation Co', 'OP Clients', 'Contenu', 'Collaborateurs'];
 
@@ -39,13 +39,38 @@ export const SERVICE_COLORS: Record<ServiceType, string> = {
 };
 
 // Simple visual colors for brands
+// =====================================================================
+// TAG HOLDING — règle métier non négociable (cf. CLAUDE.md)
+//
+// Un élément taggué Holding est TRACKÉ (il reste dans les listes, l'Agenda,
+// l'Export) mais n'est imputé à AUCUN budget, quels que soient les sites
+// sélectionnés. Le tag est aussi EXCLUSIF : le poser retire toute autre marque.
+//
+// Ne PAS confondre avec le périmètre 'GROUPE BONY' et ses clés de ventilation
+// (DISTRIBUTION_GROUPE_BONY plus bas) : celles-ci répartissent légitimement un
+// coût sur les concessions et n'ont rien à voir avec la Holding.
+// =====================================================================
+export const HOLDING_BRAND = 'Holding';
+
+// Accepte aussi l'ancienne valeur 'Groupe' : le tag est stocké en base
+// (Project.brands, FixedExpense.brands/brand sont des String[]) et une ligne
+// écrite avant le renommage du 30/07/2026 doit rester exclue du budget. Sans cet
+// alias, l'exclusion échouerait silencieusement sur les données existantes.
+export const isHoldingBrand = (
+  brands?: string[] | null,
+  legacyBrand?: string | null
+): boolean => {
+  const all = [...(brands || []), ...(legacyBrand ? [legacyBrand] : [])];
+  return all.includes(HOLDING_BRAND) || all.includes('Groupe');
+};
+
 export const BRAND_COLORS: Record<BrandType, string> = {
   Renault: 'bg-[#ffcc33] text-black border-[#ffcc33]', // Renault Yellow
   Dacia: 'bg-[#6a7551] text-white border-[#6a7551]', // Dacia Khaki
   Alpine: 'bg-[#0055a4] text-white border-[#0055a4]', // Alpine Blue
   Nissan: 'bg-[#c3002f] text-white border-[#c3002f]', // Nissan Red
   Mobilize: 'bg-purple-500 text-white border-purple-500', 
-  Groupe: 'bg-slate-700 text-white border-slate-600',
+  Holding: 'bg-slate-700 text-white border-slate-600',
 };
 
 // --- DIGITAL CONSTANTS ---
@@ -124,25 +149,25 @@ const generateMockData = (): Project[] => {
   const projectTemplates = [
     { name: 'Portes Ouvertes Janvier', type: 'OP Clients', service: ['VN', 'VO'], brands: ['Renault', 'Dacia'] },
     { name: 'Salon de l\'Habitat', type: 'Expo/Salon', service: ['VN'], brands: ['Renault'] },
-    { name: 'Déstockage Hiver', type: 'Animation Co', service: ['VO'], brands: ['Groupe'] },
+    { name: 'Déstockage Hiver', type: 'Animation Co', service: ['VO'], brands: ['Holding'] },
     { name: 'Lancement Duster 3', type: 'OP Clients', service: ['VN'], brands: ['Dacia'] },
-    { name: 'Foire de Cournon', type: 'Expo/Salon', service: ['VN', 'VO', 'APV'], brands: ['Groupe'] },
+    { name: 'Foire de Cournon', type: 'Expo/Salon', service: ['VN', 'VO', 'APV'], brands: ['Holding'] },
     { name: 'Campagne Climatisation', type: 'Animation Co', service: ['APV'], brands: ['Renault', 'Dacia'] },
     { name: 'Ventes Privées', type: 'OP Clients', service: ['VN'], brands: ['Alpine'] },
-    { name: 'Sponsoring Rugby', type: 'Partenariat', service: ['Tous Services'], brands: ['Groupe'] },
+    { name: 'Sponsoring Rugby', type: 'Partenariat', service: ['Tous Services'], brands: ['Holding'] },
     { name: 'Offre Pneus Été', type: 'Animation Co', service: ['APV', 'PR'], brands: ['Renault'] },
     { name: 'Roadshow Electrique', type: 'OP Clients', service: ['VN'], brands: ['Renault', 'Nissan'] },
-    { name: 'Challenge Vendeurs', type: 'Collaborateurs', service: ['VN'], brands: ['Groupe'] },
+    { name: 'Challenge Vendeurs', type: 'Collaborateurs', service: ['VN'], brands: ['Holding'] },
     { name: 'Rentrée Scolaire', type: 'Animation Co', service: ['VO'], brands: ['Dacia'] },
     { name: 'Portes Ouvertes Octobre', type: 'OP Clients', service: ['VN', 'VO'], brands: ['Renault', 'Dacia'] },
     { name: 'Contrôle Technique Offert', type: 'Animation Co', service: ['APV'], brands: ['Renault'] },
-    { name: 'Marché de Noël', type: 'Partenariat', service: ['VN'], brands: ['Groupe'] },
+    { name: 'Marché de Noël', type: 'Partenariat', service: ['VN'], brands: ['Holding'] },
     { name: 'Campagne Distribution', type: 'Animation Co', service: ['APV'], brands: ['Dacia'] },
-    { name: 'Black Friday VO', type: 'Animation Co', service: ['VO'], brands: ['Groupe'] },
+    { name: 'Black Friday VO', type: 'Animation Co', service: ['VO'], brands: ['Holding'] },
     { name: 'Lancement R5 E-Tech', type: 'OP Clients', service: ['VN'], brands: ['Renault'] },
     { name: 'Soirée Partenaires', type: 'Partenariat', service: ['Tous Services'], brands: ['Alpine'] },
-    { name: 'Liquidation Stock Fin Année', type: 'Animation Co', service: ['VO'], brands: ['Groupe'] },
-    { name: 'Voeux', type: 'Contenu', service: ['Tous Services'], brands: ['Groupe'] },
+    { name: 'Liquidation Stock Fin Année', type: 'Animation Co', service: ['VO'], brands: ['Holding'] },
+    { name: 'Voeux', type: 'Contenu', service: ['Tous Services'], brands: ['Holding'] },
     { name: 'Campagne Freinage', type: 'Animation Co', service: ['APV'], brands: ['Renault', 'Dacia'] }
   ];
 

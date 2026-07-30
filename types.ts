@@ -17,7 +17,11 @@ export type PlaqueName = 'PLAQUE CENTRE' | 'PLAQUE NORD' | 'PLAQUE SUD' | 'PLAQU
 
 export type ServiceType = 'VN' | 'VO' | 'APV' | 'PR' | 'Tous Services';
 
-export type BrandType = 'Renault' | 'Dacia' | 'Alpine' | 'Nissan' | 'Mobilize' | 'Groupe';
+// 'Holding' (anciennement 'Groupe', renommé le 30/07/2026) est un tag EXCLUSIF :
+// quand il est posé, aucune autre marque ne peut l'être, et l'élément n'entre dans
+// AUCUN budget quels que soient ses sites (voir isHoldingBrand dans constants.ts).
+// À ne pas confondre avec le périmètre 'GROUPE BONY' et ses clés de ventilation.
+export type BrandType = 'Renault' | 'Dacia' | 'Alpine' | 'Nissan' | 'Mobilize' | 'Holding';
 
 export type ProjectType = 'Partenariat' | 'Expo/Salon' | 'Animation Co' | 'OP Clients' | 'Contenu' | 'Collaborateurs';
 
@@ -106,7 +110,7 @@ export interface SocialPost {
   brands: BrandType[];
   service: ServiceType;
   networks: SocialNetwork[];
-  concessions: string[]; // Can include sites, plaques or 'Groupe'
+  concessions: string[]; // Sites, plaques ou 'GROUPE BONY' — périmètres, PAS des marques
   mediaFiles: string[]; // Placeholders for now
   link: string;
   wording: string;

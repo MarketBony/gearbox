@@ -115,9 +115,21 @@ que de supposer que ça va passer.
   si ça diffère de Nissan.
 - Nissan disponible sur `NISSAN_SITES` (liste plus large, bucket global non
   ventilé par site — asymétrie connue avec Alpine, pas un bug).
-- Groupe/Holding : projets trackés mais ne doivent jamais remonter dans le
-  budget. Un bug connu existe là-dessus dans `Budget.tsx` (~L440) — non corrigé
-  à ce jour, à traiter séparément si demandé.
+- **Holding = un TAG MARQUE** (`BrandType`), anciennement nommé `Groupe`, renommé
+  le 30 juillet 2026. Deux règles indissociables :
+  1. **Tag exclusif** : quand Holding est posé, aucune autre marque ne peut
+     l'être — et poser une autre marque retire Holding.
+  2. **Jamais dans aucun budget** : un projet ou une dépense taggué Holding est
+     **tracké** (il reste dans les listes, l'Agenda, l'Export, le compteur
+     « projets actifs ») mais n'est imputé à **aucun** budget, **quels que soient
+     les sites sélectionnés**. Test unique : `isHoldingBrand()` dans
+     `constants.ts`, appliqué aux 4 blocs d'agrégation (projets et dépenses
+     fixes, dans `Budget.tsx` et `Dashboard.tsx`).
+  ⚠️ **Ne pas confondre avec le périmètre `GROUPE BONY`**, qui est une valeur de
+  *site* et déclenche une ventilation pondérée légitime sur les concessions
+  (`DISTRIBUTION_GROUPE_BONY` / `_RN` dans `constants.ts`). Le tag marque et le
+  périmètre sont deux notions distinctes ; les confondre est exactement ce qui a
+  laissé ce bug en place des mois.
 - Director = mêmes droits qu'Administrator, sauf Jeux.
 - Jeux accessible uniquement à Master, Administrator, Coordinator, Digital
   Manager.

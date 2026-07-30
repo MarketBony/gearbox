@@ -283,7 +283,7 @@ const Material: React.FC = () => {
                 equipmentId: equipmentId || (selectedEquipmentId !== 'All' ? selectedEquipmentId : (equipment.length > 0 ? equipment[0].id : '')),
                 site: 'GROUPE BONY',
                 service: 'Tous Services',
-                brand: 'Groupe'
+                brand: 'Holding'
             });
             setIsEditing(false);
         }

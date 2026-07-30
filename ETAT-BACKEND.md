@@ -78,10 +78,16 @@ consommateur est `services/realtime.ts` (`RT_EVENTS`).
 qui serait diffusé à tous les clients connectés. Le helper `publicUser` est la seule
 forme qui sort du module, réponse HTTP comme événement socket.
 
-⚠️ Les routes émettent **aussi vers l'auteur** de la mutation (pas d'exclusion du
-socket émetteur). Assumé : l'auteur refetch une donnée qu'il vient d'écrire. Si du
-scintillement apparaît côté UI, la piste est un header `x-socket-id` + `io.except(id)`,
-avec un `AsyncLocalStorage` pour éviter de toucher les ~35 sites d'appel.
+✅ **L'auteur d'une mutation est EXCLU de la diffusion** (depuis le 30/07/2026). Le
+client envoie son `socket.id` dans l'en-tête `x-socket-id` ; `withEmitterContext`
+(monté avant les routes dans `index.ts`) le mémorise pour la durée de la requête via
+`AsyncLocalStorage` ; `emitEvent` diffuse alors en `io.except(socketId)`. Les ~35
+sites d'appel sont inchangés et aucune route n'a besoin de connaître le socket.
+
+Pourquoi : sans exclusion, l'auteur refetchait sa propre écriture 300 ms plus tard
+(`services/realtime.ts`) et écrasait son état local — une puce de marque cliquée dans
+`Projects.tsx` se dé-sélectionnait. Dégradation sûre : sans en-tête (curl, outil
+externe, client hors socket), on retombe sur une diffusion à tous.
 
 ## ✅ Présence en temps réel (29 juillet 2026)
 
