@@ -528,6 +528,15 @@ const Dashboard: React.FC = () => {
 
     // 3. Process PROJECTS (Actuals)
     projects.forEach(p => {
+        // Brouillon : ne remonte NULLE PART. Budget.tsx l'excluait déjà (bloc 3),
+        // le Dashboard non — un projet en brouillon portant un coût gonflait donc
+        // le consommé, la trajectoire mensuelle, le mix activité et le compteur
+        // « campagnes live », sans jamais apparaître dans Budget. Les deux écrans
+        // se contredisaient. Corrigé le 30/07/2026.
+        // Placé en tête : « projets actifs » et « prochaines échéances » ne testent
+        // que status === 'Active', ils ne comptaient donc déjà pas les brouillons.
+        if (p.status === 'Draft') return;
+
         if (!isProPlusInScope(p.proPlus)) return;
         let pSite = p.site;
         if (pSite === 'Thiers' || pSite === 'Ambert') pSite = 'Ricoux';

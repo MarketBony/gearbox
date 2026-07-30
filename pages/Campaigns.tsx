@@ -108,6 +108,10 @@ const Campaigns: React.FC = () => {
   const allCampaigns: CampaignTask[] = useMemo(() => {
     const tasks: CampaignTask[] = [];
     projects.forEach(p => {
+        // Brouillon : ne remonte nulle part (règle métier, cf. CLAUDE.md).
+        // Aucun filtre de statut n'existait ici — les tâches d'un projet en
+        // brouillon remontaient comme des campagnes réelles.
+        if (p.status === 'Draft') return;
         p.tasks.forEach(t => {
             if (t.channel === 'SMS' || t.channel === 'E-mail') {
                 tasks.push({

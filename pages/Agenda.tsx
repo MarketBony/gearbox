@@ -233,6 +233,10 @@ const Agenda: React.FC = () => {
 
   const filteredProjects = useMemo(() => {
       return projects.filter(p => {
+          // Brouillon : ne remonte nulle part (règle métier, cf. CLAUDE.md).
+          // Cette vue n'avait aucun filtre de statut — les brouillons y
+          // apparaissaient par défaut, pas par choix.
+          if (p.status === 'Draft') return false;
           if (filterBrand !== 'All' && !(p.brands || []).includes(filterBrand) && !(p.brands || []).includes('Holding')) return false;
           if (filterService !== 'All' && !p.service.includes(filterService) && !p.service.includes('Tous Services')) return false;
           if (filterType !== 'All' && p.projectType !== filterType) return false;
