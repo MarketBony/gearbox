@@ -21,7 +21,7 @@ import activityLogRoutes from './routes/activityLog';
 import userRoutes from './routes/users';
 import seedRoutes from './routes/seed';
 import uploadsRoutes, { UPLOADS_ROOT } from './routes/uploads';
-import { setupRealtime } from './realtime';
+import { setupRealtime, withEmitterContext } from './realtime';
 import { startPurgeJob } from './jobs/purge';
 
 dotenv.config();
@@ -37,6 +37,11 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+
+// Contexte d'émission : mémorise le `x-socket-id` de l'appelant pour la durée de
+// la requête, afin que emitEvent ne renvoie pas l'événement à son propre auteur
+// (voir realtime/index.ts). À monter AVANT les routes.
+app.use(withEmitterContext);
 
 // Routes
 app.use('/api/auth', authRoutes);

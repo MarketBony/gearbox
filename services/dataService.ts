@@ -2,6 +2,7 @@
 import { Project, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog } from '../types';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
+import { getCurrentSocketId } from './socketId';
 
 // In a real scenario, this connects to the Electron preload script exposed via window.electron
 // For this demo, it uses LocalStorage to simulate persistence in the browser.
@@ -35,6 +36,10 @@ export class ApiError extends Error {
 // Un 403 (rôle insuffisant) ne déconnecte PAS.
 async function apiFetch<T = any>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
+  // Identifie l'onglet appelant pour que le serveur ne lui renvoie PAS l'événement
+  // temps réel de sa propre mutation : sinon il refetche son écriture et écrase
+  // son état local en cours de saisie (voir services/socketId.ts).
+  const socketId = getCurrentSocketId();
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
@@ -42,6 +47,7 @@ async function apiFetch<T = any>(path: string, options: RequestInit = {}): Promi
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(socketId ? { 'x-socket-id': socketId } : {}),
         ...(options.headers || {})
       }
     });

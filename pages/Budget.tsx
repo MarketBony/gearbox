@@ -6,7 +6,7 @@ import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, ChevronDown, ChevronRight, Calculator, PieChart, TrendingUp, TrendingDown, AlertTriangle, Filter, Coins, Calendar, Lock, Search, X, Check } from 'lucide-react';
-import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES } from '../constants';
+import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES, isHoldingBrand } from '../constants';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -415,6 +415,11 @@ const Budget: React.FC = () => {
           if (p.status === 'Draft') return;
           if (!isProPlusInScope(p.proPlus)) return;
 
+          // Tag Holding : tracké mais JAMAIS imputé à un budget, quels que soient
+          // les sites sélectionnés (règle métier, cf. CLAUDE.md). Sortie AVANT le
+          // calcul des parts et le routage Alpine/Nissan.
+          if (isHoldingBrand(p.brands)) return;
+
           // Determine Sites and Shares
           let siteShares: Record<string, number> = {};
           if (p.sites && p.sites.length > 0 && p.budgetDistribution) {
@@ -450,7 +455,7 @@ const Budget: React.FC = () => {
 
               // Brand Filter
               if (filterBrands.length > 0) {
-                  if (!filterBrands.some(fb => pBrands.includes(fb)) && !pBrands.includes('Groupe')) return;
+                  if (!filterBrands.some(fb => pBrands.includes(fb)) && !pBrands.includes('Holding')) return;
               }
 
               // Year Filter — un projet est compté sur sa date de DÉBUT (startDate),
@@ -498,6 +503,11 @@ const Budget: React.FC = () => {
       // 4. Process FIXED EXPENSES
       fixedExpenses.forEach(exp => {
           if (!isProPlusInScope(exp.proPlus)) return;
+
+          // Tag Holding : hors budget (voir bloc 3). Le champ legacy `brand` est
+          // passé aussi, une dépense ancienne pouvant ne porter que celui-là.
+          if (isHoldingBrand(exp.brands, exp.brand)) return;
+
           // Determine Sites and Shares
           let siteShares: Record<string, number> = {};
           if (exp.sites && exp.sites.length > 0 && exp.budgetDistribution) {

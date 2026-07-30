@@ -4,7 +4,7 @@ import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense } from '../types';
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
-import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS } from '../constants';
+import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS, isHoldingBrand } from '../constants';
 import {
   TrendingUp,
   Wallet,
@@ -495,7 +495,7 @@ const Dashboard: React.FC = () => {
 
     const isBrandInScope = (projectBrands: BrandType[]) => {
         if (filterBrands.length === 0) return true;
-        return projectBrands.includes('Groupe') || filterBrands.some(b => projectBrands.includes(b));
+        return projectBrands.includes('Holding') || filterBrands.some(b => projectBrands.includes(b));
     };
 
     const isServiceInScope = (projectServices: string[]) => {
@@ -544,6 +544,12 @@ const Dashboard: React.FC = () => {
         
         const hasCampaign = p.tasks.some(t => (t.channel === 'SMS' || t.channel === 'E-mail') && t.status === 'Programmed');
         if (hasCampaign) activeCampaignsCount++;
+
+        // Tag Holding : tracké mais JAMAIS imputé à un budget (règle métier, cf.
+        // CLAUDE.md). Placé ICI volontairement, APRÈS les compteurs « projets
+        // actifs » et « campagnes live » : le Holding sort des montants, il ne
+        // disparaît pas du suivi.
+        if (isHoldingBrand(p.brands)) return;
 
         // Date de référence = date de DÉBUT du projet (cohérent avec l'agrégation Budget) :
         // le budget réalisé est compté sur le mois/année de startDate, pas de fin.
@@ -597,6 +603,9 @@ const Dashboard: React.FC = () => {
     // - pourcentages utilisés tels quels, sans renormalisation (comme Budget.tsx).
     fixedExpenses.forEach(e => {
         if (!isProPlusInScope(e.proPlus)) return;
+
+        // Tag Holding : hors budget (voir bloc 3). Champ legacy `brand` inclus.
+        if (isHoldingBrand(e.brands, e.brand)) return;
 
         const eBrands = e.brands || (e.brand ? [e.brand] : []);
         if (!isBrandInScope(eBrands)) return;
@@ -698,7 +707,7 @@ const Dashboard: React.FC = () => {
              }
              // Brand check
              if (filterBrands.length > 0) {
-                 if (!p.brands.includes('Groupe') && !filterBrands.some(b => p.brands.includes(b))) return false;
+                 if (!p.brands.includes('Holding') && !filterBrands.some(b => p.brands.includes(b))) return false;
              }
 
              if (p.archived) return false;

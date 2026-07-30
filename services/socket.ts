@@ -2,6 +2,7 @@ import { io, type Socket } from 'socket.io-client';
 import { db, getToken } from './dataService';
 import { chatStore } from './chatStore';
 import { presenceStore, type PresenceState } from './presenceStore';
+import { setCurrentSocketId } from './socketId';
 
 // =====================================================================
 // COUCHE SOCKET.IO (étape 7 — branchement Chat)
@@ -55,6 +56,9 @@ export const connectSocket = (): Socket | null => {
 
   // 'connect' se déclenche au 1er établissement ET après chaque reconnexion.
   socket.on('connect', () => {
+    // L'id change à chaque (re)connexion : on le republie pour que le serveur
+    // puisse continuer à exclure cet onglet de ses propres événements.
+    setCurrentSocketId(socket?.id ?? null);
     refreshConversations();
     // La présence serveur est en mémoire : après une reconnexion (ou un
     // redémarrage de l'api) notre entrée a disparu, on se réannonce.
@@ -86,6 +90,7 @@ export const disconnectSocket = () => {
     socket = null;
   }
   mySection = null; // sinon la prochaine session réannoncerait l'ancienne rubrique
+  setCurrentSocketId(null);
   chatStore.clear();
   presenceStore.clear();
 };

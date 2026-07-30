@@ -1,4 +1,6 @@
 import { Server, Socket } from 'socket.io';
+import { AsyncLocalStorage } from 'async_hooks';
+import type { RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../auth/secret';
 import {
@@ -67,8 +69,37 @@ export const setupRealtime = (socketIo: Server) => {
   });
 };
 
+// =====================================================================
+// EXCLUSION DE L'AUTEUR
+//
+// Jusqu'au 30/07/2026, emitEvent diffusait à TOUS les clients, auteur inclus.
+// Conséquence observée : l'auteur d'une mutation recevait son propre événement,
+// son écran refetchait 300 ms plus tard (services/realtime.ts) et écrasait son
+// état local — dans pages/Projects.tsx, une puce de marque qu'il venait de
+// cliquer se dé-sélectionnait, obligeant à cliquer plusieurs fois.
+//
+// Le client envoie son `socket.id` dans l'en-tête `x-socket-id` (voir
+// services/socketId.ts + apiFetch). On le stocke pour la durée de la requête
+// via AsyncLocalStorage : les ~35 appels à emitEvent restent inchangés, et
+// aucune route n'a besoin de connaître le socket.
+//
+// Dégradation sûre : sans en-tête (client hors socket, outil externe, curl),
+// on retombe sur une diffusion à tous, le comportement d'avant.
+// =====================================================================
+const emitterStore = new AsyncLocalStorage<{ socketId?: string }>();
+
+export const withEmitterContext: RequestHandler = (req, _res, next) => {
+  const header = req.headers['x-socket-id'];
+  const socketId = typeof header === 'string' && header.length > 0 ? header : undefined;
+  emitterStore.run({ socketId }, () => next());
+};
+
 export const emitEvent = (event: string, data: any) => {
-  if (io) {
+  if (!io) return;
+  const socketId = emitterStore.getStore()?.socketId;
+  if (socketId && io.sockets.sockets.has(socketId)) {
+    io.except(socketId).emit(event, data);
+  } else {
     io.emit(event, data);
   }
 };

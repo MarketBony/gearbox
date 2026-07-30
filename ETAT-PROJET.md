@@ -146,6 +146,44 @@
       booléen — c'est l'absence de cette indication qui avait fait croire que le
       cas ponctuel n'était pas couvert.
 
+12. **Tag marque Holding : renommage, exclusivité, exclusion de tout budget**
+    (`fix/tag-holding`, 30 juillet). La règle « Groupe/Holding ne remonte jamais
+    dans le budget » n'était codée **nulle part** — `'Groupe'` n'existait que comme
+    laissez-passer du filtre marque, donc un élément taggué comptait bel et bien.
+    - `'Groupe'` → `'Holding'` dans `BrandType`, `BRANDS`, `BRAND_COLORS`, les 8
+      projets de démo et les 7 fichiers citant la valeur.
+    - Test unique `isHoldingBrand()` dans `constants.ts`, qui accepte **aussi**
+      l'ancienne valeur `'Groupe'` : le tag est stocké en base, une ligne écrite
+      avant le renommage échapperait sinon silencieusement à l'exclusion.
+    - Exclusion appliquée aux **4 blocs** d'agrégation (projets et dépenses fixes,
+      dans `Budget.tsx` et `Dashboard.tsx`). Dans le Dashboard, la garde est placée
+      **après** les compteurs « projets actifs » et « campagnes live » :
+      volontaire, le Holding sort des montants sans disparaître du suivi.
+    - Exclusivité ajoutée au formulaire Dépenses (toggle purement additif
+      jusque-là) ; côté Projets elle existait déjà et a été conservée.
+    - ⚠️ `DISTRIBUTION_GROUPE_BONY` / `_RN` et le bouton « GROUPE BONY (GLOBAL) »
+      **non touchés** : ce sont des ventilations légitimes, sans rapport avec la
+      Holding. La confusion entre le tag marque et le périmètre est ce qui a laissé
+      ce bug en place.
+    - Mesuré sur le projet TEST (13 490 €, Clermont, Active) : Holding → 0 €,
+      bascule Renault → 13 490 €, retour Holding → 0 €, projet toujours compté
+      dans « projets actifs » (4 = les 4 actifs en base). Budget et Dashboard
+      d'accord.
+
+13. **Exclusion de l'auteur dans la diffusion temps réel** (même lot). L'auteur
+    d'une mutation recevait son propre événement, son écran refetchait 300 ms plus
+    tard et écrasait son état local : une puce de marque cliquée dans `Projects.tsx`
+    se dé-sélectionnait, d'où « il faut cliquer plusieurs fois ». Risque accepté
+    explicitement le 29/07, corrigé ici.
+    - Client : `services/socketId.ts` (module isolé pour éviter le cycle d'imports
+      `dataService` ↔ `socket`), `apiFetch` envoie l'en-tête `x-socket-id`.
+    - Serveur : `withEmitterContext` mémorise l'id par requête via
+      `AsyncLocalStorage`, et `emitEvent` diffuse en `io.except(socketId)`. Les ~35
+      sites d'appel restent inchangés, aucune route ne connaît le socket.
+    - Dégradation sûre : sans en-tête (curl, outil externe), diffusion à tous.
+    - Vérifié à deux onglets : auteur **0 refetch**, autre client **1 refetch** —
+      le temps réel entre utilisateurs est intact.
+
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - **Catalogue matériel dupliqué en base** : 16 noms uniques mais 32 lignes, chaque
   équipement en double depuis le 8 juillet ~22:07 (double exécution de

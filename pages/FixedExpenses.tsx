@@ -4,7 +4,7 @@ import { FixedExpense, ServiceType, Site, PlaqueName, BrandType, ActivityLog } f
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
-import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN } from '../constants';
+import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, HOLDING_BRAND } from '../constants';
 import { Plus, Trash2, Edit2, Save, X, Search, Filter, Euro, Calendar, MapPin, MessageSquare, Briefcase, ArrowUp, ArrowDown, ChevronDown, Check, PieChart } from 'lucide-react';
 import Select from '../components/Select';
 import DatePicker from '../components/DatePicker';
@@ -664,9 +664,14 @@ const FixedExpenses: React.FC = () => {
                                                             key={b}
                                                             disabled={!isAvailable}
                                                             onClick={() => {
-                                                                const next = isSelected
-                                                                    ? currentBrands.filter(x => x !== b)
-                                                                    : [...currentBrands, b];
+                                                                // Holding est EXCLUSIF : le poser retire toute autre marque,
+                                                                // et poser une autre marque le retire. Même logique que
+                                                                // pages/Projects.tsx, qui l'appliquait déjà de son côté.
+                                                                const next = b === HOLDING_BRAND
+                                                                    ? (isSelected ? [] : [HOLDING_BRAND as BrandType])
+                                                                    : (isSelected
+                                                                        ? currentBrands.filter(x => x !== b)
+                                                                        : [...currentBrands.filter(x => x !== HOLDING_BRAND), b]);
                                                                 setCurrentExpense({ ...currentExpense, brands: next, brand: next[0] });
                                                             }}
                                                             className={`px-3 py-1.5 rounded text-xs font-bold border transition-all ${

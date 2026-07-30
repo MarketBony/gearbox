@@ -980,7 +980,7 @@ const Digital: React.FC = () => {
           if (searchTerm && !p.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
 
           // Filters
-          if (filterBrand !== 'All' && !p.brands.includes(filterBrand) && !p.brands.includes('Groupe')) return false;
+          if (filterBrand !== 'All' && !p.brands.includes(filterBrand) && !p.brands.includes('Holding')) return false;
           if (filterService !== 'All' && p.service !== filterService && p.service !== 'Tous Services') return false;
           
           if (isPlanning && filterConcession !== 'All') {

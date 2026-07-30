@@ -289,7 +289,7 @@ const Campaigns: React.FC = () => {
         }
         
         if (filterBrand !== 'All') {
-             const hasBrand = item.parentBrands.includes(filterBrand) || item.parentBrands.includes('Groupe');
+             const hasBrand = item.parentBrands.includes(filterBrand) || item.parentBrands.includes('Holding');
              if (!hasBrand) return false;
         }
 
@@ -608,7 +608,7 @@ const Campaigns: React.FC = () => {
                         <label className="text-[10px] font-bold text-slate-500 uppercase">Marque</label>
                         <div className="flex flex-wrap gap-1">
                             <button onClick={() => setFilterBrand('All')} className={`px-2 py-1 text-[9px] font-bold rounded border ${filterBrand === 'All' ? 'bg-white text-black border-slate-300' : 'border-slate-300 dark:border-slate-700 text-slate-500'}`}>TOUT</button>
-                            {BRANDS.filter(b => b !== 'Groupe').map(b => (
+                            {BRANDS.filter(b => b !== 'Holding').map(b => (
                                 <button key={b} onClick={() => setFilterBrand(b)} className={`px-2 py-1 text-[9px] font-bold rounded border ${filterBrand === b ? 'bg-bony-panel text-bony-orange border-bony-orange' : 'border-slate-300 dark:border-slate-700 text-slate-500'}`}>{b}</button>
                             ))}
                         </div>

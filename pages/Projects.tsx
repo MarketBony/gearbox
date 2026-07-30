@@ -597,10 +597,10 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
       const currentBrands = selectedProject.brands || [];
       let newBrands: BrandType[] = [];
 
-      if (b === 'Groupe') {
-          newBrands = currentBrands.includes('Groupe') ? [] : ['Groupe'];
+      if (b === 'Holding') {
+          newBrands = currentBrands.includes('Holding') ? [] : ['Holding'];
       } else {
-          let temp = currentBrands.filter(br => br !== 'Groupe');
+          let temp = currentBrands.filter(br => br !== 'Holding');
           newBrands = temp.includes(b) ? temp.filter(br => br !== b) : [...temp, b];
       }
       handleUpdateProject({ ...selectedProject, brands: newBrands });
@@ -668,7 +668,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
 
         if (filterBrands.length > 0) {
             const pBrands = p.brands || [];
-            const hasBrand = filterBrands.some(b => pBrands.includes(b) || pBrands.includes('Groupe'));
+            const hasBrand = filterBrands.some(b => pBrands.includes(b) || pBrands.includes('Holding'));
             if (!hasBrand) return false;
         }
 
