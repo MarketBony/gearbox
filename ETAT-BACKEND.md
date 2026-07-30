@@ -14,6 +14,8 @@ Migrations Prisma appliquées sur Supabase : `20260706160559_init` + `2026070811
 3. **Budget** — `/api/budget` (lignes, upsert par site) + `/api/fixed-expenses` (dépenses fixes).
 4. **Utilisateurs** — `/api/users` CRUD, mutations Master/Admin, validation des 7 rôles (+ `avatarUrl`).
 5. **Matériel** — `/api/equipment` + `/api/equipment-bookings` (delete cascade FK).
+   **Disponibilité contrôlée côté serveur** depuis le 30/07/2026 sur POST et PUT
+   (`src/utils/availability.ts`) — voir la section dédiée plus bas.
 6. **Campagnes** — `/api/campaigns` CRUD.
 7. **Digital / Social** — `/api/social` CRUD ; `mediaFiles` = URLs de fichiers uploadés (voir Uploads).
 8. **Journal d'activité** — `/api/activity-log` (GET plafonné 200, POST fire-and-forget, Master non journalisé).
@@ -25,6 +27,46 @@ Le frontend utilise la couche unique `services/dataService.ts` (`apiFetch` + JWT
 `localStorage` **assumés et hors périmètre** (pas des données serveur) : overlay client-only chat
 (épingle / renommage / membres de groupe), avatars de groupe du chat, prefs UI (ville/anniversaire),
 et fallback des anciennes photos de profil base64 (avant bascule uploads).
+
+## 🔒 Disponibilité du matériel — anti sur-réservation (30/07/2026)
+
+`src/utils/availability.ts`, appelé par le POST et le PUT de
+`routes/equipmentBookings.ts`. Deux règles indissociables, à ne pas simplifier :
+
+1. **Le besoin se mesure en pic jour par jour, pas en somme des chevauchements.**
+   Deux réservations qui croisent la période demandée sans se croiser entre elles
+   ne s'additionnent pas. Sommer naïvement refuserait des réservations
+   légitimes — vérifié : une demande de 1 sur 01→11, avec 1 unité prise sur
+   01→02 et 1 sur 10→11 pour un stock de 2, passe (pic = 1) alors qu'une somme
+   donnerait 2 et refuserait. Même règle que `getAvailability()` dans
+   `pages/Material.tsx`, volontairement : le serveur est le garde-fou, pas une
+   seconde règle divergente.
+   Optimisation : seuls les **jours critiques** sont testés (début de la période
+   + premier jour de chaque réservation qui y entre), l'utilisation ne pouvant
+   monter qu'à ces dates — une réservation d'un an ne coûte pas 365 itérations.
+
+2. **Verrou consultatif transactionnel par matériel**, sinon le contrôle est
+   décoratif. `pg_advisory_xact_lock(1, hash32(equipmentId))` en tête de la
+   transaction : en isolation Read Committed, deux transactions lisent le même
+   état et valident toutes les deux. **Mesuré** sur 6 requêtes simultanées avec
+   un stock de 2 : sans le verrou **6 acceptées et 6 unités engagées**
+   (sur-réservation de 300 %) ; avec, exactement **2 acceptées, 4 refusées**.
+   - Verrou `_xact_` (relâché au commit) et **non** de session : le pooler
+     Supabase est en mode transaction (`pgbouncer=true`, port 6543), un verrou de
+     session n'y survivrait pas.
+   - `$executeRaw` et non `$queryRaw` : la fonction renvoie `void`, que Prisma ne
+     sait pas désérialiser (P2010 « Failed to deserialize column of type 'void' »).
+
+Réponses : **409** en cas de dépassement, avec un message reprenant demandé /
+disponible / stock — affiché tel quel à l'utilisateur (`alert` dans
+`Material.tsx`, qui lit déjà `ApiError.message`, aucun changement frontend requis).
+Le POST conserve **400** pour un `equipmentId` inconnu (statut d'avant, quand
+c'était la violation de clé étrangère qui le produisait).
+
+Corrigé au passage : un **PUT partiel ne portant que `endDate`** pouvait la placer
+avant `startDate`, le contrôle croisé n'existant que dans le POST. La
+disponibilité est désormais évaluée sur les valeurs **effectives après fusion**,
+et non sur le corps de la requête.
 
 ## ⚠️ Route DORMANTE — `/api/expenses` (modèle `OneOffExpense`)
 
