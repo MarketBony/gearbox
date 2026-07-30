@@ -448,9 +448,15 @@
       dont la préservation du compteur non-lu, abonnement mort (404) **supprimé
       automatiquement**, réabonnement sans doublon, `theme-color` suivant le thème,
       responsive mesuré à 320 et 375 px. Base rendue à son état initial.
-    - **Reste à valider par Théo** : l'installation réelle sur un poste Windows et
-      un téléphone, et la réception d'une notification. Mon environnement ne peut
-      ni installer une PWA ni recevoir une notification APNs.
+    - ✅ **Validé en production par Théo le 30/07/2026**, sur les trois cibles :
+      poste Windows, **Google Pixel 10 Pro** (Android) et **iPhone SE** (iOS).
+      Installation, réception des notifications, clic vers le chat et badge de
+      non-lus : tout fonctionne. À noter pour les prochaines sessions : mon
+      environnement ne peut ni installer une PWA ni recevoir une notification
+      APNs, la validation finale de ce genre de lot passe forcément par Théo.
+      Le test depuis un téléphone est par ailleurs impossible en local
+      (`localhost` ne sort pas du poste) : ce lot est parti en prod sans essai
+      mobile préalable, et c'était le bon arbitrage.
 
     ⚠️ **JEU DE DONNÉES DE DÉMO EN BASE** — 10 projets, 28 tâches, 6 dépenses fixes
     et 3 réservations matériel, tous préfixés **`DEMO — `**, créés le 30/07/2026 à
