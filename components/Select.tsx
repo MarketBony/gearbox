@@ -89,7 +89,14 @@ const Select: React.FC<SelectProps> = ({
     }
   };
 
-  const triggerPad = size === 'sm' ? 'py-1.5 pl-3 pr-9 text-xs min-h-[34px]' : 'py-3 pl-4 pr-11 text-sm min-h-[46px]';
+  // Zone tactile : 44 px minimum sur mobile, mais on REVIENT à 34 px à partir de
+  // `md`. Un select de 44 px de haut sur ordinateur gonflerait les barres de
+  // filtres et les formulaires denses (en-têtes de graphiques Campagnes, filtres
+  // du Dashboard) qui sont calibrés autour de 34 px. La taille `md` est déjà
+  // au-dessus du seuil (46 px), elle n'a pas besoin de ce traitement.
+  const triggerPad = size === 'sm'
+    ? 'py-1.5 pl-3 pr-9 text-xs min-h-[44px] md:min-h-[34px]'
+    : 'py-3 pl-4 pr-11 text-sm min-h-[46px]';
   const chevronRight = size === 'sm' ? 'right-2.5' : 'right-3.5';
   const chevronSize = size === 'sm' ? 14 : 17;
 
@@ -160,7 +167,7 @@ const Select: React.FC<SelectProps> = ({
               onChange={(e) => { setQuery(e.target.value); setActiveIndex(0); }}
               onKeyDown={onKeyDown}
               placeholder="Rechercher…"
-              className="w-full bg-[var(--bg-input)] border border-bony-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-bony-text outline-none focus:border-bony-orange/60"
+              className="w-full bg-[var(--bg-input)] border border-bony-border rounded-xl pl-8 pr-3 py-2.5 md:py-1.5 text-xs text-bony-text outline-none focus:border-bony-orange/60"
             />
           </div>
         )}
@@ -180,7 +187,7 @@ const Select: React.FC<SelectProps> = ({
                   aria-selected={isSel}
                   onMouseEnter={() => setActiveIndex(i)}
                   onClick={() => commit(opt.value)}
-                  className={`w-full text-left flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-[13px] font-medium transition-colors
+                  className={`w-full text-left flex items-center justify-between gap-2 px-3 py-3 md:py-2 min-h-[44px] md:min-h-0 rounded-xl text-[13px] font-medium transition-colors
                     ${isActive ? 'bg-[var(--text-main)]/[0.08]' : ''}
                     ${isSel ? 'text-bony-orange font-bold' : 'text-bony-text'}`}
                 >
