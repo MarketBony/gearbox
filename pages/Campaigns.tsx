@@ -464,7 +464,7 @@ const Campaigns: React.FC = () => {
           
           {/* CHART 1: Nb Campagnes */}
           <div className="gx-card p-3 flex flex-col relative">
-               <div className="flex justify-between items-start mb-2 z-10">
+               <div className="flex justify-between items-center min-h-[34px] mb-1 z-10">
                    <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1">
                        <Megaphone size={12} className="text-bony-orange"/> Nb Campagnes
                    </h3>
@@ -495,13 +495,16 @@ const Campaigns: React.FC = () => {
 
           {/* CHART 2: Performance */}
           <div className="gx-card p-3 flex flex-col relative">
-               <div className="flex justify-between items-start mb-2 z-10">
-                   <div className="flex items-center gap-2">
-                       <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1">
-                           <BarChart3 size={12} className="text-bony-violet"/> Performance
-                       </h3>
+               {/* `items-center` et largeur bornée sur le sélecteur : le composant
+                   Select est en `w-full`, donc en enfant de flex il s'étirait sur
+                   toute la place restante et débordait sous le titre. */}
+               <div className="flex justify-between items-center gap-2 min-h-[34px] mb-1 z-10">
+                   <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1 min-w-0 truncate">
+                       <BarChart3 size={12} className="text-bony-violet shrink-0"/> Performance
+                   </h3>
+                   <div className="w-[104px] shrink-0">
+                       <FilterSelect value={c2Metric} onChange={setC2Metric} options={['Volume', 'Ouverture', 'Clics']} />
                    </div>
-                   <FilterSelect value={c2Metric} onChange={setC2Metric} options={['Volume', 'Ouverture', 'Clics']} />
                </div>
                <div className="flex-1 w-full min-h-0">
                    <ResponsiveContainer width="100%" height="100%">
@@ -549,7 +552,7 @@ const Campaigns: React.FC = () => {
 
           {/* CHART 3: Répartition Budget */}
           <div className="gx-card p-3 flex flex-col relative">
-               <div className="flex justify-between items-start mb-2 z-10">
+               <div className="flex justify-between items-center min-h-[34px] mb-1 z-10">
                    <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1">
                        <Euro size={12} className="text-blue-400"/> Facturé / Svc
                    </h3>
@@ -612,10 +615,14 @@ const Campaigns: React.FC = () => {
       </div>
           )}
 
-      <div className="hidden md:flex sticky top-0 z-10 -mx-6 px-6 py-2 mb-2 border-b border-bony-border bg-slate-100 dark:bg-bony-dark gap-4 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+      {/* `gx-sticky-head` (index.html) et non un fond plein : le noir opaque
+          tranchait sur le thème liquid glass. La classe custom n'est pas
+          préfixée `md:` (impossible en CDN Play) — inutile ici, l'élément n'est
+          affiché qu'à partir de md. */}
+      <div className="hidden md:flex sticky top-0 z-10 -mx-6 px-6 py-2 mb-2 gx-sticky-head gap-4 text-[9px] font-bold text-slate-500 uppercase tracking-widest">
           <button 
             onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-            className="w-[5.5rem] text-center flex items-center justify-center gap-1 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+            className="w-[87px] text-center flex items-center justify-center gap-1 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
           >
               Date
               {sortOrder === 'asc' ? <ArrowUp size={10}/> : <ArrowDown size={10}/>}
@@ -663,9 +670,11 @@ const Campaigns: React.FC = () => {
                     return (
                         <div key={`${task.parentProjectId}-${task.id}-${idx}`} className={`gx-glass-panel border border-bony-border rounded-lg px-3 py-2 flex items-center gap-4 transition-all group ${borderHover}`}>
 
-                            {/* DATE COLUMN — une seule ligne (voir formatDateCompact) */}
-                            <div className="w-16 flex items-center justify-center border-r border-bony-border pr-3 shrink-0">
-                                <span className="text-xs font-title font-bold text-slate-900 dark:text-white whitespace-nowrap">{formatDateCompact(task.parentStartDate)}</span>
+                            {/* DATE COLUMN — `font-sans` et NON `font-title` :
+                                Syncopate (la police de titre) rend « 10/09/26 » sur
+                                71,6 px pour une colonne de 64 → le texte débordait. */}
+                            <div className="w-[74px] flex items-center justify-center border-r border-bony-border pr-3 shrink-0">
+                                <span className="text-[13px] font-sans font-bold text-slate-900 dark:text-white whitespace-nowrap tabular-nums">{formatDateCompact(task.parentStartDate)}</span>
                             </div>
 
                             {/* INFO BLOCK (25%) — deux lignes : projet, puis tâche + badges */}
@@ -674,14 +683,17 @@ const Campaigns: React.FC = () => {
                                     <ChannelIcon size={14} />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    {/* Ligne 1 = nom du projet */}
-                                    <h3 className="text-slate-900 dark:text-white font-bold truncate text-sm leading-tight" title={task.parentProjectName}>
+                                    {/* Ligne 1 = nom du projet. `font-sans` explicite : la règle
+                                        globale h1..h6 impose Syncopate, illisible et 32 % plus
+                                        large dans une ligne de tableau dense (350 px contre 237
+                                        pour le même libellé). Syncopate reste sur les vrais titres. */}
+                                    <h3 className="text-slate-900 dark:text-white font-sans font-bold truncate text-[13px] leading-snug tracking-normal" title={task.parentProjectName}>
                                         {task.parentProjectName}
                                     </h3>
                                     {/* Ligne 2 = nom de la tâche + badges site/marque, sur la MÊME ligne :
                                         c'est la troisième ligne qui coûtait le plus de hauteur. */}
-                                    <div className="flex items-center gap-1 min-w-0 leading-tight">
-                                        <span className="text-xs text-slate-500 font-medium truncate min-w-0" title={task.name}>
+                                    <div className="flex items-center gap-1 min-w-0 leading-snug">
+                                        <span className="text-[11px] text-slate-500 font-medium truncate min-w-0" title={task.name}>
                                             {task.name}
                                         </span>
                                         <span className="text-[8px] font-sans text-slate-500 bg-slate-100 dark:bg-black/40 px-1 rounded border border-bony-border shrink-0 whitespace-nowrap">{task.parentProjectSite}</span>

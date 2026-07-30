@@ -302,6 +302,22 @@
       .gx-num-tight::-webkit-inner-spin-button { -webkit-appearance: none; appearance: none; margin: 0; }
       .gx-num-tight { -moz-appearance: textfield; appearance: textfield; }
 
+      /* ===================== EN-TÊTE DE COLONNES COLLANT =====================
+         Un `sticky` doit masquer les lignes qui défilent dessous, mais un fond
+         plein (bg-bony-dark) tranche brutalement sur le thème liquid glass.
+         Même recette que .glass-strong — translucide + flou — mais avec la
+         SEULE bordure basse : c'est une barre, pas un panneau. */
+      .gx-sticky-head {
+        background: var(--glass-bg-strong);
+        backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+        border-bottom: 1px solid var(--glass-border);
+      }
+      /* Sans backdrop-filter, le translucide laisserait lire les lignes à travers */
+      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .gx-sticky-head { background: var(--bg-panel); }
+      }
+
       /* ===================== ANIMATIONS UTILITAIRES ===================== */
       @keyframes gx-fade-in { from { opacity: 0; } to { opacity: 1; } }
       @keyframes gx-fade-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
