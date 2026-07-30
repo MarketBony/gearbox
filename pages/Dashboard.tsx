@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense } from '../types';
+import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense, User } from '../types';
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS, isHoldingBrand } from '../constants';
@@ -26,6 +26,12 @@ import {
   Check,
   X,
   Search,
+  AlertTriangle,
+  Gauge,
+  Radio,
+  Users,
+  Briefcase,
+  Send,
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
@@ -33,6 +39,7 @@ import {
 } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
+import Avatar from '../components/Avatar';
 import DatePicker from '../components/DatePicker';
 import FloatingPanel from '../components/FloatingPanel';
 
@@ -396,6 +403,8 @@ const Dashboard: React.FC = () => {
   const [budgets, setBudgets] = useState<BudgetLine[]>([]);
   const [socialPosts, setSocialPosts] = useState<SocialPost[]>([]); // New State
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
+  // Pour afficher les noms et avatars dans « Charge de l'Équipe ».
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
   // --- FILTER STATES ---
@@ -415,18 +424,20 @@ const Dashboard: React.FC = () => {
   // page reste affichée pendant le refetch).
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    const [pData, cData, bData, sData, feData] = await Promise.all([
+    const [pData, cData, bData, sData, feData, uData] = await Promise.all([
       db.getProjects(),
       db.getCampaigns(),
       db.getBudgets(),
       db.getSocialPosts(),
-      db.getFixedExpenses()
+      db.getFixedExpenses(),
+      db.getUsers()
     ]);
     setProjects(pData);
     setCampaigns(cData);
     setBudgets(bData);
     setSocialPosts(sData);
     setFixedExpenses(feData);
+    setUsers(uData);
     if (!silent) setLoading(false);
   }, []);
 
@@ -481,6 +492,31 @@ const Dashboard: React.FC = () => {
 
     // Specific structure for mix (VN/VO/APV/PR only)
     const serviceMix: Record<string, number> = { VN: 0, VO: 0, APV: 0, PR: 0 };
+
+    // Minuit aujourd'hui, pour détecter les retards. Déclaré AVANT la boucle
+    // projets (la section « prochaines échéances » plus bas a sa propre variable).
+    const todayMidnightRef = new Date();
+    todayMidnightRef.setHours(0, 0, 0, 0);
+
+    // --- Accumulateurs des indicateurs de pilotage (ajoutés le 30/07/2026) ---
+    // Tous alimentés depuis la boucle projets, donc soumis aux MÊMES filtres
+    // (périmètre, marque, service, PRO+) et aux mêmes règles métier (Draft exclu,
+    // Holding hors montants) que le budget consommé. Un indicateur qui ne
+    // respecterait pas les filtres afficherait un chiffre incohérent avec le reste.
+    const coutParCanal: Record<string, number> = {};
+    const coutParSite: Record<string, number> = {};
+    const coutParPrestataire: Record<string, { montant: number; taches: number }> = {};
+    const chargeParUtilisateur: Record<string, number> = {};
+    const ecartsProjets: { nom: string; prevu: number; realise: number; ecart: number }[] = [];
+    const projetsEnRetard: { id: string; nom: string; site: string; fin: string; avancement: number }[] = [];
+    let sommeAvancement = 0, nbActifsPourAvancement = 0;
+    // Performance des campagnes : on cumule les NUMÉRATEURS pondérés par la
+    // volumétrie, jamais des moyennes de taux — une moyenne simple de taux issus
+    // d'envois de tailles différentes est fausse (piège classique).
+    const perf = {
+      SMS:     { volume: 0, ouvertures: 0, clics: 0, npai: 0, stop: 0, cout: 0, envois: 0 },
+      'E-mail': { volume: 0, ouvertures: 0, clics: 0, npai: 0, stop: 0, cout: 0, envois: 0 }
+    };
     
     // Parse filter dates
     const dStart = new Date(dateStart);
@@ -538,10 +574,29 @@ const Dashboard: React.FC = () => {
         if (p.status === 'Draft') return;
 
         if (!isProPlusInScope(p.proPlus)) return;
-        let pSite = p.site;
-        if (pSite === 'Thiers' || pSite === 'Ambert') pSite = 'Ricoux';
-        if ((pSite as string) === 'Riom') pSite = 'Mozac';
-        if (!isSiteInScope(pSite as string)) return;
+
+        // VENTILATION PAR SITE — corrigé le 30/07/2026, même cause que les dépenses
+        // fixes (bloc 3bis). Avant, le test portait sur `p.site` brut : or pour un
+        // projet MULTI-SITES ce champ contient le libellé concaténé
+        // ("Clermont, Vichy, Moulins"), qui ne correspond à aucun site du filtre —
+        // le projet disparaissait donc en totalité dès qu'un périmètre était
+        // sélectionné, au lieu de contribuer sa part. Même source de parts que
+        // Budget.tsx : budgetDistribution si multi-sites, sinon 100 % sur le site.
+        const siteShares: Record<string, number> =
+            (p.sites && p.sites.length > 0 && p.budgetDistribution)
+                ? p.budgetDistribution
+                : { [p.site as string]: 100 };
+
+        // Parts retenues par le filtre de périmètre. Si aucune ne passe, le projet
+        // est hors périmètre : il ne compte ni en montant, ni dans les compteurs.
+        const partsEnScope = Object.entries(siteShares).filter(([rawSite, pct]) => {
+            if (pct <= 0) return false;
+            let s = rawSite;
+            if (s === 'Thiers' || s === 'Ambert') s = 'Ricoux';
+            if (s === 'Riom') s = 'Mozac';
+            return isSiteInScope(s);
+        });
+        if (partsEnScope.length === 0) return;
 
         const pBrands = p.brands || [];
         if (!isBrandInScope(pBrands)) return;
@@ -549,10 +604,33 @@ const Dashboard: React.FC = () => {
         const pServices = p.service || [];
         if (!isServiceInScope(pServices)) return;
 
+        // Compteurs : UNE fois par projet, jamais dans la boucle de ventilation —
+        // sinon un projet sur 3 sites serait compté 3 fois.
         if (p.status === 'Active') activeProjectsCount++;
-        
-        const hasCampaign = p.tasks.some(t => (t.channel === 'SMS' || t.channel === 'E-mail') && t.status === 'Programmed');
-        if (hasCampaign) activeCampaignsCount++;
+
+        // --- Pilotage projets (indépendant du budget : le Holding est TRACKÉ) ---
+        if (p.status === 'Active') {
+            sommeAvancement += p.progress || 0;
+            nbActifsPourAvancement++;
+        }
+        // En retard = échéance dépassée et travail inachevé. C'est l'indicateur qui
+        // manquait le plus : un projet peut être « Actif » depuis des mois sans que
+        // rien ne le signale.
+        if (p.status !== 'Archived' && p.endDate && parseLocalDate(p.endDate) < todayMidnightRef && (p.progress || 0) < 100) {
+            projetsEnRetard.push({ id: p.id, nom: p.name, site: p.site as string, fin: p.endDate, avancement: p.progress || 0 });
+        }
+        // Charge d'équipe : tâches encore ouvertes, par personne assignée.
+        (p.tasks || []).forEach(t => {
+            if ((t.status === 'Todo' || t.status === 'InProgress') && t.assignedUserId) {
+                chargeParUtilisateur[t.assignedUserId] = (chargeParUtilisateur[t.assignedUserId] || 0) + 1;
+            }
+        });
+
+        // Campagnes : on compte les TÂCHES SMS/e-mail programmées, pas les projets
+        // qui en contiennent au moins une (le libellé annonçait des envois).
+        activeCampaignsCount += p.tasks.filter(
+            t => (t.channel === 'SMS' || t.channel === 'E-mail') && t.status === 'Programmed'
+        ).length;
 
         // Tag Holding : tracké mais JAMAIS imputé à un budget (règle métier, cf.
         // CLAUDE.md). Placé ICI volontairement, APRÈS les compteurs « projets
@@ -563,7 +641,11 @@ const Dashboard: React.FC = () => {
         // Date de référence = date de DÉBUT du projet (cohérent avec l'agrégation Budget) :
         // le budget réalisé est compté sur le mois/année de startDate, pas de fin.
         const pDate = new Date(p.startDate);
-        const cost = p.budgetActual || 0;
+        const coutTotal = p.budgetActual || 0;
+        // Seules les parts dans le périmètre contribuent — sans filtre, elles
+        // valent 100 % au total, donc le chiffre affiché est inchangé.
+        const partEnScope = partsEnScope.reduce((s, [, pct]) => s + pct, 0) / 100;
+        const cost = coutTotal * partEnScope;
 
         if (pDate.getFullYear() === chartYear) {
             const monthIdx = pDate.getMonth();
@@ -572,6 +654,48 @@ const Dashboard: React.FC = () => {
 
         if (pDate >= dStart && pDate <= dEnd) {
             totalActual += cost;
+
+            // --- Analyse budgétaire : où part l'argent ---
+            // Écart prévu / réalisé : seulement si un prévisionnel a été saisi,
+            // sinon l'écart vaudrait -100 % et polluerait le classement.
+            if ((p.budgetPlanned || 0) > 0) {
+                ecartsProjets.push({
+                    nom: p.name, prevu: p.budgetPlanned, realise: coutTotal,
+                    ecart: coutTotal - p.budgetPlanned
+                });
+            }
+            // Consommation par site, à partir des parts déjà filtrées.
+            partsEnScope.forEach(([rawSite, pct]) => {
+                let s = rawSite;
+                if (s === 'Thiers' || s === 'Ambert') s = 'Ricoux';
+                if (s === 'Riom') s = 'Mozac';
+                coutParSite[s] = (coutParSite[s] || 0) + coutTotal * (pct as number) / 100;
+            });
+            // Détail par tâche : canal, prestataire, performance de campagne.
+            // Les coûts de tâche sont pris au prorata de la part en périmètre, pour
+            // rester cohérents avec le consommé affiché.
+            (p.tasks || []).forEach(t => {
+                const coutTache = (t.cost || 0) * partEnScope;
+                if (t.channel) coutParCanal[t.channel] = (coutParCanal[t.channel] || 0) + coutTache;
+                if (t.provider) {
+                    const e = coutParPrestataire[t.provider] || { montant: 0, taches: 0 };
+                    e.montant += coutTache; e.taches++;
+                    coutParPrestataire[t.provider] = e;
+                }
+                const cible = perf[t.channel as 'SMS' | 'E-mail'];
+                if (cible && (t.volumetry || 0) > 0) {
+                    const v = t.volumetry as number;
+                    cible.volume += v;
+                    cible.envois++;
+                    cible.cout += coutTache;
+                    // Pondération par la volumétrie : on cumule des VOLUMES, pas des taux.
+                    cible.ouvertures += v * (t.openRate || 0) / 100;
+                    cible.clics     += v * (t.clickRate || 0) / 100;
+                    cible.npai      += v * (t.npaiRate || 0) / 100;
+                    cible.stop      += v * (t.stopRate || 0) / 100;
+                }
+            });
+
             const svcs = p.service || [];
             let servicesToHit: string[] = [];
 
@@ -691,6 +815,62 @@ const Dashboard: React.FC = () => {
         .filter(d => d.value > 0)
         .sort((a,b) => b.value - a.value);
 
+    // --- Agrégation des indicateurs de pilotage ---
+    const trier = (o: Record<string, number>, max: number) =>
+        Object.entries(o).map(([name, value]) => ({ name, value: Math.round(value) }))
+            .filter(d => d.value > 0).sort((a, b) => b.value - a.value).slice(0, max);
+
+    const budgetParCanal = trier(coutParCanal, 8);
+    const topSites = trier(coutParSite, 5);
+    const topPrestataires = Object.entries(coutParPrestataire)
+        .map(([name, v]) => ({ name, value: Math.round(v.montant), taches: v.taches }))
+        .filter(d => d.value > 0).sort((a, b) => b.value - a.value).slice(0, 5);
+
+    const chargeEquipe = Object.entries(chargeParUtilisateur)
+        .map(([userId, taches]) => ({ userId, taches })).sort((a, b) => b.taches - a.taches);
+
+    const ecartsTop = ecartsProjets
+        .sort((a, b) => Math.abs(b.ecart) - Math.abs(a.ecart)).slice(0, 6)
+        .map(e => ({ ...e, ecartPct: e.prevu > 0 ? Math.round((e.ecart / e.prevu) * 100) : 0 }));
+
+    const avancementMoyen = nbActifsPourAvancement > 0
+        ? Math.round(sommeAvancement / nbActifsPourAvancement) : 0;
+
+    // Taux pondérés : volume d'ouvertures / volume envoyé. Faire la moyenne des
+    // taux donnerait un chiffre faux dès que les envois ont des tailles différentes.
+    const tauxPondere = (num: number, vol: number) => vol > 0 ? +((num / vol) * 100).toFixed(1) : 0;
+    const perfCanal = (['SMS', 'E-mail'] as const).map(canal => {
+        const d = perf[canal];
+        return {
+            canal, envois: d.envois, volume: d.volume, cout: Math.round(d.cout),
+            ouverture: tauxPondere(d.ouvertures, d.volume),
+            clic: tauxPondere(d.clics, d.volume),
+            npai: tauxPondere(d.npai, d.volume),
+            stop: tauxPondere(d.stop, d.volume),
+            // Coût par contact : l'indicateur d'efficience d'un envoi.
+            coutParContact: d.volume > 0 ? +(d.cout / d.volume).toFixed(3) : 0
+        };
+    }).filter(d => d.volume > 0);
+
+    const volumeTotal = perf.SMS.volume + perf['E-mail'].volume;
+    const perfGlobale = {
+        volume: volumeTotal,
+        envois: perf.SMS.envois + perf['E-mail'].envois,
+        ouverture: tauxPondere(perf.SMS.ouvertures + perf['E-mail'].ouvertures, volumeTotal),
+        clic: tauxPondere(perf.SMS.clics + perf['E-mail'].clics, volumeTotal),
+        npai: tauxPondere(perf.SMS.npai + perf['E-mail'].npai, volumeTotal),
+        stop: tauxPondere(perf.SMS.stop + perf['E-mail'].stop, volumeTotal),
+        cout: Math.round(perf.SMS.cout + perf['E-mail'].cout),
+        coutParContact: volumeTotal > 0 ? +((perf.SMS.cout + perf['E-mail'].cout) / volumeTotal).toFixed(3) : 0
+    };
+
+    // Rythme de consommation : le pourcentage de budget consommé ne dit rien seul.
+    // Comparé au pourcentage de la période écoulée, il devient une alerte.
+    const dureeTotale = dEnd.getTime() - dStart.getTime();
+    const ecoule = Math.min(Math.max(Date.now() - dStart.getTime(), 0), dureeTotale);
+    const pctTempsEcoule = dureeTotale > 0 ? Math.round((ecoule / dureeTotale) * 100) : 0;
+    const pctConsomme = totalForecast > 0 ? Math.round((totalActual / totalForecast) * 100) : 0;
+
     // 6. Upcoming Deadlines (Projects) — uniquement aujourd'hui ou futur, par date de fin croissante.
     // Comparaison via parse local (anti J+1) ; recalculé à chaque rendu → les échéances passées disparaissent.
     const todayMidnight = new Date();
@@ -734,7 +914,19 @@ const Dashboard: React.FC = () => {
         monthlyTrend,
         serviceChartData,
         deadlines,
-        upcomingPosts
+        upcomingPosts,
+        // Indicateurs de pilotage
+        projetsEnRetard: projetsEnRetard.sort((a, b) => a.fin.localeCompare(b.fin)),
+        avancementMoyen,
+        ecartsTop,
+        budgetParCanal,
+        topSites,
+        topPrestataires,
+        chargeEquipe,
+        perfCanal,
+        perfGlobale,
+        pctTempsEcoule,
+        pctConsomme
     };
 
   }, [projects, budgets, socialPosts, fixedExpenses, dateStart, dateEnd, filterContexts, filterBrands, filterServices, filterProPlus]);
@@ -812,7 +1004,8 @@ const Dashboard: React.FC = () => {
       <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-6 space-y-6 pb-20">
           
           {/* 1. KPI CARDS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 6 cartes : 3 par ligne en lg plutôt que 6 serrées — lisibilité d'abord. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* BUDGET */}
               <div className="gx-card p-5 relative overflow-hidden group hover:border-bony-orange/30 transition-all">
                   <div className="flex justify-between items-start mb-4">
@@ -872,7 +1065,7 @@ const Dashboard: React.FC = () => {
               <div className="gx-card p-5 relative overflow-hidden group hover:border-bony-violet/30 transition-all">
                   <div className="flex justify-between items-start">
                       <div>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Campagnes Live</p>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Campagnes Programmées</p>
                           <h3 className="text-3xl font-title text-bony-text">{stats.activeCampaignsCount}</h3>
                       </div>
                       <div className="p-2 bg-bony-violet/10 rounded-lg text-bony-violet">
@@ -880,7 +1073,48 @@ const Dashboard: React.FC = () => {
                       </div>
                   </div>
                   <div className="mt-4 text-xs text-slate-400">
-                      SMS / E-mails programmés ou en cours d'envoi.
+                      Envois SMS / E-mail au statut « programmé ».
+                  </div>
+              </div>
+
+              {/* PROJETS EN RETARD — échéance dépassée et travail inachevé */}
+              <div className={`gx-card p-5 relative overflow-hidden group transition-all ${stats.projetsEnRetard.length > 0 ? 'hover:border-red-500/40' : 'hover:border-emerald-500/30'}`}>
+                  <div className="flex justify-between items-start">
+                      <div>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Projets en Retard</p>
+                          <h3 className={`text-3xl font-title ${stats.projetsEnRetard.length > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                              {stats.projetsEnRetard.length}
+                          </h3>
+                      </div>
+                      <div className={`p-2 rounded-lg ${stats.projetsEnRetard.length > 0 ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                          <AlertTriangle size={20} />
+                      </div>
+                  </div>
+                  <div className="mt-4 text-xs text-slate-400">
+                      Échéance dépassée, avancement &lt; 100 %.
+                  </div>
+              </div>
+
+              {/* RYTHME DE CONSOMMATION — le % consommé ne dit rien seul ; comparé au
+                  % de la période écoulée, il devient une alerte exploitable. */}
+              <div className="gx-card p-5 relative overflow-hidden group hover:border-bony-blue/30 transition-all">
+                  <div className="flex justify-between items-start">
+                      <div>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Rythme de Consommation</p>
+                          <h3 className={`text-2xl font-title ${stats.pctConsomme > stats.pctTempsEcoule + 10 ? 'text-red-500' : (stats.pctConsomme < stats.pctTempsEcoule - 10 ? 'text-amber-500' : 'text-emerald-500')}`}>
+                              {stats.pctConsomme} % <span className="text-sm text-slate-400">/ {stats.pctTempsEcoule} %</span>
+                          </h3>
+                      </div>
+                      <div className="p-2 bg-bony-blue/10 rounded-lg text-bony-blue">
+                          <Gauge size={20} />
+                      </div>
+                  </div>
+                  <div className="mt-4 text-xs text-slate-400">
+                      {stats.pctConsomme > stats.pctTempsEcoule + 10
+                        ? 'Consommation en avance sur le calendrier.'
+                        : stats.pctConsomme < stats.pctTempsEcoule - 10
+                        ? 'Sous-consommation par rapport au temps écoulé.'
+                        : 'Consommation alignée sur le temps écoulé.'}
                   </div>
               </div>
           </div>
@@ -1104,6 +1338,237 @@ const Dashboard: React.FC = () => {
                           </div>
                       )}
                   </div>
+              </div>
+          </div>
+
+          {/* ═══ 4. PILOTAGE PROJETS ═══ */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+              {/* Écart prévu / réalisé — trié par écart absolu décroissant */}
+              <div className="gx-card p-5">
+                  <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-1 flex items-center gap-2">
+                      <Briefcase size={16} className="text-bony-orange"/> Écart Prévu / Réalisé
+                  </h3>
+                  <p className="text-[10px] text-bony-muted mb-4">
+                      Projets dont un budget prévisionnel a été saisi. Avancement moyen des projets actifs : <strong className="text-bony-text">{stats.avancementMoyen} %</strong>
+                  </p>
+                  {stats.ecartsTop.length > 0 ? (
+                      <div className="space-y-3">
+                          {stats.ecartsTop.map(e => {
+                              const max = Math.max(e.prevu, e.realise) || 1;
+                              return (
+                                  <div key={e.nom}>
+                                      <div className="flex items-center justify-between gap-2 mb-1">
+                                          <span className="text-xs font-semibold text-bony-text truncate min-w-0" title={e.nom}>{e.nom}</span>
+                                          <span className={`text-[10px] font-bold shrink-0 ${e.ecart > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                              {e.ecart > 0 ? '+' : ''}{e.ecartPct} %
+                                          </span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                          <div className="flex-1 h-2 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
+                                              <div className="h-full bg-slate-400 dark:bg-slate-500" style={{ width: `${(e.prevu / max) * 100}%` }} />
+                                          </div>
+                                          <span className="text-[9px] text-slate-500 w-16 text-right shrink-0">{formatCurrency(e.prevu)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                          <div className="flex-1 h-2 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
+                                              <div className={`h-full ${e.ecart > 0 ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${(e.realise / max) * 100}%` }} />
+                                          </div>
+                                          <span className="text-[9px] text-bony-text font-bold w-16 text-right shrink-0">{formatCurrency(e.realise)}</span>
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                          <p className="text-[9px] text-bony-muted pt-1">Barre grise : prévu · barre colorée : réalisé</p>
+                      </div>
+                  ) : (
+                      <div className="text-center text-slate-600 py-10 text-sm italic border border-dashed border-bony-border rounded-xl">
+                          Aucun budget prévisionnel saisi sur les projets du périmètre.
+                      </div>
+                  )}
+              </div>
+
+              {/* Projets en retard — cliquables vers la fiche projet */}
+              <div className="gx-card p-5">
+                  <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-1 flex items-center gap-2">
+                      <AlertTriangle size={16} className="text-red-500"/> Projets en Retard
+                  </h3>
+                  <p className="text-[10px] text-bony-muted mb-4">Échéance dépassée et avancement incomplet. Triés du plus ancien retard.</p>
+                  {stats.projetsEnRetard.length > 0 ? (
+                      <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar">
+                          {stats.projetsEnRetard.map(p => (
+                              <button
+                                  key={p.id}
+                                  onClick={() => handleNavigateToProject(p.id)}
+                                  className="w-full text-left flex items-center gap-3 p-2.5 rounded-lg bg-red-500/5 border border-red-500/20 hover:bg-red-500/10 transition-colors min-h-[44px]"
+                              >
+                                  <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-semibold text-bony-text truncate">{p.nom}</p>
+                                      <p className="text-[10px] text-slate-500 truncate">{p.site} · échéance {p.fin.split('-').reverse().join('/')}</p>
+                                  </div>
+                                  <div className="shrink-0 text-right">
+                                      <span className="text-xs font-bold text-red-500">{p.avancement} %</span>
+                                      <p className="text-[9px] text-slate-500">avancé</p>
+                                  </div>
+                              </button>
+                          ))}
+                      </div>
+                  ) : (
+                      <div className="text-center text-emerald-600 dark:text-emerald-500 py-10 text-sm italic border border-dashed border-emerald-500/30 rounded-xl">
+                          Aucun projet en retard. 👌
+                      </div>
+                  )}
+              </div>
+          </div>
+
+          {/* ═══ 5. PERFORMANCE DES CAMPAGNES ═══ */}
+          <div className="gx-card p-5">
+              <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-1 flex items-center gap-2">
+                  <Send size={16} className="text-bony-blue"/> Performance des Campagnes
+              </h3>
+              <p className="text-[10px] text-bony-muted mb-4">
+                  Envois SMS et e-mail du périmètre. <strong>Taux pondérés par la volumétrie</strong> — une moyenne simple des taux serait faussée par les écarts de volume entre envois.
+              </p>
+              {stats.perfGlobale.volume > 0 ? (
+                  <>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+                          {[
+                              { label: 'Contacts touchés', valeur: stats.perfGlobale.volume.toLocaleString('fr-FR'), sous: `${stats.perfGlobale.envois} envois` },
+                              { label: "Taux d'ouverture", valeur: `${stats.perfGlobale.ouverture} %`, sous: 'pondéré' },
+                              { label: 'Taux de clic', valeur: `${stats.perfGlobale.clic} %`, sous: 'pondéré' },
+                              { label: 'Coût / contact', valeur: `${stats.perfGlobale.coutParContact.toFixed(3)} €`, sous: formatCurrency(stats.perfGlobale.cout) },
+                              { label: 'NPAI', valeur: `${stats.perfGlobale.npai} %`, sous: 'adresses invalides' },
+                              { label: 'Désabonnements', valeur: `${stats.perfGlobale.stop} %`, sous: 'STOP / désinscrits' },
+                          ].map(k => (
+                              <div key={k.label} className="bg-slate-100 dark:bg-black/20 rounded-lg p-3 border border-bony-border">
+                                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1 truncate" title={k.label}>{k.label}</p>
+                                  <p className="text-lg font-title text-bony-text">{k.valeur}</p>
+                                  <p className="text-[9px] text-slate-500 truncate">{k.sous}</p>
+                              </div>
+                          ))}
+                      </div>
+                      <div className="overflow-x-auto">
+                          <table className="w-full text-xs min-w-[520px]">
+                              <thead>
+                                  <tr className="text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-bony-border">
+                                      <th className="text-left py-2">Canal</th><th className="text-right py-2">Envois</th>
+                                      <th className="text-right py-2">Contacts</th><th className="text-right py-2">Ouverture</th>
+                                      <th className="text-right py-2">Clic</th><th className="text-right py-2">Coût</th>
+                                      <th className="text-right py-2">Coût / contact</th>
+                                  </tr>
+                              </thead>
+                              <tbody>
+                                  {stats.perfCanal.map(c => (
+                                      <tr key={c.canal} className="border-b border-bony-border/50">
+                                          <td className="py-2 font-semibold text-bony-text">{c.canal}</td>
+                                          <td className="py-2 text-right text-slate-500">{c.envois}</td>
+                                          <td className="py-2 text-right text-bony-text">{c.volume.toLocaleString('fr-FR')}</td>
+                                          <td className="py-2 text-right text-bony-text">{c.ouverture} %</td>
+                                          <td className="py-2 text-right text-bony-text">{c.clic} %</td>
+                                          <td className="py-2 text-right text-slate-500">{formatCurrency(c.cout)}</td>
+                                          <td className="py-2 text-right font-bold text-bony-orange">{c.coutParContact.toFixed(3)} €</td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </>
+              ) : (
+                  <div className="text-center text-slate-600 py-10 text-sm italic border border-dashed border-bony-border rounded-xl">
+                      Aucune volumétrie saisie. Renseignez volumétrie et taux dans les tâches SMS / E-mail des projets pour activer ces indicateurs.
+                  </div>
+              )}
+          </div>
+
+          {/* ═══ 6. OÙ PART L'ARGENT, ET QUI PORTE LA CHARGE ═══ */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+              {/* Budget par canal */}
+              <div className="gx-card p-5">
+                  <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-1 flex items-center gap-2">
+                      <Radio size={16} className="text-bony-violet"/> Budget par Canal
+                  </h3>
+                  <p className="text-[10px] text-bony-muted mb-4">Coûts des tâches, par canal de diffusion.</p>
+                  {stats.budgetParCanal.length > 0 ? (
+                      <div className="space-y-2.5">
+                          {stats.budgetParCanal.map((c, i) => {
+                              const max = stats.budgetParCanal[0].value || 1;
+                              return (
+                                  <div key={c.name}>
+                                      <div className="flex justify-between text-xs mb-1">
+                                          <span className="font-semibold text-bony-text truncate min-w-0">{c.name}</span>
+                                          <span className="text-slate-500 shrink-0 ml-2">{formatCurrency(c.value)}</span>
+                                      </div>
+                                      <div className="h-2 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
+                                          <div className="h-full bg-bony-gradient" style={{ width: `${(c.value / max) * 100}%`, opacity: 1 - i * 0.09 }} />
+                                      </div>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  ) : (
+                      <div className="text-center text-slate-600 py-10 text-sm italic border border-dashed border-bony-border rounded-xl">
+                          Aucun canal renseigné sur les tâches.
+                      </div>
+                  )}
+              </div>
+
+              {/* Top sites + top prestataires */}
+              <div className="gx-card p-5">
+                  <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-1 flex items-center gap-2">
+                      <MapPin size={16} className="text-bony-orange"/> Top Consommateurs
+                  </h3>
+                  <p className="text-[10px] text-bony-muted mb-4">Sites et prestataires, montants ventilés.</p>
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2">Sites</p>
+                  <div className="space-y-1.5 mb-4">
+                      {stats.topSites.length > 0 ? stats.topSites.map(s => (
+                          <div key={s.name} className="flex justify-between text-xs">
+                              <span className="font-semibold text-bony-text truncate min-w-0">{s.name}</span>
+                              <span className="text-slate-500 shrink-0 ml-2">{formatCurrency(s.value)}</span>
+                          </div>
+                      )) : <p className="text-xs text-slate-500 italic">Aucune donnée.</p>}
+                  </div>
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2">Prestataires</p>
+                  <div className="space-y-1.5">
+                      {stats.topPrestataires.length > 0 ? stats.topPrestataires.map(p => (
+                          <div key={p.name} className="flex justify-between text-xs">
+                              <span className="font-semibold text-bony-text truncate min-w-0">{p.name} <span className="text-slate-500 font-normal">({p.taches})</span></span>
+                              <span className="text-slate-500 shrink-0 ml-2">{formatCurrency(p.value)}</span>
+                          </div>
+                      )) : <p className="text-xs text-slate-500 italic">Aucun prestataire renseigné sur les tâches.</p>}
+                  </div>
+              </div>
+
+              {/* Charge par collaborateur */}
+              <div className="gx-card p-5">
+                  <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-1 flex items-center gap-2">
+                      <Users size={16} className="text-bony-blue"/> Charge de l'Équipe
+                  </h3>
+                  <p className="text-[10px] text-bony-muted mb-4">Tâches encore ouvertes (à faire ou en cours), par personne.</p>
+                  {stats.chargeEquipe.length > 0 ? (
+                      <div className="space-y-2.5">
+                          {stats.chargeEquipe.map(c => {
+                              const u = users.find(x => x.id === c.userId);
+                              const max = stats.chargeEquipe[0].taches || 1;
+                              return (
+                                  <div key={c.userId} className="flex items-center gap-2.5">
+                                      <Avatar userId={c.userId} name={u?.name || '?'} color={u?.avatarColor} size={26} />
+                                      <div className="flex-1 min-w-0">
+                                          <p className="text-xs font-semibold text-bony-text truncate">{u?.name || 'Utilisateur inconnu'}</p>
+                                          <div className="h-1.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden mt-1">
+                                              <div className="h-full bg-bony-blue" style={{ width: `${(c.taches / max) * 100}%` }} />
+                                          </div>
+                                      </div>
+                                      <span className="text-xs font-bold text-bony-text shrink-0">{c.taches}</span>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  ) : (
+                      <div className="text-center text-slate-600 py-10 text-sm italic border border-dashed border-bony-border rounded-xl">
+                          Aucune tâche ouverte assignée.
+                      </div>
+                  )}
               </div>
           </div>
 
