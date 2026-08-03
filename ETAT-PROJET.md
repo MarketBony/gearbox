@@ -1,4 +1,4 @@
-# ÉTAT PROJET GEARBOX — synthèse au 30 juillet 2026
+# ÉTAT PROJET GEARBOX — synthèse au 3 août 2026
 
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
@@ -10,10 +10,10 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 20
-  (`feat/pwa-install-push`, 30 juillet — PWA installable + notifications push,
-  **validé par Théo sur Windows, Pixel 10 Pro et iPhone SE**). Le correctif 21
-  (finitions) est prêt en local, **service `web` seul** à reconstruire. Le SHA
+- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 21
+  (`chore/finitions`, 30 juillet). Le correctif 22 (**reprise des données réelles
+  2026**, 3 août) ne touche **aucun code** : les données ont été écrites
+  directement en base via l'API, **aucun déploiement n'est nécessaire**. Le SHA
   exact se lit avec `git log --oneline -1` plutôt que d'être recopié ici, où il
   devenait périmé à chaque lot. Des commits de doc ou de backup automatique
   peuvent suivre sans nécessiter de redéploiement.
@@ -484,22 +484,94 @@
       police Syncopate chargée, zéro erreur JS), `tsc` backend 0 et racine 12 lignes
       préexistantes.
 
-    ⚠️ **JEU DE DONNÉES DE DÉMO EN BASE** — 10 projets, 28 tâches, 6 dépenses fixes
-    et 3 réservations matériel, tous préfixés **`DEMO — `**, créés le 30/07/2026 à
-    la demande de Théo pour faire vivre les widgets. **Ces montants comptent dans
-    le budget consommé réel** (~72 400 € de coûts projets + 18 700 € de dépenses).
-    Ne pas les prendre pour des données de production. Pour les retirer : supprimer
-    tous les projets/dépenses/réservations dont le nom, commentaire ou description
-    commence par `DEMO — `.
+    ℹ️ Le jeu de démonstration `DEMO — ` créé pour ce lot a été **entièrement
+    supprimé le 03/08/2026** lors de la reprise des données réelles (correctif 22).
+    Il n'existe plus en base.
+
+22. **REPRISE DES DONNÉES RÉELLES 2026 — le jeu de démo est remplacé par le vrai
+    suivi budgétaire** (3 août). Aucun changement de code : uniquement des données.
+    - Source : **`budget market 2026.xlsx`** (à la racine du dépôt), 13 onglets —
+      1 récapitulatif + 12 mensuels, **817 lignes**, 1 475 140,25 € au total.
+    - Écrit en base via la **vraie API** (donc toutes les validations serveur) :
+      **24 enveloppes**, **738 dépenses**, **100 projets / 247 tâches**.
+    - Supprimé au passage : les 10 projets et 6 dépenses `DEMO — `, plus 5 projets
+      et 1 dépense de test (`123456`, `TEST`, `TRACK DAY MDC`,
+      `SPORT & COLLECTION MDC`, `CCDMD 2026`, `TOUBKALPES RS`) — validé par Théo,
+      après un dump Supabase frais (`backups/gearbox-20260803-160620.sql.gz`).
+    - **Réconciliation à 0,00 € d'écart** sur les 4 axes (total, dépenses, projets,
+      enveloppes) **et sur les 12 mois**. Consommé 1 474 050 € / budget 1 480 800 €.
+
+    **Correspondances retenues — désormais des règles du projet :**
+
+    | Fichier | Gearbox |
+    |---|---|
+    | `SODAVI` | Vichy |
+    | `AVA` | Issoire |
+    | `GG VELAY` / `LE PUY EN VELAY` | Le Puy-en-Velay |
+    | `RIOM` | Mozac (déjà aliasé dans `Budget.tsx`) |
+    | code service 1 / 2 / 3 / 4 | VN / VO / **PR** / **APV** (`MPR`→PR, `ATS`→APV) |
+
+    **Décisions structurantes, à connaître avant de retoucher ces données :**
+    - **Une dépense par ligne Excel**, datée du **1ᵉʳ du mois de son onglet**,
+      `isAnnual = false`. La colonne « Date commande » est ignorée (elle contient
+      des dates de 2025 et une coquille). Représentation unique, sans interpolation :
+      la courbe mensuelle, les démarrages en cours d'année et les changements de
+      montant sont reproduits exactement.
+    - **Les colonnes de sites font foi, pas la colonne « Montant HT »** : elles
+      portent à la fois le montant et sa ventilation. Écart préexistant de
+      **1 089,99 €** entre les deux (0,07 %), mesuré par la colonne `Ctrl` du
+      fichier. 148 lignes concernées dont 70 sous 50 centimes ; **une seule
+      significative** : `CAVE SBBM` (juin, ligne 35), 320,83 € des 700 € non
+      ventilés.
+    - **Alpine et Nissan sont des marques, pas des sites.** Le routage de
+      `Budget.tsx` lit le champ **`brand` (singulier, legacy)**, pas `brands[]`.
+      Alpine : le fichier ne le ventile pas par site (le bloc 2 met tout sous
+      `LANGEAC`) → **tout sur `Alpine-Clermont`** par décision de Théo, les 3 autres
+      buckets remis à zéro. ⚠️ Le `site` d'une dépense Alpine doit rester
+      `Clermont`, sinon l'enveloppe et la dépense atterrissent dans deux buckets
+      différents. Nissan : 167 lignes le mélangent à d'autres sites → chacune
+      produit **deux** enregistrements ; sans effet sur les totaux, le bucket
+      Nissan étant global.
+    - **Marque par défaut `Renault`** pour la part non-Alpine/non-Nissan : le
+      fichier ne distingue pas Renault de Dacia et Mobilize, et la règle métier en
+      fait un seul compte. Théo retouche à la main au besoin.
+    - **Type de projet déduit du libellé** (« partenariat » → Partenariat, « salon »
+      /« expo » → Expo/Salon, « collaborateur »/« convention agent » →
+      Collaborateurs, « video »/« conf de presse » → Contenu), le reste en
+      `OP Clients`. Résultat : 67 OP Clients, 18 Partenariat, 7 Expo/Salon,
+      4 Collaborateurs, 4 Contenu.
+    - **Statut** : `Done` si le dernier mois du projet est écoulé, `Active` sinon
+      (94 / 6). Sans ça, Gearbox afficherait « 100 projets actifs » à 100 %
+      d'avancement et le compteur ne voudrait plus rien dire.
+
+    **Anomalies du fichier laissées telles quelles**, Théo les corrige dans Gearbox :
+    7 projets fantômes `corporace 2027` à `2033` (tirage de cellule Excel qui a
+    incrémenté l'année, lignes 94-101 d'avril, même prestataire), 3 quasi-doublons
+    (`partenariat raf`, `track day(s) mas du clos`, `portrait collaborateur(s)`),
+    2 lignes sans code service valide rattachées à « Tous Services », et un projet
+    dont le libellé était réduit à « projet ».
+
+    Le détail complet est dans **`RAPPORT-IMPORT.md`** à la racine : totaux par
+    mois/site/service, les 100 projets, et toutes les anomalies.
+
+    ⚠️ **Deux conséquences visibles, aucune n'est un bug :**
+    1. Le récurrent de toute l'année étant engagé, le **consommé affiche 99,5 %**
+       dès le 3 août. Le KPI « Rythme de consommation » devient de ce fait
+       trompeur — voir le backlog.
+    2. **La rubrique Campagnes est vide**, ainsi que le bloc « Performance des
+       campagnes » du Dashboard. Ces écrans se dérivent des tâches au canal `SMS`
+       ou `E-mail`, or **le fichier source ne porte pas le canal** : les 247 tâches
+       importées ont un canal vide. Le jeu de démo alimentait ces widgets, les
+       vraies données non. Pour les faire vivre, il faudra renseigner le canal des
+       tâches concernées dans Gearbox (ou ajouter une colonne au fichier).
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
-- **📥 SAISIE DES VRAIES DONNÉES MARKETING 2026 — à faire quand Théo les envoie.**
-  Décidé le 30/07/2026 : l'app reste en bêta-test avec le jeu `DEMO — ` le temps
-  de finir les écrans. Quand Théo transmettra l'ensemble des **projets et
-  dépenses du marketing depuis le début de l'année**, les saisir en base. **À
-  cette occasion, et seulement là, supprimer le jeu de démo** (voir l'encart
-  correctif 17) : les deux ne doivent jamais cohabiter, sinon le consommé est
-  faux. Prévoir un dump Supabase avant l'opération.
+- **⚠️ Corriger le KPI « Rythme de consommation »** (Dashboard). Il compare le
+  consommé au temps écoulé, ce qui n'a plus de sens depuis la reprise des données
+  réelles : les dépenses récurrentes de toute l'année sont **engagées d'avance**,
+  donc le consommé affiche 99,5 % dès juillet et le KPI indique en permanence une
+  avance de ~41 points. Décidé avec Théo le 03/08 : à traiter sur données réelles,
+  par exemple en distinguant le récurrent engagé du dépensable restant.
 - **Build local NON représentatif du build déployé** (constaté le 30/07) : Docker
   construit le front avec **node:18-alpine** et un `npm install` (pas `npm ci`),
   alors que le poste de Théo est en **Node 24**. Résultat mesuré sur le même code :
