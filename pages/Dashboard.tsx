@@ -362,6 +362,12 @@ const Dashboard: React.FC = () => {
     // 0. Init
     let totalForecast = 0;
     let totalActual = 0;
+    // Engagé JUSQU'À AUJOURD'HUI, sous-ensemble de `totalActual`. Sert uniquement au
+    // KPI de rythme : comparer un total de fin de période au temps écoulé à ce jour
+    // est faux par construction (cf. le commentaire du bloc « Rythme » plus bas).
+    // `totalActual` reste la seule valeur affichée en « Budget Consommé », pour
+    // rester d'accord avec Budget.tsx.
+    let totalEngageADate = 0;
     let activeProjectsCount = 0;
     let activeCampaignsCount = 0;
     
@@ -567,6 +573,10 @@ const Dashboard: React.FC = () => {
 
         if (pDate >= dStart && pDate <= dEnd) {
             totalActual += cost;
+            // Un projet dont le budget est engagé à sa date de DÉBUT ne compte dans
+            // l'engagé à date que si cette date est passée. `cost` est déjà la part
+            // pondérée par le périmètre : on n'ajoute aucun routage ici.
+            if (pDate <= todayMidnightRef) totalEngageADate += cost;
 
             // --- Analyse budgétaire : où part l'argent ---
             // Écart prévu / réalisé : seulement si un prévisionnel a été saisi,
@@ -714,6 +724,11 @@ const Dashboard: React.FC = () => {
                 const checkDate = e.isAnnual ? new Date(expYear, monthIdx, 15) : expDate;
                 if (checkDate >= dStart && checkDate <= dEnd) {
                     totalActual += mCost;
+                    // Même borne que les projets. À noter : `checkDate` d'une dépense
+                    // ANNUELLE est le 15 du mois (convention de ce bloc, conservée
+                    // telle quelle) — la douzième du mois courant n'entre donc dans
+                    // l'engagé à date qu'à partir du 15. C'est voulu, pas un décalage.
+                    if (checkDate <= todayMidnightRef) totalEngageADate += mCost;
                     if (servicesToHit.length > 0) {
                         const splitAmount = mCost / servicesToHit.length;
                         servicesToHit.forEach(s => {
@@ -787,12 +802,26 @@ const Dashboard: React.FC = () => {
         coutParContact: volumeTotal > 0 ? +((perf.SMS.cout + perf['E-mail'].cout) / volumeTotal).toFixed(3) : 0
     };
 
-    // Rythme de consommation : le pourcentage de budget consommé ne dit rien seul.
+    // Rythme de consommation : le pourcentage de budget engagé ne dit rien seul.
     // Comparé au pourcentage de la période écoulée, il devient une alerte.
+    //
+    // ⚠️ CORRIGÉ le 04/08/2026. La version d'origine comparait `totalActual` — cumulé
+    // sur TOUTE la période filtrée, soit janvier→décembre par défaut, donc y compris
+    // les dépenses datées du 01/11 et du 01/12 — au temps écoulé JUSQU'À AUJOURD'HUI.
+    // C'est un total de fin d'année confronté à une horloge de mi-année : faux par
+    // construction. La reprise des données réelles (le récurrent de toute l'année
+    // étant saisi) l'a rendu visible — l'écart affichait +41 points en permanence —
+    // mais la cause n'est PAS le caractère récurrent des dépenses : n'importe quel
+    // budget saisi à l'avance produisait la même fausse alerte.
+    //
+    // Le KPI compare donc désormais deux grandeurs qui parlent du même instant :
+    // l'engagé à date et la période écoulée. `pctEngagePeriode` reste calculé et
+    // affiché, mais comme information distincte et non comme terme de la comparaison.
     const dureeTotale = dEnd.getTime() - dStart.getTime();
     const ecoule = Math.min(Math.max(Date.now() - dStart.getTime(), 0), dureeTotale);
     const pctTempsEcoule = dureeTotale > 0 ? Math.round((ecoule / dureeTotale) * 100) : 0;
-    const pctConsomme = totalForecast > 0 ? Math.round((totalActual / totalForecast) * 100) : 0;
+    const pctEngageADate = totalForecast > 0 ? Math.round((totalEngageADate / totalForecast) * 100) : 0;
+    const pctEngagePeriode = totalForecast > 0 ? Math.round((totalActual / totalForecast) * 100) : 0;
 
     // 6. Upcoming Deadlines (Projects) — uniquement aujourd'hui ou futur, par date de fin croissante.
     // Comparaison via parse local (anti J+1) ; recalculé à chaque rendu → les échéances passées disparaissent.
@@ -849,7 +878,8 @@ const Dashboard: React.FC = () => {
         perfCanal,
         perfGlobale,
         pctTempsEcoule,
-        pctConsomme
+        pctEngageADate,
+        pctEngagePeriode
     };
 
   }, [projects, budgets, socialPosts, fixedExpenses, dateStart, dateEnd, filterContexts, filterBrands, filterServices, filterProPlus]);
@@ -859,9 +889,11 @@ const Dashboard: React.FC = () => {
 
   const burnRate = stats.totalForecast > 0 ? (stats.totalActual / stats.totalForecast) * 100 : 0;
   const remaining = stats.totalForecast - stats.totalActual;
-  // Écart en POINTS entre le budget dépensé et le temps écoulé. Positif = on dépense
-  // plus vite que le calendrier ; négatif = on sous-consomme.
-  const ecartRythme = stats.pctConsomme - stats.pctTempsEcoule;
+  // Écart en POINTS entre l'engagé À DATE et le temps écoulé. Positif = on engage
+  // plus vite que le calendrier ; négatif = on sous-consomme. Comparer l'engagé de
+  // toute la période (`pctEngagePeriode`) au temps écoulé serait faux — voir le
+  // commentaire du bloc « Rythme de consommation » dans l'agrégation.
+  const ecartRythme = stats.pctEngageADate - stats.pctTempsEcoule;
 
   const getNetworkIcon = (networkName: string) => {
       const n = networkName.toLowerCase();
@@ -1039,30 +1071,43 @@ const Dashboard: React.FC = () => {
                           <Gauge size={20} />
                       </div>
                   </div>
-                  {/* Deux barres superposées : ce qui est dépensé, ce qui est écoulé.
-                      La comparaison visuelle vaut mieux qu'une explication. */}
+                  {/* Deux barres superposées : ce qui est engagé À DATE, ce qui est
+                      écoulé. La comparaison visuelle vaut mieux qu'une explication.
+                      « Budget dépensé » a été renommé : cette barre n'a jamais montré
+                      du dépensé, et elle montre maintenant explicitement l'engagé à
+                      date. « Année écoulée » → « Période écoulée » : le libellé était
+                      faux dès qu'on filtrait sur un semestre ou un trimestre. */}
                   <div className="mt-3 space-y-1.5">
                       <div className="flex items-center gap-2">
-                          <span className="text-[9px] text-slate-500 w-20 shrink-0">Budget dépensé</span>
+                          <span className="text-[9px] text-slate-500 w-20 shrink-0">Engagé à date</span>
                           <div className="flex-1 h-2 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
-                              <div className="h-full bg-bony-orange" style={{ width: `${Math.min(stats.pctConsomme, 100)}%` }} />
+                              <div className="h-full bg-bony-orange" style={{ width: `${Math.min(stats.pctEngageADate, 100)}%` }} />
                           </div>
-                          <span className="text-[10px] font-bold text-bony-text w-9 text-right shrink-0">{stats.pctConsomme} %</span>
+                          <span className="text-[10px] font-bold text-bony-text w-9 text-right shrink-0">{stats.pctEngageADate} %</span>
                       </div>
                       <div className="flex items-center gap-2">
-                          <span className="text-[9px] text-slate-500 w-20 shrink-0">Année écoulée</span>
+                          <span className="text-[9px] text-slate-500 w-20 shrink-0">Période écoulée</span>
                           <div className="flex-1 h-2 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
                               <div className="h-full bg-slate-400 dark:bg-slate-500" style={{ width: `${stats.pctTempsEcoule}%` }} />
                           </div>
                           <span className="text-[10px] font-bold text-slate-500 w-9 text-right shrink-0">{stats.pctTempsEcoule} %</span>
                       </div>
+                      {/* Sans barre, volontairement : l'engagé sur toute la période est
+                          une INFORMATION (le récurrent de l'année est déjà saisi), pas
+                          un terme de la comparaison ci-dessus. Lui donner une barre
+                          inviterait à la comparer à « Période écoulée », c'est-à-dire
+                          exactement l'erreur que ce correctif supprime. */}
+                      <div className="flex items-center gap-2 pt-0.5">
+                          <span className="text-[9px] text-slate-500 shrink-0">Engagé sur la période</span>
+                          <span className="text-[10px] font-bold text-slate-500 tabular-nums">{stats.pctEngagePeriode} %</span>
+                      </div>
                   </div>
                   <div className="mt-3 text-xs text-slate-400">
                       {ecartRythme > 10
-                        ? 'Vous dépensez plus vite que le temps ne passe : le budget risque de manquer avant la fin de la période.'
+                        ? 'Vous engagez plus vite que le temps ne passe : le budget risque de manquer avant la fin de la période.'
                         : ecartRythme < -10
-                        ? 'Vous dépensez moins vite que le temps ne passe : du budget risque de rester non engagé.'
-                        : 'Dépenses au rythme du calendrier.'}
+                        ? 'Vous engagez moins vite que le temps ne passe : du budget risque de rester non engagé.'
+                        : 'Engagements au rythme du calendrier.'}
                   </div>
               </div>
           </div>
