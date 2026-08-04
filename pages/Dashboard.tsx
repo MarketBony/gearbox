@@ -4,7 +4,7 @@ import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense, User } from '../types';
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
-import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS, isHoldingBrand, resolveBudgetLine, routeShareToBucket } from '../constants';
+import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS, isHoldingBrand, resolveBudgetLine, resolveSiteAlias, splitShareToBuckets } from '../constants';
 import {
   TrendingUp,
   Wallet,
@@ -493,12 +493,21 @@ const Dashboard: React.FC = () => {
 
         // Parts retenues par le filtre de périmètre. Si aucune ne passe, le projet
         // est hors périmètre : il ne compte ni en montant, ni dans les compteurs.
-        const partsEnScope = Object.entries(siteShares).filter(([rawSite, pct]) => {
-            if (pct <= 0) return false;
-            // Périmètre testé sur la DESTINATION BUDGÉTAIRE de la part, pas sur son
-            // site brut : sans ça, « périmètre = Nissan » ne ramenait rien, puisque
-            // le site d'un projet est toujours un site réel, jamais « Nissan ».
-            return isSiteInScope(routeShareToBucket(rawSite, p.brands));
+        //
+        // Chaque part est d'abord ÉCLATÉE en destinations pondérées (une seule le
+        // plus souvent ; deux quand le curseur de répartition Alpine/Nissan scinde
+        // un élément mixte), puis chaque destination est testée séparément. Le
+        // périmètre porte sur la DESTINATION BUDGÉTAIRE, pas sur le site brut :
+        // sans ça, « périmètre = Nissan » ne ramenait rien, puisque le site d'un
+        // projet est toujours un site réel, jamais « Nissan ».
+        const partsEnScope = Object.entries(siteShares).flatMap(([rawSite, pct]) => {
+            if (pct <= 0) return [];
+            return splitShareToBuckets(rawSite, p.brands, null, {
+                alpineShare: p.alpineShare,
+                nissanShare: p.nissanShare,
+            })
+                .filter(d => isSiteInScope(d.site))
+                .map(d => ({ rawSite, pct: pct * d.ratio }));
         });
         if (partsEnScope.length === 0) return;
 
@@ -548,7 +557,7 @@ const Dashboard: React.FC = () => {
         const coutTotal = p.budgetActual || 0;
         // Seules les parts dans le périmètre contribuent — sans filtre, elles
         // valent 100 % au total, donc le chiffre affiché est inchangé.
-        const partEnScope = partsEnScope.reduce((s, [, pct]) => s + pct, 0) / 100;
+        const partEnScope = partsEnScope.reduce((s, { pct }) => s + pct, 0) / 100;
         const cost = coutTotal * partEnScope;
 
         if (pDate.getFullYear() === chartYear) {
@@ -568,12 +577,13 @@ const Dashboard: React.FC = () => {
                     ecart: coutTotal - p.budgetPlanned
                 });
             }
-            // Consommation par site, à partir des parts déjà filtrées.
-            partsEnScope.forEach(([rawSite, pct]) => {
-                let s = rawSite;
-                if (s === 'Thiers' || s === 'Ambert') s = 'Ricoux';
-                if (s === 'Riom') s = 'Mozac';
-                coutParSite[s] = (coutParSite[s] || 0) + coutTotal * (pct as number) / 100;
+            // Consommation par site, à partir des parts déjà filtrées. Ce graphe
+            // raisonne en SITES RÉELS (et non en destinations budgétaires) : une
+            // part Alpine reste affichée sur sa concession. Les alias passent par
+            // `resolveSiteAlias`, qui était recopié en dur ici.
+            partsEnScope.forEach(({ rawSite, pct }) => {
+                const s = resolveSiteAlias(rawSite);
+                coutParSite[s] = (coutParSite[s] || 0) + coutTotal * pct / 100;
             });
             // Détail par tâche : canal, prestataire, performance de campagne.
             // Les coûts de tâche sont pris au prorata de la part en périmètre, pour
@@ -670,13 +680,21 @@ const Dashboard: React.FC = () => {
         Object.entries(siteShares).forEach(([rawSite, sharePct]) => {
             if (sharePct <= 0) return;
 
-            // Comme pour les projets : le périmètre s'applique à la destination
-            // budgétaire de la part (bucket Alpine/Nissan ou site réel), sinon un
-            // périmètre Nissan ne ramène aucune dépense.
-            const eSite = routeShareToBucket(rawSite, e.brands, e.brand);
-            if (!isSiteInScope(eSite)) return;
+            // Comme pour les projets : le périmètre s'applique aux destinations
+            // budgétaires de la part (bucket Alpine/Nissan ou site réel), sinon un
+            // périmètre Nissan ne ramène aucune dépense. Rien en aval ne dépend de
+            // la destination elle-même — seule la FRACTION de la part qui tombe
+            // dans le périmètre importe (< 1 quand le curseur de répartition
+            // envoie le reste sur un site hors périmètre).
+            const fractionEnScope = splitShareToBuckets(rawSite, e.brands, e.brand, {
+                alpineShare: e.alpineShare,
+                nissanShare: e.nissanShare,
+            })
+                .filter(d => isSiteInScope(d.site))
+                .reduce((s, d) => s + d.ratio, 0);
+            if (fractionEnScope <= 0) return;
 
-            const cost = totalCost * (sharePct / 100);
+            const cost = totalCost * (sharePct / 100) * fractionEnScope;
 
             // Dépense ANNUELLE : même principe que l'agrégation Budget.tsx — le mois de
             // expDate est ignoré, le montant contribue cost/12 sur chacun des 12 mois de

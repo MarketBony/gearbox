@@ -6,7 +6,7 @@ import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, ChevronDown, ChevronRight, Calculator, PieChart, TrendingUp, TrendingDown, AlertTriangle, Filter, Coins, Calendar, Lock, Search, X, Check } from 'lucide-react';
-import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES, isHoldingBrand, ALPINE_BUCKETS, NISSAN_BUCKET, resolveBudgetLine, routeShareToBucket } from '../constants';
+import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES, isHoldingBrand, ALPINE_BUCKETS, NISSAN_BUCKET, resolveBudgetLine, splitShareToBuckets } from '../constants';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -453,18 +453,7 @@ const Budget: React.FC = () => {
           Object.entries(siteShares).forEach(([rawSite, sharePct]) => {
               if (sharePct <= 0) return;
 
-              // Destination budgétaire de CETTE part (alias de site + routage
-              // Alpine/Nissan), via le résolveur unique de constants.ts.
-              //
-              // ⚠️ L'ancien code envoyait TOUT un projet contenant le tag Alpine
-              // vers un bucket Alpine, et ABANDONNAIT par un `return` silencieux
-              // chaque part posée sur un site non éligible. Mesuré le 03/08/2026 :
-              // 2 870 € évaporés sur 5 projets Nissan+Renault. `routeShareToBucket`
-              // laisse désormais une part non éligible sur son site.
               const pBrands = p.brands || [];
-              const targetSite = routeShareToBucket(rawSite, pBrands);
-
-              if (!siteStats[targetSite]) return;
 
               // Brand Filter
               if (!isBrandInScope(pBrands)) return;
@@ -497,15 +486,30 @@ const Budget: React.FC = () => {
               }
 
               if (servicesToHit.length > 0) {
-                  const costPerSvc = siteCost / servicesToHit.length;
-                  
-                  servicesToHit.forEach(svc => {
-                      if (servicesToProcess.includes(svc as any)) {
-                          if (siteStats[targetSite].actual[svc] !== undefined) {
-                              siteStats[targetSite].actual[svc] += costPerSvc;
+                  // Destinations budgétaires de CETTE part (alias de site, routage
+                  // Alpine/Nissan, et curseur de répartition sur les éléments
+                  // mixtes), via le résolveur unique de constants.ts. Les ratios
+                  // somment à 1 : aucun euro ne peut se perdre en route.
+                  //
+                  // ⚠️ L'ancien code envoyait TOUT un projet contenant le tag
+                  // Alpine vers un bucket Alpine, et ABANDONNAIT par un `return`
+                  // silencieux chaque part posée sur un site non éligible. Mesuré
+                  // le 03/08/2026 : 2 870 € évaporés sur 5 projets Nissan+Renault.
+                  splitShareToBuckets(rawSite, pBrands, null, {
+                      alpineShare: p.alpineShare,
+                      nissanShare: p.nissanShare,
+                  }).forEach(({ site: targetSite, ratio }) => {
+                      if (!siteStats[targetSite]) return;
+                      const costPerSvc = (siteCost * ratio) / servicesToHit.length;
+
+                      servicesToHit.forEach(svc => {
+                          if (servicesToProcess.includes(svc as any)) {
+                              if (siteStats[targetSite].actual[svc] !== undefined) {
+                                  siteStats[targetSite].actual[svc] += costPerSvc;
+                              }
+                              siteStats[targetSite].actualMonthly[monthIdx] += costPerSvc;
                           }
-                          siteStats[targetSite].actualMonthly[monthIdx] += costPerSvc;
-                      }
+                      });
                   });
               }
           });
@@ -536,13 +540,6 @@ const Budget: React.FC = () => {
           Object.entries(siteShares).forEach(([rawSite, sharePct]) => {
               if (sharePct <= 0) return;
 
-              // Même résolveur que pour les projets ci-dessus. `exp.brands` est
-              // passé en plus de `exp.brand` (legacy) : une dépense peut porter la
-              // marque de routage dans l'un ou l'autre selon son ancienneté.
-              const targetSite = routeShareToBucket(rawSite, exp.brands, exp.brand);
-
-              if (!siteStats[targetSite]) return;
-
               // Year Filter
               const expDate = new Date(exp.date);
               if (expDate.getFullYear() !== filterYear) return;
@@ -562,6 +559,14 @@ const Budget: React.FC = () => {
               }
               if (servicesToHit.length === 0) return;
 
+              // Même résolveur que pour les projets ci-dessus. `exp.brands` est
+              // passé en plus de `exp.brand` (legacy) : une dépense peut porter la
+              // marque de routage dans l'un ou l'autre selon son ancienneté.
+              const destinations = splitShareToBuckets(rawSite, exp.brands, exp.brand, {
+                  alpineShare: exp.alpineShare,
+                  nissanShare: exp.nissanShare,
+              });
+
               // Month Mapping — répartition sur les mois.
               // Dépense ANNUELLE : on ignore le mois de expDate, seule l'année sert de
               // référence ; le coût du site est étalé à parts égales (siteCost/12) sur les
@@ -577,15 +582,18 @@ const Budget: React.FC = () => {
                   // verse que les mois compris dans [filterMonthStart, filterMonthEnd].
                   if (monthIdx < filterMonthStart || monthIdx > filterMonthEnd) return;
 
-                  const costPerSvc = cost / servicesToHit.length;
+                  destinations.forEach(({ site: targetSite, ratio }) => {
+                      if (!siteStats[targetSite]) return;
+                      const costPerSvc = (cost * ratio) / servicesToHit.length;
 
-                  servicesToHit.forEach(svc => {
-                      if (servicesToProcess.includes(svc as any)) {
-                          if (siteStats[targetSite].actual[svc] !== undefined) {
-                              siteStats[targetSite].actual[svc] += costPerSvc;
+                      servicesToHit.forEach(svc => {
+                          if (servicesToProcess.includes(svc as any)) {
+                              if (siteStats[targetSite].actual[svc] !== undefined) {
+                                  siteStats[targetSite].actual[svc] += costPerSvc;
+                              }
+                              siteStats[targetSite].actualMonthly[monthIdx] += costPerSvc;
                           }
-                          siteStats[targetSite].actualMonthly[monthIdx] += costPerSvc;
-                      }
+                      });
                   });
               });
           });

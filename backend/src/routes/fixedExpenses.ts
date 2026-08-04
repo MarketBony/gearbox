@@ -11,7 +11,7 @@ const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digit
 
 // Contrat aligné sur le frontend (types.ts FixedExpense + pages/FixedExpenses.tsx) :
 // { date, service, site, sites?, budgetDistribution?, comment, amount,
-//   brand?, brands?, alpineShare?, proPlus?, isAnnual? }
+//   brand?, brands?, alpineShare?, nissanShare?, proPlus?, isAnnual? }
 // Colonnes stockées BRUTES : aucun calcul métier côté serveur (pas de
 // fractionnement /12 pour isAnnual, pas de routage Alpine/Nissan) —
 // toute l'agrégation reste côté frontend (pages/Budget.tsx).
@@ -51,6 +51,9 @@ const optionalFieldsError = (body: any): string | null => {
   }
   if (body.alpineShare !== undefined && body.alpineShare !== null && !isFiniteNumber(body.alpineShare)) {
     return 'Champ "alpineShare" invalide : nombre attendu.';
+  }
+  if (body.nissanShare !== undefined && body.nissanShare !== null && !isFiniteNumber(body.nissanShare)) {
+    return 'Champ "nissanShare" invalide : nombre attendu.';
   }
   if (body.proPlus !== undefined && typeof body.proPlus !== 'boolean') {
     return 'Champ "proPlus" invalide : booléen attendu.';
@@ -92,7 +95,7 @@ router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) =>
     return res.status(400).json({ error: optErr });
   }
 
-  const { sites, budgetDistribution, comment, brand, brands, alpineShare, proPlus, isAnnual } = req.body;
+  const { sites, budgetDistribution, comment, brand, brands, alpineShare, nissanShare, proPlus, isAnnual } = req.body;
   const expense = await prisma.fixedExpense.create({
     data: {
       date: new Date(date),
@@ -105,6 +108,7 @@ router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) =>
       brand: brand ?? undefined,
       brands: brands ?? [],
       alpineShare: alpineShare ?? undefined,
+      nissanShare: nissanShare ?? undefined,
       proPlus: proPlus ?? false,
       isAnnual: isAnnual ?? false
     }
@@ -150,6 +154,7 @@ router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) 
         ...(b.brand !== undefined ? { brand: b.brand } : {}),
         ...(b.brands !== undefined ? { brands: b.brands } : {}),
         ...(b.alpineShare !== undefined ? { alpineShare: b.alpineShare } : {}),
+        ...(b.nissanShare !== undefined ? { nissanShare: b.nissanShare } : {}),
         ...(b.proPlus !== undefined ? { proPlus: b.proPlus } : {}),
         ...(b.isAnnual !== undefined ? { isAnnual: b.isAnnual } : {})
       }
