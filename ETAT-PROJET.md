@@ -11,9 +11,9 @@
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
 - master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 21
-  (`chore/finitions`, 30 juillet). Le correctif 22 (**reprise des données réelles
-  2026**, 3 août) ne touche **aucun code** : les données ont été écrites
-  directement en base via l'API, **aucun déploiement n'est nécessaire**. Le SHA
+  (`chore/finitions`, 30 juillet). Le correctif 22 (reprise des données réelles,
+  3 août) ne touche aucun code. Le correctif 23 (**routage Alpine/Nissan**, 3 août)
+  est prêt en local : **service `web` seul** à reconstruire. Le SHA
   exact se lit avec `git log --oneline -1` plutôt que d'être recopié ici, où il
   devenait périmé à chaque lot. Des commits de doc ou de backup automatique
   peuvent suivre sans nécessiter de redéploiement.
@@ -564,6 +564,46 @@
        importées ont un canal vide. Le jeu de démo alimentait ces widgets, les
        vraies données non. Pour les faire vivre, il faudra renseigner le canal des
        tâches concernées dans Gearbox (ou ajouter une colonne au fichier).
+
+23. **Routage Alpine / Nissan : le croisement marque × périmètre enfin juste**
+    (`fix/routage-alpine-nissan`, 3 août). Frontend seul, aucun changement backend.
+    Signalé par Théo dès qu'il a filtré sur Alpine, la reprise des données ayant
+    rendu ces défauts visibles.
+    - **Cause racine unique** : rien ne reliait une ligne de budget
+      (`Alpine-Clermont`, `Nissan`) au couple **(site réel, marque)**. `Budget.tsx`
+      routait la dépense vers des buckets mais filtrait les lignes par **égalité de
+      nom** ; `Dashboard.tsx` **ne routait pas du tout**. Cinq défauts en
+      découlaient, détaillés dans `BUGS-CONNUS.md`.
+    - **Correctif : un résolveur unique dans `constants.ts`** — `ALPINE_BUCKETS`,
+      `NISSAN_BUCKET`, `resolveSiteAlias`, `resolveBudgetLine` et
+      `routeShareToBucket`. Même démarche que `isHoldingBrand()` : **un seul test
+      partagé**, plus de demi-logique par écran. `routeShareToBucket` ne rend
+      **jamais** `null` — c'est ce qui récupère les 2 870 € qu'un `return`
+      silencieux faisait disparaître.
+    - **Décision de Théo : Alpine n'est plus une entité unique.** Elle est
+      réellement par site (4 concessions), donc le pseudo-site `Alpine` — qui ne
+      correspondait à aucune ligne — est retiré des deux sélecteurs de périmètre.
+      On obtient Alpine en croisant **MARQUE = Alpine × PÉRIMÈTRE**. Nissan reste
+      une entité unique et globale : sa ligne n'entre dans un périmètre que si elle
+      y est **explicitement** nommée, sinon on la compterait une fois par site
+      éligible.
+    - **Le filtre de marque s'applique désormais aux 3 sources** dans `Budget.tsx`
+      (enveloppes, projets, dépenses) : il ne touchait que les projets.
+    - `Projects.tsx` et `FixedExpenses.tsx` **volontairement non modifiés** :
+      vérifié qu'ils n'utilisent `ALPINE_SITES`/`NISSAN_SITES` que pour décider
+      quelles puces de marque proposer selon les sites choisis — aucun routage.
+    - Vérifié sur les **données réelles**, pas sur une réplique : conservation à
+      1 centime (les 2 870 € réapparaissent), MARQUE = Alpine → 119 545 € / 120 000 €
+      (100 % au lieu de 8,1 %), périmètre Nissan → 118 079 € / 60 600 € (195 %, le
+      dépassement réel, au lieu de 0 €), MARQUE = Renault → enveloppes Alpine et
+      Nissan bien exclues, et **Budget ↔ Dashboard d'accord** sur les mêmes montants.
+      16 cas unitaires sur le résolveur. `tsc` backend 0, racine 12 préexistantes.
+    - ⚠️ **Fausse alerte que je me suis faite** : le total sans filtre est passé de
+      1 474 050 € à 1 471 144 €, ce que j'ai d'abord pris pour une régression de mon
+      correctif. En réalité **Théo avait commencé à corriger les données dans
+      Gearbox** (20 projets ont un `budgetActual` différent du `budgetPlanned`, des
+      libellés nettoyés) — et le Dashboard affiche `budgetActual`. Leçon : quand un
+      total bouge, vérifier d'abord si la donnée a bougé.
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - **⚠️ Corriger le KPI « Rythme de consommation »** (Dashboard). Il compare le

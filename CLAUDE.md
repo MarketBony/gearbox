@@ -110,11 +110,25 @@ que de supposer que ça va passer.
 
 - Renault + Dacia + Mobilize = un seul compte d'exploitation, pas de distinction
   budgétaire entre elles.
-- Alpine disponible uniquement sur `ALPINE_SITES` (Clermont, Vichy, Le
-  Puy-en-Velay, Rodez) — conservé par site à la demande explicite de Théo, même
-  si ça diffère de Nissan.
-- Nissan disponible sur `NISSAN_SITES` (liste plus large, bucket global non
-  ventilé par site — asymétrie connue avec Alpine, pas un bug).
+- **Alpine est PAR SITE, Nissan est GLOBAL.** Asymétrie voulue, elle reflète la
+  réalité du groupe — ce n'est pas un bug, et c'est la règle la plus souvent
+  cassée par inadvertance (5 défauts corrigés le 03/08/2026, cf. `BUGS-CONNUS.md`) :
+  - Alpine n'existe que sur `ALPINE_SITES` (Clermont, Vichy, Le Puy-en-Velay,
+    Rodez), avec **une enveloppe par site** : `Alpine-Clermont`, `Alpine-Vichy`,
+    `Alpine-Le Puy`, `Alpine-Rodez`. **Il n'y a PAS d'entité « Alpine » globale** —
+    on l'obtient en croisant le tag marque Alpine avec le périmètre. Un pseudo-site
+    `Alpine` a existé dans les sélecteurs et ne correspondait à aucune ligne : il a
+    été retiré.
+  - Nissan couvre `NISSAN_SITES` (liste plus large) mais n'a **qu'une seule
+    enveloppe globale**, jamais ventilée par site. Elle n'entre dans un périmètre
+    que si `Nissan` y est **explicitement** sélectionné : la rattacher à chacun de
+    ses sites éligibles la compterait autant de fois.
+- ⚠️ **Tout routage budgétaire passe par `constants.ts`** — `resolveBudgetLine()`,
+  `routeShareToBucket()`, `resolveSiteAlias()`. Ne jamais réimplémenter cette
+  logique dans un écran : c'est exactement ce qui a fait diverger Budget et
+  Dashboard **quatre fois** (ventilation des dépenses, des projets, exclusion des
+  brouillons, routage Alpine/Nissan). `routeShareToBucket` ne rend jamais `null` :
+  une part non éligible reste sur son site au lieu de disparaître.
 - **Holding = un TAG MARQUE** (`BrandType`), anciennement nommé `Groupe`, renommé
   le 30 juillet 2026. Deux règles indissociables :
   1. **Tag exclusif** : quand Holding est posé, aucune autre marque ne peut
