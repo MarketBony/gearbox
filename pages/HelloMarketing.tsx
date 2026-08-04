@@ -9,6 +9,8 @@ import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import Avatar from '../components/Avatar';
 import { User, Project, FeedInfo } from '../types';
+// `parseLocalDate` est exporté par DateRangePicker (et non par constants.ts).
+import { parseLocalDate } from '../components/DateRangePicker';
 
 // =============================================================================
 // OPENWEATHER API KEY
@@ -831,10 +833,16 @@ const BirthdaysSection: React.FC = () => {
 
       const result: BirthdayEntry[] = [];
       for (const u of users) {
-        const raw = localStorage.getItem(USER_PREFS_KEY(u.id));
-        const birthdate = raw ? (JSON.parse(raw).birthdate || '') : '';
+        // ⚠️ Corrigé le 04/08/2026 : cette boucle lisait le `localStorage` du POSTE
+        // pour chaque utilisateur. Comme l'anniversaire n'était saisi que sur la
+        // machine de celui qui le renseignait, personne ne voyait ceux des autres —
+        // le symptôme signalé par Théo. C'est désormais un champ du serveur.
+        const birthdate = u.birthdate || '';
         if (!birthdate) continue;
-        const bday = new Date(birthdate);
+        // `parseLocalDate` et non `new Date` : sur 'YYYY-MM-DD' le second parse en UTC
+        // et rend la veille dès qu'on est à l'est de Greenwich, ce qui décalerait la
+        // date affichée et le décompte de jours.
+        const bday = parseLocalDate(birthdate);
         const next = new Date(today.getFullYear(), bday.getMonth(), bday.getDate());
         if (next < today) next.setFullYear(today.getFullYear() + 1);
         const daysUntil = Math.ceil((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));

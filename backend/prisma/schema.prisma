@@ -19,6 +19,14 @@ model User {
   role              String // 7 valeurs valides côté frontend (types.ts UserRole)
   avatarColor       String?
   avatarUrl         String? // URL relative de la photo de profil uploadée (/uploads/avatar/...)
+  // Date de naissance au format 'YYYY-MM-DD'. String et NON DateTime, volontairement :
+  // une date de naissance n'a ni heure ni fuseau, et un DateTime rouvrirait la classe
+  // de bug J+1 que le projet combat déjà avec parseLocalDate. En String, la valeur
+  // traverse l'API sans normalisation.
+  // Vivait auparavant dans le localStorage du poste (préférence UI), ce qui la rendait
+  // invisible de tous les autres — l'anniversaire est une donnée d'équipe, pas une
+  // préférence. La ville, elle, reste bien en localStorage (météo de son propre poste).
+  birthdate         String?
   pushSubscriptions PushSubscription[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt

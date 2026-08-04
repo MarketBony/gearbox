@@ -40,6 +40,10 @@ export interface User {
   role: UserRole;
   avatarColor?: string; // Hex code for avatar background
   avatarUrl?: string; // URL relative de la photo de profil uploadée (/uploads/avatar/...)
+  // Date de naissance 'YYYY-MM-DD'. Donnée SERVEUR depuis le 04/08/2026 : elle vivait
+  // en localStorage, ce qui la rendait invisible de tous les autres postes. À ne pas
+  // confondre avec la ville, qui reste une préférence locale (météo de son poste).
+  birthdate?: string;
 }
 
 export interface Task {
