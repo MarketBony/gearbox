@@ -10,10 +10,11 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 24** (curseurs de
-  répartition `alpineShare` / `nissanShare`, 4 août) — `api` **et** `web`
-  reconstruits, le schéma Prisma ayant bougé. Le correctif 23 (routage
-  Alpine/Nissan) est déployé aussi, `web` seul avait suffi. Le SHA exact se lit
+- master = prod, synchronisés. Dernier lot déployé : **correctif 25** (KPI de rythme
+  de consommation, 4 août) — `web` **seul**, aucun changement backend ni Prisma. Le
+  correctif 24 (curseurs `alpineShare` / `nissanShare`) a lui nécessité `api` **et**
+  `web`, le schéma Prisma ayant bougé. Le correctif 23 (routage Alpine/Nissan) est
+  déployé aussi, `web` seul avait suffi. Le SHA exact se lit
   avec `git log --oneline -1` plutôt que d'être recopié ici, où il devenait périmé
   à chaque lot. Des commits de doc ou de backup automatique peuvent suivre sans
   nécessiter de redéploiement.
@@ -658,13 +659,66 @@
       60 600 €, total sans filtre inchangé. `tsc` backend 0, racine 12
       préexistantes (jeu identique au baseline).
 
+25. **KPI « Avance / Retard de Budget » : la comparaison enfin bien posée**
+    (`fix/kpi-rythme-consommation`, 4 août). Frontend seul, `pages/Dashboard.tsx`
+    uniquement, aucun changement backend. Seul point marqué ⚠️ du backlog, arbitré
+    avec Théo le 03/08.
+    - **⚠️ La cause notée dans le backlog était fausse.** Le backlog l'expliquait par
+      « les dépenses récurrentes de toute l'année sont engagées d'avance » : vrai,
+      mais ce n'était qu'un **révélateur**. Le défaut était dans la formule :
+      `totalActual` cumule **toute la période filtrée** (janvier→décembre par défaut,
+      donc y compris les dépenses datées du 01/11 et du 01/12) alors que
+      `pctTempsEcoule` mesure le temps écoulé **jusqu'à aujourd'hui**. Un total de fin
+      d'année confronté à une horloge de mi-année : faux **par construction**. N'importe
+      quel budget saisi à l'avance produisait la même fausse alerte, sans une seule
+      ligne récurrente. Leçon générale : quand un indicateur dérape après un changement
+      de données, vérifier d'abord si sa formule était déjà mal posée.
+    - **Correctif** : un accumulateur `totalEngageADate`, alimenté aux **deux mêmes
+      endroits** que `totalActual` (bloc projets, bloc dépenses fixes) avec une borne
+      haute « aujourd'hui », sous les mêmes filtres et sur la part **déjà pondérée**
+      par `splitShareToBuckets`. Aucun routage réimplémenté. `totalActual` est
+      **inchangé** : la carte « Budget Consommé » doit rester d'accord avec `Budget.tsx`.
+    - `pctConsomme` devient **deux** valeurs : `pctEngageADate` (le terme de la
+      comparaison) et `pctEngagePeriode` (affiché comme information, plus comparé).
+    - **Libellés corrigés**, ils faisaient partie du défaut : « Budget dépensé » →
+      « Engagé à date » (cette barre n'a jamais montré du dépensé), « Année écoulée »
+      → « Période écoulée » (faux dès qu'on filtre un semestre ou un trimestre), et une
+      **troisième ligne sans barre** « Engagé sur la période » — volontairement sans
+      barre : lui en donner une inviterait à la comparer au temps écoulé, c'est-à-dire
+      exactement l'erreur corrigée ici.
+    - **Mesuré : +41 → +16 points.** Engagé à date 75 %, période écoulée 59 %, engagé
+      sur la période 99 %. Recalcul indépendant depuis l'API, hors du composant :
+      1 471 143,52 € et 75 / 59 / 99 % — identique à l'affichage.
+    - **Non-régression prouvée** : Budget Consommé 1 471 144 € / 1 480 800 €, reste à
+      engager 9 656 €, 99,3 %, **et la page Budget affiche exactement les mêmes
+      chiffres**. Croisements identiques au correctif 24 au centime : MARQUE = Alpine
+      120 295 € / 120 000 €, MARQUE = Nissan 120 949 € / 60 600 €.
+    - **Bornes vérifiées** : période entièrement passée (S1) → écoulé 100 % et les deux
+      valeurs convergent à 119 % ; période future → 0/0/0 sans `NaN` ; durée nulle
+      (période d'un jour) → pas de division par zéro ; **au 31/12 l'écart tombe à
+      −1 point**, ce qui prouve que l'indicateur est bien formé — il converge en fin de
+      période au lieu de rester bloqué. Périmètre Clermont → **−12 points**, l'écart
+      sait enfin descendre en négatif, ce qu'un +41 constant rendait impossible.
+    - ⚠️ **Biais structurel résiduel assumé, de l'ordre de +8 à +12 points.** Mesuré
+      aux dates de bascule : 01/08 → +12, 04/08 → +16, 31/08 → +10, 01/09 → +9,
+      31/12 → −1. Cause : une dépense du mois est imputée **au 1ᵉʳ**, donc le mois
+      entier est engagé quand l'horloge compte encore en jours. L'indicateur respire
+      donc à l'intérieur de chaque mois. Correctif possible si le besoin se confirme :
+      compter le temps écoulé **en mois** plutôt qu'en jours, pour que l'horloge et la
+      convention d'imputation aient la même granularité. Choix de lecture laissé à
+      Théo, ce n'est pas un bug.
+    - Responsive mesuré à 320 et 375 px : 0 chevauchement, 0 débordement de rangée,
+      pas de scroll horizontal, la nouvelle ligne tient sur une seule ligne. Vérifié
+      en clair **et** en sombre, aucune couleur hors charte. `tsc` backend 0, racine 12
+      préexistantes. **Aucune écriture en base** pendant les tests (que des `GET`).
+
 ## Backlog en attente (rien d'urgent, le site fonctionne)
-- **⚠️ Corriger le KPI « Rythme de consommation »** (Dashboard). Il compare le
-  consommé au temps écoulé, ce qui n'a plus de sens depuis la reprise des données
-  réelles : les dépenses récurrentes de toute l'année sont **engagées d'avance**,
-  donc le consommé affiche 99,5 % dès juillet et le KPI indique en permanence une
-  avance de ~41 points. Décidé avec Théo le 03/08 : à traiter sur données réelles,
-  par exemple en distinguant le récurrent engagé du dépensable restant.
+- ~~⚠️ Corriger le KPI « Rythme de consommation »~~ — **fait le 04/08** (correctif 25).
+  À retenir : la cause inscrite ici (« le récurrent est engagé d'avance ») était
+  **fausse**, ou plus exactement n'était qu'un révélateur — la formule comparait un
+  total de fin de période au temps écoulé à ce jour, elle était erronée par
+  construction. Il reste un biais structurel assumé de +8 à +12 points, documenté au
+  correctif 25.
 - **Build local NON représentatif du build déployé** (constaté le 30/07) : Docker
   construit le front avec **node:18-alpine** et un `npm install` (pas `npm ci`),
   alors que le poste de Théo est en **Node 24**. Résultat mesuré sur le même code :
