@@ -132,10 +132,24 @@ const Login: React.FC = () => {
       const grid = buildGrid(canvas.width, canvas.height);
       segments = grid.segments;
       nodes = grid.nodes;
-      pulses = Array.from({ length: 8 }, () => spawnPulse(segments));
+      // Même raison que la garde du bloc « pulses » : pas de segment, pas de pulse.
+      // Sinon on peuplerait `pulses` de 8 entrées à `segment: undefined`, qui
+      // planteraient au premier redimensionnement ramenant des segments.
+      pulses = segments.length > 0
+        ? Array.from({ length: 8 }, () => spawnPulse(segments))
+        : [];
     };
 
-    const draw = () => {
+    // ⚠️ Le corps du dessin est enveloppé dans un try/catch, et `draw()` est appelé
+    // SYNCHRONEMENT depuis l'effet ci-dessous : sans ce filet, la moindre exception
+    // ici remonte dans le useEffect et, faute d'ErrorBoundary dans l'application
+    // (cf. App.tsx / index.tsx), React démonte tout l'arbre — l'écran devient
+    // BLANC. Vérifié le 04/08/2026 par une sonde : `#root` tombe à 0 enfant et
+    // 0 octet de HTML. Une animation décorative ne doit jamais pouvoir emporter
+    // l'écran de connexion : en cas d'échec on arrête la boucle et on garde la
+    // dernière image peinte (le fond sombre est posé en tout premier, donc le
+    // rendu reste correct visuellement).
+    const drawFrame = () => {
       const w = canvas.width;
       const h = canvas.height;
 
@@ -173,35 +187,58 @@ const Login: React.FC = () => {
       }
 
       // Update & draw pulses
-      for (let i = pulses.length - 1; i >= 0; i--) {
-        const p = pulses[i];
-        p.t += p.speed;
-        if (p.t > 1) {
-          pulses[i] = spawnPulse(segments);
-          continue;
+      //
+      // ⚠️ Garde `segments.length > 0` indispensable : `buildGrid` décide de chaque
+      // segment au hasard (p = 0,55 et 0,4), donc il PEUT ne rien produire. Dans ce
+      // cas `spawnPulse` lit `segments[0]` → `undefined`, et `p.segment.x1` lève une
+      // TypeError qui blanchit l'écran (voir le filet plus haut). Mesuré sur 200 000
+      // tirages : impossible sur un écran réel (0 % à 320×568 et au-delà) mais
+      // **27 % si le canvas fait 0×0**, ce que donne `window.innerWidth` valant 0 au
+      // tout premier rendu dans certains contextes — ce qui collerait au symptôme
+      // « page blanche au premier chargement, corrigée par un rechargement ».
+      if (segments.length > 0) {
+        for (let i = pulses.length - 1; i >= 0; i--) {
+          const p = pulses[i];
+          p.t += p.speed;
+          if (p.t > 1) {
+            pulses[i] = spawnPulse(segments);
+            continue;
+          }
+          const x = p.segment.x1 + (p.segment.x2 - p.segment.x1) * p.t;
+          const y = p.segment.y1 + (p.segment.y2 - p.segment.y1) * p.t;
+
+          // Halo
+          const grad = ctx.createRadialGradient(x, y, 0, x, y, p.size * 5);
+          grad.addColorStop(0, p.color);
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(x, y, p.size * 5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Core dot
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(x, y, p.size, 0, Math.PI * 2);
+          ctx.fill();
         }
-        const x = p.segment.x1 + (p.segment.x2 - p.segment.x1) * p.t;
-        const y = p.segment.y1 + (p.segment.y2 - p.segment.y1) * p.t;
 
-        // Halo
-        const grad = ctx.createRadialGradient(x, y, 0, x, y, p.size * 5);
-        grad.addColorStop(0, p.color);
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(x, y, p.size * 5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Core dot
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(x, y, p.size, 0, Math.PI * 2);
-        ctx.fill();
+        // Maintain max 14 pulses
+        while (pulses.length < 14) pulses.push(spawnPulse(segments));
       }
+    };
 
-      // Maintain max 14 pulses
-      while (pulses.length < 14) pulses.push(spawnPulse(segments));
-
+    // Filet : une exception d'animation arrête la boucle au lieu de remonter dans
+    // React. Le `requestAnimationFrame` est hors du `try` — on ne replanifie donc
+    // pas une frame après un échec, ce qui éviterait de journaliser 60 fois par
+    // seconde. L'animation s'interrompt, l'écran de connexion reste utilisable.
+    const draw = () => {
+      try {
+        drawFrame();
+      } catch (err) {
+        console.error('[Login] animation de fond interrompue :', err);
+        return;
+      }
       animId = requestAnimationFrame(draw);
     };
 
@@ -224,6 +261,13 @@ const Login: React.FC = () => {
     if (!base || !l1 || !l2) return;
 
     let timeout: ReturnType<typeof setTimeout>;
+    // ⚠️ L'intervalle doit être suivi ICI, hors de `glitch()`. Le nettoyage ne
+    // coupait que le `setTimeout` : démonter le composant PENDANT une salve de
+    // glitch (~160 à 320 ms) laissait donc l'intervalle tourner, et celui-ci
+    // replanifie `glitch()` à la fin de la salve — la chaîne ne s'arrêtait plus
+    // JAMAIS. Après connexion, l'animation continuait à muter indéfiniment des
+    // nœuds DOM détachés, pour toute la durée de la session.
+    let interval: ReturnType<typeof setInterval> | undefined;
 
     function randPx(max: number) {
       return (Math.random() * max * 2 - max) + 'px';
@@ -233,7 +277,7 @@ const Login: React.FC = () => {
       const steps = 4 + Math.floor(Math.random() * 4);
       const stepDuration = 40;
       let i = 0;
-      const interval = setInterval(() => {
+      interval = setInterval(() => {
         if (i >= steps) {
           l1.style.opacity = '0';
           l2.style.opacity = '0';
@@ -259,7 +303,10 @@ const Login: React.FC = () => {
     }
 
     timeout = setTimeout(glitch, 1000);
-    return () => clearTimeout(timeout);
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

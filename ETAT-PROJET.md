@@ -10,8 +10,9 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 25** (KPI de rythme
-  de consommation, 4 août) — `web` **seul**, aucun changement backend ni Prisma. Le
+- master = prod, synchronisés. Dernier lot déployé : **correctif 26** (page blanche de
+  l'écran de connexion + fuite du glitch, 4 août) — `web` **seul**. Le correctif 25
+  (KPI de rythme de consommation) est déployé aussi, `web` seul également. Le
   correctif 24 (curseurs `alpineShare` / `nissanShare`) a lui nécessité `api` **et**
   `web`, le schéma Prisma ayant bougé. Le correctif 23 (routage Alpine/Nissan) est
   déployé aussi, `web` seul avait suffi. Le SHA exact se lit
@@ -711,6 +712,52 @@
       pas de scroll horizontal, la nouvelle ligne tient sur une seule ligne. Vérifié
       en clair **et** en sombre, aucune couleur hors charte. `tsc` backend 0, racine 12
       préexistantes. **Aucune écriture en base** pendant les tests (que des `GET`).
+
+26. **Écran de connexion : la page blanche ne peut plus venir de l'animation, et le
+    glitch du logo ne fuit plus** (`fix/login-page-blanche`, 4 août). Frontend seul,
+    `pages/Login.tsx` uniquement.
+    - **Feu vert de Théo sous condition explicite : aucun changement visuel.**
+      L'animation de fond de la page de connexion est intouchable (règle écrite dans
+      `THEME-LIQUID-GLASS.md` **et** `AMELIORATION-VISUELLE.md`).
+    - ⚠️ **Le diagnostic inscrit dans `BUGS-CONNUS.md` était faux** (« refs DOM nulles
+      au premier paint ») : le garde existait. Leçon, la même qu'au correctif 25 :
+      **revérifier une cause écrite avant de coder dessus.**
+    - **Mécanisme établi par sonde temporaire** (dans un autre écran, déclenchée sur
+      `?boom`, retirée aussitôt et absence de résidu vérifiée par `git diff`) : une
+      exception dans un `useEffect` vide **tout** l'arbre React faute
+      d'`ErrorBoundary` — `#root` mesuré à **0 enfant, 0 octet de HTML**. Or `draw()`
+      est appelé **synchronement** depuis l'effet du canvas.
+    - **Déclencheur possible mesuré** : `buildGrid` peut ne produire **aucun** segment
+      (tirages à p = 0,55 et 0,4) → `spawnPulse` lit `segments[0]` → `undefined` →
+      `TypeError`. Sur 200 000 tirages : **0 % à 320×568 et au-delà**, **27 % à 0×0**.
+    - **Correctifs** : garde `segments.length > 0`, et **filet `try/catch`** autour du
+      corps de dessin avec le `requestAnimationFrame` sorti du `try` (pas de frame
+      replanifiée après échec, donc pas de journal 60 fois par seconde).
+    - **Second bug, distinct** : le `setInterval` du glitch du logo **ne s'arrêtait
+      jamais**. Le nettoyage ne coupait que le `setTimeout` ; un démontage pendant une
+      salve laissait l'intervalle vivant, et il replanifie `glitch()` — chaîne infinie
+      mutant des nœuds DOM détachés pour toute la session. Handle désormais suivi hors
+      de `glitch()` et coupé au nettoyage.
+    - **Preuve de non-régression visuelle** — c'est la condition de Théo, donc elle est
+      mesurée et non affirmée : les corps de dessin des deux versions ont été extraits
+      et comparés après retrait des commentaires et des espaces. **Aucune instruction
+      de dessin ne diffère** — seules apparaissent la garde ajoutée et le
+      `requestAnimationFrame` déplacé. Tous les `ctx.*`, couleurs, coordonnées et
+      probabilités sont identiques au caractère. Combiné aux 0 % de segments vides sur
+      un écran réel, l'animation est identique au pixel.
+    - **Preuve de la fuite** : corps de l'effet extrait des **deux** versions et simulé
+      avec des minuteurs virtuels, démontage au milieu d'une salve — avant : intervalle
+      toujours actif, **113 déclenchements sur 60 s** ; après : **0 tâche restante,
+      0 déclenchement**.
+    - Vérifié en vrai sur la page de connexion (jeton mis de côté puis **restauré**,
+      zéro résidu) : canvas 1440×900 couvrant tout l'écran, fond peint, animation
+      vivante (pixel central qui change), glitch du logo actif, aucun scroll
+      horizontal. `tsc` racine 12 lignes préexistantes dont **0 dans `Login.tsx`**,
+      backend 0.
+    - ⚠️ **Réserve** : le symptôme n'a **pas été reproduit**. C'est la classe de panne
+      qui est fermée, pas un déclencheur confirmé. Si l'écran blanc réapparaît, la
+      cause est ailleurs — la console portera alors
+      `[Login] animation de fond interrompue`, ce qui tranchera tout de suite.
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - ~~⚠️ Corriger le KPI « Rythme de consommation »~~ — **fait le 04/08** (correctif 25).
