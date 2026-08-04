@@ -4,22 +4,12 @@ import bcrypt from 'bcrypt';
 import { authenticateToken, requireRole } from '../auth/middleware';
 import { VALID_ROLES, isValidRole } from '../auth/roles';
 import { emitEvent, notifyUserChanged } from '../realtime';
+// Projection publique partagée avec routes/auth.ts — voir utils/publicUser.ts pour
+// la règle (ne jamais faire sortir l'objet Prisma brut, il porte `passwordHash`).
+import { publicUser } from '../utils/publicUser';
 
 const router = Router();
 const prisma = new PrismaClient();
-
-// Projection publique d'un utilisateur : SEULE forme qui sort de ce module, que
-// ce soit en réponse HTTP ou en événement socket. Ne jamais renvoyer l'objet
-// Prisma brut — il contient `passwordHash`, qui serait diffusé à tous les
-// clients connectés par emitEvent (io.emit = broadcast global).
-const publicUser = (u: any) => ({
-  id: u.id,
-  name: u.name,
-  loginId: u.loginId,
-  role: u.role,
-  avatarColor: u.avatarColor,
-  avatarUrl: u.avatarUrl
-});
 
 // Gestion des comptes = action sensible : mutations réservées Master/Administrator/Director
 // (Director = parité Administrator, décision du 8 juillet 2026).
@@ -36,7 +26,11 @@ router.get('/', authenticateToken, async (req, res) => {
 
 // POST create user
 router.post('/', authenticateToken, requireRole(ADMIN_ROLES), async (req, res) => {
-  const { name, loginId, password, role, avatarColor, avatarUrl } = req.body;
+  // ⚠️ Cette route DÉSTRUCTURE explicitement chaque champ : un nouveau champ doit
+  // être ajouté ici, dans le PUT, dans `updateData` ET dans `publicUser`. En oublier
+  // un fait disparaître la valeur en silence — c'est exactement le piège du
+  // `nissanShare` (correctif 24).
+  const { name, loginId, password, role, avatarColor, avatarUrl, birthdate } = req.body;
 
   // role est un String libre en base (plus d'enum) : validation explicite obligatoire.
   if (!isValidRole(role)) {
@@ -46,7 +40,7 @@ router.post('/', authenticateToken, requireRole(ADMIN_ROLES), async (req, res) =
   const passwordHash = await bcrypt.hash(password, 10);
   try {
     const user = await prisma.user.create({
-      data: { name, loginId, passwordHash, role, avatarColor, avatarUrl }
+      data: { name, loginId, passwordHash, role, avatarColor, avatarUrl, birthdate }
     });
     emitEvent('users:updated', publicUser(user));
     res.json(publicUser(user));
@@ -58,7 +52,7 @@ router.post('/', authenticateToken, requireRole(ADMIN_ROLES), async (req, res) =
 // PUT update user
 router.put('/:id', authenticateToken, requireRole(ADMIN_ROLES), async (req, res) => {
   const { id } = req.params;
-  const { name, loginId, password, role, avatarColor, avatarUrl } = req.body;
+  const { name, loginId, password, role, avatarColor, avatarUrl, birthdate } = req.body;
 
   // role optionnel en mise à jour, mais s'il est fourni il doit être valide.
   if (role !== undefined && !isValidRole(role)) {
@@ -67,6 +61,9 @@ router.put('/:id', authenticateToken, requireRole(ADMIN_ROLES), async (req, res)
 
   const updateData: any = { name, loginId, role, avatarColor };
   if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl; // null = suppression
+  // Même convention qu'avatarUrl : undefined = champ absent (non modifié) ;
+  // chaîne vide ou null = l'anniversaire est effacé.
+  if (birthdate !== undefined) updateData.birthdate = birthdate || null;
   if (password) {
     updateData.passwordHash = await bcrypt.hash(password, 10);
   }

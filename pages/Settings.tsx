@@ -13,6 +13,8 @@ import DatePicker from '../components/DatePicker';
 import InstallAppModal from '../components/InstallAppModal';
 import NotificationsToggle from '../components/NotificationsToggle';
 import { SITES } from '../constants';
+// `parseLocalDate` est exporté par DateRangePicker (et non par constants.ts).
+import { parseLocalDate } from '../components/DateRangePicker';
 
 // --- Types for react-easy-crop ---
 interface CropArea { x: number; y: number; width: number; height: number; }
@@ -246,10 +248,15 @@ const RoleBadge: React.FC<{ role: string }> = ({ role }) => {
 
 const USER_PREFS_KEY = (id: string) => `gearbox_user_prefs_${id}`;
 
-interface UserPrefs { city: string; birthdate: string; }
+// ⚠️ `birthdate` a QUITTÉ cette structure le 04/08/2026 : c'est désormais un champ du
+// modèle `User` côté serveur. Il était ici, en localStorage, ce qui le rendait
+// invisible de tous les autres postes — un anniversaire est une donnée d'équipe.
+// La ville reste locale à dessein : elle pilote la météo du poste de chacun
+// (lue par HelloMarketing), ce n'est pas une information partagée.
+interface UserPrefs { city: string; }
 const loadUserPrefs = (id: string): UserPrefs => {
-  try { return { city: '', birthdate: '', ...JSON.parse(localStorage.getItem(USER_PREFS_KEY(id)) || '{}') }; }
-  catch { return { city: '', birthdate: '' }; }
+  try { return { city: '', ...JSON.parse(localStorage.getItem(USER_PREFS_KEY(id)) || '{}') }; }
+  catch { return { city: '' }; }
 };
 const saveUserPrefs = (id: string, prefs: UserPrefs) =>
   localStorage.setItem(USER_PREFS_KEY(id), JSON.stringify(prefs));
@@ -274,7 +281,7 @@ const Settings: React.FC = () => {
   const [userMgmtError, setUserMgmtError] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
-  const [editPrefs, setEditPrefs] = useState<UserPrefs>({ city: '', birthdate: '' });
+  const [editPrefs, setEditPrefs] = useState<UserPrefs>({ city: '' });
   const [isAddingUser, setIsAddingUser] = useState(false);
   // Avatar modal for master managing other users
   const [avatarTargetUser, setAvatarTargetUser] = useState<User | null>(null);
@@ -289,7 +296,8 @@ const Settings: React.FC = () => {
     if (user) {
       const prefs = loadUserPrefs(user.id);
       setUserCity(prefs.city);
-      setUserBirthdate(prefs.birthdate);
+      // L'anniversaire vient désormais du serveur (champ du User), plus du localStorage.
+      setUserBirthdate(user.birthdate || '');
     }
     if (canManageUsers) loadAllUsers();
   }, [user]);
@@ -329,9 +337,10 @@ const Settings: React.FC = () => {
     }
 
     try {
-      const updatedUser: User = { ...user, name, password: newPassword || undefined };
+      // `birthdate` part au serveur avec le profil ; seule la ville reste locale.
+      const updatedUser: User = { ...user, name, birthdate: userBirthdate, password: newPassword || undefined };
       await updateProfile(updatedUser); // PUT /api/auth/me
-      saveUserPrefs(user.id, { city: userCity, birthdate: userBirthdate });
+      saveUserPrefs(user.id, { city: userCity });
       setProfileMsg({ type: 'success', text: 'Profil mis à jour avec succès.' });
       setOldPassword(''); setNewPassword(''); setConfirmPassword('');
     } catch {
@@ -346,7 +355,7 @@ const Settings: React.FC = () => {
     setIsAddingUser(false);
   };
 
-  const cancelEdit = () => { setEditingUserId(null); setEditForm({}); setEditPrefs({ city: '', birthdate: '' }); setIsAddingUser(false); };
+  const cancelEdit = () => { setEditingUserId(null); setEditForm({}); setEditPrefs({ city: '' }); setIsAddingUser(false); };
 
   const saveUser = async () => {
     if (!editForm.name || !editForm.loginId || !editForm.role) return;
@@ -360,7 +369,9 @@ const Settings: React.FC = () => {
           loginId: editForm.loginId,
           password: editForm.password || 'admin',
           role: editForm.role as UserRole,
-          avatarColor: '#' + Math.floor(Math.random() * 16777215).toString(16)
+          avatarColor: '#' + Math.floor(Math.random() * 16777215).toString(16),
+          // L'anniversaire part au serveur avec le compte ; seule la ville reste locale.
+          birthdate: editForm.birthdate || undefined
         });
         saveUserPrefs(created.id, editPrefs);
         if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a créé l'utilisateur", entity: 'user', entityName: created.name, timestamp: new Date().toISOString() });
@@ -601,7 +612,7 @@ const Settings: React.FC = () => {
                       />
                     </td>
                     <td className="p-4">
-                      <DatePicker value={editPrefs.birthdate} onChange={v => setEditPrefs({ ...editPrefs, birthdate: v })} size="sm" />
+                      <DatePicker value={editForm.birthdate || ''} onChange={v => setEditForm({ ...editForm, birthdate: v })} size="sm" />
                     </td>
                     <td className="p-4">
                       <input className={tableInputCls} placeholder="Mot de passe" value={editForm.password || ''} onChange={e => setEditForm({ ...editForm, password: e.target.value })} />
@@ -655,7 +666,7 @@ const Settings: React.FC = () => {
                           />
                         </td>
                         <td className="p-4">
-                          <DatePicker value={editPrefs.birthdate} onChange={v => setEditPrefs({ ...editPrefs, birthdate: v })} size="sm" />
+                          <DatePicker value={editForm.birthdate || ''} onChange={v => setEditForm({ ...editForm, birthdate: v })} size="sm" />
                         </td>
                         <td className="p-4">
                           <input className={editInputCls} placeholder="Laisser vide si inchangé" value={editForm.password || ''} onChange={e => setEditForm({ ...editForm, password: e.target.value })} />
@@ -694,8 +705,13 @@ const Settings: React.FC = () => {
                           : <span className="text-slate-300 dark:text-slate-700">—</span>}
                       </td>
                       <td className="p-4 text-xs text-slate-500 dark:text-slate-400">
-                        {allUserPrefs[u.id]?.birthdate
-                          ? <span className="flex items-center gap-1"><Cake size={10} className="text-pink-400" />{new Date(allUserPrefs[u.id].birthdate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+                        {/* Vient du serveur : la colonne montrait auparavant le
+                            localStorage du poste, donc uniquement ce qui y avait été
+                            saisi. `parseLocalDate` et non `new Date` — sur une chaîne
+                            'YYYY-MM-DD', `new Date` parse en UTC et peut afficher la
+                            veille selon le fuseau. */}
+                        {u.birthdate
+                          ? <span className="flex items-center gap-1"><Cake size={10} className="text-pink-400" />{parseLocalDate(u.birthdate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
                           : <span className="text-slate-300 dark:text-slate-700">—</span>}
                       </td>
                       <td className="p-4 text-slate-400 dark:text-slate-600 font-sans text-xs">••••••</td>

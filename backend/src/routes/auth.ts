@@ -3,6 +3,8 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET as SECRET } from '../auth/secret';
+import { publicUser } from '../utils/publicUser';
+import { emitEvent, notifyUserChanged } from '../realtime';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -23,7 +25,7 @@ router.post('/login', async (req, res) => {
   }
 
   const token = jwt.sign({ id: user.id, role: user.role }, SECRET, { expiresIn: '24h' });
-  res.json({ token, user: { id: user.id, name: user.name, role: user.role, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl } });
+  res.json({ token, user: publicUser(user) });
 });
 
 // ⚠️ RÈGLE À NE PAS ENFREINDRE ICI : jamais d'accès base dans un rappel passé à
@@ -56,7 +58,7 @@ router.get('/me', async (req, res) => {
 
   const user = await prisma.user.findUnique({ where: { id: decoded.id } });
   if (!user) return res.sendStatus(404);
-  res.json({ id: user.id, name: user.name, role: user.role, avatarColor: user.avatarColor, avatarUrl: user.avatarUrl });
+  res.json(publicUser(user));
 });
 
 router.put('/me', async (req, res) => {
@@ -67,11 +69,13 @@ router.put('/me', async (req, res) => {
   const decoded = decodeToken(req);
   if (!decoded) return res.sendStatus(403);
 
-  const { name, password, avatarColor, avatarUrl } = req.body;
+  const { name, password, avatarColor, avatarUrl, birthdate } = req.body;
 
   // avatarUrl : undefined = champ absent (non modifié) ; null = suppression de la photo.
   const updateData: any = { name, avatarColor };
   if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
+  // Même convention : undefined = non modifié ; vide = anniversaire effacé.
+  if (birthdate !== undefined) updateData.birthdate = birthdate || null;
   if (password) {
     updateData.passwordHash = await bcrypt.hash(password, 10);
   }
@@ -81,7 +85,15 @@ router.put('/me', async (req, res) => {
     data: updateData
   });
 
-  res.json({ id: updatedUser.id, name: updatedUser.name, role: updatedUser.role, avatarColor: updatedUser.avatarColor, avatarUrl: updatedUser.avatarUrl });
+  // ⚠️ Cette route n'émettait RIEN et n'appelait pas notifyUserChanged, alors que
+  // routes/users.ts fait les deux. Conséquence : modifier son propre profil (nom,
+  // avatar, et maintenant anniversaire) ne rafraîchissait ni les autres clients ni
+  // le cache de présence — il fallait un F5. Manque préexistant, corrigé ici parce
+  // que le bloc « Anniversaires » de Hello Marketing en dépend directement.
+  emitEvent('users:updated', publicUser(updatedUser));
+  notifyUserChanged(decoded.id);
+
+  res.json(publicUser(updatedUser));
 });
 
 export default router;
