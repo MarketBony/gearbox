@@ -10,9 +10,10 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 26** (page blanche de
-  l'écran de connexion + fuite du glitch, 4 août) — `web` **seul**. Le correctif 25
-  (KPI de rythme de consommation) est déployé aussi, `web` seul également. Le
+- master = prod, synchronisés. Dernier lot déployé : **correctif 27** (anniversaires en
+  base + choix de l'année dans les calendriers, 4 août) — `api` **et** `web`, le schéma
+  Prisma ayant bougé. Les correctifs 25 (KPI de rythme) et 26 (page blanche du login)
+  sont déployés aussi, `web` seul avait suffi pour chacun. Le
   correctif 24 (curseurs `alpineShare` / `nissanShare`) a lui nécessité `api` **et**
   `web`, le schéma Prisma ayant bougé. Le correctif 23 (routage Alpine/Nissan) est
   déployé aussi, `web` seul avait suffi. Le SHA exact se lit
@@ -758,6 +759,75 @@
       qui est fermée, pas un déclencheur confirmé. Si l'écran blanc réapparaît, la
       cause est ailleurs — la console portera alors
       `[Login] animation de fond interrompue`, ce qui tranchera tout de suite.
+
+27. **Anniversaires visibles de tous, et choix de l'année dans tous les calendriers**
+    (`feat/anniversaires-partages` + `feat/datepicker-annee`, 4 août). Deux patchs
+    indépendants demandés ensemble par Théo, un seul déploiement. **`api` et `web`**
+    reconstruits, le schéma Prisma ayant bougé.
+
+    **Patch 1 — l'anniversaire n'avait jamais quitté le navigateur.** Ce n'était pas
+    un bug d'affichage : `Settings.tsx` écrivait la date dans `localStorage`
+    (`gearbox_user_prefs_<id>`) et `BirthdaysSection` bouclait sur les utilisateurs de
+    l'API en relisant ce **même `localStorage`** pour chacun. Un poste ne connaissait
+    donc que les anniversaires saisis **sur lui** — d'où « personne ne voit les
+    anniversaires des autres ». La colonne « Anniversaire » de la Gestion des
+    Utilisateurs avait le même défaut.
+    - Migration `20260804152533_add_user_birthdate` : `birthdate String?` sur `User`.
+      **`String` et non `DateTime`** — une date de naissance n'a ni heure ni fuseau, et
+      un `DateTime` rouvrirait la classe de bug J+1. Détail dans `ETAT-BACKEND.md`.
+    - Décision de Théo parmi trois options : **date complète, âge visible de tous**.
+      C'est ce que le code visait déjà (`{age} ans` était affiché), ça ne fonctionnait
+      simplement jamais.
+    - **La ville reste en `localStorage`**, à dessein : elle pilote la météo du poste
+      de chacun, ce n'est pas une donnée d'équipe. ⚠️ `ETAT-BACKEND.md` classait les
+      deux ensemble dans les « résidus assumés » — corrigé, c'était une erreur de
+      classement pour l'anniversaire.
+    - ⚠️ Quatre points de passage dans `routes/users.ts` (déstructuration explicite) :
+      le piège du `nissanShare`. `publicUser` extrait vers `utils/publicUser.ts` pour
+      être partagé avec `auth.ts` — l'invariant « jamais l'objet Prisma brut, il porte
+      `passwordHash` » reste entier, vérifié.
+    - **Manque préexistant corrigé** : `PUT /me` n'émettait aucun événement et
+      n'appelait pas `notifyUserChanged`. Modifier son propre profil ne rafraîchissait
+      ni les autres clients ni le cache de présence.
+    - Vérifié : les 12 comptes à `null` après migration, aucune autre colonne touchée ;
+      écriture relue depuis `/me` **et** `/api/users` ; chaîne vide = effacement ;
+      champ absent = valeur préservée ; chemin admin sans toucher rôle/loginId/nom ;
+      **temps réel prouvé à deux onglets** (« 29 ans / dans 224 j » → « 28 ans /
+      Auj. ! » sans rechargement) ; cas du jour, 29 février, date effacée ;
+      non-régression météo, musique et flux. **Base rendue à son état initial.**
+    - ℹ️ **Aucune reprise des valeurs existantes**, volontairement : elles vivaient
+      dans le `localStorage` du poste de saisie et sont invisibles du serveur ; un
+      script de reprise côté client serait non idempotent (le défaut de
+      `migrateEquipmentIfNeeded`). Vérifié : aucune préférence locale n'existait sur le
+      navigateur inspecté. À ressaisir à la main, ce qui coûte désormais 4 clics.
+
+    **Patch 2 — impossible de choisir l'année dans un calendrier.**
+    `components/DatePicker.tsx` n'offrait que deux flèches ±1 mois : atteindre une date
+    de naissance demandait **336 clics** pour 2026 → 1998.
+    - **Un seul fichier corrige les 28 champs de date des 9 écrans** : cette
+      navigation n'existait qu'ici, `DateRangePicker` délègue à ce composant et aucun
+      autre ne porte de `addMonths`/`viewMonth`.
+    - Trois modes (jours / mois / années), l'en-tête devenant un bouton marqué d'un
+      chevron. **24 années par page en 4 × 6, pages fixes alignées sur des multiples
+      de 24** : ce nombre est calculé, pas esthétique — la page contenant l'année
+      courante (2016-2039) est **voisine** de celle des années de naissance courantes
+      (1992-2015), donc une seule flèche suffit. Pagination plutôt que liste bornée :
+      pas de « à partir de 1930 » à maintenir.
+    - **Mesuré : mars 1998 en 4 clics** (en-tête, flèche, année, mois) au lieu de 336.
+    - `minDate` respecté aux **trois** niveaux, sinon on offrirait un chemin vers une
+      date interdite : une année est désactivée si son 31 décembre est trop tôt, un
+      mois si son **dernier** jour l'est. Vérifié sur Export — borne au 01/01/2026 :
+      années 2016-2025 désactivées, page 1992-2015 entièrement désactivée ; borne au
+      15/06/2026 : janvier à mai désactivés.
+      ℹ️ `minDate` n'est utilisé que dans `Export.tsx` et `Projects.tsx`, **pas** dans
+      Matériel.
+    - Cellules mois/années à **44 px sous `md`**, 36 px au-delà (règle du correctif
+      21). Retour automatique en mode « jours » à l'ouverture. Les 9 raccourcis de
+      période rendent des bornes inchangées. Vérifié en clair **et** en sombre, aucune
+      teinte hors charte, panneau dans l'écran à 375 px.
+    - ℹ️ Limite connue laissée en place : les cellules **jour** restent à 36 px sur
+      mobile, sous le seuil des 44 px. Défaut préexistant, non touché pour ne pas
+      modifier la grille existante.
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - ~~⚠️ Corriger le KPI « Rythme de consommation »~~ — **fait le 04/08** (correctif 25).

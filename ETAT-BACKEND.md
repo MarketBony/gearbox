@@ -51,8 +51,46 @@ Côté routes, deux comportements distincts à connaître :
 
 Le frontend utilise la couche unique `services/dataService.ts` (`apiFetch` + JWT). Résidus
 `localStorage` **assumés et hors périmètre** (pas des données serveur) : overlay client-only chat
-(épingle / renommage / membres de groupe), avatars de groupe du chat, prefs UI (ville/anniversaire),
-et fallback des anciennes photos de profil base64 (avant bascule uploads).
+(épingle / renommage / membres de groupe), avatars de groupe du chat, **ville de l'utilisateur**
+(elle pilote la météo de son propre poste dans Hello Marketing), et fallback des anciennes photos
+de profil base64 (avant bascule uploads).
+
+⚠️ **Cette liste mentionnait l'anniversaire jusqu'au 04/08/2026 — c'était une erreur de
+classement, pas un choix.** Un anniversaire est par nature une donnée d'équipe : le laisser en
+`localStorage` faisait que personne ne voyait celui des autres. Il est passé en base, voir la
+section dédiée ci-dessous. La ville, elle, reste bien locale.
+
+### Date de naissance — `User.birthdate` (04/08/2026)
+
+Migration `20260804152533_add_user_birthdate` : `birthdate String?` sur `model User`.
+Une seule colonne nullable, purement additive — aucune donnée touchée. SQL relu en
+`--create-only` avant `migrate deploy` (ne jamais lancer `migrate dev` sur la base de
+prod).
+
+**`String` et non `DateTime`, volontairement** : une date de naissance n'a ni heure ni
+fuseau. En `DateTime` on rouvrirait la classe de bug J+1 que le projet combat déjà
+avec `parseLocalDate`. Au format `'YYYY-MM-DD'` la valeur traverse l'API sans
+normalisation — c'est pourquoi `dataService.getUsers` (simple passe-plat) n'a rien eu
+à changer.
+
+**Pourquoi ce changement** : la valeur vivait dans le `localStorage` du poste. Or
+`BirthdaysSection` (Hello Marketing) bouclait sur les utilisateurs de l'API en
+relisant ce `localStorage` pour chacun — un poste ne connaissait donc que les
+anniversaires saisis **sur lui**. Même défaut sur la colonne « Anniversaire » de la
+Gestion des Utilisateurs.
+
+⚠️ **`routes/users.ts` déstructure explicitement chaque champ** : `birthdate` a dû
+être ajouté à **quatre** endroits — `publicUser`, le body du POST, le body du PUT et
+`updateData`. En oublier un fait disparaître la valeur en silence : c'est exactement
+le piège rencontré avec `nissanShare`. Convention retenue, identique à `avatarUrl` :
+`undefined` = champ absent (non modifié), chaîne vide ou `null` = effacement.
+
+**`publicUser` vit désormais dans `src/utils/publicUser.ts`** et est partagé par
+`routes/users.ts` et `routes/auth.ts` (login, `GET /me`, `PUT /me`). L'invariant est
+inchangé et doit le rester : **ne jamais renvoyer ni émettre l'objet Prisma brut**, il
+contient `passwordHash`. Un seul helper plutôt que deux projections à garder
+synchronisées. Effet de bord assumé : `GET /me` renvoie maintenant aussi `loginId`, la
+donnée de l'utilisateur lui-même, déjà présente dans `/api/users`.
 
 ## 🔒 Disponibilité du matériel — anti sur-réservation (30/07/2026)
 
@@ -203,6 +241,15 @@ client envoie son `socket.id` dans l'en-tête `x-socket-id` ; `withEmitterContex
 (monté avant les routes dans `index.ts`) le mémorise pour la durée de la requête via
 `AsyncLocalStorage` ; `emitEvent` diffuse alors en `io.except(socketId)`. Les ~35
 sites d'appel sont inchangés et aucune route n'a besoin de connaître le socket.
+
+✅ **`PUT /me` émet enfin, lui aussi** (depuis le 04/08/2026). Cette route ne
+diffusait **aucun** événement et n'appelait pas `notifyUserChanged`, alors que
+`routes/users.ts` faisait les deux : modifier **son propre** profil (nom, avatar, et
+désormais anniversaire) ne rafraîchissait donc ni les autres clients ni le cache de
+présence — il fallait un F5. Manque préexistant, corrigé parce que le bloc
+« Anniversaires » de Hello Marketing en dépend directement. Vérifié à deux onglets :
+l'onglet spectateur est passé de « 29 ans / dans 224 j » à « 28 ans / Auj. ! » **sans
+rechargement**.
 
 Pourquoi : sans exclusion, l'auteur refetchait sa propre écriture 300 ms plus tard
 (`services/realtime.ts`) et écrasait son état local — une puce de marque cliquée dans
