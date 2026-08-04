@@ -27,6 +27,28 @@ Migrations Prisma appliquées sur Supabase : `20260706160559_init` + `2026070811
 10. **Notifications push** — `/api/push` (clé publique VAPID + abonnements) et
     `PushSubscription`. Voir la section dédiée.
 
+### Curseurs de répartition marque / RDM — `alpineShare` et `nissanShare` (04/08/2026)
+
+Migration `20260804110458_add_nissan_share` : `nissanShare Float?` ajouté sur
+`Project` **et** `FixedExpense`, à côté d'`alpineShare` qui existait déjà. Deux
+colonnes nullables, purement additives — aucune donnée touchée, `migrate deploy`
+après relecture du SQL généré en `--create-only` (ne pas lancer `migrate dev` sur
+la base de prod).
+
+Sémantique : **`null` = 100 % sur la marque**, pas 50/50. C'est ce qui permet
+d'activer la fonction sans déplacer un euro des données existantes. Tout le calcul
+vit côté frontend dans `splitShareToBuckets` (`constants.ts`) ; le backend ne fait
+que stocker et valider.
+
+Côté routes, deux comportements distincts à connaître :
+- `projects.ts` fait `const { tasks, ...projectData } = req.body` puis passe le
+  reste à Prisma → **un nouveau champ transite sans modification de code**, mais
+  n'est pas validé non plus.
+- `fixedExpenses.ts` **déstructure explicitement** chaque champ → il a fallu
+  ajouter `nissanShare` en **trois** endroits : `optionalFieldsError` (validation
+  `isFiniteNumber`), le `create` et le `update`. Oublier l'un des trois fait
+  disparaître la valeur silencieusement.
+
 Le frontend utilise la couche unique `services/dataService.ts` (`apiFetch` + JWT). Résidus
 `localStorage` **assumés et hors périmètre** (pas des données serveur) : overlay client-only chat
 (épingle / renommage / membres de groupe), avatars de groupe du chat, prefs UI (ville/anniversaire),

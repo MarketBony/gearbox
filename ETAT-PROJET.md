@@ -604,6 +604,45 @@
       Gearbox** (20 projets ont un `budgetActual` différent du `budgetPlanned`, des
       libellés nettoyés) — et le Dashboard affiche `budgetActual`. Leçon : quand un
       total bouge, vérifier d'abord si la donnée a bougé.
+24. **Curseurs de répartition marque / compte RDM : `nissanShare` créé,
+    `alpineShare` enfin branché** (`feat/part-nissan`, 4 août). Demande de Théo
+    après explication d'`alpineShare` : « il faudrait la même chose pour Nissan ».
+    - **Le point important : `alpineShare` était un champ MORT.** Il existait en
+      base, s'affichait dans les deux formulaires, se sauvegardait… et **aucune
+      agrégation ne le lisait**. La valeur saisie ne changeait rien. Ajouter un
+      `nissanShare` sans brancher le calcul aurait donc fabriqué un **second
+      curseur mort** — les deux ont été activés dans le même lot.
+    - **Migration** `20260804110458_add_nissan_share` : `nissanShare Float?` sur
+      `Project` et `FixedExpense`. Deux colonnes nullables, purement additives,
+      appliquée via `migrate deploy` (SQL relu d'abord avec `--create-only` :
+      `migrate dev` sur la base de PROD n'est pas une bonne idée).
+    - **`routeShareToBucket` remplacée par `splitShareToBuckets`**, qui rend une
+      **liste de destinations pondérées** au lieu d'une seule. Les ratios somment
+      toujours à 1 : **la conservation des montants est garantie par construction**,
+      plus par la vigilance de l'appelant. Remplacée et non doublée — deux
+      fonctions de routage, c'est exactement la duplication qui a causé les
+      quatre bugs du correctif 23.
+    - **Règle « curseur vide = tout sur la marque »** (décision de Théo, parmi
+      trois options proposées). Conséquence voulue : activer la fonction **ne
+      déplace aucun euro** tant que personne ne renseigne un curseur. Vérifié :
+      les 835 lignes en base (97 projets, 738 dépenses) ont **toutes** les deux
+      champs à `null`.
+    - **Le curseur n'est lu que si une marque RDM est présente** — même condition
+      que son affichage. Une valeur restée en base après le retrait du tag Renault
+      ne peut donc pas scinder en douce un projet Alpine pur.
+    - **Défaut d'affichage corrigé : 100 et non 50.** Les deux formulaires
+      affichaient `?? 50` alors que le calcul impute 100 % à la marque quand le
+      champ est vide — l'interface annonçait une répartition qui n'avait pas lieu.
+    - **Garde-fou `Number.isFinite`** : une part `NaN`/`Infinity` se propageait
+      dans tous les totaux, qui auraient affiché « NaN € ». Trouvé parce que le
+      test de conservation le laissait passer (`Math.abs(NaN - 1) > 1e-12` vaut
+      `false`) ; l'assertion a été corrigée en même temps que le code.
+    - Vérifié : **1 344/1 344 cas** identiques à l'ancien routage quand les parts
+      sont vides (tous les sites × 14 combinaisons de marques × 4 valeurs de
+      `brand` legacy), conservation OK sur tous les cas, et sur les données réelles
+      MARQUE = Alpine → 120 295 € / 120 000 €, MARQUE = Nissan → 120 949 € /
+      60 600 €, total sans filtre inchangé. `tsc` backend 0, racine 12
+      préexistantes (jeu identique au baseline).
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - **⚠️ Corriger le KPI « Rythme de consommation »** (Dashboard). Il compare le

@@ -127,31 +127,82 @@ export const resolveBudgetLine = (
 };
 
 /**
- * Où imputer UNE PART de dépense (un site de la ventilation), selon les marques
- * de l'élément.
- *
- * ⚠️ Retourne TOUJOURS une destination — jamais `null`. C'est le correctif du
- * défaut qui faisait disparaître 2 870 € : l'ancien code abandonnait la part par
- * un `return` silencieux dès qu'un élément tagué Alpine portait une part sur un
- * site non-Alpine. Une part non éligible reste désormais sur son site.
- *
- * Règle retenue avec Théo : on route les parts ÉLIGIBLES, on garde le reste sur
- * les sites. Un projet Nissan + Renault verse donc sa part Clermont au bucket
- * Nissan et laisse sa part Vichy sur Vichy.
+ * Les trois marques qui partagent un seul compte d'exploitation (règle métier :
+ * aucune distinction budgétaire entre elles).
  */
-export const routeShareToBucket = (
+export const RDM_BRANDS: BrandType[] = ['Renault', 'Dacia', 'Mobilize'];
+
+/** L'élément mélange-t-il une marque à budget propre et le compte RDM ? */
+const hasRDM = (brands: string[]): boolean =>
+  brands.some(b => (RDM_BRANDS as string[]).includes(b));
+
+const clampPct = (v: number): number => Math.min(100, Math.max(0, v));
+
+/**
+ * Où imputer UNE PART de dépense (un site de la ventilation), selon les marques
+ * de l'élément — et, pour les éléments mixtes, selon le curseur de répartition.
+ *
+ * Retourne une LISTE de destinations pondérées dont les ratios somment
+ * TOUJOURS à 1. La conservation des montants est donc garantie par
+ * construction, et non par la vigilance de l'appelant.
+ *
+ * ⚠️ Retourne toujours au moins une destination — jamais une liste vide. C'est
+ * le correctif du défaut qui faisait disparaître 2 870 € : l'ancien code
+ * abandonnait la part par un `return` silencieux dès qu'un élément tagué Alpine
+ * portait une part sur un site non-Alpine. Une part non éligible reste
+ * désormais sur son site.
+ *
+ * Deux règles, arrêtées avec Théo :
+ *
+ * 1. **Parts éligibles routées, reste sur les sites.** Un projet Nissan +
+ *    Renault verse sa part Clermont au bucket Nissan et laisse sa part Vichy
+ *    sur Vichy (Vichy n'est pas un site Nissan).
+ * 2. **Curseur vide = tout sur la marque.** Sur un élément mixte
+ *    (Alpine ou Nissan + RDM), `alpineShare` / `nissanShare` scinde la part
+ *    entre le bucket marque et le site. Non renseigné, on garde le
+ *    comportement historique : 100 % vers la marque. Activer les curseurs ne
+ *    déplace donc aucun euro tant que personne ne les renseigne.
+ *
+ * Le curseur n'est lu que si une marque RDM est présente — même condition que
+ * son affichage dans les formulaires. Une valeur restée en base après le
+ * retrait du tag Renault ne peut ainsi pas scinder en douce un projet
+ * Alpine pur.
+ *
+ * Alpine est évaluée avant Nissan : sur l'improbable Alpine + Nissan + Renault,
+ * Alpine gagne et `nissanShare` est ignoré.
+ */
+export const splitShareToBuckets = (
   site: string,
   brands?: string[] | null,
-  legacyBrand?: string | null
-): string => {
+  legacyBrand?: string | null,
+  shares?: { alpineShare?: number | null; nissanShare?: number | null }
+): Array<{ site: string; ratio: number }> => {
   const all = [...(brands || []), ...(legacyBrand ? [legacyBrand] : [])];
   const cible = resolveSiteAlias(site);
 
-  // Alpine d'abord : la marque la plus spécifique gagne (une part ne peut aller
-  // que dans un seul bucket).
-  if (all.includes('Alpine') && ALPINE_BUCKETS[cible]) return ALPINE_BUCKETS[cible];
-  if (all.includes('Nissan') && (NISSAN_SITES as string[]).includes(cible)) return NISSAN_BUCKET;
-  return cible;
+  const split = (bucket: string, pct: number | null | undefined) => {
+    // Curseur vide (ou élément non mixte) : tout sur la marque, comme avant.
+    // `Number.isFinite` couvre aussi NaN et ±Infinity : une valeur non finie
+    // se propagerait sinon dans tous les totaux, qui afficheraient « NaN € ».
+    if (pct === undefined || pct === null || !Number.isFinite(pct) || !hasRDM(all)) {
+      return [{ site: bucket, ratio: 1 }];
+    }
+    const r = clampPct(pct) / 100;
+    if (r >= 1) return [{ site: bucket, ratio: 1 }];
+    if (r <= 0) return [{ site: cible, ratio: 1 }];
+    return [
+      { site: bucket, ratio: r },
+      { site: cible, ratio: 1 - r },
+    ];
+  };
+
+  if (all.includes('Alpine') && ALPINE_BUCKETS[cible]) {
+    return split(ALPINE_BUCKETS[cible], shares?.alpineShare);
+  }
+  if (all.includes('Nissan') && (NISSAN_SITES as string[]).includes(cible)) {
+    return split(NISSAN_BUCKET, shares?.nissanShare);
+  }
+  return [{ site: cible, ratio: 1 }];
 };
 
 export const BRAND_COLORS: Record<BrandType, string> = {

@@ -123,12 +123,30 @@ que de supposer que ça va passer.
     enveloppe globale**, jamais ventilée par site. Elle n'entre dans un périmètre
     que si `Nissan` y est **explicitement** sélectionné : la rattacher à chacun de
     ses sites éligibles la compterait autant de fois.
+- **Éléments mixtes : les curseurs `alpineShare` / `nissanShare`.** Un projet ou
+  une dépense taggué Alpine (ou Nissan) **et** une marque RDM porte un curseur de
+  répartition, en pourcentage, entre l'enveloppe de la marque et le compte RDM.
+  Trois règles :
+  1. **Curseur vide = 100 % sur la marque**, jamais 50/50. C'est le comportement
+     historique, et c'est ce qui a permis d'activer la fonction sans déplacer un
+     euro. Les formulaires doivent donc afficher **100** par défaut — afficher 50
+     laissait croire à une répartition qui n'avait pas lieu.
+  2. **Le curseur n'est lu que si une marque RDM est présente**, même condition que
+     son affichage. Sinon une valeur restée en base après le retrait du tag Renault
+     scinderait en douce un élément Alpine pur.
+  3. **Alpine passe avant Nissan** sur l'improbable Alpine + Nissan + RDM : Alpine
+     gagne, `nissanShare` est ignoré. Une part ne va jamais dans deux buckets marque.
 - ⚠️ **Tout routage budgétaire passe par `constants.ts`** — `resolveBudgetLine()`,
-  `routeShareToBucket()`, `resolveSiteAlias()`. Ne jamais réimplémenter cette
+  `splitShareToBuckets()`, `resolveSiteAlias()`. Ne jamais réimplémenter cette
   logique dans un écran : c'est exactement ce qui a fait diverger Budget et
   Dashboard **quatre fois** (ventilation des dépenses, des projets, exclusion des
-  brouillons, routage Alpine/Nissan). `routeShareToBucket` ne rend jamais `null` :
-  une part non éligible reste sur son site au lieu de disparaître.
+  brouillons, routage Alpine/Nissan). Et ne jamais en ajouter une **seconde** à
+  côté : `splitShareToBuckets` a REMPLACÉ `routeShareToBucket`, elle ne s'est pas
+  posée en plus. Deux propriétés à préserver si tu y touches :
+  - elle rend **toujours au moins une destination** — une part non éligible reste
+    sur son site au lieu de disparaître (c'est ce qui récupère les 2 870 € perdus) ;
+  - **les ratios somment toujours à 1**, donc la conservation des montants est
+    garantie par construction et non par la vigilance de l'appelant.
 - **Holding = un TAG MARQUE** (`BrandType`), anciennement nommé `Groupe`, renommé
   le 30 juillet 2026. Deux règles indissociables :
   1. **Tag exclusif** : quand Holding est posé, aucune autre marque ne peut

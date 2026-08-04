@@ -308,7 +308,7 @@ class DataService {
   // répartition %/€, les marques et PRO+. Ne pas recréer de second chemin ici.
 
   // --- Fixed Expenses (BRANCHÉES BACKEND — étape 7.2) ---
-  // CRUD unitaire ; isAnnual/alpineShare/budgetDistribution transitent BRUTS
+  // CRUD unitaire ; isAnnual/alpineShare/nissanShare/budgetDistribution BRUTS
   // (tout calcul — fractionnement /12, routage Alpine/Nissan — reste dans Budget.tsx).
   async getFixedExpenses(): Promise<FixedExpense[]> {
     let expenses = await apiFetch<any[]>('/fixed-expenses');

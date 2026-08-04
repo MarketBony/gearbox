@@ -59,7 +59,8 @@ model Project {
   description        String
   progress           Float
   assignedUsers      String[] @default([])
-  alpineShare        Float? // % Alpine vs RDM (0-100), défaut 50 côté UI
+  alpineShare        Float? // % Alpine vs RDM (0-100) — null = 100 % Alpine
+  nissanShare        Float? // % Nissan vs RDM (0-100) — null = 100 % Nissan
   proPlus            Boolean  @default(false)
   tasks              Task[]
   createdAt          DateTime @default(now())
@@ -182,7 +183,8 @@ model FixedExpense {
   amount             Float
   brand              String? // legacy — premier élément de brands
   brands             String[] @default([])
-  alpineShare        Float? // % Alpine vs RDM (0-100)
+  alpineShare        Float? // % Alpine vs RDM (0-100) — null = 100 % Alpine
+  nissanShare        Float? // % Nissan vs RDM (0-100) — null = 100 % Nissan
   proPlus            Boolean  @default(false)
   isAnnual           Boolean  @default(false) // fractionnée /12 à l'agrégation Budget (jamais dupliquée)
   createdAt          DateTime @default(now())

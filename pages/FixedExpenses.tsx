@@ -4,7 +4,7 @@ import { FixedExpense, ServiceType, Site, PlaqueName, BrandType, ActivityLog } f
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
-import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, HOLDING_BRAND } from '../constants';
+import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, HOLDING_BRAND, RDM_BRANDS } from '../constants';
 import { Plus, Trash2, Edit2, Save, X, Search, Filter, Euro, Calendar, MapPin, MessageSquare, Briefcase, ArrowUp, ArrowDown, ChevronDown, Check, PieChart } from 'lucide-react';
 import Select from '../components/Select';
 import DatePicker from '../components/DatePicker';
@@ -71,7 +71,7 @@ const FixedExpenses: React.FC = () => {
         const expenseData = { ...currentExpense, brands: saveBrands, brand: saveBrands[0] };
 
         // CRUD unitaire vers l'API (étape 7.2) — l'id d'une création vient du
-        // backend. isAnnual/alpineShare/budgetDistribution transitent tels quels.
+        // backend. isAnnual/alpineShare/nissanShare/budgetDistribution tels quels.
         try {
             if (isEditing && currentExpense.id) {
                 const saved = await db.updateFixedExpense(expenseData as FixedExpense);
@@ -696,30 +696,41 @@ const FixedExpenses: React.FC = () => {
                                     );
                                 })()}
 
-                                {/* ALPINE SHARE — visible si marques mixtes Alpine + RDM */}
+                                {/* RÉPARTITION MARQUE / COMPTE RDM — visible seulement sur une
+                                    dépense mixte (Alpine ou Nissan + Renault/Dacia/Mobilize).
+                                    Même condition que `splitShareToBuckets` dans constants.ts.
+
+                                    Défaut 100 et non 50 : non renseigné, le calcul impute TOUT
+                                    à la marque. */}
                                 {(() => {
                                     const expBrands = currentExpense.brands || [];
-                                    const hasAlpine = expBrands.includes('Alpine');
-                                    const hasRDM = expBrands.some(b => ['Renault', 'Dacia', 'Mobilize'].includes(b));
-                                    if (!hasAlpine || !hasRDM) return null;
-                                    const share = currentExpense.alpineShare ?? 50;
-                                    return (
-                                        <div className="space-y-1 pt-3 border-t border-bony-border animate-in fade-in">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Part Alpine (%)</label>
+                                    const hasRDM = expBrands.some(b => (RDM_BRANDS as string[]).includes(b));
+                                    if (!hasRDM) return null;
+                                    const curseurs = ([
+                                        { marque: 'Alpine', champ: 'alpineShare' as const, accent: 'accent-[#0055a4]' },
+                                        { marque: 'Nissan', champ: 'nissanShare' as const, accent: 'accent-[#c3002f]' },
+                                    ]).filter(c => expBrands.includes(c.marque as any));
+                                    if (curseurs.length === 0) return null;
+                                    return curseurs.map(({ marque, champ, accent }) => {
+                                        const share = currentExpense[champ] ?? 100;
+                                        return (
+                                        <div key={champ} className="space-y-1 pt-3 border-t border-bony-border animate-in fade-in">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Part {marque} (%)</label>
                                             <div className="flex items-center gap-3">
                                                 <input
                                                     type="range"
                                                     min="0"
                                                     max="100"
                                                     value={share}
-                                                    onChange={(e) => setCurrentExpense({...currentExpense, alpineShare: Number(e.target.value)})}
-                                                    className="flex-1 accent-[#0055a4]"
+                                                    onChange={(e) => setCurrentExpense({...currentExpense, [champ]: Number(e.target.value)})}
+                                                    className={`flex-1 ${accent}`}
                                                 />
                                                 <span className="text-sm font-bold text-bony-text w-10 text-right">{share}%</span>
                                             </div>
-                                            <p className="text-[10px] text-slate-400">{share}% → Alpine · {100 - share}% → compte RDM</p>
+                                            <p className="text-[10px] text-slate-400">{share}% → {marque} · {100 - share}% → compte RDM</p>
                                         </div>
-                                    );
+                                        );
+                                    });
                                 })()}
 
                                 {/* BUDGET ALLOCATION SECTION */}

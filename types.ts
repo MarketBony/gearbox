@@ -79,7 +79,11 @@ export interface Project {
   tasks: Task[];
   assignedUsers?: string[];
   proPlus?: boolean; // PRO+ (B2B) — optionnel, absent/false = non-PRO+ (fallback)
-  alpineShare?: number; // % Alpine vs RDM (0-100) pour projets mixtes Alpine + Renault/Dacia/Mobilize — défaut 50 côté UI
+  // Curseurs de répartition pour les projets mixtes (marque à budget propre +
+  // Renault/Dacia/Mobilize). Non renseigné = 100 % vers la marque, cf.
+  // `splitShareToBuckets` dans constants.ts.
+  alpineShare?: number; // % Alpine vs RDM (0-100)
+  nissanShare?: number; // % Nissan vs RDM (0-100)
 }
 
 export interface Campaign {
@@ -176,7 +180,9 @@ export interface FixedExpense {
   brands?: BrandType[]; // Multi-sélection marques pour le routage budgétaire
   proPlus?: boolean; // PRO+ (B2B) — optionnel, absent/false = non-PRO+ (fallback)
   isAnnual?: boolean; // Dépense annuelle : montant total sur l'année, fractionné sur 12 mois UNIQUEMENT à l'agrégation Budget (jamais stocké dupliqué). Absent/false = mensuelle (comportement inchangé).
-  alpineShare?: number; // % Alpine vs RDM (0-100) pour dépenses mixtes Alpine + Renault/Dacia/Mobilize — défaut 50 côté UI
+  // Curseurs de répartition pour les dépenses mixtes — mêmes règles que Project.
+  alpineShare?: number; // % Alpine vs RDM (0-100)
+  nissanShare?: number; // % Nissan vs RDM (0-100)
 }
 
 // --- CHAT TYPES ---
