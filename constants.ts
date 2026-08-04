@@ -64,6 +64,96 @@ export const isHoldingBrand = (
   return all.includes(HOLDING_BRAND) || all.includes('Groupe');
 };
 
+// =====================================================================
+// ROUTAGE BUDGÉTAIRE ALPINE / NISSAN — SOURCE UNIQUE DE VÉRITÉ
+//
+// Ces entités ne sont ni tout à fait des marques, ni tout à fait des sites, et
+// cette ambiguïté a produit quatre bugs (voir BUGS-CONNUS.md du 03/08/2026) :
+// `Budget.tsx` routait la dépense vers des buckets mais filtrait les lignes par
+// égalité de nom, et `Dashboard.tsx` ne routait pas du tout. Chaque écran avait
+// sa propre demi-logique. Tout passe désormais par les 3 fonctions ci-dessous.
+//
+// Asymétrie ASSUMÉE, elle reflète la réalité du groupe :
+//   - **Alpine est par site** : 4 concessions, donc 4 enveloppes `Alpine-<site>`.
+//     Il n'existe PAS d'entité « Alpine » globale — on l'obtient en croisant le
+//     tag marque Alpine avec le périmètre.
+//   - **Nissan est global** : une seule enveloppe `Nissan`, jamais ventilée par
+//     site. Elle n'appartient à un périmètre que si `Nissan` y est explicitement
+//     sélectionné, sinon on la compterait une fois par site éligible.
+// =====================================================================
+
+/** Site réel -> nom de la ligne de budget Alpine correspondante. */
+export const ALPINE_BUCKETS: Record<string, string> = {
+  'Clermont': 'Alpine-Clermont',
+  'Vichy': 'Alpine-Vichy',
+  'Le Puy-en-Velay': 'Alpine-Le Puy',
+  'Rodez': 'Alpine-Rodez',
+};
+
+/** L'unique ligne de budget Nissan (globale, non ventilée). */
+export const NISSAN_BUCKET = 'Nissan';
+
+// Concessions dont le budget est porté par une autre : elles n'ont pas de ligne
+// propre. Était recopié en dur dans deux blocs de Budget.tsx.
+const SITE_ALIASES: Record<string, string> = {
+  'Thiers': 'Ricoux',
+  'Ambert': 'Ricoux',
+  'Riom': 'Mozac',
+};
+
+/** Ramène un site saisi vers le site qui porte réellement son budget. */
+export const resolveSiteAlias = (site: string): string => SITE_ALIASES[site] ?? site;
+
+/**
+ * Décompose une LIGNE DE BUDGET en (site réel, marque).
+ * Sert à filtrer les enveloppes : `Alpine-Clermont` doit répondre à la fois au
+ * périmètre « Clermont » et au tag marque « Alpine ».
+ *
+ *   'Alpine-Clermont' -> { siteReel: 'Clermont', marque: 'Alpine', global: false }
+ *   'Nissan'          -> { siteReel: null,       marque: 'Nissan', global: true  }
+ *   'Clermont'        -> { siteReel: 'Clermont', marque: null,     global: false }
+ *
+ * `marque: null` signifie Renault/Dacia/Mobilize — le compte d'exploitation
+ * commun, qu'aucune de ces trois marques ne distingue (règle métier).
+ */
+export const resolveBudgetLine = (
+  site: string
+): { siteReel: string | null; marque: BrandType | null; global: boolean } => {
+  if (site === NISSAN_BUCKET) return { siteReel: null, marque: 'Nissan', global: true };
+  for (const [siteReel, bucket] of Object.entries(ALPINE_BUCKETS)) {
+    if (site === bucket) return { siteReel, marque: 'Alpine', global: false };
+  }
+  return { siteReel: site, marque: null, global: false };
+};
+
+/**
+ * Où imputer UNE PART de dépense (un site de la ventilation), selon les marques
+ * de l'élément.
+ *
+ * ⚠️ Retourne TOUJOURS une destination — jamais `null`. C'est le correctif du
+ * défaut qui faisait disparaître 2 870 € : l'ancien code abandonnait la part par
+ * un `return` silencieux dès qu'un élément tagué Alpine portait une part sur un
+ * site non-Alpine. Une part non éligible reste désormais sur son site.
+ *
+ * Règle retenue avec Théo : on route les parts ÉLIGIBLES, on garde le reste sur
+ * les sites. Un projet Nissan + Renault verse donc sa part Clermont au bucket
+ * Nissan et laisse sa part Vichy sur Vichy.
+ */
+export const routeShareToBucket = (
+  site: string,
+  brands?: string[] | null,
+  legacyBrand?: string | null
+): string => {
+  const all = [...(brands || []), ...(legacyBrand ? [legacyBrand] : [])];
+  const cible = resolveSiteAlias(site);
+
+  // Alpine d'abord : la marque la plus spécifique gagne (une part ne peut aller
+  // que dans un seul bucket).
+  if (all.includes('Alpine') && ALPINE_BUCKETS[cible]) return ALPINE_BUCKETS[cible];
+  if (all.includes('Nissan') && (NISSAN_SITES as string[]).includes(cible)) return NISSAN_BUCKET;
+  return cible;
+};
+
 export const BRAND_COLORS: Record<BrandType, string> = {
   Renault: 'bg-[#ffcc33] text-black border-[#ffcc33]', // Renault Yellow
   Dacia: 'bg-[#6a7551] text-white border-[#6a7551]', // Dacia Khaki

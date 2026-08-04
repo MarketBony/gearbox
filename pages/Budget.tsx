@@ -6,7 +6,7 @@ import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, ChevronDown, ChevronRight, Calculator, PieChart, TrendingUp, TrendingDown, AlertTriangle, Filter, Coins, Calendar, Lock, Search, X, Check } from 'lucide-react';
-import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES, isHoldingBrand } from '../constants';
+import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES, isHoldingBrand, ALPINE_BUCKETS, NISSAN_BUCKET, resolveBudgetLine, routeShareToBucket } from '../constants';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -22,15 +22,15 @@ const YEARS = [2024, 2025, 2026];
 // ─── BUDGET FILTER PICKERS ───────────────────────────────────────────────────
 
 const BUDGET_ALL_PLAQUE_SITES = Object.values(PLAQUES_STRUCTURE).flat() as string[];
-const BUDGET_SPECIAL_SITES = ['Alpine', 'Nissan'];
+// `Alpine` retiré le 03/08/2026 : aucune ligne de budget ne porte ce nom (elles
+// s'appellent Alpine-<site>), donc `filterSites.includes(b.site)` ne matchait
+// jamais — d'où « Alpine ne marche pas mais Nissan marche » signalé par Théo.
+// Alpine s'obtient en croisant le tag MARQUE avec le périmètre.
+const BUDGET_SPECIAL_SITES = ['Nissan'];
 
-const ALPINE_BUCKETS: Record<string, string> = {
-    'Clermont':       'Alpine-Clermont',
-    'Vichy':          'Alpine-Vichy',
-    'Le Puy-en-Velay': 'Alpine-Le Puy',
-    'Rodez':          'Alpine-Rodez',
-};
-const NISSAN_BUCKET = 'Nissan';
+// ALPINE_BUCKETS et NISSAN_BUCKET vivaient ici, en double aveugle avec Dashboard
+// qui, lui, ne routait pas du tout. Ils sont désormais dans constants.ts, source
+// unique de vérité du routage budgétaire.
 
 interface BudgetSitePickerProps { selected: string[]; onChange: (v: string[]) => void; }
 const BudgetSitePicker: React.FC<BudgetSitePickerProps> = ({ selected, onChange }) => {
@@ -381,12 +381,33 @@ const Budget: React.FC = () => {
           if (servicesToProcess.length === 0) servicesToProcess = ['VN', 'VO', 'PR', 'APV'];
       }
 
+      // Filtre de MARQUE — un seul test pour les 3 sources (enveloppes, projets,
+      // dépenses). Avant le 03/08/2026 il n'était appliqué QU'AUX PROJETS : les
+      // enveloppes portaient le commentaire « brand filter applied at site level
+      // via filterSites » (vrai à l'époque où Alpine était un pseudo-site) et les
+      // dépenses n'étaient pas filtrées du tout. Résultat avec MARQUE = Alpine :
+      // toutes les enveloppes, les projets Alpine, et TOUTES les dépenses.
+      const isBrandInScope = (brands?: string[] | null, legacyBrand?: string | null) => {
+          if (filterBrands.length === 0) return true;
+          const all = [...(brands || []), ...(legacyBrand ? [legacyBrand] : [])];
+          if (all.includes('Holding')) return true;     // tracké partout (règle métier)
+          return filterBrands.some(fb => all.includes(fb));
+      };
+
+      // Marque portée par une LIGNE DE BUDGET. `null` = compte commun
+      // Renault/Dacia/Mobilize, que la règle métier ne distingue pas.
+      const isBudgetLineBrandInScope = (site: string) => {
+          if (filterBrands.length === 0) return true;
+          const { marque } = resolveBudgetLine(site);
+          if (marque) return filterBrands.includes(marque);
+          return filterBrands.some(b => b === 'Renault' || b === 'Dacia' || b === 'Mobilize');
+      };
+
       // 2. Process FORECASTS (Budgets)
       budgets.forEach(b => {
           const s = siteStats[b.site];
           if (!s) return;
-
-          // (Brand filter applied at site level via filterSites)
+          if (!isBudgetLineBrandInScope(b.site)) return;
 
           servicesToProcess.forEach(svc => {
               // Iterate over months
@@ -432,31 +453,21 @@ const Budget: React.FC = () => {
           Object.entries(siteShares).forEach(([rawSite, sharePct]) => {
               if (sharePct <= 0) return;
 
-              // Site Mapping
-              let targetSite = rawSite;
-              if (targetSite === 'Thiers' || targetSite === 'Ambert') targetSite = 'Ricoux';
-              if (targetSite === 'Riom') targetSite = 'Mozac';
-
-              // Alpine/Nissan brand routing: override target to entity bucket
+              // Destination budgétaire de CETTE part (alias de site + routage
+              // Alpine/Nissan), via le résolveur unique de constants.ts.
+              //
+              // ⚠️ L'ancien code envoyait TOUT un projet contenant le tag Alpine
+              // vers un bucket Alpine, et ABANDONNAIT par un `return` silencieux
+              // chaque part posée sur un site non éligible. Mesuré le 03/08/2026 :
+              // 2 870 € évaporés sur 5 projets Nissan+Renault. `routeShareToBucket`
+              // laisse désormais une part non éligible sur son site.
               const pBrands = p.brands || [];
-
-              if (pBrands.includes('Alpine')) {
-                  const bucket = ALPINE_BUCKETS[rawSite];
-                  if (!bucket) return; // Site non autorisé Alpine
-                  if (siteStats[bucket]) targetSite = bucket;
-                  else return; // Bucket non configuré
-              } else if (pBrands.includes('Nissan')) {
-                  if (!(NISSAN_SITES as string[]).includes(rawSite)) return;
-                  if (siteStats[NISSAN_BUCKET]) targetSite = NISSAN_BUCKET;
-                  else return;
-              }
+              const targetSite = routeShareToBucket(rawSite, pBrands);
 
               if (!siteStats[targetSite]) return;
 
               // Brand Filter
-              if (filterBrands.length > 0) {
-                  if (!filterBrands.some(fb => pBrands.includes(fb)) && !pBrands.includes('Holding')) return;
-              }
+              if (!isBrandInScope(pBrands)) return;
 
               // Year Filter — un projet est compté sur sa date de DÉBUT (startDate),
               // pas de fin. pDate pilote l'année (filterYear) et le mois (monthIdx ci-dessous).
@@ -508,6 +519,11 @@ const Budget: React.FC = () => {
           // passé aussi, une dépense ancienne pouvant ne porter que celui-là.
           if (isHoldingBrand(exp.brands, exp.brand)) return;
 
+          // Le filtre de marque ne s'appliquait PAS aux dépenses avant le
+          // 03/08/2026 : avec MARQUE = Alpine, les projets étaient filtrés mais
+          // toutes les dépenses du groupe restaient comptées.
+          if (!isBrandInScope(exp.brands, exp.brand)) return;
+
           // Determine Sites and Shares
           let siteShares: Record<string, number> = {};
           if (exp.sites && exp.sites.length > 0 && exp.budgetDistribution) {
@@ -520,22 +536,10 @@ const Budget: React.FC = () => {
           Object.entries(siteShares).forEach(([rawSite, sharePct]) => {
               if (sharePct <= 0) return;
 
-              // Site Mapping
-              let targetSite = rawSite;
-              if (targetSite === 'Thiers' || targetSite === 'Ambert') targetSite = 'Ricoux';
-              if (targetSite === 'Riom') targetSite = 'Mozac';
-
-              // Alpine/Nissan brand routing: override target to entity bucket
-              if (exp.brand === 'Alpine') {
-                  const bucket = ALPINE_BUCKETS[rawSite];
-                  if (!bucket) return;
-                  if (siteStats[bucket]) targetSite = bucket;
-                  else return;
-              } else if (exp.brand === 'Nissan') {
-                  if (!(NISSAN_SITES as string[]).includes(rawSite)) return;
-                  if (siteStats[NISSAN_BUCKET]) targetSite = NISSAN_BUCKET;
-                  else return;
-              }
+              // Même résolveur que pour les projets ci-dessus. `exp.brands` est
+              // passé en plus de `exp.brand` (legacy) : une dépense peut porter la
+              // marque de routage dans l'un ou l'autre selon son ancienneté.
+              const targetSite = routeShareToBucket(rawSite, exp.brands, exp.brand);
 
               if (!siteStats[targetSite]) return;
 
@@ -654,7 +658,18 @@ const Budget: React.FC = () => {
       }, 0);
 
       // Group Budgets by Plaque (filtered by selected sites)
-      const displayBudgets = filterSites.length > 0 ? budgets.filter(b => filterSites.includes(b.site)) : budgets;
+      //
+      // Le filtre passe par `resolveBudgetLine` et non par une égalité de nom :
+      // sélectionner « Clermont » doit faire apparaître AUSSI son enveloppe
+      // `Alpine-Clermont`. L'égalité stricte d'avant expliquait que le périmètre
+      // Alpine ne ramenait rien (aucune ligne ne s'appelle « Alpine ») tandis que
+      // Nissan fonctionnait — sa ligne porte exactement ce nom.
+      const displayBudgets = filterSites.length === 0 ? budgets : budgets.filter(b => {
+          if (filterSites.includes(b.site)) return true;          // bucket choisi directement
+          const { siteReel, global } = resolveBudgetLine(b.site);
+          if (global) return false;                                // Nissan : jamais implicite
+          return siteReel !== null && filterSites.includes(siteReel);
+      });
       const groupedBudgets: Record<string, BudgetLine[]> = {};
       Object.keys(PLAQUES_STRUCTURE).forEach(p => groupedBudgets[p] = []);
       groupedBudgets['ENTITÉS SPÉCIFIQUES'] = [];

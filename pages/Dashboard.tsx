@@ -4,7 +4,7 @@ import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense, User } from '../types';
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
-import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS, isHoldingBrand } from '../constants';
+import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS, isHoldingBrand, resolveBudgetLine, routeShareToBucket } from '../constants';
 import {
   TrendingUp,
   Wallet,
@@ -50,7 +50,12 @@ import DateRangePicker, { toLocalIso, parseLocalDate, getPeriodRanges } from '..
 
 // --- COMPONENT: SITE CONTEXT PICKER ---
 const ALL_PLAQUE_SITES = Object.values(PLAQUES_STRUCTURE).flat();
-const SPECIAL_SITES: string[] = ['Alpine', 'Nissan'];
+// `Alpine` retiré le 03/08/2026 : il n'existe AUCUNE ligne de budget « Alpine »
+// (elles s'appellent Alpine-Clermont, Alpine-Vichy, Alpine-Le Puy, Alpine-Rodez),
+// donc ce pseudo-site ne filtrait rien et faussait le budget affiché. Alpine étant
+// réellement par site, on l'obtient en croisant le tag MARQUE Alpine avec le
+// périmètre. Nissan reste ici : son enveloppe est bien une entité unique globale.
+const SPECIAL_SITES: string[] = ['Nissan'];
 
 interface SiteContextPickerProps {
   selected: string[];
@@ -407,6 +412,21 @@ const Dashboard: React.FC = () => {
         return filterContexts.includes(site);
     };
 
+    // Périmètre d'une LIGNE DE BUDGET, qui peut être un bucket (`Alpine-Clermont`,
+    // `Nissan`) et non un site réel. Sans ça, sélectionner « Clermont » masquait
+    // l'enveloppe Alpine-Clermont, et le croisement marque × périmètre était
+    // impossible (correctif du 03/08/2026, cf. BUGS-CONNUS.md).
+    const isBudgetLineInScope = (site: string) => {
+        if (filterContexts.length === 0) return true;
+        if (filterContexts.includes(site)) return true;        // sélection directe du bucket
+        if (filterContexts.includes('GROUPE BONY')) return true;
+        const { siteReel, global } = resolveBudgetLine(site);
+        // Nissan est GLOBAL : il n'entre dans un périmètre que s'il y est nommé
+        // explicitement, sinon on le compterait une fois par site éligible.
+        if (global) return false;
+        return siteReel !== null && filterContexts.includes(siteReel);
+    };
+
     const isBrandInScope = (projectBrands: BrandType[]) => {
         if (filterBrands.length === 0) return true;
         return projectBrands.includes('Holding') || filterBrands.some(b => projectBrands.includes(b));
@@ -426,7 +446,13 @@ const Dashboard: React.FC = () => {
     const chartYear = dStart.getFullYear();
 
     budgets.forEach(b => {
-        if (!isSiteInScope(b.site)) return;
+        if (!isBudgetLineInScope(b.site)) return;
+        // ⚠️ Le filtre de MARQUE manquait ici alors que le consommé l'appliquait :
+        // avec MARQUE = Alpine, on comparait 120 295 € consommés à l'enveloppe du
+        // GROUPE ENTIER (1 480 800 €). Trois chiffres faux d'un coup — le
+        // pourcentage, le « Sur X € » et le Reste à engager, tous dérivés de
+        // `totalForecast`. Signalé par Théo le 03/08/2026.
+        if (!isBrandInScope(b.brands || [])) return;
 
         (['VN', 'VO', 'PR', 'APV'] as const).forEach(svc => {
             if (filterServices.length > 0 && !filterServices.includes(svc as ServiceType)) return;
@@ -469,10 +495,10 @@ const Dashboard: React.FC = () => {
         // est hors périmètre : il ne compte ni en montant, ni dans les compteurs.
         const partsEnScope = Object.entries(siteShares).filter(([rawSite, pct]) => {
             if (pct <= 0) return false;
-            let s = rawSite;
-            if (s === 'Thiers' || s === 'Ambert') s = 'Ricoux';
-            if (s === 'Riom') s = 'Mozac';
-            return isSiteInScope(s);
+            // Périmètre testé sur la DESTINATION BUDGÉTAIRE de la part, pas sur son
+            // site brut : sans ça, « périmètre = Nissan » ne ramenait rien, puisque
+            // le site d'un projet est toujours un site réel, jamais « Nissan ».
+            return isSiteInScope(routeShareToBucket(rawSite, p.brands));
         });
         if (partsEnScope.length === 0) return;
 
@@ -644,9 +670,10 @@ const Dashboard: React.FC = () => {
         Object.entries(siteShares).forEach(([rawSite, sharePct]) => {
             if (sharePct <= 0) return;
 
-            let eSite = rawSite;
-            if (eSite === 'Thiers' || eSite === 'Ambert') eSite = 'Ricoux';
-            if (eSite === 'Riom') eSite = 'Mozac';
+            // Comme pour les projets : le périmètre s'applique à la destination
+            // budgétaire de la part (bucket Alpine/Nissan ou site réel), sinon un
+            // périmètre Nissan ne ramène aucune dépense.
+            const eSite = routeShareToBucket(rawSite, e.brands, e.brand);
             if (!isSiteInScope(eSite)) return;
 
             const cost = totalCost * (sharePct / 100);
