@@ -74,7 +74,20 @@
       "Bash(echo \"=== tsc exit: $? ===\")",
       "Bash(npx vite *)",
       "Bash(npx playwright *)",
-      "Bash(npm i *)"
+      "Bash(npm i *)",
+      "Bash(ssh *)",
+      "Bash(echo \"EXIT:$? \\(1 = normal pour ssh -T github\\)\")",
+      "Bash(echo \"EXIT:$?\")",
+      "PowerShell(Test-NetConnection *)",
+      "Bash(echo \"TSC_EXIT:$?\")",
+      "Bash(curl -s -o /dev/null -w 'home: %{http_code}\\\\n' https://gearbox.bonyauto-mobile.com/)",
+      "Bash(curl -s -w '\\\\nlogin bidon: HTTP %{http_code}\\\\n' https://gearbox.bonyauto-mobile.com/api/auth/login -X POST -H 'Content-Type: application/json' -d '{\"loginId\":\"test-inexistant\",\"password\":\"x\"}')",
+      "Bash(curl -s -o /dev/null -w 'logo: %{http_code} %{content_type}\\\\n' https://gearbox.bonyauto-mobile.com/logo-white.svg)",
+      "Bash(python -c ' *)",
+      "Bash(sed -i '/<link rel=\"stylesheet\" href=\"\\\\/index.css\">/d' index.html)",
+      "PowerShell(Get-Process git,git-lfs,gitk -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=36592\")",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"Name='git.exe'\")"
     ]
   }
 }

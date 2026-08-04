@@ -1,4 +1,4 @@
-# ÉTAT PROJET GEARBOX — synthèse au 3 août 2026
+# ÉTAT PROJET GEARBOX — synthèse au 4 août 2026
 
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
@@ -10,17 +10,28 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot **fonctionnel** déployé : correctif 21
-  (`chore/finitions`, 30 juillet). Le correctif 22 (reprise des données réelles,
-  3 août) ne touche aucun code. Le correctif 23 (**routage Alpine/Nissan**, 3 août)
-  est prêt en local : **service `web` seul** à reconstruire. Le SHA
-  exact se lit avec `git log --oneline -1` plutôt que d'être recopié ici, où il
-  devenait périmé à chaque lot. Des commits de doc ou de backup automatique
-  peuvent suivre sans nécessiter de redéploiement.
+- master = prod, synchronisés. Dernier lot déployé : **correctif 24** (curseurs de
+  répartition `alpineShare` / `nissanShare`, 4 août) — `api` **et** `web`
+  reconstruits, le schéma Prisma ayant bougé. Le correctif 23 (routage
+  Alpine/Nissan) est déployé aussi, `web` seul avait suffi. Le SHA exact se lit
+  avec `git log --oneline -1` plutôt que d'être recopié ici, où il devenait périmé
+  à chaque lot. Des commits de doc ou de backup automatique peuvent suivre sans
+  nécessiter de redéploiement.
+- **Quel service reconstruire ?** `web` seul si le lot ne touche que le frontend ;
+  `api` **et** `web` dès que `backend/prisma/schema.prisma` bouge (le client Prisma
+  est généré au build de l'image `api`). Les fichiers partagés `constants.ts` /
+  `types.ts` sont compilés dans le bundle frontend uniquement.
 - Procédure complète de déploiement à jour dans DEPLOIEMENT.md
 - Sauvegardes automatiques : `.github/workflows/backup.yml` pousse un dump Supabase
   dans `backups/` chaque semaine (commits `github-actions[bot]`) — penser à
   `git pull` avant de pousser, le local est vite en retard de quelques commits
+- **Deux fichiers volontairement NON suivis par git** (ce n'est pas un oubli, ne
+  pas les committer sans l'avis de Théo) :
+  - `budget market 2026.xlsx` — le fichier source de la reprise des données. Sert
+    de référence d'audit pour `RAPPORT-IMPORT.md`, mais il évolue de son côté et
+    c'est un binaire.
+  - `PRESENTATION-EQUIPE.html` — la présentation de la stack faite pour l'équipe,
+    livrable ponctuel, hors du code de l'application.
 
 ## Historique des correctifs post-déploiement (par ordre chronologique)
 1. Prep déploiement : Supabase branché dans docker-compose, Dockerfile backend créé,
@@ -580,6 +591,9 @@
       partagé**, plus de demi-logique par écran. `routeShareToBucket` ne rend
       **jamais** `null` — c'est ce qui récupère les 2 870 € qu'un `return`
       silencieux faisait disparaître.
+      ⚠️ **`routeShareToBucket` n'existe plus** : remplacée par
+      `splitShareToBuckets` au correctif 24 (elle rend désormais une liste de
+      destinations pondérées). Ne pas la chercher dans le code.
     - **Décision de Théo : Alpine n'est plus une entité unique.** Elle est
       réellement par site (4 concessions), donc le pseudo-site `Alpine` — qui ne
       correspondait à aucune ligne — est retiré des deux sélecteurs de périmètre.
@@ -702,6 +716,23 @@
   dev) : tout test local écrit dans les vraies données et est visible des
   utilisateurs connectés. Créer une entité clairement nommée, la supprimer juste
   après, vérifier qu'il ne reste aucun résidu.
+- **⚠️ Sauvegarder un projet RÉÉCRIT son avancement et son budget réel.**
+  `handleUpdateProject` ([pages/Projects.tsx](pages/Projects.tsx), ~ligne 397)
+  recalcule `progress` depuis les statuts de tâches et `budgetActual` depuis la
+  somme des coûts de tâches, **à chaque sauvegarde**, quel que soit le champ
+  modifié. Constaté le 04/08 : changer la part Nissan d'un projet a fait passer son
+  avancement de 50 % (valeur venue de l'import, périmée) à 100 % (valeur réellement
+  dérivée de ses 2 tâches terminées). Ce n'est pas un bug — c'est voulu — mais
+  **l'avancement importé depuis l'Excel sera écrasé au premier passage de l'équipe
+  sur chaque projet.** Vérifié le 04/08 côté montants : les 97 projets ont tous
+  `budgetActual` = somme des coûts de leurs tâches, donc **aucun euro n'est en
+  risque** ; c'est l'avancement seul qui bougera.
+- **L'alias SSH `gearbox-vps` n'est PAS configuré** sur ce poste (vérifié le
+  04/08 : `Could not resolve hostname`). Utiliser directement
+  `ssh ubuntu@51.83.75.181`. Ne pas en déduire un problème de droits ni de réseau.
+- **Les serveurs de dev se lancent par nom** depuis `.claude/launch.json` (ajouté
+  le 04/08) : `gearbox-web` (port 3000) et `gearbox-api` (port 3001), au lieu de
+  lancer `npm run dev` à la main.
 
 ## Contraintes d'environnement toujours actives
 - Réseau bureau bloque les ports sortants 22 (SSH) et 5432/6543 (Postgres/Supabase)
