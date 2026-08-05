@@ -1,5 +1,15 @@
 # BACKEND-AUDIT.md
 
+> # ⛔ DOCUMENT HISTORIQUE — NE PAS L'UTILISER COMME ÉTAT COURANT
+>
+> Cet audit décrit le backend du **6 juillet 2026**, c'est-à-dire **avant** qu'il ne
+> tourne pour la première fois. Tout ce qu'il annonce comme manquant a été fait depuis :
+> le backend est en production depuis le 8 juillet, avec 8 migrations, le chat, les
+> uploads, les jeux, le temps réel et le cloisonnement par site.
+>
+> **L'état courant est dans `ETAT-BACKEND.md`.** Ce fichier n'est conservé que pour
+> comprendre d'où l'on part et pourquoi certaines décisions ont été prises.
+
 > Audit factuel de l'état réel du backend au **6 juillet 2026**, avant préparation de la migration.
 > Objectif : image fidèle, pas optimiste. Aucun fichier existant n'a été modifié pour produire ce document.
 

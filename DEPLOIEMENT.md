@@ -77,8 +77,7 @@ cd ~/gearbox
 
 ## 4. Configuration
 
-Créer `~/gearbox/.env` (jamais committé, `chmod 600`) avec **exactement 5
-variables** — modèle dans `.env.example` :
+Créer `~/gearbox/.env` (jamais committé, `chmod 600`) — modèle dans `.env.example` :
 
 | Variable | Contenu |
 |---|---|
@@ -87,6 +86,15 @@ variables** — modèle dans `.env.example` :
 | `JWT_SECRET` | Secret de session, propre à la prod : `openssl rand -hex 32` |
 | `DATABASE_URL` | Pooler **transaction** Supabase, port 6543, avec `?pgbouncer=true` |
 | `DIRECT_URL` | Pooler **session** Supabase, port 5432, sans `?pgbouncer=true` (utilisé par `prisma migrate deploy`) |
+| `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` · `VAPID_SUBJECT` | Notifications push (ajoutées le 30/07/2026) |
+
+> ⚠️ Ce guide annonçait « exactement 5 variables » jusqu'au 05/08/2026 : c'était faux
+> depuis l'ajout des notifications push. Corrigé.
+
+⚠️ **Piège de configuration à deux temps** : une variable doit être **à la fois**
+valorisée dans ce `.env` **et déclarée dans le bloc `environment:` du service `api`**
+de `docker-compose.yml`. Absente de cette liste, elle **n'atteint pas le conteneur**,
+et l'échec est silencieux (les notifications ne partent simplement pas).
 
 Il n'y a **plus** de `POSTGRES_PASSWORD` : aucun Postgres local, la base est
 Supabase. Les URLs se récupèrent dans le dashboard Supabase (Connection pooling).
@@ -108,7 +116,8 @@ Docker lance les **3 services** :
    HTTPS Let's Encrypt.
 
 Seul caddy expose des ports publics (80/443). Les uploads sont persistés dans le
-volume Docker `uploads_data` (ils survivent aux rebuilds).
+volume Docker **nommé** `gearbox_uploads_data` (ils survivent aux rebuilds),
+physiquement `/var/lib/docker/volumes/gearbox_uploads_data/_data` sur le VPS.
 
 ## 6. Premier accès
 

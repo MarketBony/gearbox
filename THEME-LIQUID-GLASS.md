@@ -194,23 +194,23 @@ html.dark .gx-hover-lift:hover { box-shadow: 0 16px 40px -8px rgba(0,0,0,0.5); }
 
 ## BLOC 5 — Transitions de changement de page (framer-motion)
 
-Les transitions page → page reposent sur framer-motion. Le Full résout actuellement ses
-dépendances via un **importmap esm.sh** (react, lucide-react, recharts) — PAS via le bundle Vite.
-framer-motion doit donc être ajouté à l'importmap, **en partageant l'instance React de l'app**,
-sinon "Invalid hook call" au démarrage.
+> ⚠️ **SECTION EN PARTIE PÉRIMÉE — mise à jour du 05/08/2026.**
+> Ce bloc décrivait un **importmap esm.sh** dans `index.html`. Cet importmap a été
+> **SUPPRIMÉ** au correctif 21 (30/07/2026) après avoir été prouvé **inerte** : deux
+> builds sur la même machine, avec et sans lui, ont produit des fichiers **identiques
+> au hachage près**. Vite résout ces spécificateurs depuis `node_modules` et l'ignorait
+> complètement. **Ne pas le remettre.**
+>
+> framer-motion est aujourd'hui une dépendance npm normale, résolue par Vite. Les
+> sous-sections 5.1 (importmap) est donc **caduque** ; 5.2 et 5.3 restent valables et
+> sont d'ailleurs déjà appliquées (`lib/motion.ts` existe, `App.tsx` est câblé).
 
-### 5.1 — Ajouter framer-motion à l'importmap (`index.html`)
+### 5.1 — ~~Ajouter framer-motion à l'importmap~~ (CADUQUE, voir l'avertissement)
 
-Ajouter cette entrée dans le bloc `<script type="importmap">`. Le `?external=react,react-dom`
-est le point CRITIQUE (React doit être partagé, pas dupliqué) :
+Conservé pour mémoire uniquement. `framer-motion` est dans les `dependencies` de
+`package.json` et résolu par le bundler.
 
-```json
-"framer-motion": "https://esm.sh/framer-motion@^12.40.0?external=react,react-dom"
-```
-
-Ajouter aussi `"framer-motion": "^12.40.0"` aux dependencies de `package.json` (cohérence + types).
-
-### 5.2 — Créer `lib/motion.ts` (le dossier lib/ n'existe pas encore)
+### 5.2 — Créer `lib/motion.ts` (⚠️ DÉJÀ FAIT, le fichier existe)
 
 Presets partagés (easing Apple, variants de page, stagger, modales). À créer tel quel :
 

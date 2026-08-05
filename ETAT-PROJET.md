@@ -1,4 +1,4 @@
-# ÉTAT PROJET GEARBOX — synthèse au 4 août 2026
+# ÉTAT PROJET GEARBOX — synthèse au 5 août 2026
 
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
@@ -1155,54 +1155,69 @@
     faisait échouer les vérifications avec « fetch failed ». Tester depuis l'extérieur
     du dossier surveillé.
 
-## Backlog en attente (rien d'urgent, le site fonctionne)
-- ~~⚠️ Corriger le KPI « Rythme de consommation »~~ — **fait le 04/08** (correctif 25).
-  À retenir : la cause inscrite ici (« le récurrent est engagé d'avance ») était
-  **fausse**, ou plus exactement n'était qu'un révélateur — la formule comparait un
-  total de fin de période au temps écoulé à ce jour, elle était erronée par
-  construction. Il reste un biais structurel assumé de +8 à +12 points, documenté au
-  correctif 25.
-- **Build local NON représentatif du build déployé** (constaté le 30/07) : Docker
-  construit le front avec **node:18-alpine** et un `npm install` (pas `npm ci`),
-  alors que le poste de Théo est en **Node 24**. Résultat mesuré sur le même code :
-  bundle local **2 012 Ko** contre **1 363 Ko** en production. Le déploiement n'est
-  donc pas reproductible à l'identique en local. Sans gravité (la prod fonctionne),
-  mais à savoir avant de conclure quoi que ce soit d'une mesure de bundle locale.
-  Correctif propre : aligner la version de Node et passer à `npm ci`.
-- **4 vulnérabilités npm dans le backend** (1 critique, 2 hautes, 1 basse au
-  30/07), toutes **préexistantes** et venant de `bcrypt` (→ `@mapbox/node-pre-gyp`
-  → `tar`, `rimraf` → `glob` → `minimatch` → `brace-expansion`), `nodemon` (dev) et
-  `express` (→ `body-parser`). `web-push`, ajouté ce jour, n'a **aucune** dépendance
-  transitive. La `tar` critique n'est utilisée qu'à l'**installation** de bcrypt,
-  pas à l'exécution. `npm audit fix` risquerait de casser bcrypt : à traiter
-  explicitement, pas au passage.
-- ~~Nettoyage des branches locales mergées~~ — **fait le 30/07** : 27 branches
-  supprimées après vérification qu'aucune n'était non mergée. Il ne reste que
-  `master`.
-- ~~Réactions emoji du Chat non accessibles sur mobile~~ — **fait le 05/08** (correctif
-  31). ⚠️ La cause inscrite ici (« masquées au survol ») était **fausse** : la barre
-  d'actions était bien visible sur mobile, c'est la **rangée d'emojis à l'intérieur**
-  qui portait `hidden md:flex`. Corrigé par un bouton dédié ouvrant un sélecteur — pas
-  en retirant le `hidden`, cinq emojis permanents par message sur 320 px auraient été
-  pires. La piste « appui long » notée ici n'a pas été retenue : un menu est plus
-  découvrable et réutilise le mécanisme déjà en place.
-- **Duplication à surveiller** : `pages/Projects.tsx` garde sa barre de filtres inline
-  et n'utilise pas `components/CollapsibleFilters.tsx`, créé au correctif 31 pour le
-  Dashboard et Digital. Choix assumé (barre imbriquée dans une barre d'outils complexe,
-  écran très utilisé), mais toute évolution du comportement de repli doit être portée
-  aux **deux** endroits en attendant.
-- Vues Trimestre/Semestre/Année de l'Agenda : pas de vue mobile dédiée (contrairement
-  à Semaine/Mois) — les barres Gantt compressent sans déborder, jugé acceptable
-- Point technique à garder en tête : Tailwind est chargé en CDN Play → les variantes
-  md:/lg: ne fonctionnent pas sur les classes custom (gx-*, glass-*), seulement sur
-  les utilitaires Tailwind standards. Deux pièges confirmés le 30/07 sur Campagnes :
-  les **valeurs arbitraires contenant `repeat(...)`** ne sont pas générées, et un
-  raccourci `p-*` **écrase** un `pt-*` écrit après lui dès qu'il est préfixé `md:`
-  (l'ordre des règles générées ne suit pas l'ordre des classes)
-- ~~Composant `Select` à 34 px~~ — **corrigé le 30/07** (correctif 21) : 44 px sur
-  mobile, 34 px conservés à partir de `md`. Un select de 44 px sur ordinateur
-  gonflerait les barres de filtres denses (en-têtes de graphiques Campagnes,
-  filtres du Dashboard) calibrées autour de 34 px.
+## Backlog — ce qui reste à faire
+
+> Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
+> l'historique des correctifs ci-dessus et dans `BUGS-CONNUS.md`.
+
+### Fonctionnel / produit
+- **Campagnes et « Performance des campagnes » restent VIDES.** Ce n'est pas un bug :
+  ces écrans dérivent des tâches au canal `SMS` ou `E-mail`, or le fichier source de
+  l'import ne portait pas le canal — les 247 tâches importées l'ont vide. Chantier
+  **donnée** : renseigner le canal dans Gearbox, ou ajouter une colonne au fichier.
+- **Résidu du routage multi-marques** : avec MARQUE = Renault, les buckets
+  `Alpine-Clermont` et `Nissan` affichent un petit consommé sans enveloppe. Pas faux,
+  mais se lit mal. Deux voies, **côté Théo** : scinder les projets multi-marques, ou
+  renseigner le curseur de part.
+- **Biais résiduel du KPI de rythme** : +8 à +12 points, parce qu'une dépense du mois
+  est imputée au 1ᵉʳ alors que l'horloge compte en jours. Correctif possible si le
+  besoin se confirme : compter le temps écoulé **en mois**. Choix de lecture, pas un bug.
+- **Recoupement non fait** : le budget d'un chef de site (Mozac, 69 600 € de prévu)
+  n'a pas été comparé à ce que voit un Master filtré sur Mozac. Les deux doivent
+  coïncider — contrôle rapide à faire.
+
+### Dette technique
+- **Build local non représentatif du build déployé** : Docker construit le front en
+  **node:18-alpine** avec `npm install`, le poste de Théo est en **Node 24**. Mesuré
+  sur le même code : **2 012 Ko** en local contre **1 363 Ko** en prod. Aucune mesure
+  de bundle locale n'est donc concluante. Correctif : aligner Node et passer à `npm ci`.
+- **4 vulnérabilités npm backend** (1 critique, 2 hautes, 1 basse), toutes
+  **préexistantes** : `bcrypt` (→ `tar`, `minimatch`), `nodemon` (dev), `express`
+  (→ `body-parser`). La `tar` critique ne sert qu'à l'**installation** de bcrypt.
+  `npm audit fix` risque de casser bcrypt → à traiter explicitement, jamais au passage.
+- **Un onglet déjà ouvert reste sur l'ancien bundle après un déploiement.** Le
+  `Cache-Control` garantit qu'un **rechargement** sert la dernière version, pas la mise
+  à jour d'un onglet vivant. Il faudrait une détection de version côté client.
+  ⚠️ **Ne PAS ajouter de gestionnaire `fetch` au service worker** — décision
+  structurante du lot PWA.
+- **`migrateEquipmentIfNeeded` n'est pas idempotente** face à deux onglets simultanés
+  (un flag `localStorage` ne suffit pas). Catalogue propre aujourd'hui ; s'il se
+  re-duplique, la cause est là et la vraie parade est une contrainte d'unicité en base.
+- **Deux duplications à garder synchronisées à la main** :
+  1. `PLAQUES_STRUCTURE` est recopié dans `backend/src/auth/siteScope.ts` (le backend
+     ne peut pas importer le `constants.ts` racine). Un site ajouté d'un seul côté
+     fausserait le périmètre d'un chef de site.
+  2. `pages/Projects.tsx` garde sa barre de filtres inline et n'utilise pas
+     `components/CollapsibleFilters.tsx`.
+
+### Confort / UI, non bloquant
+- **Agenda** : pas de vue mobile dédiée pour Trimestre/Semestre/Année (les barres Gantt
+  compressent sans déborder — jugé acceptable).
+- **Campagnes sous ~1000 px** : volumétries à 5 chiffres et noms de projet tronqués,
+  avec infobulle. **Non régressif**. À reprendre seulement si Théo travaille sur écran
+  étroit.
+- **Chat** : l'overlay d'édition de l'avatar de groupe est encore masqué au survol
+  (`opacity-0 group-hover/ga:`), donc invisible au doigt. Même classe que la sourdine,
+  corrigée au correctif 31 ; celui-ci était hors périmètre.
+- **Cellules JOUR du sélecteur de date** : 36 px sur mobile, sous le seuil des 44 px.
+  Préexistant, non touché au correctif 31 pour ne pas modifier la grille existante.
+
+### ⚠️ Contrainte permanente Tailwind (à relire avant toute retouche visuelle)
+Tailwind est chargé en **CDN Play** : les variantes `md:`/`lg:` **ne fonctionnent pas**
+sur les classes custom (`gx-*`, `glass-*`), seulement sur les utilitaires standards.
+Deux pièges confirmés : les **valeurs arbitraires contenant `repeat(...)`** ne sont pas
+générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit après lui
+(l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
 - **Après un déploiement, recharger complètement la page** : un onglet resté ouvert

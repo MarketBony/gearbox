@@ -1,11 +1,21 @@
-# ÉTAT BACKEND — synthèse au 29 juillet 2026
+# ÉTAT BACKEND — synthèse au 5 août 2026
 
 Étape 7 (branchement frontend↔backend) **terminée**. Tous les modules de données **et** la
 gestion des fichiers uploadés sont branchés sur le backend Express/Supabase et **vérifiés en
 base réelle**. Le frontend ne lit/écrit **plus** `localStorage` pour ces entités.
 
-Migrations Prisma appliquées sur Supabase : `20260706160559_init` + `20260708114830_add_avatar_and_archived_at`.
-`tsc --noEmit` backend : 0 erreur. `vite build` frontend : OK.
+**8 migrations Prisma** appliquées sur Supabase. La liste ne se recopie pas ici, où elle
+devenait périmée à chaque lot : `ls backend/prisma/migrations`, ou le log de démarrage du
+conteneur `api` qui annonce combien il en trouve. Les trois dernières, pour mémoire :
+`add_chat_attachments`, `add_games`, `add_user_sites`.
+
+`tsc --noEmit` backend : 0 erreur. Frontend : 12 lignes préexistantes (jeu de référence,
+dans Budget/FixedExpenses/Projects — voir `ETAT-PROJET.md`).
+
+> ⚠️ **Trois modules ont chacun leur « seule porte », à ne jamais contourner** :
+> `utils/publicUser.ts` (jamais l'objet Prisma brut, il porte `passwordHash`),
+> `utils/gameView.ts` (jamais une partie non redactée), et `auth/siteScope.ts`
+> (jamais un `where` de site recopié dans une route). Détail dans les sections dédiées.
 
 ## ✅ Modules de données branchés (frontend → REST/Socket.IO, vérifiés en base)
 

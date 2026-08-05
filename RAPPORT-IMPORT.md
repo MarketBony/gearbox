@@ -1,7 +1,18 @@
 # Rapport de contrôle — reprise des données 2026
 
-> **Rien n'a été écrit dans Gearbox.** Ce document décrit exactement ce qui *serait*
-> créé. À valider avant l'import.
+> ## ℹ️ L'IMPORT A ÉTÉ EFFECTUÉ le 3 août 2026
+>
+> Ce document a été rédigé **avant** l'import, pour validation. Il a été validé et
+> l'import a eu lieu (correctif 22 de `ETAT-PROJET.md`) : 24 enveloppes, 738 dépenses,
+> 100 projets et 247 tâches, réconciliés à **0,00 € d'écart**.
+>
+> Il reste la **référence d'audit** de cette reprise : totaux par mois, site et service,
+> correspondances de nommage retenues, et anomalies du fichier source laissées telles
+> quelles. C'est la pièce à ouvrir pour comprendre l'origine d'un chiffre en base.
+> Les phrases au conditionnel ci-dessous sont donc à lire au passé.
+>
+> ⚠️ Les données ont **évolué depuis** : Théo corrige les projets au fil de l'eau, et
+> les totaux actuels ne correspondent plus exactement à ceux d'ici.
 
 ## 1. Ce qui serait créé
 
