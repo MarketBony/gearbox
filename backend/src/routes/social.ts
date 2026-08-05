@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
-import { authenticateToken, requireRole } from '../auth/middleware';
+import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
+import { scopeOf, arrayScopeWhere, redactSiteFields } from '../auth/siteScope';
 import { withDates } from '../utils/dates';
 import { UPLOADS_ROOT } from './uploads';
 
@@ -14,9 +15,14 @@ const prisma = new PrismaClient();
 // l'ancien 'DigitalManager' sans espace qui ne matchait jamais le vrai rôle.
 const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Digital Manager', 'External'];
 
-router.get('/', authenticateToken, async (req, res) => {
-  const posts = await prisma.socialPost.findMany();
-  res.json(posts);
+router.get('/', authenticateToken, async (req: AuthRequest, res) => {
+  // Cloisonnement par concession. ⚠️ Le champ s'appelle `concessions` ici (et non
+  // `sites`) : c'est le même rôle, un nom différent selon le modèle.
+  const scope = await scopeOf(req);
+  const posts = await prisma.socialPost.findMany({
+    where: arrayScopeWhere('concessions', scope),
+  });
+  res.json(posts.map(p => redactSiteFields(p, scope, 'concessions')));
 });
 
 router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) => {

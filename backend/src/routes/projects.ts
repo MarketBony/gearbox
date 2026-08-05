@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
 import { withDates } from '../utils/dates';
+import { scopeOf, arrayScopeWhere, redactSiteFields } from '../auth/siteScope';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -16,9 +17,20 @@ const prisma = new PrismaClient();
 // des boutons que l'API refuse en 403.
 const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
 
-router.get('/', authenticateToken, async (req, res) => {
-  const projects = await prisma.project.findMany({ include: { tasks: true } });
-  res.json(projects);
+router.get('/', authenticateToken, async (req: AuthRequest, res) => {
+  // Cloisonnement par concession : `scopeOf` rend `null` pour tous les rôles
+  // historiques (aucune restriction), et la liste des sites autorisés pour un chef
+  // de site. ⚠️ Le filtre est appliqué ICI, côté serveur : le faire côté client
+  // laisserait les autres concessions lisibles dans l'onglet Réseau.
+  // L'Agenda se sert de cette même route, il est donc cloisonné du même coup.
+  const scope = await scopeOf(req);
+  const projects = await prisma.project.findMany({
+    where: arrayScopeWhere('sites', scope),
+    include: { tasks: true },
+  });
+  // ⚠️ Filtrer les lignes ne suffit pas : un projet multi-sites qui inclut le sien
+  // nommait les AUTRES concessions et leurs pourcentages. Voir redactSiteFields.
+  res.json(projects.map(p => redactSiteFields(p, scope)));
 });
 
 router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) => {

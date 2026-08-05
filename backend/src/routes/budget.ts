@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticateToken, requireRole } from '../auth/middleware';
+import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
+import { budgetScopeOf, stringScopeWhere } from '../auth/siteScope';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -14,8 +15,15 @@ const EDIT_ROLES = ['Master', 'Administrator', 'Director'];
 // Cette route ne fait que stocker/renvoyer les valeurs brutes — toute l'agrégation
 // (buckets Alpine/Nissan, filtres...) reste côté frontend.
 
-router.get('/', authenticateToken, async (req, res) => {
-  const budgets = await prisma.budgetLine.findMany();
+router.get('/', authenticateToken, async (req: AuthRequest, res) => {
+  // ⚠️ `budgetScopeOf` et non `scopeOf` : une ligne de budget peut être un BUCKET
+  // (`Alpine-Clermont`) et pas un site géographique. Le chef de site de Clermont doit
+  // voir `Alpine-Clermont` — c'est sa concession — mais **pas** l'enveloppe `Nissan`,
+  // qui est globale et n'est ventilée sur aucun site (décision de Théo).
+  const scope = await budgetScopeOf(req);
+  const budgets = await prisma.budgetLine.findMany({
+    where: stringScopeWhere('site', scope),
+  });
   res.json(budgets);
 });
 

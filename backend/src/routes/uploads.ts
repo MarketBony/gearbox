@@ -3,7 +3,14 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
-import { authenticateToken } from '../auth/middleware';
+import { authenticateToken, requireRole } from '../auth/middleware';
+import { VALID_ROLES, SITE_MANAGER_ROLE } from '../auth/roles';
+
+
+// Tous les rôles SAUF ceux en lecture seule. Écrit en soustraction volontairement :
+// un futur rôle sera autorisé par défaut, ce qui est le comportement d'avant — le
+// durcissement ne concerne que les rôles explicitement en lecture seule.
+const UPLOAD_ROLES = (VALID_ROLES as readonly string[]).filter(r => r !== SITE_MANAGER_ROLE);
 
 const router = Router();
 
@@ -96,7 +103,13 @@ const storage = multer.diskStorage({
 // POST /api/uploads/:type — upload d'un fichier unique (champ "file").
 // Auth JWT obligatoire. multer configuré PAR requête selon le type (les limites
 // de taille et formats diffèrent).
-router.post('/:type', authenticateToken, (req, res) => {
+// ⚠️ Cette route n'avait AUCUN contrôle de rôle jusqu'au 05/08/2026 : tout compte
+// authentifié pouvait déposer un fichier, donc consommer le disque du VPS. Sans
+// conséquence tant que tous les rôles écrivaient quelque part, mais le chef de site
+// est en lecture seule — lui laisser l'upload ouvert serait la seule écriture qu'il
+// pourrait faire, et la plus coûteuse. On refuse donc explicitement les rôles sans
+// droit d'écriture.
+router.post('/:type', authenticateToken, requireRole(UPLOAD_ROLES), (req, res) => {
   const type = req.params.type as UploadType;
   if (!UPLOAD_TYPES.includes(type)) {
     return res.status(400).json({ error: `Type d'upload invalide : "${type}". Attendu : ${UPLOAD_TYPES.join(', ')}.` });
