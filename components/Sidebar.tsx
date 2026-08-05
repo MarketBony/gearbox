@@ -10,6 +10,8 @@ import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { usePresence } from '../services/presenceStore';
 import { setAppBadge } from '../services/pushNotifications';
 import { ActivityLog } from '../types';
+// Source unique des rôles ayant accès aux Jeux (Director en est exclu, règle métier).
+import { GAMES_ALLOWED_ROLES } from '../constants';
 import {
   LayoutDashboard,
   FolderKanban,
@@ -76,14 +78,22 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     setAppBadge(total);
   };
 
+  // ⚠️ Lisait `localStorage.gearbox_game_challenges` avec un polling 3 s jusqu'au
+  // 05/08/2026 : la pastille ne pouvait donc JAMAIS montrer un défi reçu, puisque le
+  // défi était écrit dans le navigateur de l'émetteur. Oubli résiduel de la refonte
+  // des Jeux — le reste du module était passé au serveur, pas ce compteur.
+  // Désormais serveur, et rafraîchi par l'événement socket (voir plus bas), donc
+  // sans polling.
   const loadGamesChallenges = () => {
-    if (!user) return;
-    try {
-      const data = localStorage.getItem('gearbox_game_challenges');
-      const challenges: any[] = data ? JSON.parse(data) : [];
-      const count = challenges.filter(c => c.toUserId === user.id && c.status === 'pending').length;
-      setGamesChallengeCount(count);
-    } catch { /* ignore */ }
+    if (!user || !GAMES_ALLOWED_ROLES.includes(user.role)) {
+      setGamesChallengeCount(0);
+      return;
+    }
+    db.getGamesLobby()
+      .then(d => setGamesChallengeCount(
+        d.challenges.filter(c => c.toUserId === user.id && c.status === 'pending').length
+      ))
+      .catch(() => { /* réseau : on garde la valeur précédente */ });
   };
 
   useEffect(() => {
@@ -94,13 +104,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     const chatHandler = () => loadChatUnread();
     window.addEventListener('gearbox-activity-updated', actHandler);
     window.addEventListener('gearbox-chat-unread-updated', chatHandler);
-    const gamesInterval = setInterval(loadGamesChallenges, 3000);
     return () => {
       window.removeEventListener('gearbox-activity-updated', actHandler);
       window.removeEventListener('gearbox-chat-unread-updated', chatHandler);
-      clearInterval(gamesInterval);
     };
   }, []);
+
+  // Défis reçus : le socket remplace le polling 3 s supprimé ci-dessus. La pastille
+  // apparaît donc dès qu'un collègue lance un défi, sans rechargement.
+  useRealtimeSync(RT_EVENTS.games, loadGamesChallenges);
 
   // Temps réel du journal d'activité : 'gearbox-activity-updated' ci-dessus est
   // un événement window, donc limité à l'onglet qui a écrit. La cloche ne
