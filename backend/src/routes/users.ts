@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
-import { VALID_ROLES, isValidRole, canAssignRole, forbiddenRoleMessage } from '../auth/roles';
+import { VALID_ROLES, isValidRole, canAssignRole, forbiddenRoleMessage, USER_DELETE_ROLES } from '../auth/roles';
 import { emitEvent, notifyUserChanged } from '../realtime';
 // Projection publique partagée avec routes/auth.ts — voir utils/publicUser.ts pour
 // la règle (ne jamais faire sortir l'objet Prisma brut, il porte `passwordHash`).
@@ -92,8 +92,11 @@ router.put('/:id', authenticateToken, requireRole(ADMIN_ROLES), async (req: Auth
   }
 });
 
-// DELETE user
-router.delete('/:id', authenticateToken, requireRole(ADMIN_ROLES), async (req, res) => {
+// DELETE user — ⚠️ PAS `ADMIN_ROLES` : la suppression est réservée à Master et
+// Administrator (`USER_DELETE_ROLES`). Un Director ne supprime aucun compte, pas même
+// un Coordinator : il ne peut déjà plus promouvoir personne, lui laisser l'effacement
+// serait incohérent, et c'est irréversible.
+router.delete('/:id', authenticateToken, requireRole(USER_DELETE_ROLES), async (req, res) => {
   const { id } = req.params;
   try {
     await prisma.user.delete({ where: { id } });

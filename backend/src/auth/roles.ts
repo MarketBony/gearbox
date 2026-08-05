@@ -30,6 +30,14 @@ export const isValidRole = (role: unknown): boolean =>
 // la promotion croisée à deux comptes suffisait à contourner.
 export const DIRECTOR_ASSIGNABLE_ROLES = ['Coordinator', 'Digital Manager', 'Guest', 'External'];
 
+// Suppression d'un compte : réservée à Master et Administrator (décision de Théo,
+// 05/08/2026). Le DELETE était ouvert à `ADMIN_ROLES`, Director inclus, et ne regardait
+// **ni qui supprime ni qui est supprimé** : un Director pouvait donc effacer un
+// Administrator, voire le compte Master — sans même passer par une escalade de rôle.
+// Supprimer est irréversible : on ne le laisse pas à un rôle qui ne peut déjà plus
+// promouvoir personne.
+export const USER_DELETE_ROLES = ['Master', 'Administrator'];
+
 export const canAssignRole = (actorRole: string | undefined, targetRole: string): boolean => {
   if (actorRole === 'Director') return DIRECTOR_ASSIGNABLE_ROLES.includes(targetRole);
   return true;

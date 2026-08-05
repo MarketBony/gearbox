@@ -388,6 +388,10 @@ const Settings: React.FC = () => {
   // ADMIN_ROLES du backend routes/users.ts — les mutations y sont déjà protégées).
   const canManageUsers = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director';
 
+  // Supprimer un compte est réservé à Master et Administrator. ⚠️ Aligné sur
+  // `USER_DELETE_ROLES` de `backend/src/auth/roles.ts`.
+  const canDeleteUsers = user?.role === 'Master' || user?.role === 'Administrator';
+
   // Rôles qu'un Director a le droit d'attribuer. ⚠️ Doit rester aligné sur
   // `DIRECTOR_ASSIGNABLE_ROLES` de `backend/src/auth/roles.ts`, qui est le garde-fou
   // réel : ici on se contente de ne pas proposer ce que l'API refusera en 403.
@@ -753,15 +757,7 @@ const Settings: React.FC = () => {
                           <Select
                             value={editForm.role ?? ''}
                             onChange={v => setEditForm({ ...editForm, role: v as UserRole })}
-                            options={[
-                              { value: 'Master', label: 'Master' },
-                              { value: 'Administrator', label: 'Administrator' },
-                              { value: 'Director', label: 'Director' },
-                              { value: 'Coordinator', label: 'Coordinator' },
-                              { value: 'Digital Manager', label: 'Digital Manager' },
-                              { value: 'Guest', label: 'Guest' },
-                              { value: 'External', label: 'External' },
-                            ]}
+                            options={roleOptions(editForm.role)}
                             size="sm"
                           />
                         </td>
@@ -828,7 +824,12 @@ const Settings: React.FC = () => {
                           <button onClick={() => startEdit(u)} className="p-2.5 hover:bg-slate-100 dark:hover:bg-white/10 rounded text-slate-500 dark:text-slate-300">
                             <Edit2 size={16} />
                           </button>
-                          {u.role !== 'Master' && (
+                          {/* ⚠️ Doit rester aligné sur `USER_DELETE_ROLES` de
+                              `backend/src/auth/roles.ts`, seul garde-fou réel : un
+                              Director ne supprime aucun compte. Ne pas afficher un
+                              bouton que l'API refusera en 403. Le compte Master reste
+                              par ailleurs non supprimable, comme avant. */}
+                          {u.role !== 'Master' && canDeleteUsers && (
                             <button onClick={() => deleteUser(u.id)} className="p-2.5 hover:bg-red-500/20 rounded text-red-500">
                               <Trash2 size={16} />
                             </button>
