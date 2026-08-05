@@ -10,9 +10,14 @@ import {
   joinConversationRooms as chatJoinConversationRooms,
   notifyConversationCreated as chatNotifyConversationCreated
 } from './chat';
-import { registerPresenceHandlers, handleUserChanged } from './presence';
+import { registerPresenceHandlers, handleUserChanged, getUserIdsOnSection } from './presence';
+import { registerGameHandlers, emitSessionToPlayers } from './games';
+import { sendPushToUsers } from '../utils/pushSender';
+import { PrismaClient } from '@prisma/client';
 
 let io: Server;
+// Sert uniquement à résoudre le nom de l'auteur d'un défi pour la notification.
+const prisma = new PrismaClient();
 
 // Extrait le JWT du handshake : socket.handshake.auth.token (convention socket.io-client)
 // avec repli sur le header Authorization: Bearer <token>.
@@ -63,6 +68,10 @@ export const setupRealtime = (socketIo: Server) => {
     // puis à chaque changement d'onglet) et reçoit 'presence:state'.
     registerPresenceHandlers(io, socket);
 
+    // Jeux : placement de flotte, coups et abandon. Les handlers ne sont pas
+    // enregistrés du tout pour un rôle sans accès aux Jeux.
+    registerGameHandlers(io, socket);
+
     socket.on('disconnect', () => {
       console.log('Client disconnected', socket.id);
     });
@@ -112,6 +121,59 @@ export const joinConversationRooms = async (conversationId: string, participantI
 
 export const notifyConversationCreated = (conversation: { participants: string[] }) => {
   if (io) chatNotifyConversationCreated(io, conversation);
+};
+
+// ---------------------------------------------------------------------------
+// JEUX — helpers exposés aux routes REST
+// ---------------------------------------------------------------------------
+
+const NOMS_JEUX: Record<string, string> = {
+  morpion: 'Morpion',
+  connect4: 'Puissance 4',
+  battleship: 'Bataille navale',
+};
+
+/**
+ * Notifie un défi (créé, refusé, annulé) aux DEUX intéressés, dans leur room
+ * personnelle — jamais en broadcast : un défi ne concerne personne d'autre.
+ *
+ * Un défi créé déclenche en plus une notification push chez le destinataire.
+ * C'est le manque signalé par Théo : « impossible de défier un utilisateur, il ne
+ * reçoit jamais l'invitation ». On ne pousse PAS si la personne est déjà sur la
+ * rubrique Jeux (elle le voit arriver en direct), même logique que le chat.
+ */
+export const notifyChallenge = (
+  challenge: { id: string; fromUserId: string; toUserId: string; game: string; status: string },
+  auteurId: string
+) => {
+  if (!io) return;
+  io.to(`user:${challenge.toUserId}`).emit('game:challenge:updated', challenge);
+  io.to(`user:${challenge.fromUserId}`).emit('game:challenge:updated', challenge);
+
+  if (challenge.status !== 'pending' || auteurId !== challenge.fromUserId) return;
+
+  // Best-effort : l'échec d'un push ne doit jamais faire échouer la création du
+  // défi (et `sendPushToUsers` purge déjà les abonnements morts).
+  void (async () => {
+    try {
+      // `getUserIdsOnSection` renvoie un Set, pas un tableau.
+      if (getUserIdsOnSection('games').has(challenge.toUserId)) return;
+      const auteur = await prisma.user.findUnique({ where: { id: auteurId }, select: { name: true } });
+      await sendPushToUsers([challenge.toUserId], {
+        title: `${auteur?.name ?? 'Un collègue'} vous défie !`,
+        body: `${NOMS_JEUX[challenge.game] ?? challenge.game} — à vous de relever le gant.`,
+        tag: `game-challenge-${challenge.id}`,
+        section: 'games',
+      });
+    } catch (e) {
+      console.error('[games] notification push du défi', e);
+    }
+  })();
+};
+
+/** Diffuse une partie aux deux joueurs, chacun avec SA vue redactée. */
+export const notifySessionToPlayers = (session: any, event: string) => {
+  if (io) emitSessionToPlayers(io, session, event);
 };
 
 // Appelé par routes/users.ts après une mutation de compte : recharge l'identité

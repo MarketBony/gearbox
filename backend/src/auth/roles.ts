@@ -38,6 +38,12 @@ export const DIRECTOR_ASSIGNABLE_ROLES = ['Coordinator', 'Digital Manager', 'Gue
 // promouvoir personne.
 export const USER_DELETE_ROLES = ['Master', 'Administrator'];
 
+// Accès aux Jeux. ⚠️ **Director en est EXCLU volontairement** — c'est la seule
+// exception à la règle « Director = mêmes droits qu'Administrator » (cf. CLAUDE.md).
+// Ce n'est pas un oubli : ne pas l'ajouter en croyant corriger une incohérence.
+// Doit rester aligné sur `GAMES_ALLOWED_ROLES` de `constants.ts` côté frontend.
+export const GAMES_ROLES = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'];
+
 export const canAssignRole = (actorRole: string | undefined, targetRole: string): boolean => {
   if (actorRole === 'Director') return DIRECTOR_ASSIGNABLE_ROLES.includes(targetRole);
   return true;

@@ -289,3 +289,61 @@ model ActivityLog {
   timestamp  DateTime
   createdAt  DateTime @default(now())
 }
+
+// ============================================================================
+// JEUX (05/08/2026)
+//
+// Jusqu'ici les défis ET les parties vivaient dans le `localStorage` du
+// navigateur : défier un collègue était donc structurellement impossible (le
+// défi n'existait que chez l'émetteur), et le « classement global » ne classait
+// que les parties d'un seul poste. Ces deux modèles sont la couche qui manquait.
+//
+// ⚠️ On ne stocke QUE des `userId` — jamais le nom ni la couleur du joueur.
+// L'ancienne version les recopiait dans chaque partie, si bien qu'un renommage
+// laissait l'ancien nom au classement. L'identité se résout par id à l'affichage.
+// ============================================================================
+
+model GameChallenge {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  game       String // 'morpion' | 'connect4' | 'battleship'
+  status     String // 'pending' | 'accepted' | 'refused'
+  // La session créée à l'acceptation, pour que les deux joueurs y soient renvoyés.
+  sessionId  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Un défi en attente est cherché par destinataire à chaque ouverture du lobby.
+  @@index([toUserId, status])
+  @@index([fromUserId, status])
+}
+
+model GameSession {
+  id          String   @id @default(uuid())
+  game        String // 'morpion' | 'connect4' | 'battleship'
+  player1Id   String
+  player2Id   String
+  currentTurn String // userId
+  // Plateau en Json : sa forme diffère par jeu et a vocation à évoluer (la
+  // bataille navale est passée d'une grille de cellules à une liste de navires
+  // identifiés) — le faire vivre ici évite une migration à chaque ajustement.
+  //
+  // ⚠️ CE CHAMP CONTIENT DES INFORMATIONS SECRÈTES (positions des navires) : il
+  // ne doit JAMAIS sortir du backend tel quel. Seul `projectSessionFor()`
+  // (utils/gameView.ts) produit une vue publiable, redactée pour un joueur donné.
+  board       Json
+  // 'placing' = bataille navale, flottes en cours de placement ; les autres jeux
+  // démarrent directement en 'playing'.
+  status      String // 'placing' | 'playing' | 'finished'
+  // userId du vainqueur, ou 'draw' pour un match nul. Null tant que la partie court.
+  winnerId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Le lobby liste « mes parties » : deux index, un par place de joueur.
+  @@index([player1Id, status])
+  @@index([player2Id, status])
+  // Le classement lit toutes les parties terminées.
+  @@index([status])
+}
