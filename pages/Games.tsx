@@ -404,7 +404,10 @@ const Games: React.FC = () => {
         <div className="flex gap-1.5 mt-3 overflow-x-auto custom-scrollbar -mx-1 px-1 pb-1">
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`shrink-0 min-h-[36px] px-3 rounded-xl text-[11px] font-bold transition-colors flex items-center gap-1.5 ${
+              // 44 px sous md, 36 px au-delà : même arbitrage que le composant Select
+              // (correctif 21) — une puce de 36 px se rate au doigt, mais 44 px
+              // sur ordinateur gonflerait inutilement la barre.
+              className={`shrink-0 min-h-[44px] md:min-h-[36px] px-3 rounded-xl text-[11px] font-bold transition-colors flex items-center gap-1.5 ${
                 tab === t.id ? 'gx-gradient text-white' : 'bg-white/5 text-bony-muted hover:text-bony-text'
               }`}>
               {t.icon} {t.label}
