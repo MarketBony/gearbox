@@ -471,3 +471,40 @@ export const GAMES_ALLOWED_ROLES: string[] = [
   'Coordinator',
   'Digital Manager',
 ];
+
+// ============================================================================
+// RÔLE « CHEF DE SITE » (Site Manager) — 05/08/2026
+//
+// Premier rôle dont les droits dépendent d'une DONNÉE du compte (`user.sites`) et
+// pas seulement de son nom. Consultation seule, cloisonné à ses concessions.
+//
+// ⚠️ Ce fichier ne fait que MASQUER : le garde-fou réel est côté serveur
+// (`backend/src/auth/siteScope.ts` filtre les données, et l'absence du rôle dans
+// tous les `EDIT_ROLES` interdit l'écriture). Ne jamais s'appuyer uniquement sur
+// ces constantes pour protéger quoi que ce soit.
+// ============================================================================
+export const SITE_MANAGER_ROLE = 'Site Manager';
+export const isSiteManager = (role?: string | null) => role === SITE_MANAGER_ROLE;
+
+/** Rubriques accessibles à un chef de site. Liste FERMÉE, alignée sur le backend. */
+export const SITE_MANAGER_SECTIONS: string[] = [
+  'dashboard', 'projects', 'digital', 'hello-marketing', 'budget', 'agenda',
+];
+
+/**
+ * Rôles qui n'ont aucune interaction avec l'équipe marketing : ni chat, ni jeux, ni
+ * fil d'actualité, ni bulles de présence — ni les leurs, ni celles des autres.
+ * Aligné sur `hasSocialFeatures` de backend/src/auth/roles.ts.
+ */
+export const hasSocialFeatures = (role?: string | null) => !isSiteManager(role);
+
+/**
+ * Périmètre imposé à l'utilisateur, ou `null` s'il voit tout.
+ *
+ * ⚠️ Renvoie un tableau VIDE pour un chef de site sans site rattaché — « ne voit
+ * rien », jamais « voit tout ». Le défaut doit être fermé, comme côté serveur.
+ * À utiliser pour BORNER les sélecteurs de périmètre : il peut filtrer **entre** ses
+ * sites s'il en a plusieurs, jamais en dehors.
+ */
+export const allowedSitesFor = (user?: { role?: string | null; sites?: string[] } | null): string[] | null =>
+  isSiteManager(user?.role) ? (user?.sites ?? []) : null;
