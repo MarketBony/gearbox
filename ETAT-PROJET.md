@@ -10,10 +10,11 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 30** (refonte des Jeux :
-  moteur multijoueur serveur, bataille navale, refonte visuelle, 5 août) — `api` **et**
-  `web`, migration Prisma. Les correctifs 27, 28 et 29 ont eux aussi demandé les deux
-  services ; les 25 et 26 s'étaient contentés de `web`. Le
+- master = prod, synchronisés. Dernier lot déployé : **correctif 31** (responsive mobile :
+  filtres repliables, Budget écrasé, Chat au doigt, barre du bas, 5 août) — **`web`
+  seul**, frontend uniquement. Le correctif 30 (refonte des Jeux) avait demandé `api`
+  **et** `web` avec migration, comme les 27, 28 et 29 ; les 25 et 26 s'étaient contentés
+  de `web`. Le
   correctif 24 (curseurs `alpineShare` / `nissanShare`) a lui nécessité `api` **et**
   `web`, le schéma Prisma ayant bougé. Le correctif 23 (routage Alpine/Nissan) est
   déployé aussi, `web` seul avait suffi. Le SHA exact se lit
@@ -1017,6 +1018,76 @@
     port 3001 — c'était la cause des `EADDRINUSE` et des `EPERM` sur `prisma generate`.
     Vérifier qu'il n'en tourne **qu'un** avant de diagnostiquer autre chose.
 
+31. **Responsive mobile : filtres repliables, Budget écrasé, Chat au doigt, barre du bas**
+    (`fix/responsive-mobile`, 5 août). **Frontend seul**, aucune migration → `web` seul.
+
+    **Filtres repliables (Dashboard, Digital)** — signalé par Théo, capture à l'appui.
+    Mesuré à 375 × 812 : l'en-tête du Dashboard occupait **461 px sur 812**, soit 57 %
+    de l'écran, avec **3 cartes visibles** seulement. Nouveau composant
+    `components/CollapsibleFilters.tsx`, qui ne gère **que l'enveloppe** : chaque page
+    fournit ses contrôles en `children` et son propre résumé — elle seule sait ce que
+    ses filtres veulent dire. On ne centralise pas les filtres eux-mêmes, ce serait
+    coupler des écrans qui n'ont pas les mêmes.
+    - ⚠️ **À partir de `md`, rendu strictement inchangé** : ni barre ni bouton. Vérifié
+      par **style calculé** — l'enveloppe est en `display: none` et le bouton mesure
+      **0 px** de haut à 1440 px.
+    - ⚠️ **Les enfants ne sont montés qu'une fois**, masqués par `hidden` et non rendus
+      conditionnellement : un `{open && children}` ferait perdre l'état interne des
+      sélecteurs à chaque repli.
+    - Replié, la barre affiche un **résumé compact des filtres actifs** (choix de Théo
+      parmi trois options) du type « 2026 · Tout le réseau », plus une pastille du
+      nombre de filtres restrictifs. Les **dates ne comptent pas** comme filtre actif :
+      elles valent toujours quelque chose, la pastille afficherait « 1 » en permanence.
+    - Mesuré : Dashboard **461 → 150 px** (311 px regagnés), cartes **3 → 5** ; Digital
+      **420 → 232 px** (188 px regagnés). Consommé du Dashboard **inchangé à
+      1 447 820 €** en desktop, donc aucun filtre altéré au passage.
+
+    **Budget — le tableau par site était invisible.** Le conteneur passe en **colonne**
+    sous `md` et le panneau portait `flex-1`, qui vaut `flex: 1 1 0%` : base de hauteur
+    **nulle**. Mesuré en réappliquant l'ancienne règle par le DOM sur la page réelle :
+    **2 px de haut, 0 ligne visible**. Après : **568 px, 5 lignes**, défilement interne
+    et en-tête `sticky` opérants. **Même classe de défaut que « Prochaines Échéances »**
+    du Dashboard.
+    ℹ️ **Première correction écartée, et c'est instructif** : en hauteur naturelle
+    (`flex-none min-h-[420px]`) la carte montait à **1 933 px** pour 25 lignes — le
+    tableau était visible mais son en-tête collant ne collait plus à rien et le
+    défilement devenait interminable. D'où `h-[70vh]` sous `md` et `md:h-auto md:flex-1`
+    au-delà (vérifié : 488 px à 1440 px, `md:h-auto` gagne bien).
+
+    **Chat — deux défauts distincts, que j'avais d'abord confondus.**
+    1. Sourdine et épinglage : six boutons (deux par rendu, **trois** rendus de la
+       liste) en `opacity-0 group-hover:opacity-100`, donc invisibles sans survol.
+       Passés en `opacity-100 md:opacity-0 md:group-hover:opacity-100`.
+    2. ⚠️ **Réactions emoji : j'avais annoncé à tort « exactement la même cause ».** La
+       barre d'actions est déjà visible sur mobile ; c'est la **rangée d'emojis à
+       l'intérieur** qui porte `hidden md:flex`. On ne se contente donc **pas** d'enlever
+       le `hidden` — cinq emojis en permanence à côté de chaque message sur 320 px
+       serait pire que le mal, et c'est précisément pourquoi ils avaient été masqués. Un
+       bouton dédié ouvre un sélecteur, en réutilisant le mécanisme `menuMsgId` déjà en
+       place plutôt qu'un second système de popover. Cycle ajout/retrait vérifié sur la
+       page réelle, base rendue à son état initial.
+
+    **Barre du bas** → **Dashboard, Projets, To-do, Agenda, Chat**. L'ancien ordre
+    n'était pas un choix mais un effet de bord de `mainItems.slice(0, 5)` : la barre
+    héritait de l'ordre du menu latéral.
+    - ⚠️ `moreNavItems` était un complément **par indice** (`slice(5)`) : changer la
+      barre sans y toucher aurait fait **disparaître Hello Marketing et Jeux** du mobile
+      et affiché **Agenda et Chat en double**. « Plus » est désormais « tout ce qui n'est
+      pas dans la barre » — vérifié, aucun doublon.
+    - ⚠️ Le rôle **External** n'a que Digital, Chat et Hello Marketing et son menu
+      « Plus » est **vide** : avec une liste figée il n'aurait gardé que « Chat » et les
+      deux autres rubriques devenaient **inaccessibles**. D'où le repli sous trois
+      rubriques.
+    - Les ids sont piochés **dans `mainItems`**, qui porte déjà le gating par rôle : on
+      l'hérite au lieu de le réimplémenter. La pastille de présence du bouton « Plus »
+      suit automatiquement. L'ouverture automatique sur Dashboard (`App.tsx`) n'est pas
+      touchée.
+
+    Vérifié aussi : zones tactiles à 62 px sur la barre du bas et 44 px sur les emojis
+    du sélecteur, aucun défilement horizontal de page sur les quatre écrans, thèmes
+    clair **et** sombre. `tsc` racine 12 lignes préexistantes, backend 0.
+    ℹ️ **Validé par Théo** avant déploiement.
+
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - ~~⚠️ Corriger le KPI « Rythme de consommation »~~ — **fait le 04/08** (correctif 25).
   À retenir : la cause inscrite ici (« le récurrent est engagé d'avance ») était
@@ -1041,8 +1112,18 @@
 - ~~Nettoyage des branches locales mergées~~ — **fait le 30/07** : 27 branches
   supprimées après vérification qu'aucune n'était non mergée. Il ne reste que
   `master`.
-- Réactions emoji du Chat non accessibles sur mobile (masquées au survol) — laissé
-  de côté volontairement lors du lot responsive, nécessite un appui long ou un menu
+- ~~Réactions emoji du Chat non accessibles sur mobile~~ — **fait le 05/08** (correctif
+  31). ⚠️ La cause inscrite ici (« masquées au survol ») était **fausse** : la barre
+  d'actions était bien visible sur mobile, c'est la **rangée d'emojis à l'intérieur**
+  qui portait `hidden md:flex`. Corrigé par un bouton dédié ouvrant un sélecteur — pas
+  en retirant le `hidden`, cinq emojis permanents par message sur 320 px auraient été
+  pires. La piste « appui long » notée ici n'a pas été retenue : un menu est plus
+  découvrable et réutilise le mécanisme déjà en place.
+- **Duplication à surveiller** : `pages/Projects.tsx` garde sa barre de filtres inline
+  et n'utilise pas `components/CollapsibleFilters.tsx`, créé au correctif 31 pour le
+  Dashboard et Digital. Choix assumé (barre imbriquée dans une barre d'outils complexe,
+  écran très utilisé), mais toute évolution du comportement de repli doit être portée
+  aux **deux** endroits en attendant.
 - Vues Trimestre/Semestre/Année de l'Agenda : pas de vue mobile dédiée (contrairement
   à Semaine/Mois) — les barres Gantt compressent sans déborder, jugé acceptable
 - Point technique à garder en tête : Tailwind est chargé en CDN Play → les variantes

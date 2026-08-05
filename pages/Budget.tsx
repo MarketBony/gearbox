@@ -903,7 +903,18 @@ const Budget: React.FC = () => {
                   </div>
 
                   {/* RIGHT: MATRIX */}
-                  <div className="flex-1 gx-card flex flex-col overflow-hidden">
+                  {/* ⚠️ `flex-none md:flex-1` et non `flex-1` seul. Le conteneur parent
+                      passe en COLONNE sous md : `flex-1` y vaut `flex: 1 1 0%`, donc une
+                      base de hauteur NULLE — la carte portant `overflow-hidden` et son
+                      propre défilement interne, le tableau se retrouvait écrasé à une
+                      hauteur résiduelle sur mobile (signalé par Théo le 05/08/2026).
+                      Même classe de défaut que « Prochaines Échéances » du Dashboard.
+                      Sous md on fixe donc une hauteur (`h-[70vh]`) plutôt que de
+                      laisser la carte s'étirer : mesuré, en hauteur naturelle elle
+                      montait à 1 933 px pour 25 lignes — l'en-tête `sticky` du
+                      tableau n'aurait plus rien collé et le défilement aurait été
+                      interminable. Bornée, elle garde son défilement interne. */}
+                  <div className="flex-none h-[70vh] md:h-auto md:flex-1 md:min-h-0 gx-card flex flex-col overflow-hidden">
                       <div className="p-4 border-b border-bony-border shrink-0">
                            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
                                <PieChart size={14} className="text-bony-orange"/> Répartition & Performance par Site

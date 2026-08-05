@@ -10,7 +10,7 @@ import {
   MessageSquare, Plus, Send, Star, StarOff, ArrowLeft,
   MoreHorizontal, Pencil, Trash2, X, Image, Reply, Check,
   Users, UserPlus, UserMinus, ChevronRight, Hash, Camera, Upload, ZoomIn,
-  Bell, BellOff, Paperclip, FileText, FileX, Download
+  Bell, BellOff, Paperclip, FileText, FileX, Download, SmilePlus
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import Cropper from 'react-easy-crop';
@@ -307,6 +307,11 @@ const Chat: React.FC = () => {
   const [editContent, setEditContent] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [menuMsgId, setMenuMsgId] = useState<string | null>(null);
+  // Sélecteur de réactions, pour le tactile : la rangée d'emojis directe est
+  // réservée au desktop (`hidden md:flex` plus bas) — cinq emojis en permanence à
+  // côté de chaque message serait illisible sur 320 px. Même mécanisme que
+  // `menuMsgId` plutôt qu'un second système de popover.
+  const [reactMsgId, setReactMsgId] = useState<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [showMobileChat, setShowMobileChat] = useState(false);
 
@@ -666,7 +671,9 @@ const Chat: React.FC = () => {
   // RENDER
   // ========================
   return (
-    <div className="flex h-full overflow-hidden text-bony-text" onClick={() => setMenuMsgId(null)}>
+    // Un clic n'importe où referme le menu d'un message ET le sélecteur de
+    // réactions — ce dernier suit la même règle, sinon il resterait ouvert.
+    <div className="flex h-full overflow-hidden text-bony-text" onClick={() => { setMenuMsgId(null); setReactMsgId(null); }}>
 
       {/* ===== LEFT: CONVERSATION LIST ===== */}
       <div className={`${showMobileChat ? 'hidden md:flex' : 'flex'} w-full md:w-[280px] md:min-w-[280px] border-r border-bony-border flex-col glass-strong h-full shrink-0`}>
@@ -719,10 +726,10 @@ const Chat: React.FC = () => {
                         {unread > 0 && <span className="ml-1 shrink-0 min-w-[18px] h-[18px] bg-bony-orange text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">{unread > 99 ? '99+' : unread}</span>}
                       </div>
                     </div>
-                    <button onClick={e => { e.stopPropagation(); toggleMute(conv.id); }} title={muted ? 'Réactiver les notifications' : 'Mettre en sourdine'} className={`shrink-0 p-1 rounded transition-opacity ${muted ? 'opacity-100 text-bony-orange' : 'opacity-0 group-hover:opacity-100'} ${isActive && !muted ? 'text-white/70 hover:text-white' : muted ? '' : 'text-slate-400 hover:text-bony-orange'}`}>
+                    <button onClick={e => { e.stopPropagation(); toggleMute(conv.id); }} title={muted ? 'Réactiver les notifications' : 'Mettre en sourdine'} className={`shrink-0 p-1 rounded transition-opacity ${muted ? 'opacity-100 text-bony-orange' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'} ${isActive && !muted ? 'text-white/70 hover:text-white' : muted ? '' : 'text-slate-400 hover:text-bony-orange'}`}>
                       {muted ? <BellOff size={13} /> : <Bell size={13} />}
                     </button>
-                    <button onClick={e => { e.stopPropagation(); togglePin(conv.id); }} className={`shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity ${isActive ? 'text-white/70 hover:text-white' : 'text-slate-400 hover:text-bony-orange'}`}>
+                    <button onClick={e => { e.stopPropagation(); togglePin(conv.id); }} className={`shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1 rounded transition-opacity ${isActive ? 'text-white/70 hover:text-white' : 'text-slate-400 hover:text-bony-orange'}`}>
                       {pinned ? <StarOff size={13} /> : <Star size={13} />}
                     </button>
                   </div>
@@ -763,10 +770,10 @@ const Chat: React.FC = () => {
                             {unread > 0 && <span className="ml-1 shrink-0 min-w-[18px] h-[18px] bg-bony-orange text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">{unread > 99 ? '99+' : unread}</span>}
                           </div>
                         </div>
-                        <button onClick={e => { e.stopPropagation(); toggleMute(conv.id); }} title={muted ? 'Réactiver les notifications' : 'Mettre en sourdine'} className={`shrink-0 p-1 rounded transition-opacity ${muted ? 'opacity-100 text-bony-orange' : 'opacity-0 group-hover:opacity-100'} ${isActive && !muted ? 'text-white/70 hover:text-white' : muted ? '' : 'text-slate-400 hover:text-bony-orange'}`}>
+                        <button onClick={e => { e.stopPropagation(); toggleMute(conv.id); }} title={muted ? 'Réactiver les notifications' : 'Mettre en sourdine'} className={`shrink-0 p-1 rounded transition-opacity ${muted ? 'opacity-100 text-bony-orange' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'} ${isActive && !muted ? 'text-white/70 hover:text-white' : muted ? '' : 'text-slate-400 hover:text-bony-orange'}`}>
                           {muted ? <BellOff size={13} /> : <Bell size={13} />}
                         </button>
-                        <button onClick={e => { e.stopPropagation(); togglePin(conv.id); }} className={`shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity ${isActive ? 'text-white/70 hover:text-white' : 'text-slate-400 hover:text-bony-orange'}`}>
+                        <button onClick={e => { e.stopPropagation(); togglePin(conv.id); }} className={`shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1 rounded transition-opacity ${isActive ? 'text-white/70 hover:text-white' : 'text-slate-400 hover:text-bony-orange'}`}>
                           {pinned ? <StarOff size={13} /> : <Star size={13} />}
                         </button>
                       </div>
@@ -806,10 +813,10 @@ const Chat: React.FC = () => {
                         {unread > 0 && <span className="ml-1 shrink-0 min-w-[18px] h-[18px] bg-bony-orange text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">{unread > 99 ? '99+' : unread}</span>}
                       </div>
                     </div>
-                    <button onClick={e => { e.stopPropagation(); toggleMute(conv.id); }} title={muted ? 'Réactiver les notifications' : 'Mettre en sourdine'} className={`shrink-0 p-1 rounded transition-opacity ${muted ? 'opacity-100 text-bony-orange' : 'opacity-0 group-hover:opacity-100'} ${isActive && !muted ? 'text-white/70 hover:text-white' : muted ? '' : 'text-slate-400 hover:text-bony-orange'}`}>
+                    <button onClick={e => { e.stopPropagation(); toggleMute(conv.id); }} title={muted ? 'Réactiver les notifications' : 'Mettre en sourdine'} className={`shrink-0 p-1 rounded transition-opacity ${muted ? 'opacity-100 text-bony-orange' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'} ${isActive && !muted ? 'text-white/70 hover:text-white' : muted ? '' : 'text-slate-400 hover:text-bony-orange'}`}>
                       {muted ? <BellOff size={13} /> : <Bell size={13} />}
                     </button>
-                    <button onClick={e => { e.stopPropagation(); togglePin(conv.id); }} className={`shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity ${isActive ? 'text-white/70 hover:text-white' : 'text-slate-400 hover:text-bony-orange'}`}>
+                    <button onClick={e => { e.stopPropagation(); togglePin(conv.id); }} className={`shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1 rounded transition-opacity ${isActive ? 'text-white/70 hover:text-white' : 'text-slate-400 hover:text-bony-orange'}`}>
                       {pinned ? <StarOff size={13} /> : <Star size={13} />}
                     </button>
                   </div>
@@ -1023,10 +1030,37 @@ const Chat: React.FC = () => {
                                   )}
                                   {/* Hover actions */}
                                   <div className={`absolute ${isMe ? 'right-full mr-1' : 'left-full ml-1'} top-0 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10`}>
+                                    {/* Desktop : la rangée d'emojis directement, un clic suffit. */}
                                     <div className="hidden md:flex items-center gap-1">
                                       {REACTIONS.map(emoji => (
                                         <button key={emoji} onClick={e => { e.stopPropagation(); toggleReaction(msg.id, emoji); }} className="text-sm hover:scale-125 transition-transform leading-none">{emoji}</button>
                                       ))}
+                                    </div>
+                                    {/* Mobile : un bouton qui ouvre le sélecteur. Réagir était tout
+                                        simplement impossible au doigt jusqu'au 05/08/2026 — la barre
+                                        d'actions était bien visible, mais la rangée d'emojis
+                                        qu'elle contient est en `hidden md:flex`. */}
+                                    <div className="relative md:hidden">
+                                      <button
+                                        onClick={e => { e.stopPropagation(); setReactMsgId(reactMsgId === msg.id ? null : msg.id); }}
+                                        className="p-1 rounded text-slate-400 hover:text-bony-orange transition"
+                                        title="Réagir"
+                                      >
+                                        <SmilePlus size={13} />
+                                      </button>
+                                      {reactMsgId === msg.id && (
+                                        <div className="glass-menu absolute right-0 top-full mt-1 rounded-full z-20 flex items-center gap-1 px-2 py-1.5" onClick={e => e.stopPropagation()}>
+                                          {REACTIONS.map(emoji => (
+                                            <button
+                                              key={emoji}
+                                              onClick={e => { e.stopPropagation(); toggleReaction(msg.id, emoji); setReactMsgId(null); }}
+                                              className="text-lg leading-none min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full active:bg-white/10"
+                                            >
+                                              {emoji}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                     <button onClick={e => { e.stopPropagation(); setReplyTo(msg); inputRef.current?.focus(); }} className="p-1 rounded text-slate-400 hover:text-bony-blue transition" title="Répondre">
                                       <Reply size={13} />

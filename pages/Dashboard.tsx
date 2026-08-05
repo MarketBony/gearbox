@@ -42,6 +42,7 @@ import Select from '../components/Select';
 import Avatar from '../components/Avatar';
 import FloatingPanel from '../components/FloatingPanel';
 import DateRangePicker, { toLocalIso, parseLocalDate, getPeriodRanges } from '../components/DateRangePicker';
+import CollapsibleFilters from '../components/CollapsibleFilters';
 
 // Les aides de date et le sélecteur de période vivent désormais dans
 // components/DateRangePicker.tsx : la page Campagnes en a besoin aussi, et les
@@ -895,6 +896,33 @@ const Dashboard: React.FC = () => {
   // commentaire du bloc « Rythme de consommation » dans l'agrégation.
   const ecartRythme = stats.pctEngageADate - stats.pctTempsEcoule;
 
+  // --- Résumé des filtres, pour la barre repliée sur mobile ---
+  // Un filtre « actif » = un filtre qui restreint réellement les chiffres. Les
+  // dates n'en font PAS partie : elles valent toujours quelque chose, les compter
+  // afficherait « 1 filtre » en permanence et la pastille ne voudrait plus rien dire.
+  const filtresActifs =
+    (filterContexts.length > 0 ? 1 : 0) +
+    (filterBrands.length > 0 ? 1 : 0) +
+    (filterServices.length > 0 ? 1 : 0) +
+    (filterProPlus !== 'all' ? 1 : 0);
+
+  // Résumé lisible d'un coup d'œil : la période d'abord (c'est ce qui cadre tous
+  // les montants), puis chaque filtre restrictif. On abrège au-delà de deux
+  // valeurs pour tenir sur une ligne à 320 px.
+  const abrege = (liste: string[]) =>
+    liste.length <= 2 ? liste.join(', ') : `${liste[0]} +${liste.length - 1}`;
+  const resumeFiltres = [
+    dateStart && dateEnd
+      ? (dateStart.slice(0, 4) === dateEnd.slice(0, 4) && dateStart.endsWith('-01-01') && dateEnd.endsWith('-12-31')
+          ? dateStart.slice(0, 4)
+          : `${dateStart.slice(8, 10)}/${dateStart.slice(5, 7)} → ${dateEnd.slice(8, 10)}/${dateEnd.slice(5, 7)}`)
+      : null,
+    filterContexts.length > 0 ? abrege(filterContexts) : 'Tout le réseau',
+    filterBrands.length > 0 ? abrege(filterBrands) : null,
+    filterServices.length > 0 ? abrege(filterServices) : null,
+    filterProPlus === 'pro' ? 'PRO+ seul' : filterProPlus === 'standard' ? 'Sans PRO+' : null,
+  ].filter(Boolean).join(' · ');
+
   const getNetworkIcon = (networkName: string) => {
       const n = networkName.toLowerCase();
       if (n.includes('instagram')) return <Instagram size={14} className="text-[#E1306C]" />;
@@ -921,7 +949,15 @@ const Dashboard: React.FC = () => {
                  </p>
              </div>
 
-             {/* FILTERS */}
+             {/* FILTERS — repliés derrière une barre fine sur mobile (voir
+                 components/CollapsibleFilters.tsx) : ces six blocs empilés
+                 occupaient tout l'écran avant la première carte. Rendu desktop
+                 strictement inchangé. */}
+             <CollapsibleFilters
+               storageKey="dashboard"
+               activeCount={filtresActifs}
+               summary={resumeFiltres}
+             >
              <div className="flex flex-wrap items-center gap-3 bg-slate-100 dark:bg-black/30 px-3 py-2.5 rounded-xl border border-bony-border/50">
                  {/* 1. Date Range */}
                  <DateRangePicker
@@ -955,6 +991,7 @@ const Dashboard: React.FC = () => {
                      />
                  </div>
              </div>
+             </CollapsibleFilters>
          </div>
       </div>
 

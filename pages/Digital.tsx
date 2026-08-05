@@ -9,6 +9,7 @@ import { SOCIAL_STATUS_COLORS, BRANDS, SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTI
 import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
+import CollapsibleFilters from '../components/CollapsibleFilters';
 import DatePicker from '../components/DatePicker';
 
 type Tab = 'Calendrier Editorial' | 'Planning Digital' | 'Archives' | 'Gestion des TAGS';
@@ -1386,6 +1387,20 @@ const Digital: React.FC = () => {
       );
   };
 
+  // --- Résumé des filtres, pour la barre repliée sur mobile ---
+  // Un filtre « actif » = un filtre qui restreint réellement la liste. La
+  // recherche en fait partie ; « Toutes marques » et « Tous services » non.
+  const filtresActifs =
+    (searchTerm.trim() ? 1 : 0) +
+    (filterBrand !== 'All' ? 1 : 0) +
+    (filterService !== 'All' ? 1 : 0);
+
+  const resumeFiltres = [
+    searchTerm.trim() ? `« ${searchTerm.trim()} »` : null,
+    filterBrand !== 'All' ? filterBrand : 'Toutes marques',
+    filterService !== 'All' ? filterService : null,
+  ].filter(Boolean).join(' · ');
+
   return (
     <div className="flex flex-col h-full overflow-hidden animate-fade-in transition-colors relative max-w-full">
 
@@ -1460,8 +1475,15 @@ const Digital: React.FC = () => {
                 </div>
             </div>
 
-            {/* Toolbar (Only for Calendar & Archives) */}
+            {/* Toolbar (Only for Calendar & Archives) — repliée derrière une barre
+                fine sur mobile : recherche, deux sélecteurs et bouton « Ajouter »
+                empilés pleine largeur mangeaient l'écran. Desktop inchangé. */}
             {activeTab !== 'Planning Digital' && activeTab !== 'Gestion des TAGS' && (
+                <CollapsibleFilters
+                    storageKey="digital"
+                    activeCount={filtresActifs}
+                    summary={resumeFiltres}
+                >
                 <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2">
                     {/* Search — pleine largeur sur mobile */}
                     <div className="relative w-full md:flex-1 md:max-w-md">
@@ -1510,6 +1532,7 @@ const Digital: React.FC = () => {
                         </button>
                     )}
                 </div>
+                </CollapsibleFilters>
             )}
         </div>
 

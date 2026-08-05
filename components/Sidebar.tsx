@@ -199,12 +199,41 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     ? allMainItems.filter(i => ['digital', 'chat', 'hello-marketing'].includes(i.id))
     : allMainItems;
 
-  // Bottom nav: first 5 items shown directly, rest + extras in More menu
-  const bottomNavItems = mainItems.slice(0, 5);
+  // ============================================================================
+  // BARRE DU BAS (mobile) — liste EXPLICITE, demandée par Théo le 05/08/2026
+  //
+  // Avant, c'était `mainItems.slice(0, 5)` : la barre héritait donc de l'ordre du
+  // menu latéral, d'où Hello Marketing et Jeux en première position alors que ce
+  // ne sont pas les rubriques du quotidien. On choisit désormais explicitement.
+  //
+  // ⚠️ On pioche les ids DANS `mainItems` et non dans une liste parallèle : le
+  // gating par rôle (Jeux, Export, External) y est déjà porté, on l'hérite donc
+  // gratuitement au lieu de le réimplémenter — et une rubrique retirée à un rôle
+  // ne peut pas réapparaître par la barre.
+  // ============================================================================
+  const MOBILE_BAR_IDS = ['dashboard', 'projects', 'todo', 'agenda', 'chat'];
+
+  // Ordre = celui de MOBILE_BAR_IDS, pas celui du menu latéral.
+  const preferredBottom = MOBILE_BAR_IDS
+    .map(id => mainItems.find(i => i.id === id))
+    .filter((i): i is typeof mainItems[number] => !!i);
+
+  // ⚠️ Repli indispensable pour le rôle EXTERNAL : il n'a que Digital, Chat et
+  // Hello Marketing, et son menu « Plus » est vide (voir plus bas). Sans ce repli
+  // il n'aurait que « Chat » dans sa barre et les deux autres rubriques
+  // deviendraient tout simplement inaccessibles sur mobile.
+  const bottomNavItems = preferredBottom.length >= 3
+    ? preferredBottom
+    : mainItems.slice(0, 5);
+
+  // ⚠️ « Plus » = tout ce qui n'est PAS dans la barre, et non plus un découpage par
+  // indice (`slice(5)`). Avec l'ancienne formule, changer la barre aurait fait
+  // disparaître Hello Marketing et Jeux du mobile tout en dupliquant Agenda et Chat.
+  const bottomIds = new Set(bottomNavItems.map(i => i.id));
   const moreNavItems = isExternal
     ? []
     : [
-        ...mainItems.slice(5),
+        ...mainItems.filter(i => !bottomIds.has(i.id)),
         { id: 'archives', icon: Archive, label: 'Projets Archivés' },
         { id: 'settings', icon: Settings, label: 'Paramètres' },
       ];
