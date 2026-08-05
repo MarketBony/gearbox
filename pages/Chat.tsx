@@ -10,14 +10,27 @@ import {
   MessageSquare, Plus, Send, Star, StarOff, ArrowLeft,
   MoreHorizontal, Pencil, Trash2, X, Image, Reply, Check,
   Users, UserPlus, UserMinus, ChevronRight, Hash, Camera, Upload, ZoomIn,
-  Bell, BellOff
+  Bell, BellOff, Paperclip, FileText, FileX, Download
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import Cropper from 'react-easy-crop';
 
 const REACTIONS = ['👍', '❤️', '😂', '😮'];
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 Mo (aligné backend uploads chat)
+// ⚠️ Doit rester aligné sur la règle `chat` de `backend/src/routes/uploads.ts`. Ce
+// contrôle client n'est qu'un confort (message d'erreur immédiat, pas d'upload de
+// 100 Mo pour rien) : **le serveur est le seul garde-fou réel**.
+const MAX_UPLOAD_SIZE = 100 * 1024 * 1024; // 100 Mo, tous formats
+// Sert uniquement à décider si le message s'affiche en IMAGE dans le fil ou en carte
+// de pièce jointe — ce n'est plus une liste d'autorisation.
 const CHAT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+// Poids lisible pour l'affichage d'une pièce jointe.
+const formatPoids = (octets?: number): string => {
+  if (!octets || octets <= 0) return '';
+  if (octets < 1024) return `${octets} o`;
+  if (octets < 1024 * 1024) return `${(octets / 1024).toFixed(0)} Ko`;
+  return `${(octets / 1024 / 1024).toFixed(octets < 10 * 1024 * 1024 ? 1 : 0)} Mo`;
+};
 
 // Overlay client-only pour les features HORS PÉRIMÈTRE (épingle, renommage et
 // membres de groupe) : le backend n'expose aucun événement pour elles. Stocké
@@ -314,6 +327,7 @@ const Chat: React.FC = () => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const activeConvIdRef = useRef<string | null>(null);
   useEffect(() => { activeConvIdRef.current = activeConvId; }, [activeConvId]);
 
@@ -447,7 +461,13 @@ const Chat: React.FC = () => {
   const unreadCount = (conv: ChatConversation) => conv.unreadCounts?.[me?.id ?? ''] ?? 0;
 
   // ---- SEND ----
-  const sendMessage = useCallback((content: string, type: 'text' | 'image' = 'text') => {
+  // `piece` porte le nom et le poids d'origine d'une pièce jointe : le fichier sur le
+  // serveur est renommé en uuid, donc sans ça on ne saurait plus quoi afficher.
+  const sendMessage = useCallback((
+    content: string,
+    type: 'text' | 'image' | 'file' = 'text',
+    piece?: { fileName: string; fileSize: number }
+  ) => {
     if (!activeConvId || !me || !content.trim()) return;
     const replyToId = replyTo?.id;
     setReplyTo(null);
@@ -455,7 +475,7 @@ const Chat: React.FC = () => {
     // Envoi via socket : l'ajout à la liste se fait à la réception de
     // chat:message:new (l'émetteur est dans la room et reçoit sa diffusion).
     // Le backend gère identité/timestamp/unread/lastMessage. Erreur via l'ack.
-    emitWithAck('chat:message:send', { conversationId: activeConvId, content, type, replyToId })
+    emitWithAck('chat:message:send', { conversationId: activeConvId, content, type, replyToId, ...piece })
       .catch(err => alert(err instanceof Error ? err.message : "Échec de l'envoi du message."));
   }, [activeConvId, me, replyTo]);
 
@@ -521,23 +541,31 @@ const Chat: React.FC = () => {
       .catch(() => alert('Échec de la mise en sourdine (serveur injoignable ?).'));
   };
 
-  // ---- IMAGE ----
+  // ---- PIÈCES JOINTES ----
   // Upload préalable (POST /api/uploads/chat) puis le message socket transporte
-  // l'URL (plus de base64). Formats et taille alignés sur les règles backend.
-  const handleImage = async (file: File) => {
-    if (!CHAT_IMAGE_TYPES.includes(file.type)) { alert('Format non accepté (JPEG, PNG, GIF, WebP).'); return; }
-    if (file.size > MAX_IMAGE_SIZE) { alert('Image trop lourde (max 10 Mo).'); return; }
+  // l'URL (plus de base64). Tous formats acceptés depuis le 05/08/2026 : une image
+  // s'affiche dans le fil, tout le reste devient une carte de pièce jointe.
+  const handleAttachment = async (file: File) => {
+    if (file.size > MAX_UPLOAD_SIZE) {
+      alert(`Fichier trop lourd (max ${MAX_UPLOAD_SIZE / 1024 / 1024} Mo).`);
+      return;
+    }
+    // Un fichier vide passerait le contrôle de taille mais produirait un message
+    // inutilisable (et `content` vide est refusé par le serveur).
+    if (file.size === 0) { alert('Fichier vide.'); return; }
     try {
       const url = await db.uploadFile('chat', file);
-      sendMessage(url, 'image');
+      const estImage = CHAT_IMAGE_TYPES.includes(file.type);
+      sendMessage(url, estImage ? 'image' : 'file', { fileName: file.name, fileSize: file.size });
     } catch (e) {
-      alert(e instanceof ApiError ? e.message : "Échec de l'upload de l'image.");
+      alert(e instanceof ApiError ? e.message : "Échec de l'envoi du fichier.");
     }
   };
 
+  // Coller : on prend le premier fichier quel qu'il soit, plus seulement une image.
   const handlePaste = (e: React.ClipboardEvent) => {
-    const file = Array.from(e.clipboardData.files as FileList).find((f: File) => f.type.startsWith('image/'));
-    if (file) { e.preventDefault(); handleImage(file); }
+    const file = Array.from(e.clipboardData.files as FileList)[0];
+    if (file) { e.preventDefault(); handleAttachment(file); }
   };
 
   // ---- NEW PRIVATE CONVERSATION ----
@@ -912,7 +940,11 @@ const Chat: React.FC = () => {
                                 if (!parent) return null;
                                 return (
                                   <div className="text-[10px] text-bony-muted border-l-2 border-bony-orange pl-2 mb-1 truncate max-w-full italic">
-                                    {parent.senderName}: {parent.type === 'image' ? '📷 Image' : parent.content.slice(0, 60)}
+                                    {parent.senderName}: {parent.type === 'image'
+                                      ? '📷 Image'
+                                      : parent.type === 'file'
+                                        ? `📎 ${parent.fileName ?? 'Pièce jointe'}`
+                                        : parent.content.slice(0, 60)}
                                   </div>
                                 );
                               })()}
@@ -935,12 +967,51 @@ const Chat: React.FC = () => {
                                 </div>
                               ) : (
                                 <div className="relative">
-                                  {msg.type === 'image' ? (
+                                  {/* Pièce jointe purgée (180 j) : le message reste, le
+                                      fichier a disparu du disque. On l'annonce au lieu
+                                      d'afficher une image cassée ou un lien mort. */}
+                                  {msg.fileExpiredAt ? (
+                                    <div className="px-3 py-2 rounded-xl border border-dashed border-bony-border bg-bony-panel/60 flex items-center gap-2 max-w-[260px]">
+                                      <FileX size={16} className="text-bony-muted shrink-0" />
+                                      <div className="min-w-0">
+                                        <p className="text-[11px] font-bold text-bony-muted truncate">
+                                          {msg.fileName ?? 'Pièce jointe'}
+                                        </p>
+                                        <p className="text-[10px] text-bony-muted/70">Pièce jointe expirée</p>
+                                      </div>
+                                    </div>
+                                  ) : msg.type === 'image' ? (
                                     <img
                                       src={msg.content} alt="img"
                                       className="max-w-[240px] max-h-[200px] rounded-xl object-cover cursor-pointer border border-bony-border hover:opacity-90 transition"
                                       onClick={() => setLightboxSrc(msg.content)}
                                     />
+                                  ) : msg.type === 'file' ? (
+                                    // `download` porte le nom d'origine : le fichier sur
+                                    // le serveur s'appelle <uuid>.<ext>, l'utilisateur
+                                    // récupérerait sinon un nom illisible. Le serveur
+                                    // force déjà le téléchargement pour tout ce qui
+                                    // n'est pas image ou PDF (en-tête Content-Disposition).
+                                    <a
+                                      href={msg.content}
+                                      download={msg.fileName ?? undefined}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-3 py-2.5 rounded-xl border border-bony-border bg-bony-panel hover:border-bony-orange/60 transition-colors flex items-center gap-2.5 max-w-[260px] group/pj"
+                                    >
+                                      <span className="w-8 h-8 rounded-lg bg-bony-orange/10 flex items-center justify-center shrink-0">
+                                        <FileText size={16} className="text-bony-orange" />
+                                      </span>
+                                      <span className="min-w-0 flex-1">
+                                        <span className="block text-[11px] font-bold text-bony-text truncate" title={msg.fileName ?? ''}>
+                                          {msg.fileName ?? 'Pièce jointe'}
+                                        </span>
+                                        <span className="block text-[10px] text-bony-muted">
+                                          {formatPoids(msg.fileSize) || 'Fichier'}
+                                        </span>
+                                      </span>
+                                      <Download size={14} className="text-bony-muted group-hover/pj:text-bony-orange transition-colors shrink-0" />
+                                    </a>
                                   ) : (
                                     <div
                                       className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${isMe ? 'text-white rounded-br-sm' : 'bg-bony-panel border border-bony-border text-bony-text rounded-bl-sm'}`}
@@ -1012,7 +1083,11 @@ const Chat: React.FC = () => {
                     <Reply size={14} className="text-bony-orange shrink-0" />
                     <div className="flex-1 text-[11px] text-bony-muted truncate">
                       <span className="font-bold text-bony-orange">{replyTo.senderName}</span>
-                      {' '}— {replyTo.type === 'image' ? '📷 Image' : replyTo.content.slice(0, 80)}
+                      {' '}— {replyTo.type === 'image'
+                        ? '📷 Image'
+                        : replyTo.type === 'file'
+                          ? `📎 ${replyTo.fileName ?? 'Pièce jointe'}`
+                          : replyTo.content.slice(0, 80)}
                     </div>
                     <button onClick={() => setReplyTo(null)} className="text-slate-400 hover:text-bony-text"><X size={14} /></button>
                   </div>
@@ -1021,8 +1096,15 @@ const Chat: React.FC = () => {
                 {/* Input */}
                 <div className="px-4 py-3 border-t border-bony-border glass-strong shrink-0">
                   <div className="flex items-end gap-2 bg-bony-dark border border-bony-border rounded-xl px-3 py-2 focus-within:border-bony-orange transition-colors">
-                    <button onClick={() => fileInputRef.current?.click()} className="text-slate-400 hover:text-bony-orange transition p-1 shrink-0 mb-0.5" title="Envoyer une image">
+                    {/* Deux déclencheurs pour un seul champ : l'un filtre sur les
+                        images (usage le plus courant, la galerie s'ouvre directement
+                        sur mobile), l'autre accepte tout. Le contrôle réel est côté
+                        serveur, `accept` n'est qu'un confort de sélection. */}
+                    <button onClick={() => imageInputRef.current?.click()} className="text-slate-400 hover:text-bony-orange transition p-1 shrink-0 mb-0.5" title="Envoyer une image">
                       <Image size={18} />
+                    </button>
+                    <button onClick={() => fileInputRef.current?.click()} className="text-slate-400 hover:text-bony-orange transition p-1 shrink-0 mb-0.5" title="Joindre un fichier (tous formats, max 100 Mo)">
+                      <Paperclip size={18} />
                     </button>
                     <textarea
                       ref={inputRef}
@@ -1038,7 +1120,8 @@ const Chat: React.FC = () => {
                       <Send size={16} />
                     </button>
                   </div>
-                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImage(f); e.target.value = ''; }} />
+                  <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleAttachment(f); e.target.value = ''; }} />
+                  <input ref={fileInputRef} type="file" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleAttachment(f); e.target.value = ''; }} />
                 </div>
               </div>
 

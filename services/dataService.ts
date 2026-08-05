@@ -1,5 +1,5 @@
 
-import { Project, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo } from '../types';
+import { Project, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo } from '../types';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
 import { getCurrentSocketId } from './socketId';
@@ -431,6 +431,13 @@ class DataService {
   // autre compte). null = suppression. Les autres champs restent inchangés.
   async setUserAvatar(userId: string, avatarUrl: string | null): Promise<User> {
     return apiFetch(`/users/${userId}`, { method: 'PUT', body: JSON.stringify({ avatarUrl }) });
+  }
+
+  // Espace consommé par les uploads + espace disque du serveur. Lecture ouverte à
+  // tous les rôles ; le backend met le résultat en cache 60 s, l'appeler à chaque
+  // ouverture des Paramètres ne coûte donc rien.
+  async getStorage(): Promise<StorageInfo> {
+    return apiFetch('/storage');
   }
 
   // --- Social Posts / Digital (BRANCHÉS BACKEND — étape 7.4) ---
