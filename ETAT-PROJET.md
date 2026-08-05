@@ -10,11 +10,10 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 29** (droits : Digital
-  Manager éditeur de projets, escalade de privilège du Director fermée, 5 août) — `api`
-  **et** `web` (le backend bouge, mais **aucune migration**). Le correctif 28 (stockage)
-  et le 27 (anniversaires) avaient eux une migration ; les 25 et 26 s'étaient contentés
-  de `web`. Le
+- master = prod, synchronisés. Dernier lot déployé : **correctif 30** (refonte des Jeux :
+  moteur multijoueur serveur, bataille navale, refonte visuelle, 5 août) — `api` **et**
+  `web`, migration Prisma. Les correctifs 27, 28 et 29 ont eux aussi demandé les deux
+  services ; les 25 et 26 s'étaient contentés de `web`. Le
   correctif 24 (curseurs `alpineShare` / `nissanShare`) a lui nécessité `api` **et**
   `web`, le schéma Prisma ayant bougé. Le correctif 23 (routage Alpine/Nissan) est
   déployé aussi, `web` seul avait suffi. Le SHA exact se lit
@@ -953,6 +952,70 @@
     prouvée (création 200, modification persistée, suppression 204), gestion des comptes
     toujours refusée. Base rendue à son état initial : 12 comptes, mêmes rôles.
     ℹ️ Vérifié aussi qu'**aucun compte n'avait été promu à tort** avant le correctif.
+
+30. **REFONTE DES JEUX — le multijoueur n'existait pas, il existe** (`feat/refonte-jeux`,
+    5 août). Backend + frontend, **migration Prisma** → `api` **et** `web`.
+
+    **Le diagnostic, très au-delà de « ça manque de fun ».** Défis **et** parties
+    vivaient dans le `localStorage`, et il n'y avait **aucun** modèle Prisma, aucune
+    route, aucun handler socket pour les jeux. Conséquences enchaînées :
+    - défier un collègue était **structurellement impossible** — le défi n'existait que
+      chez l'émetteur. On ne pouvait que se défier soi-même et jouer les deux camps ;
+    - le « Leaderboard Global » était une **fiction** : il classait les parties d'un
+      seul navigateur, deux postes affichaient deux classements différents ;
+    - la bataille navale **ne pouvait pas dire « coulé »** : sa grille était un tableau
+      de cellules sans identité de navire ;
+    - responsive quasi absent (14 points de rupture sur 1 671 lignes).
+
+    **Défaut de classement trouvé en plus du stockage** : les noms et couleurs étaient
+    recopiés dans chaque partie, si bien qu'un renommage laissait l'ancien nom au
+    classement. On ne stocke plus que des `userId`, l'identité se résout au rendu.
+
+    ⚠️ **Le point d'architecture du lot : l'anti-triche.** Une partie partagée signifie
+    que les deux clients reçoivent la même ligne — envoyer la session brute donnerait à
+    chacun la position des navires de l'autre, visible dans l'onglet Réseau. Deux
+    garde-fous, détaillés dans `ETAT-BACKEND.md` : `projectSessionFor()` est la **seule**
+    forme de session qui sort du backend (statut de `publicUser` pour `passwordHash`),
+    et **les règles vivent sur le serveur**, qui valide le tour et **calcule** le
+    vainqueur. Un `winnerId` envoyé par le client est ignoré.
+
+    **Bataille navale refaite** à la façon du site cité par Théo : nouveau modèle en
+    navires identifiés (cases + touches), phase de placement avec clic pour poser, clic
+    pour pivoter, tirage aléatoire et réinitialisation ; retours **manqué / touché /
+    coulé** avec le nom du navire ; **marquage automatique** du pourtour d'un navire
+    coulé ; flotte restante affichée. Toucher ne redonne pas la main — règle symétrique.
+
+    **Refonte visuelle et responsive** : lobby avec cartes de jeu, adversaires et
+    classement lisible ; plateaux au vocabulaire visuel du projet (dégradé charte,
+    `gx-card`) ; `Games.tsx` passe de **1 069 à 527 lignes**, la couche données ayant
+    migré côté serveur. Polling 3 s supprimé, remplacé par les événements socket.
+    `GAMES_ALLOWED_ROLES`, qui était dupliqué dans `App.tsx` et `Games.tsx`, remonte
+    dans `constants.ts`.
+
+    **Vérifié, deux joueurs connectés en socket :** droits (Guest 403, **Director 403**
+    — règle métier, autorisé 200) · défi sur soi-même 400, jeu inconnu 400, doublon
+    renvoyant le même défi · **le destinataire voit le défi**, le bug d'origine ·
+    l'émetteur ne peut pas accepter son propre défi (403) · placement : flotte
+    incomplète, navires superposés, navire « en escalier », hors grille, tir avant que
+    l'adversaire ait placé, replacement — **tous refusés** · **anti-triche prouvé** :
+    `board.opponent` expose `ready/shots/sunkShips/remaining/allSunk` et **jamais
+    `ships`**, alors que `board.me` contient bien mes navires · tour : jouer hors tour
+    et rejouer une case déjà tirée refusés · temps réel : 4 événements reçus par
+    l'adversaire **sans rechargement** · classement recoupé à la main (4 parties → 2V/1D/1N
+    et 1V/2D/1N, face-à-face 2–1) et **sans champ `board`** dans la réponse · responsive
+    320 px : aucun scroll horizontal sur les 5 écrans, zones tactiles portées à 44 px ·
+    clair **et** sombre, aucune teinte hors charte. `tsc` backend 0, racine 12
+    préexistantes.
+    ℹ️ **Validé fonctionnellement par Théo** en local avec deux comptes.
+
+    ⚠️ **Le classement repart de zéro** : les parties d'avant vivaient dans les
+    `localStorage` de chacun (souvent des parties jouées seul) et n'étaient pas
+    récupérables de façon sensée. Aucune reprise, c'est un choix.
+
+    ℹ️ **Piège rencontré, à retenir** : quatre serveurs `nodemon` s'étaient empilés sur
+    le poste au fil des lots, chacun re-verrouillant le moteur Prisma et se disputant le
+    port 3001 — c'était la cause des `EADDRINUSE` et des `EPERM` sur `prisma generate`.
+    Vérifier qu'il n'en tourne **qu'un** avant de diagnostiquer autre chose.
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - ~~⚠️ Corriger le KPI « Rythme de consommation »~~ — **fait le 04/08** (correctif 25).
