@@ -7,8 +7,14 @@ import { withDates } from '../utils/dates';
 const router = Router();
 const prisma = new PrismaClient();
 
-// Roles allowed to edit
-const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator'];
+// Rôles autorisés à éditer les projets.
+// ⚠️ 'Digital Manager' AVEC l'espace — c'est la valeur réelle en base (le rôle écrit
+// 'DigitalManager' ne matche jamais, piège déjà rencontré dans tags.ts et social.ts).
+// Ajouté le 05/08/2026 à la demande de Théo : le Digital Manager éditait déjà les
+// dépenses fixes, les tags et le Digital, mais pas les projets.
+// Doit rester aligné sur `canEdit` de `pages/Projects.tsx` — sinon l'interface affiche
+// des boutons que l'API refuse en 403.
+const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
 
 router.get('/', authenticateToken, async (req, res) => {
   const projects = await prisma.project.findMany({ include: { tasks: true } });
