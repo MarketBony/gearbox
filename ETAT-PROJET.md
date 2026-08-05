@@ -10,10 +10,11 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 27** (anniversaires en
-  base + choix de l'année dans les calendriers, 4 août) — `api` **et** `web`, le schéma
-  Prisma ayant bougé. Les correctifs 25 (KPI de rythme) et 26 (page blanche du login)
-  sont déployés aussi, `web` seul avait suffi pour chacun. Le
+- master = prod, synchronisés. Dernier lot déployé : **correctif 28** (stockage :
+  indicateur d'espace, purge du chat, pièces jointes 100 Mo, 5 août) — `api` **et**
+  `web`, le schéma Prisma ayant bougé. Le correctif 27 (anniversaires + choix de
+  l'année) a lui aussi demandé les deux services ; les correctifs 25 et 26 s'étaient
+  contentés de `web`. Le
   correctif 24 (curseurs `alpineShare` / `nissanShare`) a lui nécessité `api` **et**
   `web`, le schéma Prisma ayant bougé. Le correctif 23 (routage Alpine/Nissan) est
   déployé aussi, `web` seul avait suffi. Le SHA exact se lit
@@ -828,6 +829,69 @@
     - ℹ️ Limite connue laissée en place : les cellules **jour** restent à 36 px sur
       mobile, sous le seuil des 44 px. Défaut préexistant, non touché pour ne pas
       modifier la grille existante.
+
+28. **Stockage de fichiers : audit, indicateur d'espace, purge du chat, pièces jointes**
+    (`feat/stockage-fichiers`, 5 août). **Migration Prisma** → `api` **et** `web`.
+
+    **Audit demandé par Théo — où s'enregistrent les fichiers.** Réponse : **sur le VPS,
+    et nulle part ailleurs.** Volume Docker **nommé** `gearbox_uploads_data` monté sur
+    `/app/uploads`, physiquement
+    `/var/lib/docker/volumes/gearbox_uploads_data/_data`. **Rien dans Supabase** (qui ne
+    stocke que les URL relatives), **aucun S3**. Le volume étant nommé, il survit aux
+    rebuilds. Relevé : **4,6 Mo pour 16 fichiers** (6 chat, 9 avatar, 1 calendar) sur un
+    disque de **193 Go dont 186 libres — 4 %**.
+
+    **La purge était à moitié en place**, et pas comme Théo la décrivait :
+    - Digital/calendar : ✅ 30 j, mais ancré sur l'archivage d'une **PUBLICATION
+      Digital**, pas d'un projet — et le désarchivage annule le décompte ;
+    - Chat : ❌ **rien du tout** ;
+    - Avatars : ❌ aucune (volontaire).
+    → Purge du chat ajoutée à **180 jours** (arbitrage de Théo parmi trois options) : le
+    fichier part du disque, **le message reste** avec `fileExpiredAt` et la mention
+    « pièce jointe expirée ». Branchée sur le `runSafe` existant : un seul timer pour les
+    deux purges. Rien n'a été supprimé au premier passage, la prod ne tournant que depuis
+    le 8 juillet.
+
+    **Pièces jointes : tous formats, 100 Mo** (au lieu de 4 formats d'image et 10 Mo).
+    Bouton trombone à côté du bouton image, carte de pièce jointe avec nom d'origine,
+    poids et téléchargement, aperçu de conversation et barre de réponse en `📎 <nom>`.
+    ℹ️ Bonus gratuit : le corps des **notifications push** réutilise `lastMessage`, elles
+    sont donc correctes sans une ligne de plus.
+
+    ⚠️ **Le point de sécurité central du lot.** Ouvrir le chat à tous les formats créait
+    une faille qui n'existait pas : les fichiers sont servis **depuis le domaine de
+    Gearbox** sans aucun en-tête, donc un `.html` ou un `.svg` déposé dans une
+    conversation et ouvert dans l'onglet s'exécutait **dans la session de la victime**
+    (XSS stocké, vol de jeton). Parade dans `express.static` : `nosniff` partout et
+    téléchargement forcé sauf pour `.jpg .jpeg .png .gif .webp .pdf` — `.svg`
+    volontairement exclu. Détail dans `ETAT-BACKEND.md`. Et le nom d'origine n'entre
+    **jamais** dans un chemin : seule une extension assainie en est extraite, vérifié
+    avec un fichier nommé `../../evil.sh`.
+
+    **`GET /api/storage`** (nouveau) : espace disque via `fs.statfs` + poids par type,
+    cache 60 s, **ouvert à tous les rôles**. Section « Stockage » dans les Paramètres avec
+    barre de progression sur le **disque du serveur** (pas « uploads / disque », qui
+    resterait à 0 %), seuils ambre 75 % / rouge 90 %, et une phrase disant que le disque
+    est partagé avec le système — sinon « 4,6 Mo envoyés » à côté de « 4 % utilisé » est
+    incompréhensible.
+
+    ⚠️ **Défaut de bornage corrigé sur TOUTES les limites d'upload** : la limite de
+    multer est atteinte **dès l'égalité**. Mesuré : 104 857 599 octets passaient,
+    104 857 600 (100 Mio pile) partait en 413 alors que le message annonce « max
+    100 Mo ». `fileSize: maxBytes + 1` rend la borne inclusive — vaut aussi pour l'avatar
+    (5 Mo) et le calendrier (2 Go).
+
+    Vérifié : PDF/docx/zip/svg/sans-extension acceptés et stockés sous uuid ; en-têtes
+    conformes sur 7 cas ; 100 Mio pile accepté, +1 octet refusé en 413 ; avatar toujours
+    415 sur format interdit ; `/api/storage` recoupé et 401 sans jeton ; purge testée sur
+    3 passes dont l'idempotence ; envoi d'un PDF de bout en bout par l'interface ; section
+    Stockage et carte de pièce jointe mesurées à 320 px en clair **et** en sombre.
+    **Base et disque rendus à leur état initial**, y compris l'aperçu de conversation et
+    les compteurs de non-lus que le message de test avait incrémentés.
+
+    ⚠️ **Piège à connaître** : lancer la purge en local agit sur la base de **PROD** avec
+    le disque **LOCAL** — un message de plus de 180 jours serait marqué expiré alors que
+    son fichier vit toujours sur le VPS. Consigné dans `ETAT-BACKEND.md`.
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - ~~⚠️ Corriger le KPI « Rythme de consommation »~~ — **fait le 04/08** (correctif 25).

@@ -213,13 +213,31 @@ export interface ChatMessage {
   senderName: string;
   senderColor: string;
   content: string;
-  type: 'text' | 'image';
+  type: 'text' | 'image' | 'file';
   timestamp: string;
   edited: boolean;
   editedAt?: string;
   deleted: boolean;
   reactions: Record<string, string[]>; // emoji -> userId[]
   replyToId?: string;
+  // --- Pièces jointes (05/08/2026) ---
+  // Le fichier sur disque porte un uuid : `fileName` est le nom d'origine, nécessaire
+  // à l'affichage et au téléchargement. `fileExpiredAt` est posé par la purge à
+  // 180 jours — le message reste, seule la pièce jointe a disparu.
+  fileName?: string;
+  fileSize?: number;
+  fileExpiredAt?: string;
+}
+
+// --- STOCKAGE (GET /api/storage) ---
+// Espace consommé par Gearbox et espace disque du serveur. Lisible par tous les rôles.
+export interface StorageInfo {
+  disque: { total: number; libre: number; utilise: number };
+  uploads: {
+    total: number;
+    parType: Record<'chat' | 'avatar' | 'calendar', { octets: number; fichiers: number }>;
+  };
+  calculeLe: string;
 }
 
 // --- BUDGET FORECAST TYPES ---

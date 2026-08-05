@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db, ApiError } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
-import { User, UserRole, ActivityLog } from '../types';
-import { Save, User as UserIcon, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn, MapPin, Cake, Download, Smartphone } from 'lucide-react';
+import { User, UserRole, ActivityLog, StorageInfo } from '../types';
+import { Save, User as UserIcon, Trash2, Plus, Edit2, Check, X, ShieldAlert, Camera, Upload, ZoomIn, MapPin, Cake, Download, Smartphone, HardDrive } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import Avatar, { avatarKey } from '../components/Avatar';
 import { getAvatarUrl, setAvatarUrl } from '../services/avatarCache';
@@ -243,6 +243,102 @@ const RoleBadge: React.FC<{ role: string }> = ({ role }) => {
                 : 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10';
   return (
     <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${cls}`}>{role}</span>
+  );
+};
+
+// --- SECTION STOCKAGE -------------------------------------------------------------
+// Combien de place les fichiers envoyés dans Gearbox occupent, et combien il reste sur
+// le serveur. Lecture ouverte à tous les rôles.
+
+const formatOctets = (o: number): string => {
+  if (o <= 0) return '0 o';
+  if (o < 1024) return `${o} o`;
+  if (o < 1024 * 1024) return `${(o / 1024).toFixed(0)} Ko`;
+  if (o < 1024 * 1024 * 1024) return `${(o / 1024 / 1024).toFixed(o < 10 * 1024 * 1024 ? 1 : 0)} Mo`;
+  return `${(o / 1024 / 1024 / 1024).toFixed(1)} Go`;
+};
+
+const LIBELLES_TYPE: Record<string, string> = {
+  chat: 'Chat (pièces jointes)',
+  avatar: 'Photos de profil',
+  calendar: 'Digital (médias)'
+};
+
+const StorageSection: React.FC = () => {
+  const [info, setInfo] = useState<StorageInfo | null>(null);
+  const [erreur, setErreur] = useState('');
+
+  useEffect(() => {
+    db.getStorage().then(setInfo).catch(() =>
+      setErreur("Impossible de lire l'espace disque (serveur injoignable ?)."));
+  }, []);
+
+  // Pourcentage du DISQUE occupé, toutes causes confondues. Volontairement pas
+  // « uploads / disque » : ce chiffre serait toujours proche de 0 % et ne dirait rien
+  // du risque réel de saturation, qui est ce qu'on veut surveiller.
+  const pct = info && info.disque.total > 0
+    ? Math.round((info.disque.utilise / info.disque.total) * 100)
+    : 0;
+  // Seuils d'alerte : au-delà de 90 % la place manque vraiment.
+  const couleurBarre = pct >= 90 ? 'bg-red-500' : pct >= 75 ? 'bg-amber-500' : 'bg-bony-orange';
+
+  return (
+    <div className="max-w-4xl mx-auto gx-card p-6 mb-10">
+      <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-b border-slate-200 dark:border-white/5 pb-2 mb-4 flex items-center gap-2">
+        <HardDrive size={15} className="text-bony-blue" /> Stockage
+      </h4>
+
+      {erreur ? (
+        <p className="text-xs text-red-500">{erreur}</p>
+      ) : !info ? (
+        <p className="text-xs text-slate-500 dark:text-bony-muted">Calcul en cours…</p>
+      ) : (
+        <>
+          <div className="flex items-baseline justify-between mb-1.5">
+            <span className="text-xs font-bold text-slate-700 dark:text-bony-text">
+              Fichiers envoyés dans Gearbox : {formatOctets(info.uploads.total)}
+            </span>
+            <span className="text-[11px] text-slate-500 dark:text-bony-muted tabular-nums">
+              {formatOctets(info.disque.libre)} libres
+            </span>
+          </div>
+
+          <div className="h-2.5 bg-slate-200 dark:bg-white/5 rounded-full overflow-hidden">
+            <div className={`h-full ${couleurBarre} transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />
+          </div>
+
+          {/* Dire explicitement ce que mesure la barre : sans cette phrase, « 4,6 Mo
+              envoyés » à côté de « 4 % utilisé » est incompréhensible. */}
+          <p className="text-[10px] text-slate-500 dark:text-slate-500 mt-1.5">
+            Le disque du serveur est utilisé à <strong>{pct} %</strong> ({formatOctets(info.disque.utilise)}
+            {' '}sur {formatOctets(info.disque.total)}). Il est partagé avec le système,
+            ce n'est pas un quota propre à Gearbox.
+          </p>
+
+          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/5 space-y-2">
+            {/* `Object.entries` perd le type de la valeur (elle ressort en `unknown`) :
+                on le rétablit explicitement plutôt que d'ajouter une erreur au
+                baseline `tsc`. */}
+            {(Object.entries(info.uploads.parType) as [string, { octets: number; fichiers: number }][]).map(([type, v]) => (
+              <div key={type} className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-600 dark:text-bony-muted">
+                  {LIBELLES_TYPE[type] ?? type}
+                  <span className="text-slate-400 dark:text-slate-600"> · {v.fichiers} fichier{v.fichiers > 1 ? 's' : ''}</span>
+                </span>
+                <span className="font-bold text-slate-700 dark:text-bony-text tabular-nums">{formatOctets(v.octets)}</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-4 leading-relaxed">
+            Ménage automatique : les médias d'une publication Digital archivée sont
+            supprimés au bout de 30 jours, les pièces jointes du chat au bout de
+            180 jours (le message reste, la pièce jointe disparaît). Les photos de
+            profil ne sont jamais supprimées automatiquement.
+          </p>
+        </>
+      )}
+    </div>
   );
 };
 
@@ -539,6 +635,10 @@ const Settings: React.FC = () => {
           <NotificationsToggle />
         </div>
       </div>
+
+      {/* SECTION 1ter : STOCKAGE — visible par TOUS les rôles (demande de Théo) :
+           savoir si le serveur sature concerne tout le monde, pas que les admins. */}
+      <StorageSection />
 
       {/* SECTION 2: USER MANAGEMENT (MASTER/ADMINISTRATOR) */}
       {canManageUsers && (

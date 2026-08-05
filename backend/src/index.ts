@@ -1,6 +1,7 @@
 import express from 'express';
 import 'express-async-errors'; // patch Express 4 : les rejets async atteignent le middleware d'erreur
 import http from 'http';
+import path from 'path';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
@@ -24,6 +25,7 @@ import musicRoutes from './routes/music';
 import pushRoutes from './routes/push';
 import seedRoutes from './routes/seed';
 import uploadsRoutes, { UPLOADS_ROOT } from './routes/uploads';
+import storageRoutes from './routes/storage';
 import { setupRealtime, withEmitterContext } from './realtime';
 import { startPurgeJob } from './jobs/purge';
 
@@ -63,6 +65,8 @@ app.use('/api/equipment-bookings', equipmentBookingRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/activity-log', activityLogRoutes);
 app.use('/api/uploads', uploadsRoutes);
+// Espace consommé / disque restant — lecture ouverte à tous les rôles authentifiés.
+app.use('/api/storage', storageRoutes);
 // Hello Marketing : proxy des flux RSS et de la playlist Deezer (le navigateur ne
 // peut pas les appeler en direct — CORS ; voir les commentaires de ces routes).
 app.use('/api/feeds', feedRoutes);
@@ -72,7 +76,31 @@ app.use('/api/music', musicRoutes);
 app.use('/api/push', pushRoutes);
 
 // Fichiers uploadés servis en statique (URLs relatives renvoyées par la route).
-app.use('/uploads', express.static(UPLOADS_ROOT));
+//
+// ⚠️ SÉCURITÉ — À NE PAS RETIRER. Depuis le 05/08/2026 le chat accepte TOUS les
+// formats : ces fichiers sont servis depuis le domaine de Gearbox, donc un `.html` ou
+// un `.svg` déposé dans une conversation et ouvert dans l'onglet s'exécuterait dans la
+// session de celui qui l'ouvre — XSS stocké, vol de jeton compris. Deux en-têtes
+// suffisent à fermer cette classe d'attaque :
+//   - `nosniff` sur TOUT, pour que le navigateur ne devine jamais un type exécutable
+//     à partir du contenu ;
+//   - `Content-Disposition: attachment` sauf pour les extensions réellement
+//     affichables, qui doivent le rester (les images s'affichent dans le fil de
+//     discussion, et Théo a demandé l'aperçu des PDF).
+// La liste porte sur l'EXTENSION DU FICHIER SUR LE DISQUE, jamais sur un type MIME
+// fourni par le client — c'est lui qui le déclare, on ne s'y fie pas.
+// `.svg` en est volontairement absent : c'est un format actif, il se téléchargera.
+const EXT_AFFICHABLES = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf']);
+
+app.use('/uploads', express.static(UPLOADS_ROOT, {
+  setHeaders: (res, filePath) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    const ext = path.extname(filePath).toLowerCase();
+    if (!EXT_AFFICHABLES.has(ext)) {
+      res.setHeader('Content-Disposition', 'attachment');
+    }
+  }
+}));
 
 // Middleware d'erreur global — après toutes les routes.
 app.use(errorHandler);
