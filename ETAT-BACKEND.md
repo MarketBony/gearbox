@@ -27,6 +27,89 @@ Migrations Prisma appliquées sur Supabase : `20260706160559_init` + `2026070811
 10. **Notifications push** — `/api/push` (clé publique VAPID + abonnements) et
     `PushSubscription`. Voir la section dédiée.
 
+### 🎮 Jeux — modèles, règles serveur et anti-triche (05/08/2026)
+
+Migration `20260805131643_add_games` : `GameChallenge` et `GameSession`. Deux tables
+neuves, cinq index, aucun `ALTER` sur l'existant.
+
+**Pourquoi ce module existe** : jusque-là, défis **et** parties vivaient dans le
+`localStorage` du navigateur, et il n'y avait **aucun** modèle, route ni handler
+socket pour les jeux. Défier un collègue était donc structurellement impossible — le
+défi n'existait que chez l'émetteur — et le « classement global » ne classait que les
+parties d'un seul poste.
+
+⚠️ **On ne stocke QUE des `userId`**, jamais le nom ni la couleur du joueur.
+L'ancienne version les recopiait dans chaque partie, si bien qu'un renommage laissait
+l'ancien nom au classement. L'identité se résout par id au rendu.
+
+`board` est en **`Json`** : la forme du plateau diffère par jeu et a vocation à
+évoluer (la bataille navale est passée d'une grille de cellules anonymes à une liste
+de navires identifiés) — la faire vivre là évite une migration à chaque ajustement.
+
+#### ⚠️⚠️ `utils/gameView.ts` — la SEULE forme de session qui sort du backend
+
+Même statut que `publicUser` pour `passwordHash` : **aucune route et aucun événement
+socket ne renvoie une `GameSession` brute.** Elle contient la position des navires
+des **deux** joueurs ; l'envoyer telle quelle suffirait à gagner toute bataille
+navale en ouvrant l'onglet Réseau.
+
+`projectSessionFor(userId, session)` produit la vue redactée. De la flotte adverse il
+ne reste que : les tirs déjà portés, les navires **effectivement coulés** (découverts
+à la loyale, donc plus secrets) et le **nombre** de navires restants avec leurs
+tailles — jamais leurs positions. Ma propre flotte, elle, est complète.
+
+⚠️ **Deux `emit` distincts par partie**, jamais un émetteur commun
+(`io.to(a).to(b)`) : le payload **diffère par destinataire**, c'est toute la raison
+d'être de la redaction. Un émetteur partagé renverrait à l'un les navires de l'autre.
+
+`projectSessionSummary()` sert au classement : aucune donnée de plateau, donc rien de
+secret — vérifié, la réponse du lobby ne contient pas de champ `board`.
+
+#### ⚠️ `utils/gameRules.ts` — les règles vivent sur le serveur
+
+C'était sans enjeu tant qu'on jouait seul contre soi-même en `localStorage`. Dès que
+la partie est partagée, **tout ce qui n'est pas validé ici est falsifiable** :
+
+- le tour (`currentTurn`), la légalité du coup, la case déjà jouée ;
+- **le vainqueur est CALCULÉ par le serveur** — un `winnerId` envoyé par le client
+  est purement ignoré ;
+- `validateFleet()` contrôle intégralement une flotte reçue : nombre de navires,
+  tailles, alignement, contiguïté, chevauchements, limites de grille. Sans ce
+  contrôle, un client pourrait envoyer une flotte de deux cases et devenir imbattable.
+
+Le frontend ne fait que proposer une case ; il ne décide de rien. Effets renvoyés à
+l'auteur du tir uniquement (`miss` / `hit` / `sunk` + nom du navire) : l'adversaire
+les déduit de sa grille.
+
+Bataille navale, règles retenues : toucher **ne redonne pas** la main (le tour passe
+à chaque tir, règle symétrique et simple) ; couler un navire **marque
+automatiquement** son pourtour en « manqué », ces cases ne pouvant rien contenir.
+
+#### Routes et temps réel
+
+| Chemin | Rôle |
+|---|---|
+| `GET /api/games/lobby` | défis, mes parties (redactées), historique global |
+| `GET /api/games/sessions/:id` | une partie, redactée pour l'appelant (403 si tiers) |
+| `POST /api/games/challenges` | défier — 400 sur soi-même, jeu inconnu, cible sans accès |
+| `POST /api/games/challenges/:id/accept` | **seul le destinataire** peut accepter (403 sinon) |
+| `POST /api/games/challenges/:id/refuse` | refus par le destinataire, annulation par l'émetteur |
+
+Socket (`realtime/games.ts`) : `game:fleet:place`, `game:move`, `game:forfeit`, avec
+accusé de réception. Diffusion **ciblée** vers la room personnelle de chaque joueur
+(`user:<id>`, convention du chat) — jamais de `io.emit` global, une partie ne concerne
+que deux personnes. Les handlers ne sont **pas enregistrés** pour un rôle sans accès
+aux Jeux : la porte est fermée au transport, pas seulement dans l'interface.
+
+**Notification de défi** : événement socket ciblé + push via `sendPushToUsers`,
+**sautée si la personne est déjà sur la rubrique Jeux** (`getUserIdsOnSection`, qui
+renvoie un `Set` et non un tableau — piège rencontré). C'est le manque exact signalé :
+« il ne reçoit jamais l'invitation ».
+
+ℹ️ `GAMES_ROLES` vit dans `auth/roles.ts`. **Director en est exclu volontairement** —
+seule exception à sa parité avec Administrator, commenté sur place pour qu'on ne
+« corrige » pas cette incohérence apparente.
+
 ### 🔐 Droits par rôle — `src/auth/roles.ts` est la SOURCE UNIQUE (05/08/2026)
 
 Toutes les règles de rôle vivent dans ce fichier : `VALID_ROLES`, `isValidRole`,

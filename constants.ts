@@ -452,3 +452,22 @@ export const DISTRIBUTION_GROUPE_BONY_RN: Record<string, number> = {
     'Gaillac': 35.37 * 0.14
     // Note: Villefranche, Lavaur, Carmaux, Nissan not specified for RN
 };
+
+// ============================================================================
+// ACCÈS AUX JEUX
+//
+// ⚠️ **Director en est EXCLU volontairement** : c'est la seule exception à la
+// règle « Director = mêmes droits qu'Administrator » (cf. CLAUDE.md). Ce n'est
+// pas un oubli — ne pas l'ajouter en croyant corriger une incohérence.
+//
+// Était dupliqué dans App.tsx ET pages/Games.tsx jusqu'au 05/08/2026 ; remonté
+// ici pour n'avoir qu'une source, comme le reste des règles transverses.
+// Doit rester aligné sur `GAMES_ROLES` de backend/src/auth/roles.ts, qui est le
+// seul garde-fou réel : ici on ne fait que masquer une rubrique inaccessible.
+// ============================================================================
+export const GAMES_ALLOWED_ROLES: string[] = [
+  'Master',
+  'Administrator',
+  'Coordinator',
+  'Digital Manager',
+];
