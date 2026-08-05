@@ -173,6 +173,47 @@ que de supposer que ça va passer.
 - Jeux accessible uniquement à Master, Administrator, Coordinator, Digital
   Manager.
 
+## ⚠️ Rôles CLOISONNÉS — à vérifier à CHAQUE nouvelle feature
+
+Depuis le 5 août 2026, Gearbox a un rôle dont les droits dépendent d'une **donnée du
+compte** et non seulement de son nom : **`Site Manager` (chef de site)**. Il est
+rattaché à une ou plusieurs concessions (`User.sites`), ne voit **que** les données de
+ses sites, et est en **lecture seule** partout.
+
+**Deux questions à se poser pour toute nouvelle rubrique, tout nouveau bloc et toute
+nouvelle route :**
+
+1. **Est-ce visible par un chef de site ?** Ses rubriques sont une liste **fermée** :
+   Dashboard, Projets, Digital (onglet Planning uniquement), Hello Marketing, Budget,
+   Agenda. Tout le reste lui est refusé — côté navigation **et** côté routage
+   (`App.tsx`) **et** côté API.
+2. **Les données sont-elles filtrées par son périmètre, CÔTÉ SERVEUR ?** Un filtrage
+   frontend ne cloisonne rien : les autres concessions resteraient lisibles dans
+   l'onglet Réseau du navigateur.
+
+**La seule porte : `backend/src/auth/siteScope.ts`.** Toute route qui renvoie des
+données rattachées à un site doit passer par `scopeOf()` / `budgetScopeOf()` et les
+helpers de clause associés. **Ne jamais recopier un `where` de site dans une route** —
+c'est le même principe que `constants.ts` pour le routage budgétaire et `publicUser`
+pour `passwordHash`.
+
+⚠️ **Filtrer les lignes ne suffit pas : il faut aussi redacter leur CONTENU.** Un
+projet multi-sites qui inclut sa concession passe légitimement le filtre, mais son
+`sites[]` et son `budgetDistribution` nommeraient toutes les autres avec leurs
+montants. `redactSiteFields()` est là pour ça.
+
+⚠️ **Un rôle en lecture seule l'est par ABSENCE** : il ne figure dans aucun
+`EDIT_ROLES`. Ne l'y ajoutez jamais « pour faire propre ». En revanche, toute route
+d'écriture **sans** `requireRole` est une porte ouverte — c'était le cas d'`/api/uploads`.
+
+⚠️ **Attention aux données FABRIQUÉES côté client.** `Budget.tsx` recréait les buckets
+Alpine et Nissan quoi que renvoie l'API, annulant le cloisonnement. Une page qui
+complète les données du serveur doit se demander si elle a le droit de le faire.
+
+**Et surtout : un rôle ne se vérifie pas sans parcourir son interface.** Des contrôles
+d'API exacts ont laissé passer deux fois une navigation complète visible à un rôle
+restreint. Tester avec un vrai compte, dans le navigateur.
+
 ## Historique de contexte (pour comprendre le pourquoi, pas pour agir dessus)
 
 Le fil "Déploiement VPS et configuration serveur" avec Bastien contient l'historique
