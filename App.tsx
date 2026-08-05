@@ -16,6 +16,7 @@ import HelloMarketing from './pages/HelloMarketing';
 import Games from './pages/Games';
 import TodoList from './pages/TodoList';
 import Export, { EXPORT_ALLOWED_ROLES } from './pages/Export';
+import { GAMES_ALLOWED_ROLES } from './constants';
 import AnimatedBackground from './components/AnimatedBackground';
 import { db } from './services/dataService';
 import { setMySection } from './services/socket';
@@ -46,7 +47,8 @@ const InnerApp: React.FC = () => {
   }, []);
 
   const EXTERNAL_ALLOWED_TABS = ['digital', 'chat', 'hello-marketing', 'games'];
-  const GAMES_ALLOWED_ROLES = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'];
+  // GAMES_ALLOWED_ROLES vient désormais de constants.ts (il était dupliqué ici
+  // et dans pages/Games.tsx).
 
   // Onglet RÉSOLU (après redirections de rôle) — sert de `key` à la transition.
   const isExternal = user?.role === 'External';

@@ -1,5 +1,6 @@
 
 import { Project, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo } from '../types';
+import type { LobbyData, GameSession, GameChallenge, GameType } from '../components/games/gameTypes';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
 import { getCurrentSocketId } from './socketId';
@@ -438,6 +439,27 @@ class DataService {
   // ouverture des Paramètres ne coûte donc rien.
   async getStorage(): Promise<StorageInfo> {
     return apiFetch('/storage');
+  }
+
+  // --- JEUX (branchés backend le 05/08/2026) ---
+  // Avant, défis et parties vivaient dans le localStorage : défier un collègue
+  // était impossible. Tout passe désormais par le serveur, et les parties
+  // reçues sont des vues REDACTÉES (pas de navires adverses) — voir gameTypes.ts.
+  async getGamesLobby(): Promise<LobbyData> {
+    return apiFetch('/games/lobby');
+  }
+  async getGameSession(id: string): Promise<GameSession> {
+    return apiFetch(`/games/sessions/${id}`);
+  }
+  async sendGameChallenge(toUserId: string, game: GameType): Promise<GameChallenge> {
+    return apiFetch('/games/challenges', { method: 'POST', body: JSON.stringify({ toUserId, game }) });
+  }
+  async refuseGameChallenge(id: string): Promise<GameChallenge> {
+    return apiFetch(`/games/challenges/${id}/refuse`, { method: 'POST' });
+  }
+  // Renvoie la partie créée : seul le destinataire du défi peut accepter.
+  async acceptGameChallenge(id: string): Promise<GameSession> {
+    return apiFetch(`/games/challenges/${id}/accept`, { method: 'POST' });
   }
 
   // --- Social Posts / Digital (BRANCHÉS BACKEND — étape 7.4) ---

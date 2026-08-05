@@ -49,7 +49,13 @@ export const RT_EVENTS = {
   activity: ['activity:created'],
   // Émis par le backend mais aucun écran ne lit /contacts aujourd'hui —
   // référencé ici pour le jour où ce sera le cas.
-  contacts: ['contacts:updated', 'contacts:deleted']
+  contacts: ['contacts:updated', 'contacts:deleted'],
+  // Jeux (05/08/2026). ⚠️ Ces événements sont CIBLÉS : le backend les envoie dans
+  // la room personnelle des deux joueurs concernés, jamais en diffusion globale —
+  // et `game:session:updated` porte une charge DIFFÉRENTE par destinataire (vue
+  // redactée). Le lobby s'en sert comme d'une invalidation, comme les autres ;
+  // l'écran de jeu, lui, consomme la charge directement (voir Games.tsx).
+  games: ['game:challenge:updated', 'game:session:started', 'game:session:updated']
 } as const;
 
 // Fenêtre de regroupement : une seule sauvegarde peut déclencher plusieurs

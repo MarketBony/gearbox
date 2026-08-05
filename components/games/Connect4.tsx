@@ -1,156 +1,105 @@
-
 import React, { useState } from 'react';
-import { GameProps } from './gameTypes';
+import { ChevronDown } from 'lucide-react';
+import { GameProps, Connect4Board } from './gameTypes';
+
+// ============================================================================
+// PUISSANCE 4 — réécrit le 05/08/2026
+//
+// ⚠️ Comme le morpion, plus aucune règle ici. L'ancienne version dupliquait
+// `dropRow` et `checkWinner`, désormais côté serveur — qui renvoie `winningLine`
+// et `lastMove` dans le plateau. On ne joue qu'une COLONNE : la gravité est
+// appliquée par le serveur, le client n'a pas à deviner la ligne d'arrivée.
+// ============================================================================
 
 const ROWS = 6;
 const COLS = 7;
 
-function dropRow(board: (string | null)[][], col: number): number {
-  for (let r = ROWS - 1; r >= 0; r--) {
-    if (!board[r][col]) return r;
-  }
-  return -1;
-}
+const Connect4: React.FC<GameProps> = ({ session, myId, onMove }) => {
+  const board = session.board as Connect4Board;
+  const cells = board?.cells ?? Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+  const ligne = board?.winningLine ?? [];
+  const dernier = board?.lastMove;
+  const monTour = session.currentTurn === myId;
+  const fini = session.status === 'finished';
+  const [msg, setMsg] = useState('');
+  const [survol, setSurvol] = useState<number | null>(null);
 
-function checkWinner(board: (string | null)[][]): string | null {
-  const directions = [[0,1],[1,0],[1,1],[1,-1]];
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const cell = board[r][c];
-      if (!cell) continue;
-      for (const [dr, dc] of directions) {
-        let count = 1;
-        for (let i = 1; i < 4; i++) {
-          const nr = r + dr * i;
-          const nc = c + dc * i;
-          if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || board[nr][nc] !== cell) break;
-          count++;
-        }
-        if (count === 4) return cell;
-      }
-    }
-  }
-  return null;
-}
+  const estGagnante = (r: number, c: number) => ligne.some(([lr, lc]) => lr === r && lc === c);
+  const colonnePleine = (c: number) => cells[0][c] !== null;
 
-const Connect4: React.FC<GameProps> = ({ session, myId, onUpdate }) => {
-  const [hoverCol, setHoverCol] = useState<number | null>(null);
-  const board: (string | null)[][] = session.board;
-  const isMyTurn = session.currentTurn === myId;
-  const isFinished = session.status === 'finished';
-  const isP1 = session.player1Id === myId;
-
-  const getWinCells = (): Set<string> => {
-    const directions = [[0,1],[1,0],[1,1],[1,-1]];
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const cell = board[r][c];
-        if (!cell) continue;
-        for (const [dr, dc] of directions) {
-          const cells: [number,number][] = [[r,c]];
-          for (let i = 1; i < 4; i++) {
-            const nr = r + dr * i;
-            const nc = c + dc * i;
-            if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || board[nr][nc] !== cell) break;
-            cells.push([nr, nc]);
-          }
-          if (cells.length === 4) return new Set(cells.map(([rr,cc]) => `${rr}-${cc}`));
-        }
-      }
-    }
-    return new Set();
+  const jouer = async (c: number) => {
+    if (!monTour || fini || colonnePleine(c)) return;
+    const r = await onMove({ col: c });
+    setMsg(r.error ?? '');
   };
-
-  const winCells = isFinished ? getWinCells() : new Set<string>();
-
-  const handleColClick = (col: number) => {
-    if (!isMyTurn || isFinished) return;
-    const row = dropRow(board, col);
-    if (row === -1) return;
-    const newBoard = board.map(r => [...r]);
-    newBoard[row][col] = myId;
-    const winner = checkWinner(newBoard);
-    const isFull = newBoard.every(r => r.every(c => c !== null));
-    const nextTurn = isP1 ? session.player2Id : session.player1Id;
-    onUpdate(newBoard, winner ? myId : nextTurn, winner ? myId : (isFull ? 'draw' : undefined));
-  };
-
-  const isDraw = session.winnerId === 'draw';
-  const iWon = session.winnerId === myId;
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="text-center">
-        {isFinished ? (
-          <p className={`font-bold text-lg ${iWon ? 'text-green-400' : isDraw ? 'text-yellow-400' : 'text-red-400'}`}>
-            {isDraw ? 'Match nul !' : iWon ? 'Vous avez gagné !' : 'Vous avez perdu !'}
-          </p>
-        ) : (
-          <p className="text-slate-700 dark:text-bony-text/70 text-sm">
-            {isMyTurn
-              ? <span className="text-bony-orange font-semibold">Votre tour</span>
-              : <span>En attente de l'adversaire…</span>
-            }
-          </p>
-        )}
+    <div className="space-y-4">
+      <div className={`rounded-2xl px-4 py-2.5 text-center text-xs font-bold transition-colors ${
+        fini ? 'bg-white/5 text-bony-muted' : monTour ? 'gx-gradient text-white shadow-glow' : 'bg-white/5 text-bony-muted'
+      }`}>
+        {fini ? 'Partie terminée' : monTour ? 'À vous de jouer' : 'Au tour de votre adversaire…'}
       </div>
 
-      {/* Column hover arrows */}
-      <div className="flex gap-1">
-        {Array.from({ length: COLS }, (_, c) => (
-          <div key={c} className="w-10 h-5 flex items-center justify-center">
-            {isMyTurn && !isFinished && hoverCol === c && (
-              <div className={`w-0 h-0 border-l-4 border-r-4 border-t-8 border-l-transparent border-r-transparent ${isP1 ? 'border-t-bony-orange' : 'border-t-bony-violet'}`} />
+      {msg && <p className="text-[11px] text-center text-bony-orange">{msg}</p>}
+
+      <div className="max-w-[420px] mx-auto">
+        {/* Indicateurs de colonne : on joue une colonne, l'affordance doit donc
+            porter sur la colonne entière et pas sur une case. */}
+        <div className="grid grid-cols-7 gap-1.5 mb-1">
+          {Array.from({ length: COLS }, (_, c) => {
+            const actif = monTour && !fini && !colonnePleine(c);
+            return (
+              <button
+                key={c}
+                type="button"
+                disabled={!actif}
+                onClick={() => jouer(c)}
+                onMouseEnter={() => setSurvol(c)}
+                onMouseLeave={() => setSurvol(null)}
+                aria-label={`Jouer colonne ${c + 1}`}
+                className={`min-h-[28px] rounded-lg flex items-center justify-center transition-all ${
+                  actif ? 'text-bony-orange hover:bg-bony-orange/10' : 'text-transparent'
+                }`}
+              >
+                <ChevronDown size={16} className={survol === c && actif ? 'translate-y-0.5' : ''} />
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Plateau : fond bleu de charte, cellules en `aspect-square` — plus de
+            `w-10` fixes, qui rendaient la grille plus large que l'écran. */}
+        <div className="rounded-2xl bg-bony-blue/10 dark:bg-bony-blue/20 border border-bony-border p-1.5">
+          <div className="grid grid-cols-7 gap-1.5">
+            {cells.flatMap((row, r) =>
+              row.map((v, c) => {
+                const gagnante = estGagnante(r, c);
+                const estDernier = dernier?.[0] === r && dernier?.[1] === c;
+                return (
+                  <button
+                    key={`${r}-${c}`}
+                    type="button"
+                    disabled={!monTour || fini || colonnePleine(c)}
+                    onClick={() => jouer(c)}
+                    onMouseEnter={() => setSurvol(c)}
+                    onMouseLeave={() => setSurvol(null)}
+                    aria-label={`Colonne ${c + 1}, ligne ${r + 1}`}
+                    className={[
+                      'aspect-square rounded-full transition-all duration-200 border',
+                      v === 'p1' ? 'bg-bony-orange border-bony-orange'
+                        : v === 'p2' ? 'bg-bony-violet border-bony-violet'
+                        : survol === c && monTour && !fini && !colonnePleine(c)
+                          ? 'bg-bony-orange/15 border-bony-orange/40'
+                          : 'bg-white/70 dark:bg-black/30 border-transparent',
+                      gagnante ? 'ring-2 ring-white shadow-glow scale-105' : '',
+                      estDernier && !gagnante ? 'ring-1 ring-white/50' : '',
+                    ].join(' ')}
+                  />
+                );
+              })
             )}
           </div>
-        ))}
-      </div>
-
-      {/* Grid */}
-      <div
-        className="rounded-xl overflow-hidden border border-slate-300 dark:border-white/10"
-        onMouseLeave={() => setHoverCol(null)}
-      >
-        {board.map((row, r) => (
-          <div key={r} className="flex">
-            {row.map((cell, c) => {
-              const key = `${r}-${c}`;
-              const isWin = winCells.has(key);
-              const isP1Cell = cell === session.player1Id;
-              const isPreview = !cell && isMyTurn && !isFinished && hoverCol === c && dropRow(board, c) === r;
-              return (
-                <div
-                  key={c}
-                  className="w-10 h-10 p-1 bg-slate-200 dark:bg-[#1a2540] cursor-pointer"
-                  onClick={() => handleColClick(c)}
-                  onMouseEnter={() => setHoverCol(c)}
-                >
-                  <div className={`
-                    w-full h-full rounded-full transition-all duration-150
-                    ${cell
-                      ? (isP1Cell
-                          ? `${isWin ? 'bg-yellow-400' : 'bg-bony-orange'}`
-                          : `${isWin ? 'bg-yellow-400' : 'bg-bony-violet'}`)
-                      : isPreview
-                        ? (isP1 ? 'bg-bony-orange/40' : 'bg-bony-violet/40')
-                        : 'bg-slate-100 dark:bg-[#0f1929]'
-                    }
-                  `} />
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
-      <div className="flex gap-8 text-sm text-slate-600 dark:text-bony-text/60">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-bony-orange" />
-          <span>{session.player1Name}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-bony-violet" />
-          <span>{session.player2Name}</span>
         </div>
       </div>
     </div>
