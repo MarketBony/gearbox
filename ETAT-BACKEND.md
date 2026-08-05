@@ -27,6 +27,48 @@ Migrations Prisma appliquées sur Supabase : `20260706160559_init` + `2026070811
 10. **Notifications push** — `/api/push` (clé publique VAPID + abonnements) et
     `PushSubscription`. Voir la section dédiée.
 
+### 🔐 Droits par rôle — `src/auth/roles.ts` est la SOURCE UNIQUE (05/08/2026)
+
+Toutes les règles de rôle vivent dans ce fichier : `VALID_ROLES`, `isValidRole`,
+`canAssignRole`, `DIRECTOR_ASSIGNABLE_ROLES`, `USER_DELETE_ROLES`. Même principe que
+`constants.ts` pour le routage budgétaire — **jamais de demi-règle recopiée par écran**.
+Les listes équivalentes du frontend (`Settings.tsx`, `Projects.tsx`) ne sont que des
+commodités d'affichage : elles évitent de proposer un bouton que l'API refusera, elles
+ne protègent rien.
+
+**Qui peut quoi sur `/api/users`** :
+
+| Acteur | Peut attribuer | Peut supprimer |
+|---|---|---|
+| Master | les 7 rôles | oui |
+| Administrator | les 7 rôles | oui |
+| **Director** | **Coordinator, Digital Manager, Guest, External** | **non** |
+| autres rôles | — (bloqués par `requireRole(ADMIN_ROLES)`) | non |
+
+⚠️ **Le défaut corrigé** : `isValidRole` vérifiait que le rôle demandé **existe**, jamais
+que l'auteur avait le droit de le donner. Un Director s'attribuait donc Administrator ou
+Master en un PUT sur son propre id. `canAssignRole` est appliqué au **POST et au PUT** —
+les deux, sinon on créait directement le compte voulu. Et le DELETE, ouvert à
+`ADMIN_ROLES`, ne regardait **ni qui supprime ni qui est supprimé**.
+
+⚠️ **Interdire seulement l'auto-promotion aurait été décoratif** : un Director promouvait
+un complice qui le promouvait en retour. Le contrôle porte donc sur le rôle **demandé**,
+quelle que soit la cible.
+
+⚠️ **Conséquence volontaire** : l'interface envoyant l'objet utilisateur complet, un
+Director qui modifierait seulement le nom d'un compte Administrator enverrait quand même
+`role: 'Administrator'` et sera refusé. Un Director ne peut donc pas éditer un compte de
+niveau supérieur ou égal au sien — ce qui ferme une **seconde voie d'escalade** :
+s'approprier un compte Administrator en changeant son identifiant et son mot de passe.
+
+ℹ️ `PUT /api/auth/me` ne déstructure **pas** `role` : on ne peut pas changer son rôle par
+son propre profil. `routes/seed.ts` est verrouillé sur Master/Administrator. Ce sont, avec
+`routes/users.ts`, les seuls chemins qui touchent au rôle — vérifié par recherche
+exhaustive.
+
+ℹ️ **Le rôle vient du JWT**, émis à la connexion et valable 24 h : une promotion ou une
+rétrogradation ne prend effet pour l'intéressé qu'à sa prochaine connexion.
+
 ### Curseurs de répartition marque / RDM — `alpineShare` et `nissanShare` (04/08/2026)
 
 Migration `20260804110458_add_nissan_share` : `nissanShare Float?` ajouté sur

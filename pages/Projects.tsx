@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { Project, Task, TaskStatus, ServiceType, PlaqueName, Site, BrandType, ProjectType, User, ActivityLog } from '../types';
+import { Project, Task, TaskStatus, ServiceType, PlaqueName, Site, BrandType, ProjectType, User, UserRole, ActivityLog } from '../types';
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
@@ -276,7 +276,12 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const [budgetDistMode, setBudgetDistMode] = useState<'%' | '€'>('%');
 
   // --- PERMISSIONS ---
-  const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Coordinator';
+  // ⚠️ Doit rester aligné sur `EDIT_ROLES` de `backend/src/routes/projects.ts`, seul
+  // garde-fou réel : si l'interface est plus permissive, les boutons partent en 403 ;
+  // si elle est plus restrictive, le droit existe mais reste inaccessible — c'était
+  // exactement le cas du Digital Manager avant le 05/08/2026.
+  const EDIT_ROLES: UserRole[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+  const canEdit = !!user && EDIT_ROLES.includes(user.role);
 
   // --- ARCHIVE MODAL STATE ---
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
