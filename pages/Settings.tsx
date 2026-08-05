@@ -12,7 +12,7 @@ import Select from '../components/Select';
 import DatePicker from '../components/DatePicker';
 import InstallAppModal from '../components/InstallAppModal';
 import NotificationsToggle from '../components/NotificationsToggle';
-import { SITES } from '../constants';
+import { SITES, isSiteManager } from '../constants';
 // `parseLocalDate` est exporté par DateRangePicker (et non par constants.ts).
 import { parseLocalDate } from '../components/DateRangePicker';
 
@@ -342,6 +342,50 @@ const StorageSection: React.FC = () => {
   );
 };
 
+/**
+ * Sélecteur de concessions du rôle « Chef de site ».
+ *
+ * N'apparaît QUE lorsque le rôle sélectionné est `Site Manager` — c'est le
+ * comportement demandé par Théo : « quand on attribue ce rôle, un menu de sélection
+ * supplémentaire s'affiche ».
+ *
+ * ⚠️ Avertit explicitement quand aucun site n'est coché : la liste vide signifie
+ * « ne voit RIEN » (fail closed, côté serveur comme ici). Sans ce message, on
+ * créerait un compte muet sans comprendre pourquoi.
+ */
+const SitesPicker: React.FC<{ value: string[]; onChange: (v: string[]) => void }> = ({ value, onChange }) => {
+  const toggle = (s: string) => onChange(value.includes(s) ? value.filter(x => x !== s) : [...value, s]);
+  return (
+    <div className="mt-2 p-2 rounded-lg bg-slate-100 dark:bg-black/30 border border-bony-border">
+      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+        Concessions rattachées
+      </p>
+      <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto custom-scrollbar">
+        {SITES.map(s => {
+          const actif = value.includes(s);
+          return (
+            <button
+              key={s}
+              type="button"
+              onClick={() => toggle(s)}
+              className={`min-h-[28px] px-2 rounded-md text-[10px] font-bold transition-colors ${
+                actif ? 'gx-gradient text-white' : 'bg-white/5 text-slate-500 hover:text-bony-text border border-bony-border'
+              }`}
+            >
+              {s}
+            </button>
+          );
+        })}
+      </div>
+      {value.length === 0 && (
+        <p className="text-[9px] text-red-400 mt-1.5 font-bold">
+          Aucune concession : ce compte ne verra aucune donnée.
+        </p>
+      )}
+    </div>
+  );
+};
+
 const USER_PREFS_KEY = (id: string) => `gearbox_user_prefs_${id}`;
 
 // ⚠️ `birthdate` a QUITTÉ cette structure le 04/08/2026 : c'est désormais un champ du
@@ -396,7 +440,10 @@ const Settings: React.FC = () => {
   // `DIRECTOR_ASSIGNABLE_ROLES` de `backend/src/auth/roles.ts`, qui est le garde-fou
   // réel : ici on se contente de ne pas proposer ce que l'API refusera en 403.
   const DIRECTOR_ASSIGNABLE: UserRole[] = ['Coordinator', 'Digital Manager', 'Guest', 'External'];
-  const TOUS_LES_ROLES: UserRole[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager', 'Guest', 'External'];
+  // ⚠️ 'Site Manager' est ABSENT de DIRECTOR_ASSIGNABLE : créer un chef de site revient
+  // à ouvrir un accès aux données financières d'une concession, réservé à Master et
+  // Administrator (décision de Théo). Aligné sur le backend, qui refuse en 403.
+  const TOUS_LES_ROLES: UserRole[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager', 'Guest', 'External', 'Site Manager'];
 
   // `roleActuel` est réinjecté dans la liste même s'il n'est pas attribuable : sans ça,
   // un Director ouvrant la fiche d'un Administrator verrait un sélecteur vide et
@@ -487,7 +534,10 @@ const Settings: React.FC = () => {
           role: editForm.role as UserRole,
           avatarColor: '#' + Math.floor(Math.random() * 16777215).toString(16),
           // L'anniversaire part au serveur avec le compte ; seule la ville reste locale.
-          birthdate: editForm.birthdate || undefined
+          birthdate: editForm.birthdate || undefined,
+          // Périmètre du chef de site. Le serveur revalide contre la liste des sites
+          // connus — ici on ne fait que transmettre.
+          sites: editForm.sites ?? []
         });
         saveUserPrefs(created.id, editPrefs);
         if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: "a créé l'utilisateur", entity: 'user', entityName: created.name, timestamp: new Date().toISOString() });
@@ -714,6 +764,12 @@ const Settings: React.FC = () => {
                         options={roleOptions(editForm.role)}
                         size="sm"
                       />
+                      {isSiteManager(editForm.role) && (
+                        <SitesPicker
+                          value={editForm.sites ?? []}
+                          onChange={v => setEditForm({ ...editForm, sites: v })}
+                        />
+                      )}
                     </td>
                     <td className="p-4">
                       <Select
@@ -760,6 +816,12 @@ const Settings: React.FC = () => {
                             options={roleOptions(editForm.role)}
                             size="sm"
                           />
+                          {isSiteManager(editForm.role) && (
+                            <SitesPicker
+                              value={editForm.sites ?? []}
+                              onChange={v => setEditForm({ ...editForm, sites: v })}
+                            />
+                          )}
                         </td>
                         <td className="p-4">
                           <Select

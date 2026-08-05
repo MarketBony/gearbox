@@ -30,7 +30,11 @@ export type TaskChannel = '' | 'SMS' | 'E-mail' | 'GMB' | 'Radio' | 'Print' | 'A
 export type TaskStatus = 'Todo' | 'InProgress' | 'Done' | 'Programmed' | 'Empty';
 
 // --- AUTH TYPES ---
-export type UserRole = 'Master' | 'Administrator' | 'Director' | 'Coordinator' | 'Digital Manager' | 'Guest' | 'External';
+// ⚠️ 'Site Manager' (chef de site) est le premier rôle dont les droits dépendent d'une
+// DONNÉE du compte (`sites` ci-dessous) et pas seulement de son nom : lecture seule,
+// cloisonné à ses concessions. Voir SITE_MANAGER_SECTIONS dans constants.ts et
+// backend/src/auth/siteScope.ts, qui est le garde-fou réel.
+export type UserRole = 'Master' | 'Administrator' | 'Director' | 'Coordinator' | 'Digital Manager' | 'Guest' | 'External' | 'Site Manager';
 
 export interface User {
   id: string;
@@ -44,6 +48,10 @@ export interface User {
   // en localStorage, ce qui la rendait invisible de tous les autres postes. À ne pas
   // confondre avec la ville, qui reste une préférence locale (météo de son poste).
   birthdate?: string;
+  // Périmètre du rôle « Site Manager » : les concessions auxquelles il est rattaché.
+  // Vide ou absent pour tous les autres rôles, qui voient l'ensemble.
+  // ⚠️ Liste vide = ne voit RIEN (fail closed), jamais « voit tout ».
+  sites?: string[];
 }
 
 export interface Task {

@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticateToken, requireRole } from '../auth/middleware';
+import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
+import { scopeOf, arrayScopeWhere, redactSiteFields } from '../auth/siteScope';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -67,11 +68,17 @@ const optionalFieldsError = (body: any): string | null => {
   return null;
 };
 
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req: AuthRequest, res) => {
+  // Cloisonnement par concession — voir auth/siteScope.ts. `null` = aucune
+  // restriction (rôles historiques), liste = sites d'un chef de site.
+  const scope = await scopeOf(req);
   const expenses = await prisma.fixedExpense.findMany({
+    where: arrayScopeWhere('sites', scope),
     orderBy: { date: 'desc' }
   });
-  res.json(expenses);
+  // Même redaction que les projets : une dépense multi-sites ne doit pas révéler la
+  // répartition des autres concessions.
+  res.json(expenses.map(e => redactSiteFields(e, scope)));
 });
 
 router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) => {

@@ -4,7 +4,8 @@ import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense, User } from '../types';
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
-import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS, isHoldingBrand, resolveBudgetLine, resolveSiteAlias, splitShareToBuckets } from '../constants';
+import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS, isHoldingBrand, resolveBudgetLine, resolveSiteAlias, splitShareToBuckets, hasSocialFeatures, allowedSitesFor } from '../constants';
+import { useAuth } from '../contexts/AuthContext';
 import {
   TrendingUp,
   Wallet,
@@ -61,8 +62,15 @@ const SPECIAL_SITES: string[] = ['Nissan'];
 interface SiteContextPickerProps {
   selected: string[];
   onChange: (v: string[]) => void;
+  /**
+   * Périmètre imposé, ou `null` s'il n'y en a pas. Pour un chef de site, le
+   * sélecteur ne propose QUE ses concessions : il peut filtrer **entre** elles s'il
+   * en a plusieurs, jamais en dehors. ⚠️ Ce n'est qu'un confort d'interface — le
+   * serveur ne lui enverrait de toute façon rien d'autre (auth/siteScope.ts).
+   */
+  restrictTo?: string[] | null;
 }
-const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChange }) => {
+const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChange, restrictTo = null }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [expandedPlaques, setExpandedPlaques] = useState<Set<string>>(new Set(Object.keys(PLAQUES_STRUCTURE)));
@@ -83,7 +91,7 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
     setExpandedPlaques(next);
   };
 
-  const selectAll = () => onChange([...ALL_PLAQUE_SITES, ...SPECIAL_SITES]);
+  const selectAll = () => onChange(restrictTo ?? [...ALL_PLAQUE_SITES, ...SPECIAL_SITES]);
   const clearAll = () => onChange([]);
 
   const isAll = selected.length === 0;
@@ -132,7 +140,11 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar py-1">
-                  {Object.entries(PLAQUES_STRUCTURE).map(([plaqueName, sites]) => {
+                  {Object.entries(PLAQUES_STRUCTURE).map(([plaqueName, sitesBrutes]) => {
+                    // Périmètre imposé : on retire d'emblée les concessions interdites,
+                    // et une plaque qui n'en contient plus aucune disparaît.
+                    const sites = restrictTo ? sitesBrutes.filter(s => restrictTo.includes(s)) : sitesBrutes;
+                    if (sites.length === 0) return null;
                     const filtered = sites.filter(s => !search || s.toLowerCase().includes(search.toLowerCase()));
                     if (search && filtered.length === 0) return null;
                     const expanded = expandedPlaques.has(plaqueName);
@@ -165,7 +177,9 @@ const SiteContextPicker: React.FC<SiteContextPickerProps> = ({ selected, onChang
                   })}
                   <div>
                     <div className="px-2 py-1 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Entités Spécifiques</div>
-                    {SPECIAL_SITES.filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
+                    {/* Nissan est une enveloppe GLOBALE, ventilée sur aucun site : elle
+                        n'est jamais proposée à un chef de site (décision de Théo). */}
+                    {(restrictTo ? [] : SPECIAL_SITES).filter(s => !search || s.toLowerCase().includes(search.toLowerCase())).map(site => (
                       <button key={site} onClick={() => toggle(site)}
                         className="w-full flex items-center justify-between gap-2 min-w-0 pl-6 pr-2 py-1.5 text-xs hover:bg-white/5 transition">
                         <span className={`truncate min-w-0 ${selected.includes(site) ? 'text-bony-text font-bold' : 'text-slate-500'}`}>{site}</span>
@@ -292,6 +306,8 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   // --- FILTER STATES ---
+  const { user } = useAuth();
+
   // Default to current year (Jan 1 to Dec 31)
   const currentYear = new Date().getFullYear();
   const [dateStart, setDateStart] = useSessionState<string>('dashboard_dateStart', `${currentYear}-01-01`);
@@ -896,6 +912,14 @@ const Dashboard: React.FC = () => {
   // commentaire du bloc « Rythme de consommation » dans l'agrégation.
   const ecartRythme = stats.pctEngageADate - stats.pctTempsEcoule;
 
+  // Blocs réservés à l'équipe marketing, masqués au chef de site (demande de Théo) :
+  // performance des campagnes, top consommateurs et charge de l'équipe. Les deux
+  // premiers supposent de comparer les concessions entre elles, le troisième nomme
+  // des collègues avec qui il n'a aucune interaction.
+  const montrerBlocsMarketing = hasSocialFeatures(user?.role);
+  // Périmètre imposé (chef de site) ou `null`. Borne le sélecteur de périmètre.
+  const perimetreImpose = allowedSitesFor(user);
+
   // --- Résumé des filtres, pour la barre repliée sur mobile ---
   // Un filtre « actif » = un filtre qui restreint réellement les chiffres. Les
   // dates n'en font PAS partie : elles valent toujours quelque chose, les compter
@@ -968,7 +992,7 @@ const Dashboard: React.FC = () => {
                  />
                  <div className="w-px h-6 bg-bony-border hidden sm:block" />
                  {/* 2. Périmètre multi-select */}
-                 <SiteContextPicker selected={filterContexts} onChange={setFilterContexts} />
+                 <SiteContextPicker selected={filterContexts} onChange={setFilterContexts} restrictTo={perimetreImpose} />
                  <div className="w-px h-6 bg-bony-border hidden sm:block" />
                  {/* 3. Marques chips */}
                  <BrandPicker selected={filterBrands} onChange={setFilterBrands} />
@@ -1461,7 +1485,10 @@ const Dashboard: React.FC = () => {
               </div>
           </div>
 
-          {/* ═══ 5. PERFORMANCE DES CAMPAGNES ═══ */}
+          {/* ═══ 5. PERFORMANCE DES CAMPAGNES ═══
+              Masqué au chef de site : les campagnes sont un outil marketing, et il
+              n'a pas accès à la rubrique Campagnes (demande de Théo). */}
+          {montrerBlocsMarketing && (
           <div className="gx-card p-5">
               <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-1 flex items-center gap-2">
                   <Send size={16} className="text-bony-blue"/> Performance des Campagnes
@@ -1519,6 +1546,7 @@ const Dashboard: React.FC = () => {
                   </div>
               )}
           </div>
+          )}
 
           {/* ═══ 6. OÙ PART L'ARGENT, ET QUI PORTE LA CHARGE ═══ */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1553,7 +1581,9 @@ const Dashboard: React.FC = () => {
                   )}
               </div>
 
-              {/* Top sites + top prestataires */}
+              {/* Top sites + top prestataires — masqué au chef de site : classer les
+                  concessions entre elles suppose de voir les autres. */}
+              {montrerBlocsMarketing && (
               <div className="gx-card p-5">
                   <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-1 flex items-center gap-2">
                       <MapPin size={16} className="text-bony-orange"/> Top Consommateurs
@@ -1578,8 +1608,12 @@ const Dashboard: React.FC = () => {
                       )) : <p className="text-xs text-slate-500 italic">Aucun prestataire renseigné sur les tâches.</p>}
                   </div>
               </div>
+              )}
 
-              {/* Charge par collaborateur */}
+              {/* Charge par collaborateur — masqué au chef de site : il nomme les
+                  membres de l'équipe marketing, avec qui il n'a aucune interaction.
+                  Et sa liste d'utilisateurs est de toute façon réduite à lui-même. */}
+              {montrerBlocsMarketing && (
               <div className="gx-card p-5">
                   <h3 className="text-sm font-bold text-bony-text uppercase tracking-wider mb-1 flex items-center gap-2">
                       <Users size={16} className="text-bony-blue"/> Charge de l'Équipe
@@ -1610,6 +1644,7 @@ const Dashboard: React.FC = () => {
                       </div>
                   )}
               </div>
+              )}
           </div>
 
       </div>

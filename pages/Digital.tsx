@@ -10,6 +10,7 @@ import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check,
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
 import CollapsibleFilters from '../components/CollapsibleFilters';
+import { isSiteManager } from '../constants';
 import DatePicker from '../components/DatePicker';
 
 type Tab = 'Calendrier Editorial' | 'Planning Digital' | 'Archives' | 'Gestion des TAGS';
@@ -839,6 +840,14 @@ const Digital: React.FC = () => {
   // External role can edit in Calendrier Editorial only (create, modify, status, media)
   const canEditCalendar = canEdit || user?.role === 'External';
   const isExternal = user?.role === 'External';
+  const estChefDeSite = isSiteManager(user?.role);
+
+  // ⚠️ L'onglet actif est mémorisé en session : un chef de site arrivant avec
+  // « Calendrier Editorial » en mémoire (par exemple après un changement de rôle)
+  // se retrouverait sur un onglet qui ne lui est plus proposé. On le ramène.
+  useEffect(() => {
+    if (estChefDeSite && activeTab !== 'Planning Digital') setActiveTab('Planning Digital');
+  }, [estChefDeSite, activeTab]);
 
   useEffect(() => {
       loadData();
@@ -1459,7 +1468,11 @@ const Digital: React.FC = () => {
                     )}
                     {/* Tabs */}
                     <div className="bg-slate-100 dark:bg-black/30 p-1 rounded-lg border border-bony-border flex flex-wrap gap-1">
-                        {(['Calendrier Editorial', 'Planning Digital', 'Archives', 'Gestion des TAGS'] as Tab[]).filter(tab => !isExternal || tab === 'Calendrier Editorial').map(tab => (
+                        {/* Chef de site : SEUL « Planning Digital » lui est accessible
+                            (demande de Théo). External : seul le calendrier éditorial. */}
+                        {(['Calendrier Editorial', 'Planning Digital', 'Archives', 'Gestion des TAGS'] as Tab[])
+                          .filter(tab => estChefDeSite ? tab === 'Planning Digital' : (!isExternal || tab === 'Calendrier Editorial'))
+                          .map(tab => (
                             <button 
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}

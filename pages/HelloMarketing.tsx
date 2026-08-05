@@ -11,6 +11,7 @@ import Avatar from '../components/Avatar';
 import { User, Project, FeedInfo } from '../types';
 // `parseLocalDate` est exporté par DateRangePicker (et non par constants.ts).
 import { parseLocalDate } from '../components/DateRangePicker';
+import { hasSocialFeatures } from '../constants';
 
 // =============================================================================
 // OPENWEATHER API KEY
@@ -1200,6 +1201,10 @@ const WeatherSkeleton: React.FC = () => (
 
 const HelloMarketing: React.FC = () => {
   const { user } = useAuth();
+  // Rituels d'équipe (musique du jour, viennoiseries, anniversaires) : réservés à
+  // l'équipe marketing. Un chef de site garde la météo, les actus et les prochains
+  // événements, qui se rapportent à son activité.
+  const blocsEquipe = hasSocialFeatures(user?.role);
   if (!user) return null;
 
   const weather = useWeatherData(user.id);
@@ -1248,17 +1253,23 @@ const HelloMarketing: React.FC = () => {
             )}
           </div>
 
-          {/* Bas gauche — Musique du jour + Viennoiseries de la semaine */}
+          {/* Bas gauche — Musique du jour + Viennoiseries de la semaine.
+              Masqués au chef de site : ce sont des rituels d'équipe marketing
+              (demande de Théo). Le bloc entier disparaît, la grille se réajuste. */}
+          {blocsEquipe && (
           <div className="flex flex-col gap-4 h-full">
             <div className="h-40 shrink-0">
               <MusicSection />
             </div>
             <ViennoiseriesSection />
           </div>
+          )}
 
-          {/* Bas droite — Anniversaires + Prochains événements */}
+          {/* Bas droite — Anniversaires + Prochains événements.
+              Les anniversaires sont eux aussi réservés à l'équipe ; les prochains
+              événements restent, ils concernent ses projets. */}
           <div className="flex flex-col gap-3 h-full">
-            <BirthdaysSection />
+            {blocsEquipe && <BirthdaysSection />}
             <NextEventSection />
           </div>
 

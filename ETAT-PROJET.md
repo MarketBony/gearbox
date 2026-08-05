@@ -10,9 +10,9 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 31** (responsive mobile :
-  filtres repliables, Budget écrasé, Chat au doigt, barre du bas, 5 août) — **`web`
-  seul**, frontend uniquement. Le correctif 30 (refonte des Jeux) avait demandé `api`
+- master = prod, synchronisés. Dernier lot déployé : **correctif 32** (rôle « chef de
+  site », 5 août) — `api` **et** `web`, migration Prisma. Le correctif 31 (responsive
+  mobile) s'était contenté de `web`. Le correctif 30 (refonte des Jeux) avait demandé `api`
   **et** `web` avec migration, comme les 27, 28 et 29 ; les 25 et 26 s'étaient contentés
   de `web`. Le
   correctif 24 (curseurs `alpineShare` / `nissanShare`) a lui nécessité `api` **et**
@@ -1087,6 +1087,73 @@
     du sélecteur, aucun défilement horizontal de page sur les quatre écrans, thèmes
     clair **et** sombre. `tsc` racine 12 lignes préexistantes, backend 0.
     ℹ️ **Validé par Théo** avant déploiement.
+
+32. **RÔLE « CHEF DE SITE » — lecture seule, cloisonné par concession**
+    (`feat/role-chef-de-site`, 5 août). Backend + frontend, **migration Prisma** →
+    `api` **et** `web`.
+
+    Demande de Théo : donner aux responsables de concession un accès limité **à leur
+    site**, en lecture seule, sans interaction avec l'équipe marketing. Nouveau rôle
+    `Site Manager`, rattaché à une liste de sites choisie dans les Paramètres.
+    **Premier rôle dont les droits dépendent d'une DONNÉE du compte** et pas seulement
+    de son nom — d'où la section dédiée ajoutée à `CLAUDE.md`.
+
+    **Ce que l'audit a trouvé :** aucune route ne filtrait par site (tous les `GET`
+    renvoyaient tout, le frontend triait), `/api/uploads` n'avait **aucun** contrôle de
+    rôle, les handlers chat et présence étaient enregistrés pour tout socket
+    authentifié, et `emitEvent` diffusait l'objet Prisma **brut à tous**. Bonne
+    nouvelle en revanche : la lecture seule est acquise **par absence** du rôle dans
+    les huit `EDIT_ROLES`.
+
+    **Décisions de Théo** : filtrage imposé **côté serveur** · `GROUPE BONY` visible
+    avec sa part · `Alpine-<son site>` visible, **Nissan masquée** (globale, ventilée
+    sur aucun site) · attribution réservée à Master et Administrator.
+
+    ⚠️ **Trois pièges trouvés en VÉRIFIANT, pas en planifiant :**
+    1. **Filtrer les lignes ne suffit pas.** Un projet multi-sites incluant Mozac passe
+       légitimement le filtre, mais nommait **toutes les autres concessions avec leurs
+       pourcentages**. `redactSiteFields` ne garde que ses clés — et comme le frontend
+       ventile déjà par `budgetDistribution`, il calcule **sa part** sans qu'on touche
+       aux montants.
+    2. **Les opérations au niveau PLAQUE** (`PLAQUE CENTRE`) sont des valeurs de site à
+       part entière. Les manquer aurait rendu invisible une dépense pesant sur son
+       budget.
+    3. **`Budget.tsx` FABRIQUE les buckets Alpine et Nissan côté client**, quoi que
+       renvoie l'API — elle recréait exactement ce que le serveur venait d'exclure.
+
+    ⚠️ **Et le piège le plus instructif, signalé par Théo après son test :** la nav
+    groupée du desktop **réécrit ses rubriques en dur** et ignorait `mainItems`. Mon
+    filtrage ne s'appliquait donc qu'aux variantes tablette et mobile, et Lucien voyait
+    Chat, Dépenses, Matériel, Campagnes, To-do et Archives. Réalignée sur la source
+    unique. **Mes contrôles d'API étaient exacts et l'écran mentait quand même — la
+    deuxième fois après le lot d'escalade de privilège.** Consigné dans `CLAUDE.md` :
+    un rôle ne se vérifie pas sans parcourir son interface.
+
+    Ajouté dans la foulée : **garde de routage dans `App.tsx`**. Masquer le menu ne
+    suffit pas, l'onglet actif est mémorisé en session et une rubrique retirée restait
+    **atteignable**.
+
+    **Retraits par écran**, conformes au cahier des charges : Dashboard sans
+    « Performance des Campagnes », « Top Consommateurs » ni « Charge de l'Équipe » ·
+    Hello Marketing sans musique, viennoiseries ni anniversaires · Digital limité à
+    l'onglet « Planning Digital » · Budget complet mais provisions non éditables ·
+    Agenda normal (cloisonné automatiquement, il ne lit que les projets).
+
+    **Vérifié sur l'API** avec un chef de site rattaché à Mozac : projets 94 → 13 avec
+    **0 ligne hors périmètre**, sa réponse ne contient **que « Mozac »** comme valeur de
+    site (ni dans `sites[]`, ni dans `budgetDistribution`, ni dans le libellé legacy),
+    budget 25 → 1 ligne, **Nissan absente**, écriture refusée en 403 sur les cinq
+    routes testées dont `/api/uploads`, liste d'utilisateurs réduite à 1 compte, fil
+    d'actualité et jeux en 403. Master inchangé : 94 projets, 19 concessions.
+    **Vérifié dans le navigateur** avec le compte réel de Lucien : navigation réduite
+    aux 6 rubriques exactes, ni cloche ni bulles de présence, Budget limité à Mozac, et
+    **sept tentatives de navigation forcée** retombent toutes sur le Dashboard.
+    ℹ️ **Validé par Théo** en local avant déploiement.
+
+    ℹ️ **Piège d'environnement à retenir** : `nodemon` surveille `*.*`, donc écrire un
+    script de test **dans `backend/`** redémarre l'API en plein test — c'est ce qui
+    faisait échouer les vérifications avec « fetch failed ». Tester depuis l'extérieur
+    du dossier surveillé.
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - ~~⚠️ Corriger le KPI « Rythme de consommation »~~ — **fait le 04/08** (correctif 25).

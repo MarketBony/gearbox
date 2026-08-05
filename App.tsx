@@ -16,7 +16,7 @@ import HelloMarketing from './pages/HelloMarketing';
 import Games from './pages/Games';
 import TodoList from './pages/TodoList';
 import Export, { EXPORT_ALLOWED_ROLES } from './pages/Export';
-import { GAMES_ALLOWED_ROLES } from './constants';
+import { GAMES_ALLOWED_ROLES, SITE_MANAGER_SECTIONS, isSiteManager } from './constants';
 import AnimatedBackground from './components/AnimatedBackground';
 import { db } from './services/dataService';
 import { setMySection } from './services/socket';
@@ -57,6 +57,14 @@ const InnerApp: React.FC = () => {
   let resolvedTab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(activeTab)) ? 'digital' : activeTab;
   if (resolvedTab === 'games' && !canAccessGames) resolvedTab = 'dashboard';
   if (resolvedTab === 'export' && !canExport) resolvedTab = 'dashboard';
+  // ⚠️ Chef de site : liste FERMÉE de rubriques. Masquer la navigation ne suffit pas —
+  // l'onglet actif est mémorisé en session et un événement `gearbox-navigate` peut
+  // pointer n'importe où. Sans cette garde, une rubrique interdite restait
+  // ATTEIGNABLE même une fois retirée du menu. `settings` est autorisé en plus des
+  // 6 rubriques : chacun accède à son propre profil.
+  if (isSiteManager(user?.role) && ![...SITE_MANAGER_SECTIONS, 'settings'].includes(resolvedTab)) {
+    resolvedTab = 'dashboard';
+  }
 
   // Présence : on annonce la rubrique RÉELLEMENT affichée (`resolvedTab`), pas
   // `activeTab` brut qui peut être redirigé par les droits — sinon un External

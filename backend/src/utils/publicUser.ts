@@ -16,5 +16,9 @@ export const publicUser = (u: any) => ({
   role: u.role,
   avatarColor: u.avatarColor,
   avatarUrl: u.avatarUrl,
-  birthdate: u.birthdate
+  birthdate: u.birthdate,
+  // Périmètre du chef de site. Vide pour tous les autres rôles. Non sensible en
+  // soi (ce sont des noms de concession), et nécessaire au frontend pour borner
+  // ses sélecteurs de périmètre.
+  sites: u.sites ?? []
 });

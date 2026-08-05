@@ -27,6 +27,16 @@ model User {
   // invisible de tous les autres — l'anniversaire est une donnée d'équipe, pas une
   // préférence. La ville, elle, reste bien en localStorage (météo de son propre poste).
   birthdate         String?
+  // Périmètre du rôle « Site Manager » (chef de site) : les concessions auxquelles le
+  // compte est rattaché. Vide pour tous les autres rôles, qui voient l'ensemble.
+  //
+  // ⚠️ PREMIER champ de Gearbox qui porte un DROIT D'ACCÈS et non une préférence.
+  // Il est lu côté serveur par `auth/siteScope.ts`, seule porte par laquelle un
+  // périmètre s'applique — jamais recopié dans un `where` de route.
+  //
+  // ⚠️ Liste VIDE = ne voit RIEN (fail closed). Un chef de site sans site rattaché ne
+  // doit pas hériter d'un accès complet par accident : c'est l'inverse du défaut sûr.
+  sites             String[] @default([])
   pushSubscriptions PushSubscription[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt

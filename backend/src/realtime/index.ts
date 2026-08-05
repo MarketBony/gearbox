@@ -12,6 +12,8 @@ import {
 } from './chat';
 import { registerPresenceHandlers, handleUserChanged, getUserIdsOnSection } from './presence';
 import { registerGameHandlers, emitSessionToPlayers } from './games';
+import { hasSocialFeatures } from '../auth/roles';
+import { invalidateUserScope } from '../auth/siteScope';
 import { sendPushToUsers } from '../utils/pushSender';
 import { PrismaClient } from '@prisma/client';
 
@@ -59,14 +61,27 @@ export const setupRealtime = (socketIo: Server) => {
   io.on('connection', (socket) => {
     console.log('Client connected', socket.id, `(user ${socket.data.user?.id})`);
 
-    // Chat : rejoint sa room personnelle + celles de ses conversations,
-    // puis enregistre les handlers temps réel (voir ./chat).
-    joinUserRooms(socket).catch(err => console.error('joinUserRooms failed', err));
-    registerChatHandlers(io, socket);
+    // ⚠️ Les rôles sans vie sociale (chef de site) n'ont NI chat NI présence, et la
+    // porte est fermée au TRANSPORT et pas seulement dans l'interface : sans ce test,
+    // il rejoignait le Chat Général (appartenance implicite) et sa présence était
+    // diffusée à tous. Même motif que `registerGameHandlers`, qui ne s'enregistre pas
+    // hors des rôles autorisés.
+    const social = hasSocialFeatures(socket.data.user?.role);
 
-    // Présence : le client annonce sa rubrique via 'presence:set' (au connect
-    // puis à chaque changement d'onglet) et reçoit 'presence:state'.
-    registerPresenceHandlers(io, socket);
+    // Détermine si ce socket reçoit les payloads complets ou seulement les noms
+    // d'événements (voir emitEvent plus bas).
+    assignEmitRoom(socket);
+
+    if (social) {
+      // Chat : rejoint sa room personnelle + celles de ses conversations,
+      // puis enregistre les handlers temps réel (voir ./chat).
+      joinUserRooms(socket).catch(err => console.error('joinUserRooms failed', err));
+      registerChatHandlers(io, socket);
+
+      // Présence : le client annonce sa rubrique via 'presence:set' (au connect
+      // puis à chaque changement d'onglet) et reçoit 'presence:state'.
+      registerPresenceHandlers(io, socket);
+    }
 
     // Jeux : placement de flotte, coups et abandon. Les handlers ne sont pas
     // enregistrés du tout pour un rôle sans accès aux Jeux.
@@ -103,14 +118,33 @@ export const withEmitterContext: RequestHandler = (req, _res, next) => {
   emitterStore.run({ socketId }, () => next());
 };
 
+// ⚠️⚠️ CLOISONNEMENT DU TEMPS RÉEL (05/08/2026)
+//
+// `emitEvent` diffusait l'objet Prisma BRUT à TOUS les clients (`io.emit`). Avec le
+// rôle « chef de site », cela percait le cloisonnement : le projet d'une autre
+// concession lui arrivait en clair dans le socket, alors même que la route `GET`
+// venait de le filtrer. Le frontend ignore ce payload par convention
+// (services/realtime.ts : stratégie d'invalidation, pas de patch de state) — mais il
+// transitait sur le fil, et c'est ce qui compte.
+//
+// Parade : ces rôles reçoivent l'événement **sans sa charge**. Ils rappellent alors
+// leur loader, qui passe par la route filtrée. Comportement inchangé pour tous les
+// autres rôles.
+const scopedRoom = 'scoped-clients';
+
+/** Range un socket dans la room des clients à charge réduite, selon son rôle. */
+export const assignEmitRoom = (socket: Socket) => {
+  if (!hasSocialFeatures(socket.data.user?.role)) socket.join(scopedRoom);
+};
+
 export const emitEvent = (event: string, data: any) => {
   if (!io) return;
   const socketId = emitterStore.getStore()?.socketId;
-  if (socketId && io.sockets.sockets.has(socketId)) {
-    io.except(socketId).emit(event, data);
-  } else {
-    io.emit(event, data);
-  }
+  const base = socketId && io.sockets.sockets.has(socketId) ? io.except(socketId) : io;
+  // Tout le monde sauf les clients cloisonnés : payload complet, comme avant.
+  base.except(scopedRoom).emit(event, data);
+  // Clients cloisonnés : le nom de l'événement suffit à déclencher leur refetch.
+  base.to(scopedRoom).emit(event, null);
 };
 
 // Helpers chat exposés aux routes REST (création de conversation) —
@@ -181,6 +215,11 @@ export const notifySessionToPlayers = (session: any, event: string) => {
 // présences du compte s'il a été supprimé. Best-effort : n'interrompt jamais la
 // réponse HTTP de la route appelante.
 export const notifyUserChanged = (userId: string) => {
+  // ⚠️ Invalide AUSSI le périmètre en cache (auth/siteScope.ts). C'est ce qui rend un
+  // changement de sites effectif IMMÉDIATEMENT, sans attendre l'expiration du jeton :
+  // le périmètre n'est volontairement pas dans le JWT, qui vit 24 h — retirer un site
+  // à quelqu'un doit prendre effet tout de suite.
+  invalidateUserScope(userId);
   handleUserChanged(io, userId).catch(err =>
     console.error('notifyUserChanged failed', err)
   );

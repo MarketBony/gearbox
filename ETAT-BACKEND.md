@@ -110,6 +110,73 @@ renvoie un `Set` et non un tableau — piège rencontré). C'est le manque exact
 seule exception à sa parité avec Administrator, commenté sur place pour qu'on ne
 « corrige » pas cette incohérence apparente.
 
+### 🏢 Rôle « Chef de site » — cloisonnement par concession (05/08/2026)
+
+Migration `20260805190033_add_user_sites` : `sites String[] @default([])` sur `User`.
+Premier champ de Gearbox qui porte un **droit d'accès** et non une préférence.
+
+⚠️ **Liste VIDE = ne voit RIEN** (fail closed). Un chef de site sans concession
+rattachée ne doit pas hériter d'un accès complet par accident.
+
+#### ⚠️⚠️ `auth/siteScope.ts` — SEULE porte du cloisonnement
+
+Même statut que `publicUser` pour `passwordHash` : **aucune route ne recopie un
+`where` de site.** Avant ce lot, tous les `GET` renvoyaient l'intégralité des données
+et c'était le frontend qui triait — acceptable tant que tous les rôles voyaient tout,
+inacceptable pour un rôle cloisonné (les autres concessions restaient lisibles dans
+l'onglet Réseau).
+
+- `scopeOf(req)` → `null` (aucune restriction) ou la liste des valeurs autorisées.
+- `budgetScopeOf(req)` → variante pour `BudgetLine.site`, qui peut être un **bucket**.
+- `arrayScopeWhere` / `stringScopeWhere` → clauses Prisma, `{}` s'il n'y a pas de
+  restriction (composables sans condition).
+
+**Ce que le périmètre englobe**, et pourquoi :
+
+| Valeur | Incluse ? | Raison |
+|---|---|---|
+| Ses sites | oui | évident |
+| Sa **plaque** (`PLAQUE CENTRE`…) | **oui** | une opération de plaque couvre son site ; la manquer rendrait invisible une dépense qui pèse sur son budget |
+| `GROUPE BONY` / `(R/N)` | **oui** | ventilé sur toutes les concessions, donc il en porte une part |
+| `Alpine-<son site>` | oui | c'est sa concession |
+| `Nissan` | **NON** | enveloppe globale, ventilée sur aucun site — elle n'est à personne |
+
+⚠️ **`redactSiteFields()` — filtrer les lignes NE SUFFIT PAS.** Découvert en vérifiant
+l'API : un projet multi-sites incluant Mozac passe légitimement le filtre, mais son
+`sites[]` et son `budgetDistribution` nommaient **toutes les autres concessions avec
+leurs pourcentages**. On ne garde que ses clés. Effet exploité : le frontend ventilant
+déjà par `budgetDistribution`, il calcule naturellement **sa part** sans qu'on touche
+aux montants — donc sans risque de double application d'un ratio. Le libellé legacy
+`site` (concaténé) est recomposé, sans quoi il annulait tout le reste.
+
+⚠️ **Le périmètre n'est PAS dans le JWT**, volontairement : le jeton vit 24 h, donc
+retirer un site ne prendrait effet qu'à la reconnexion. Il est mis en cache et
+invalidé par `notifyUserChanged()`, déjà appelé après chaque modification de compte —
+effet immédiat, sans requête base à chaque appel.
+
+⚠️ **`PLAQUES_STRUCTURE` est DUPLIQUÉ** dans `siteScope.ts` : le backend ne peut pas
+importer le `constants.ts` racine, compilé seulement dans le bundle frontend. À garder
+synchronisé à la main.
+
+#### Portes fermées dans le même lot
+
+- **`/api/uploads` n'avait AUCUN contrôle de rôle** — tout compte authentifié pouvait
+  déposer un fichier. C'aurait été la seule écriture possible d'un rôle en lecture
+  seule, et la plus coûteuse pour le disque.
+- **Chat et présence** : `joinUserRooms` / `registerChatHandlers` /
+  `registerPresenceHandlers` ne sont plus enregistrés pour ces rôles. Fermé au
+  **transport**, donc les autres ne le voient pas non plus.
+- **`emitEvent` diffusait l'objet Prisma brut à TOUS** : le projet d'une autre
+  concession arrivait en clair dans son socket alors que la route venait de le
+  filtrer. Les rôles cloisonnés reçoivent l'événement **sans sa charge** — le frontend
+  ignore déjà le payload (stratégie d'invalidation), donc rien ne casse.
+- **`/api/activity-log`** → 403. **`/api/users`** → réduit à son propre compte (plutôt
+  qu'un 403, pour que la résolution des noms continue de fonctionner).
+
+ℹ️ **La lecture seule est acquise par ABSENCE** : le rôle ne figure dans aucun
+`EDIT_ROLES`. Ne l'y ajouter nulle part. Il n'est pas non plus dans
+`DIRECTOR_ASSIGNABLE_ROLES` — Master et Administrator seuls peuvent le donner.
+
 ### 🔐 Droits par rôle — `src/auth/roles.ts` est la SOURCE UNIQUE (05/08/2026)
 
 Toutes les règles de rôle vivent dans ce fichier : `VALID_ROLES`, `isValidRole`,

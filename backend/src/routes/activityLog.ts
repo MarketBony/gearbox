@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
+import { hasSocialFeatures } from '../auth/roles';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -12,7 +13,14 @@ const prisma = new PrismaClient();
 // - plafond 200 : appliqué à la lecture (take 200, récent d'abord) — l'équivalent
 //   du slice(0,200) frontend ; pas de purge à l'écriture (rotation à décider plus tard)
 
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, async (req: AuthRequest, res) => {
+  // Le fil d'actualité est un outil d'équipe marketing : un chef de site n'y a pas
+  // accès (demande de Théo — « pas d'interaction avec le marketing »). Refus côté
+  // serveur et pas seulement masquage de la cloche : le journal nomme des collègues
+  // et des projets d'autres concessions.
+  if (!hasSocialFeatures(req.user?.role)) {
+    return res.status(403).json({ error: "Le fil d'actualité ne vous est pas accessible." });
+  }
   const entries = await prisma.activityLog.findMany({
     orderBy: { timestamp: 'desc' },
     take: 200

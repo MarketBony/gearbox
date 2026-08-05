@@ -11,7 +11,7 @@ import { usePresence } from '../services/presenceStore';
 import { setAppBadge } from '../services/pushNotifications';
 import { ActivityLog } from '../types';
 // Source unique des rôles ayant accès aux Jeux (Director en est exclu, règle métier).
-import { GAMES_ALLOWED_ROLES } from '../constants';
+import { GAMES_ALLOWED_ROLES, SITE_MANAGER_SECTIONS, isSiteManager, hasSocialFeatures } from '../constants';
 import {
   LayoutDashboard,
   FolderKanban,
@@ -173,7 +173,19 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
 
   // Présence des AUTRES utilisateurs par rubrique (soi-même exclu : on sait
   // déjà où on est, et ça économise une place précieuse sur mobile).
-  const presence = usePresence(user?.id);
+  // Chef de site : consultation seule, cloisonné, et sans aucune interaction avec
+  // l'équipe marketing (ni cloche d'actualité, ni bulles de présence — les siennes
+  // comme celles des autres). Déclaré ICI, avant la présence qui s'en sert.
+  const isSiteManagerUser = isSiteManager(user?.role);
+  const showSocial = hasSocialFeatures(user?.role);
+
+  const presenceBrute = usePresence(user?.id);
+  // ⚠️ Un chef de site ne voit AUCUNE bulle de présence — ni la sienne, ni celles des
+  // autres. On neutralise la SOURCE plutôt que d'ajouter une condition aux cinq
+  // endroits qui rendent <PresenceBubbles/> : c'est le genre d'oubli qui laisse une
+  // bulle traîner dans une variante de nav. Le serveur ne lui envoie de toute façon
+  // rien (registerPresenceHandlers n'est pas enregistré pour ce rôle).
+  const presence = showSocial ? presenceBrute : {};
 
   const isExternal = user?.role === 'External';
   const canAccessGames = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Coordinator' || user?.role === 'Digital Manager';
@@ -195,9 +207,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     ...(canExport ? [{ id: 'export', icon: FileSpreadsheet, label: 'Export' }] : []),
   ];
 
-  const mainItems = isExternal
-    ? allMainItems.filter(i => ['digital', 'chat', 'hello-marketing'].includes(i.id))
-    : allMainItems;
+  // Chef de site : liste FERMÉE de rubriques (Dashboard, Projets, Digital, Hello
+  // Marketing, Budget, Agenda). Tout le reste lui est refusé — et pas seulement
+  // masqué : les routes correspondantes le rejettent côté serveur.
+  const mainItems = isSiteManagerUser
+    ? allMainItems.filter(i => SITE_MANAGER_SECTIONS.includes(i.id))
+    : isExternal
+      ? allMainItems.filter(i => ['digital', 'chat', 'hello-marketing'].includes(i.id))
+      : allMainItems;
 
   // ============================================================================
   // BARRE DU BAS (mobile) — liste EXPLICITE, demandée par Théo le 05/08/2026
@@ -313,9 +330,23 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                 },
               ];
 
+          // ⚠️ Cette nav groupée réécrivait ses rubriques EN DUR et ignorait
+          // complètement `mainItems` : un rôle restreint voyait donc toute la
+          // navigation malgré le filtrage (constaté par Théo le 05/08/2026 avec le
+          // premier compte chef de site). On la réaligne sur la source unique —
+          // `mainItems` porte déjà toutes les règles de rôle. Archives n'y figurant
+          // pas, on l'autorise explicitement pour les rôles qui y ont droit.
+          const idsAutorises = new Set([
+            ...mainItems.map(i => i.id),
+            ...(isSiteManagerUser ? [] : ['archives']),
+          ]);
+          const groupesFiltres = groups
+            .map(g => ({ ...g, items: g.items.filter(i => idsAutorises.has(i.id)) }))
+            .filter(g => g.items.length > 0);
+
           return (
             <nav className="hidden lg:flex flex-1 flex-col py-2 px-2 overflow-y-auto [&::-webkit-scrollbar]:w-0 [-ms-overflow-style:none] [scrollbar-width:none]">
-              {groups.filter(g => g.items.length > 0).map((group, gi) => (
+              {groupesFiltres.map((group, gi) => (
                 <div key={group.label || gi} className={gi > 0 ? 'mt-1' : ''}>
                   {gi > 0 && <div className="h-px bg-bony-border/50 mx-1 my-1.5" />}
                   {group.label && (
@@ -414,7 +445,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
               </button>
             );
           })}
-          {!isExternal && (
+          {/* Archives : hors des rubriques d'un chef de site (liste fermée). */}
+          {!isExternal && !isSiteManagerUser && (
             <>
               <div className="w-6 h-px bg-bony-border/60 my-1" />
               <button
@@ -451,8 +483,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
               )}
             </div>
 
-            {/* Fil d'actualité */}
-            {!isExternal && (
+            {/* Fil d'actualité — outil d'équipe marketing. Un chef de site n'y a pas
+                accès : la route répond 403, ce n'est pas qu'un masquage. */}
+            {!isExternal && showSocial && (
               <button
                 onClick={openActivity}
                 className="relative flex items-center gap-1.5 px-2 py-1 rounded hover:bg-white/5 text-bony-text/50 hover:text-bony-orange transition-colors w-full"
@@ -494,7 +527,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
 
           {/* Tablet md: icon buttons */}
           <div className="flex lg:hidden flex-col items-center gap-1.5 p-3">
-            {!isExternal && (
+            {!isExternal && showSocial && (
               <button onClick={openActivity} className="relative p-2 rounded hover:bg-white/10 text-bony-text/50 hover:text-bony-orange transition-colors">
                 <Bell size={18} />
                 {unreadCount > 0 && (

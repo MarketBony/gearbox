@@ -9,6 +9,13 @@ export const VALID_ROLES = [
   'Digital Manager',
   'Guest',
   'External',
+  // Chef de site (05/08/2026) — PREMIER rôle dont les droits dépendent d'une DONNÉE
+  // du compte (`User.sites`) et pas seulement de son nom. Lecture seule, cloisonné
+  // à ses concessions par `auth/siteScope.ts`.
+  //
+  // ⚠️ Son absence de tous les `EDIT_ROLES` des routes suffit à le rendre en lecture
+  // seule : ne l'ajouter à AUCUNE de ces listes. C'est voulu, ce n'est pas un oubli.
+  'Site Manager',
 ] as const;
 
 export const isValidRole = (role: unknown): boolean =>
@@ -43,6 +50,31 @@ export const USER_DELETE_ROLES = ['Master', 'Administrator'];
 // Ce n'est pas un oubli : ne pas l'ajouter en croyant corriger une incohérence.
 // Doit rester aligné sur `GAMES_ALLOWED_ROLES` de `constants.ts` côté frontend.
 export const GAMES_ROLES = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'];
+
+// --- Chef de site (05/08/2026) ------------------------------------------------
+//
+// Le nom du rôle et son test vivent ICI, avec les autres constantes de rôle, et non
+// dans `siteScope.ts` : ce dernier tire Prisma, or `uploads.ts` a besoin du test sans
+// avoir besoin d'une base.
+export const SITE_MANAGER_ROLE = 'Site Manager';
+export const isSiteManager = (role?: string | null) => role === SITE_MANAGER_ROLE;
+//
+// ⚠️ **PAS dans DIRECTOR_ASSIGNABLE_ROLES** (décision de Théo) : créer un chef de site
+// revient à ouvrir un accès aux données financières d'une concession, on le réserve à
+// Master et Administrator.
+//
+// Les rubriques qui lui sont accessibles. Liste FERMÉE : tout ce qui n'y figure pas lui
+// est refusé, y compris par appel direct à l'API. Doit rester alignée sur
+// `SITE_MANAGER_SECTIONS` de `constants.ts` (frontend).
+export const SITE_MANAGER_SECTIONS = [
+  'dashboard', 'projects', 'digital', 'hello-marketing', 'budget', 'agenda',
+];
+
+// Rôles qui n'ont AUCUNE interaction avec l'équipe marketing : ni chat, ni jeux, ni
+// présence, ni fil d'actualité. Un chef de site consulte, il ne collabore pas.
+export const NO_SOCIAL_ROLES = ['Site Manager'];
+export const hasSocialFeatures = (role?: string | null) =>
+  !!role && !NO_SOCIAL_ROLES.includes(role);
 
 export const canAssignRole = (actorRole: string | undefined, targetRole: string): boolean => {
   if (actorRole === 'Director') return DIRECTOR_ASSIGNABLE_ROLES.includes(targetRole);
