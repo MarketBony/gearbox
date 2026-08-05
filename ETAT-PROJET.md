@@ -10,11 +10,11 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 28** (stockage :
-  indicateur d'espace, purge du chat, pièces jointes 100 Mo, 5 août) — `api` **et**
-  `web`, le schéma Prisma ayant bougé. Le correctif 27 (anniversaires + choix de
-  l'année) a lui aussi demandé les deux services ; les correctifs 25 et 26 s'étaient
-  contentés de `web`. Le
+- master = prod, synchronisés. Dernier lot déployé : **correctif 29** (droits : Digital
+  Manager éditeur de projets, escalade de privilège du Director fermée, 5 août) — `api`
+  **et** `web` (le backend bouge, mais **aucune migration**). Le correctif 28 (stockage)
+  et le 27 (anniversaires) avaient eux une migration ; les 25 et 26 s'étaient contentés
+  de `web`. Le
   correctif 24 (curseurs `alpineShare` / `nissanShare`) a lui nécessité `api` **et**
   `web`, le schéma Prisma ayant bougé. Le correctif 23 (routage Alpine/Nissan) est
   déployé aussi, `web` seul avait suffi. Le SHA exact se lit
@@ -892,6 +892,67 @@
     ⚠️ **Piège à connaître** : lancer la purge en local agit sur la base de **PROD** avec
     le disque **LOCAL** — un message de plus de 180 jours serait marqué expiré alors que
     son fichier vit toujours sur le VPS. Consigné dans `ETAT-BACKEND.md`.
+
+29. **Droits : Digital Manager éditeur de projets, et fin de l'escalade de privilège du
+    Director** (`fix/droits-projets-et-escalade-role`, 5 août). Frontend + backend,
+    **aucune migration** → `api` **et** `web` quand même, le backend bouge.
+
+    **Demande 1 — le Digital Manager n'éditait pas les projets**, alors qu'il éditait
+    déjà les dépenses fixes, les tags et le Digital. Il manquait des **deux** côtés :
+    `EDIT_ROLES` de `routes/projects.ts` (le seul garde-fou réel) et `canEdit` de
+    `pages/Projects.tsx`. Le frontend seul aurait affiché des boutons refusés en 403.
+    ⚠️ `'Digital Manager'` **avec l'espace** — `'DigitalManager'` ne matche jamais la
+    valeur en base, piège déjà rencontré dans `tags.ts` et `social.ts`.
+
+    **Demande 2 — un Director pouvait changer son propre rôle.** Le trou était bien plus
+    large : `isValidRole` vérifiait que le rôle demandé **existe**, jamais que l'auteur
+    avait le droit de le donner. Un Director pouvait donc s'attribuer Administrator **ou
+    même Master** en un PUT sur son propre id, ou promouvoir un complice qui le promouvait
+    en retour. Et `DELETE /api/users/:id`, ouvert à `ADMIN_ROLES`, ne regardait **ni qui
+    supprime ni qui est supprimé** : un Director pouvait effacer un Administrator, voire
+    le compte Master.
+
+    **Règle arbitrée par Théo** : un Director ne gère que les comptes **en dessous de
+    lui** — Coordinator, Digital Manager, Guest, External. Il ne peut donner ni Master,
+    ni Administrator, ni même Director, ni à lui-même ni à personne, ni en modification ni
+    à la création. Et il ne supprime **aucun** compte. Master et Administrator conservent
+    tous leurs droits.
+    ⚠️ Interdire seulement « Director → soi-même → Administrator » aurait été décoratif :
+    la promotion croisée à deux comptes suffisait à contourner.
+
+    **`backend/src/auth/roles.ts` est désormais la source unique** des règles de rôle
+    (`canAssignRole`, `DIRECTOR_ASSIGNABLE_ROLES`, `USER_DELETE_ROLES`) — même principe
+    que `constants.ts` pour le routage budgétaire : jamais de demi-règle recopiée par
+    écran. Les listes du frontend (`Settings.tsx`, `Projects.tsx`) sont des commodités
+    d'affichage, commentées comme telles.
+
+    ⚠️ **Conséquence volontaire** : un Director ne peut plus éditer **du tout** un compte
+    Administrator ou Master. L'interface envoyant l'objet complet, modifier seulement le
+    nom envoie aussi `role: 'Administrator'` → refus. Cela ferme au passage une **seconde
+    voie d'escalade** : s'approprier un compte Administrator en changeant son identifiant
+    et son mot de passe. Un Director édite son propre nom via « Mon Profil » (`PUT /me`,
+    qui ne lit même pas `role`).
+
+    **Ce lot a demandé deux passes, et la raison mérite d'être retenue.** Après la
+    première, Théo voyait encore l'escalade passer. Deux causes :
+    1. son essai datait de **09:40**, le garde-fou a été écrit à **11:25** — il a testé
+       deux heures avant que la protection existe, et rien n'était déployé ;
+    2. **un des deux sélecteurs de rôle de `Settings.tsx` était resté non filtré** : le
+       remplacement n'avait matché qu'un des deux blocs, les indentations différant. Le
+       serveur refusait bien, mais l'interface laissait croire le contraire.
+    → **Leçon : un test HTTP avec un jeton forgé ne remplace pas un test dans l'interface
+    avec le vrai rôle.** C'est exactement cet écart qui a laissé passer le sélecteur.
+
+    Vérifié en seconde passe **dans le navigateur avec un vrai compte Director** (compte
+    de test créé puis supprimé, jeton signé avec le secret de dev — aucun collègue
+    impersonné) : menu limité aux 4 rôles bas + son rôle en place ; 0 corbeille sur 13
+    lignes ; appels directs contournant l'interface → 403 sur auto-promotion Administrator
+    et Master, promotion d'un tiers, création d'un Administrator, suppression d'un
+    Coordinator et d'un Administrator ; **relecture finale, aucun rôle modifié, aucun
+    compte supprimé**. Digital Manager : bouton « Nouveau » visible et écriture réelle
+    prouvée (création 200, modification persistée, suppression 204), gestion des comptes
+    toujours refusée. Base rendue à son état initial : 12 comptes, mêmes rôles.
+    ℹ️ Vérifié aussi qu'**aucun compte n'avait été promu à tort** avant le correctif.
 
 ## Backlog en attente (rien d'urgent, le site fonctionne)
 - ~~⚠️ Corriger le KPI « Rythme de consommation »~~ — **fait le 04/08** (correctif 25).
