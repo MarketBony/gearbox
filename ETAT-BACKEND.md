@@ -202,13 +202,68 @@ conservés en l'état, sans migration.
 - **`POST /api/uploads/:type`** (`chat|avatar|calendar`), auth JWT, `multer` disque, nom **uuid**,
   renvoie `{ url: "/uploads/<type>/<uuid>.<ext>" }`. **`GET /uploads/...`** en `express.static`.
   Monté sur l'entrypoint `backend/src/index.ts`, proxy Vite `/uploads`.
-- Formats/tailles **figés** : avatar jpeg/png/gif/webp 5 Mo · chat idem 10 Mo · calendar
-  jpeg/png/webp/mp4/mov 2 Go. Refus → 415 (format) / 413 (taille) / 400 (type) / 401 (sans token).
-- **Purge automatique CALENDAR uniquement, ancrée sur `SocialPost.archivedAt`** (jamais la date du
-  fichier). `archivedAt` renseigné serveur à la bascule `archived` false→true, remis à `null` au
-  désarchivage. Job (`backend/src/jobs/purge.ts`) : démarrage +15 s puis 24 h ; supprime les fichiers
-  `/uploads/calendar/` des posts `archivedAt > 30 j` et vide leurs `mediaFiles`. **Aucune purge
-  chat/avatar.** `DELETE /api/social/:id` nettoie aussi les fichiers du post supprimé.
+- **OÙ VIVENT LES FICHIERS** (audit du 05/08/2026) : volume Docker **nommé**
+  `gearbox_uploads_data`, monté sur `/app/uploads` dans le conteneur `api`,
+  physiquement `/var/lib/docker/volumes/gearbox_uploads_data/_data` sur le VPS.
+  **Rien dans Supabase** (qui ne stocke que les URL relatives), **aucun S3**. Le volume
+  étant nommé, il survit aux `docker compose up --build`. Relevé à l'audit : 4,6 Mo
+  pour 16 fichiers, disque de 193 Go dont 186 libres.
+- Formats/tailles **figés** : avatar jpeg/png/gif/webp 5 Mo · **chat TOUS FORMATS 100 Mo**
+  (depuis le 05/08/2026) · calendar jpeg/png/webp/mp4/mov 2 Go.
+  Refus → 415 (format) / 413 (taille) / 400 (type) / 401 (sans token).
+  ⚠️ **La limite de multer est ATTEINTE dès l'égalité**, pas dépassée : mesuré,
+  104 857 599 octets passaient mais 104 857 600 (100 Mio pile) partait en 413 alors que
+  le message annonce « max 100 Mo ». On passe donc `fileSize: maxBytes + 1` pour que
+  `maxBytes` soit un maximum **inclusif**. Ne pas « simplifier » ce `+ 1`.
+- ⚠️⚠️ **SÉCURITÉ — les en-têtes de `express.static` sont load-bearing.** Le chat
+  acceptant tous les formats, les fichiers sont servis **depuis le domaine de Gearbox** :
+  sans en-tête, un `.html` ou un `.svg` déposé dans une conversation puis ouvert dans
+  l'onglet s'exécute **dans la session de celui qui l'ouvre** (XSS stocké, vol de jeton).
+  `index.ts` pose donc, via l'option `setHeaders` :
+  `X-Content-Type-Options: nosniff` **partout**, et `Content-Disposition: attachment`
+  **sauf** pour `.jpg .jpeg .png .gif .webp .pdf`. `.svg` en est **volontairement
+  absent** (format actif). La liste porte sur l'**extension du fichier sur le disque**,
+  jamais sur un type MIME — c'est le client qui le déclare.
+- ⚠️ **Le nom d'origine n'entre JAMAIS dans un chemin.** Le fichier sur disque porte un
+  uuid ; l'extension vient du MIME quand il est connu, sinon d'une extraction assainie
+  du nom fourni (`[a-z0-9]{1,8}`, via `safeExtFromName`). Vérifié : un fichier nommé
+  `../../evil.sh` atterrit sous un uuid dans `chat/`. Le nom réel vit en base
+  (`ChatMessage.fileName`), pas sur le disque.
+- **Purges automatiques** (`backend/src/jobs/purge.ts`, un **seul** timer : +15 s au
+  démarrage puis 24 h, les deux fonctions enchaînées dans `runSafe`) :
+  | Type | Rétention | Ancre |
+  |---|---|---|
+  | `calendar` | 30 j | `SocialPost.archivedAt` |
+  | `chat` | **180 j** (05/08/2026) | `ChatMessage.timestamp` |
+  | `avatar` | aucune | — (volontaire) |
+  - ⚠️ « Archivé » pour calendar = une **PUBLICATION Digital**, pas un projet. Confusion
+    fréquente. `archivedAt` est renseigné serveur à la bascule `archived` false→true et
+    remis à `null` au désarchivage, ce qui **annule le décompte**.
+  - Pour le chat, le fichier est supprimé mais **le MESSAGE RESTE** : `fileExpiredAt` est
+    renseigné et l'interface affiche « pièce jointe expirée ». On ne réécrit pas
+    l'historique d'une conversation pour libérer de la place.
+  - `fileExpiredAt: null` dans le filtre est ce qui rend le job **idempotent** — sans
+    lui, chaque passage retenterait des suppressions déjà faites.
+  - ⚠️ **PIÈGE : lancer la purge en local agit sur la base de PROD avec le disque
+    LOCAL.** Un message de plus de 180 jours serait marqué « expiré » alors que son
+    fichier vit toujours sur le VPS. Vérifier l'âge des messages avant tout test.
+  - `DELETE /api/social/:id` nettoie aussi les fichiers du post supprimé.
+
+## ✅ Espace disque — `GET /api/storage` (05/08/2026)
+
+`src/routes/storage.ts`. Renvoie l'état du système de fichiers qui **porte** les uploads
+(`fs.statfsSync`, disponible depuis Node 18.15 — l'image est en `node:20-slim`) et le
+poids des uploads **par type**, avec le nombre de fichiers.
+
+- **Lecture ouverte à TOUS les rôles authentifiés** (demande explicite de Théo) : savoir
+  si le serveur sature concerne tout le monde. Aucune donnée sensible n'y transite — ni
+  chemin absolu, ni nom de fichier, seulement des volumes agrégés. 401 sans jeton.
+- `bavail` et non `bfree` : `bfree` inclut la réserve root et surestimerait l'espace
+  réellement exploitable.
+- **Cache mémoire 60 s**, même motif que le proxy de flux : sans lui, chaque ouverture
+  des Paramètres reparcourrait toute l'arborescence.
+- Côté interface, la barre porte sur le **disque**, pas sur « uploads / disque » — ce
+  dernier resterait à 0 % et ne dirait rien du risque réel de saturation.
 - Branchements front : Chat (upload → URL dans le message socket), Settings (upload → PUT avatarUrl),
   Digital (upload → `mediaFiles`). Plus de base64 pour ces médias.
 - Vérifié en base réelle (8/8) : `User.avatarUrl` persisté, `SocialPost.mediaFiles` persisté,
