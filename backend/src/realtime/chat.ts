@@ -80,17 +80,29 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
   // Envoi d'un message : persiste PUIS diffuse à la room de la conversation.
   socket.on('chat:message:send', async (payload: any, ack: Ack) => {
     try {
-      const { conversationId, content, type, replyToId } = payload ?? {};
+      const { conversationId, content, type, replyToId, fileName, fileSize } = payload ?? {};
       if (typeof conversationId !== 'string' || conversationId.length === 0) {
         return reply(ack, { error: 'Champ "conversationId" requis.' });
       }
       if (typeof content !== 'string' || content.length === 0) {
         return reply(ack, { error: 'Champ "content" requis (chaîne non vide).' });
       }
-      const msgType = type === 'image' ? 'image' : 'text'; // stockage brut, aucun traitement d'upload ici
+      // stockage brut, aucun traitement d'upload ici : le fichier est déjà déposé par
+      // POST /api/uploads/chat, `content` n'en porte que l'URL relative.
+      const msgType = type === 'image' ? 'image' : type === 'file' ? 'file' : 'text';
       if (replyToId !== undefined && replyToId !== null && typeof replyToId !== 'string') {
         return reply(ack, { error: 'Champ "replyToId" invalide.' });
       }
+      // Métadonnées de pièce jointe. Bornées volontairement : `fileName` vient du
+      // client et sert à l'AFFICHAGE et au nom de téléchargement — il ne touche jamais
+      // au disque (le fichier y porte un uuid), mais un nom de 10 Mo n'a aucune raison
+      // d'entrer en base. 260 caractères = la limite de chemin usuelle sous Windows.
+      const nomFichier = typeof fileName === 'string' && fileName.length > 0
+        ? fileName.slice(0, 260)
+        : null;
+      const tailleFichier = Number.isInteger(fileSize) && fileSize > 0 && fileSize <= 100 * 1024 * 1024
+        ? fileSize
+        : null;
 
       const conversation = await prisma.chatConversation.findUnique({ where: { id: conversationId } });
       if (!conversation) return reply(ack, { error: 'Conversation introuvable.' });
@@ -112,6 +124,8 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
           senderColor: user?.avatarColor ?? '#64748b',
           content,
           type: msgType,
+          fileName: msgType === 'file' ? nomFichier : null,
+          fileSize: msgType === 'file' || msgType === 'image' ? tailleFichier : null,
           timestamp: now,
           edited: false,
           deleted: false,
@@ -128,11 +142,19 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
         unreadTargets = allUsers.filter(u => u.role !== 'External').map(u => u.id);
       }
 
-      // lastMessage tronqué à 60 / '📷 Image' : même logique que Chat.tsx.
+      // lastMessage tronqué à 60 / '📷 Image' / '📎 <nom>' : même logique que Chat.tsx.
+      // ℹ️ Sert AUSSI de corps à la notification push (voir plus bas, `body:`) : il n'y
+      // a donc rien de plus à faire pour que les notifications de pièce jointe soient
+      // correctes.
+      const apercu = msgType === 'image'
+        ? '📷 Image'
+        : msgType === 'file'
+          ? `📎 ${nomFichier ?? 'Pièce jointe'}`.slice(0, 60)
+          : content.slice(0, 60);
       const updatedConv = await prisma.chatConversation.update({
         where: { id: conversationId },
         data: {
-          lastMessage: msgType === 'image' ? '📷 Image' : content.slice(0, 60),
+          lastMessage: apercu,
           lastMessageAt: now,
           unreadCounts: bumpUnread(conversation.unreadCounts, unreadTargets, userId)
         }

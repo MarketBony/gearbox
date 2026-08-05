@@ -255,7 +255,17 @@ model ChatMessage {
   senderName     String
   senderColor    String
   content        String
-  type           String // 'text' | 'image'
+  type           String // 'text' | 'image' | 'file'
+  // --- Pièces jointes (05/08/2026) ---
+  // Le fichier sur disque porte un nom en uuid (jamais celui fourni par le client) :
+  // le nom d'origine doit donc être conservé ici pour l'affichage et le
+  // téléchargement. `fileSize` évite une requête de plus juste pour afficher « 2,4 Mo ».
+  fileName       String?
+  fileSize       Int?
+  // Renseigné par le job de purge quand le fichier a été supprimé du disque (180 j).
+  // Le MESSAGE reste, l'interface affiche « pièce jointe expirée » — on ne réécrit
+  // pas l'historique d'une conversation pour libérer de l'espace.
+  fileExpiredAt  DateTime?
   timestamp      DateTime
   edited         Boolean          @default(false)
   editedAt       DateTime?

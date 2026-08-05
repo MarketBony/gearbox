@@ -18,16 +18,27 @@ export const UPLOAD_TYPES = ['chat', 'avatar', 'calendar'] as const;
 export type UploadType = typeof UPLOAD_TYPES[number];
 
 // RÈGLES FIGÉES — formats acceptés + tailles max par type.
-const RULES: Record<UploadType, { mimes: string[]; maxBytes: number; label: string }> = {
+// `mimes: null` = AUCUNE restriction de format (voir le cas `chat` ci-dessous).
+// ⚠️ Ces valeurs sont dupliquées côté client (`pages/Chat.tsx`) pour afficher un
+// message d'erreur immédiat. Le contrôle client est un confort, **celui-ci est le seul
+// garde-fou réel** : toute modification doit être reportée des deux côtés.
+const RULES: Record<UploadType, { mimes: string[] | null; maxBytes: number; label: string }> = {
   avatar: {
     mimes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
     maxBytes: 5 * 1024 * 1024, // 5 MB
     label: 'JPEG, PNG, GIF, WebP'
   },
   chat: {
-    mimes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-    maxBytes: 10 * 1024 * 1024, // 10 MB
-    label: 'JPEG, PNG, GIF, WebP'
+    // Pièces jointes de toute nature (décision de Théo, 05/08/2026) : on n'impose plus
+    // de liste de formats. La sécurité ne repose donc PLUS sur le filtrage à l'entrée
+    // mais sur la façon de SERVIR les fichiers — voir l'option `setHeaders` du
+    // `express.static` de `index.ts` : `nosniff` systématique et téléchargement forcé
+    // pour tout ce qui n'est pas une image ou un PDF. Sans cela, un `.html` ou un
+    // `.svg` déposé ici s'exécuterait dans la session de celui qui l'ouvre (XSS
+    // stocké), puisque les fichiers sont servis depuis le domaine de Gearbox.
+    mimes: null,
+    maxBytes: 100 * 1024 * 1024, // 100 MB
+    label: 'tous formats'
   },
   calendar: {
     mimes: ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime'],
@@ -36,7 +47,7 @@ const RULES: Record<UploadType, { mimes: string[]; maxBytes: number; label: stri
   }
 };
 
-// Extension déduite du type MIME (jamais le nom d'origine fourni par le client).
+// Extension déduite du type MIME quand le format est dans une liste blanche.
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
@@ -44,6 +55,22 @@ const EXT_BY_MIME: Record<string, string> = {
   'image/webp': '.webp',
   'video/mp4': '.mp4',
   'video/quicktime': '.mov'
+};
+
+// Extension de SECOURS, tirée du nom fourni par le client, quand le type MIME n'est
+// pas dans la liste blanche (cas des pièces jointes de chat, tous formats acceptés).
+//
+// ⚠️ RÈGLE ABSOLUE : le nom d'origine ne doit JAMAIS entrer dans un chemin de fichier.
+// C'est une donnée contrôlée par l'utilisateur ; un `../` suffirait à écrire hors du
+// dossier de destination. On n'en extrait donc qu'une extension, réduite à
+// `[a-z0-9]{1,8}` — ni point, ni séparateur, ni caractère de contrôle ne survit. Le
+// nom réel est conservé en base (`ChatMessage.fileName`), pas sur le disque.
+const safeExtFromName = (originalName: string): string => {
+  const dot = originalName.lastIndexOf('.');
+  if (dot < 0 || dot === originalName.length - 1) return '';
+  const brut = originalName.slice(dot + 1).toLowerCase();
+  const propre = brut.replace(/[^a-z0-9]/g, '');
+  return propre.length > 0 && propre.length <= 8 ? `.${propre}` : '';
 };
 
 // Crée les dossiers de destination au démarrage.
@@ -59,8 +86,9 @@ const storage = multer.diskStorage({
     cb(null, path.join(UPLOADS_ROOT, req.params.type as UploadType));
   },
   filename: (_req, file, cb) => {
-    // Nom en uuid + extension déduite du MIME (jamais file.originalname).
-    const ext = EXT_BY_MIME[file.mimetype] ?? '';
+    // Nom en uuid, jamais `file.originalname`. L'extension vient du MIME quand il est
+    // connu, sinon d'une extraction assainie du nom d'origine (pièces jointes de chat).
+    const ext = EXT_BY_MIME[file.mimetype] ?? safeExtFromName(file.originalname || '');
     cb(null, `${randomUUID()}${ext}`);
   }
 });
@@ -77,8 +105,17 @@ router.post('/:type', authenticateToken, (req, res) => {
 
   const upload = multer({
     storage,
-    limits: { fileSize: rule.maxBytes, files: 1 },
+    // ⚠️ `+ 1` volontaire, et load-bearing. La limite de multer/busboy est atteinte
+    // dès que la taille reçue ÉGALE `fileSize` : mesuré, un fichier de 104 857 599
+    // octets passait mais 104 857 600 (100 Mio pile) partait en 413, alors que le
+    // message d'erreur annonce « max 100 Mo ». `maxBytes` est donc traité comme un
+    // maximum INCLUSIF, ce que l'utilisateur comprend, et multer reçoit la première
+    // valeur interdite. Vaut aussi pour l'avatar (5 Mo) et le calendrier (2 Go).
+    limits: { fileSize: rule.maxBytes + 1, files: 1 },
     fileFilter: (_req, file, cb) => {
+      // `mimes === null` = tous formats acceptés (chat). Voir le commentaire de RULES :
+      // la protection se joue alors à la lecture, pas à l'écriture.
+      if (rule.mimes === null) return cb(null, true);
       if (!rule.mimes.includes(file.mimetype)) {
         return cb(new UnsupportedTypeError(
           `Format non accepté pour "${type}" (${file.mimetype}). Formats autorisés : ${rule.label}.`
