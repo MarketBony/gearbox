@@ -330,9 +330,23 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                 },
               ];
 
+          // ⚠️ Cette nav groupée réécrivait ses rubriques EN DUR et ignorait
+          // complètement `mainItems` : un rôle restreint voyait donc toute la
+          // navigation malgré le filtrage (constaté par Théo le 05/08/2026 avec le
+          // premier compte chef de site). On la réaligne sur la source unique —
+          // `mainItems` porte déjà toutes les règles de rôle. Archives n'y figurant
+          // pas, on l'autorise explicitement pour les rôles qui y ont droit.
+          const idsAutorises = new Set([
+            ...mainItems.map(i => i.id),
+            ...(isSiteManagerUser ? [] : ['archives']),
+          ]);
+          const groupesFiltres = groups
+            .map(g => ({ ...g, items: g.items.filter(i => idsAutorises.has(i.id)) }))
+            .filter(g => g.items.length > 0);
+
           return (
             <nav className="hidden lg:flex flex-1 flex-col py-2 px-2 overflow-y-auto [&::-webkit-scrollbar]:w-0 [-ms-overflow-style:none] [scrollbar-width:none]">
-              {groups.filter(g => g.items.length > 0).map((group, gi) => (
+              {groupesFiltres.map((group, gi) => (
                 <div key={group.label || gi} className={gi > 0 ? 'mt-1' : ''}>
                   {gi > 0 && <div className="h-px bg-bony-border/50 mx-1 my-1.5" />}
                   {group.label && (

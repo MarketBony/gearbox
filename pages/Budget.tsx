@@ -6,7 +6,7 @@ import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, ChevronDown, ChevronRight, Calculator, PieChart, TrendingUp, TrendingDown, AlertTriangle, Filter, Coins, Calendar, Lock, Search, X, Check } from 'lucide-react';
-import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES, isHoldingBrand, ALPINE_BUCKETS, NISSAN_BUCKET, resolveBudgetLine, splitShareToBuckets } from '../constants';
+import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES, isHoldingBrand, ALPINE_BUCKETS, NISSAN_BUCKET, resolveBudgetLine, splitShareToBuckets, allowedSitesFor } from '../constants';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -207,6 +207,9 @@ const Budget: React.FC = () => {
 
   // Permissions
   const canEditProvisions = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director';
+  // Périmètre imposé (chef de site) ou `null`. Sert à ne pas recréer côté client des
+  // lignes de budget que le serveur a exclues, et à borner le sélecteur de périmètre.
+  const perimetreImpose = allowedSitesFor(user);
 
   // --- FILTERS ---
   const [filterSites, setFilterSites] = useSessionState<string[]>('budget_filterSites', []);
@@ -260,7 +263,14 @@ const Budget: React.FC = () => {
     // un lecteur (Coordinator/Guest...) obtient la fusion EN MÉMOIRE seulement
     // (affichage cohérent, zéro requête d'écriture, zéro 403 au chargement).
     {
-        const allBuckets = [...Object.values(ALPINE_BUCKETS), NISSAN_BUCKET];
+        // ⚠️ Cette migration FABRIQUE des lignes de budget côté client, quoi que
+        // l'API ait renvoyé. Pour un chef de site, elle recréait donc les buckets
+        // Alpine et Nissan que le serveur venait précisément d'exclure de son
+        // périmètre — constaté par Théo le 05/08/2026. Un rôle cloisonné n'a rien à
+        // migrer : il ne voit qu'un sous-ensemble et n'écrit jamais.
+        const allBuckets = perimetreImpose
+            ? []
+            : [...Object.values(ALPINE_BUCKETS), NISSAN_BUCKET];
         const missing = allBuckets.filter(bucket => !budgetData.some(b => b.site === bucket));
         // Retire le bucket générique 'Alpine' s'il existe encore
         const generic = budgetData.find(b => b.site === 'Alpine');
