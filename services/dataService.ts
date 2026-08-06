@@ -582,7 +582,14 @@ class DataService {
     return apiFetch('/music/tracks');
   }
 
-  async updateMe(data: { name?: string; password?: string; avatarColor?: string; avatarUrl?: string | null }): Promise<Omit<User, 'loginId'>> {
+  // ⚠️ Cette signature est une WHITELIST : un champ absent d'ici ne peut pas être
+  // envoyé (excess property check sur l'objet littéral de l'appelant). C'est ce qui a
+  // fait qu'un utilisateur ne pouvait pas enregistrer son propre anniversaire pendant
+  // deux jours. Tout champ ajouté à `User` et modifiable par son porteur doit être
+  // reporté ICI **et** dans `AuthContext.updateProfile` — même piège que la
+  // déstructuration explicite de `routes/users.ts` (cf. `nissanShare`, `birthdate`).
+  // Convention du serveur (routes/auth.ts) : champ absent = inchangé, valeur vide = effacement.
+  async updateMe(data: { name?: string; password?: string; avatarColor?: string; avatarUrl?: string | null; birthdate?: string }): Promise<Omit<User, 'loginId'>> {
     return apiFetch('/auth/me', { method: 'PUT', body: JSON.stringify(data) });
   }
 }

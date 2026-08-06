@@ -30,7 +30,8 @@ dans Budget/FixedExpenses/Projects — voir `ETAT-PROJET.md`).
 7. **Digital / Social** — `/api/social` CRUD ; `mediaFiles` = URLs de fichiers uploadés (voir Uploads).
 8. **Journal d'activité** — `/api/activity-log` (GET plafonné 200, POST fire-and-forget, Master non journalisé).
 9. **Chat** — `/api/chat` REST (chargement) + Socket.IO temps réel (`chat:message:send/edit/delete/react`,
-   `chat:conversation:read`, **`chat:conversation:mute`** → `chat:message:new/updated`,
+   `chat:conversation:read`, **`chat:conversation:mute`**, **`chat:conversation:avatar`**
+   → `chat:message:new/updated`,
    `chat:conversation:updated/created`). Chat Général = appartenance implicite
    (seed idempotent, non-External). Un message envoyé déclenche aussi les
    **notifications push** — voir la section dédiée plus bas.
@@ -379,6 +380,60 @@ faire échouer l'envoi du message lui-même.
 colonne mais **n'est jamais écrit** (l'épinglage est un overlay `localStorage` côté
 client). La sourdine, elle, est bien en base : c'est le serveur qui décide d'envoyer
 le push. Elle coupe le push, **pas** le compteur non-lu (comportement Messenger).
+
+### 🖼️ Photo de groupe — `chat:conversation:avatar` (06/08/2026)
+
+Migration `20260806103000_add_chat_conversation_avatar` : `avatarUrl String?` sur
+`ChatConversation`. Une colonne nullable, sans `DEFAULT` — opération de catalogue
+Postgres, ni réécriture de table ni verrou long.
+
+**Pourquoi ce handler existe** : la photo d'un groupe vivait en **base64 dans le
+`localStorage`** du poste qui l'avait déposée (clé `gearbox_conv_avatar_<id>`), donc
+invisible de tous les autres **par construction**. **Troisième occurrence** du même
+piège après la date de naissance et les jeux — le réflexe à avoir devant « X ne
+s'affiche que chez moi » est de chercher *où la valeur est stockée* avant de chercher
+un bug d'affichage.
+
+`chat:conversation:avatar` (`{conversationId, avatarUrl}`) est calqué sur
+`chat:conversation:mute` : même contrôle d'appartenance, même
+`io.to(convRoom(id)).emit('chat:conversation:updated', …)`, même `reply(ack, …)`.
+Convention du projet : `null` = suppression.
+
+⚠️ **On stocke une URL de fichier uploadé, jamais du base64** : la conversation est
+relue en entier à chaque `GET /conversations`, une image encodée dedans la ferait
+grossir sans fin. Le type d'upload réutilisé est **`avatar`** (liste blanche d'images,
+5 Mo) et non `chat`, qui accepte tout format — `uploads.ts` est inchangé.
+
+⚠️⚠️ **`AVATAR_UPLOAD_PATH` — le point de sécurité de ce lot.** La valeur est écrite
+par un utilisateur et **rendue dans un `<img>` chez tous les autres** : elle ne peut
+pas être crue sur parole. Le handler n'accepte donc **que** la forme
+`/uploads/avatar/<uuid v4>.<jpg|png|gif|webp>`. Sans ce contrôle, un participant
+pourrait pointer la photo vers une **URL externe** que le navigateur de chaque membre
+irait charger (fuite d'IP, pixel de traçage, accusé de lecture involontaire), ou vers
+`/uploads/chat/…` où **aucun format n'est filtré à l'entrée**. Les 4 extensions sont
+exactement celles que produit `EXT_BY_MIME` pour la liste blanche `avatar` (pas de
+`.jpeg` possible).
+ℓ **Écart préexistant assumé** : `PUT /api/auth/me` ne valide **pas** la forme de
+`avatarUrl` pour un utilisateur — même trou, pas encore fermé. Le regex est
+réutilisable tel quel, voir `BUGS-CONNUS.md`.
+
+**Trois contrôles, dans cet ordre** : forme de l'URL → `type === 'group'` →
+appartenance. Le filtre `type` passe **avant** l'appartenance parce qu'une conversation
+privée affiche l'avatar de l'autre utilisateur et le Chat Général son icône `#` : y
+écrire `avatarUrl` créerait un état en base que rien n'affiche jamais. C'est aussi
+pourquoi la branche `type === 'general'` du test d'appartenance de `mute` **n'a pas
+d'équivalent ici** — elle serait du code mort, ce n'est pas un oubli à « rétablir ».
+
+⚠️ **Droit volontairement ouvert à TOUS les participants** (arbitrage de Théo), et non
+aux seuls `adminIds` comme le renommage et la gestion des membres. « Ouvert aux
+participants » n'est pas « ouvert à tous » : le contrôle d'appartenance reste
+indispensable, c'est lui qui empêche un tiers d'écrire.
+
+**Chef de site** : rien à ajouter, il est bloqué par trois portes préexistantes —
+`joinUserRooms` **et** `registerChatHandlers` sont tous deux sous `if (social)`
+(`realtime/index.ts`), donc il ne rejoint aucune room de conversation et le listener
+n'existe même pas pour lui ; `chat` est absent de ses rubriques ; et `UPLOAD_ROLES`
+lui refuse l'upload. Ne pas l'ajouter à une liste « pour faire propre ».
 
 **Service worker** (`public/sw.js`, servi par le front) : `push` +
 `notificationclick` uniquement, **aucun gestionnaire `fetch`**. C'est délibéré et à

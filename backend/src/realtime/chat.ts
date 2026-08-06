@@ -14,6 +14,19 @@ const userRoom = (id: string) => `user:${id}`;
 type Ack = ((response: any) => void) | undefined;
 const reply = (ack: Ack, data: any) => { if (typeof ack === 'function') ack(data); };
 
+// Une photo de groupe ne peut être QUE un fichier déposé par POST /api/uploads/avatar :
+// nom en uuid v4 + extension assainie (voir routes/uploads.ts).
+// ⚠️ Ce contrôle n'est pas cosmétique. Sans lui, un participant pourrait faire pointer
+// la photo du groupe vers une URL EXTERNE que le navigateur de tous les autres irait
+// charger à l'affichage — fuite d'adresse IP, pixel de traçage, accusé de lecture
+// involontaire — ou vers /uploads/chat/<...>, où AUCUN format n'est filtré à l'entrée.
+// La valeur est écrite par un utilisateur et rendue chez tous les autres : elle ne peut
+// pas être crue sur parole.
+// Les 4 extensions sont exactement celles que `EXT_BY_MIME` produit pour la liste
+// blanche du type `avatar` (jpeg -> .jpg, png, gif, webp) : pas de `.jpeg` possible.
+const AVATAR_UPLOAD_PATH =
+  /^\/uploads\/avatar\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|gif|webp)$/;
+
 // À la connexion (handshake authentifié déjà passé) : rejoint sa room
 // personnelle + les rooms de toutes ses conversations.
 export const joinUserRooms = async (socket: Socket) => {
@@ -337,6 +350,56 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       reply(ack, updatedConv);
     } catch (e) {
       reply(ack, { error: 'Échec de la mise à jour de la sourdine.' });
+    }
+  });
+
+  // Photo d'un groupe. Calqué sur `chat:conversation:mute` : même contrôle
+  // d'appartenance, même diffusion ciblée à la room, même `reply(ack, ...)`.
+  //
+  // ⚠️ Droit VOLONTAIREMENT ouvert à TOUS les participants, pas seulement aux
+  // `adminIds` (décision de Théo) — contrairement au renommage et à la gestion des
+  // membres. Mais « ouvert aux participants » n'est pas « ouvert à tous » : le
+  // contrôle d'appartenance ci-dessous reste indispensable.
+  //
+  // Jusqu'au 06/08/2026 cette photo vivait en base64 dans le localStorage du poste
+  // qui l'avait déposée, donc invisible de tous les autres (3ᵉ fois que ce piège se
+  // produit dans ce projet, après la date de naissance et les jeux).
+  socket.on('chat:conversation:avatar', async (payload: any, ack: Ack) => {
+    try {
+      const { conversationId, avatarUrl } = payload ?? {};
+      if (typeof conversationId !== 'string') return reply(ack, { error: 'Champ "conversationId" requis.' });
+      // Convention du projet (routes/auth.ts) : null = suppression. Ici un champ
+      // ABSENT n'est pas un no-op utile mais un bug d'appelant, donc refusé.
+      if (avatarUrl !== null && typeof avatarUrl !== 'string') {
+        return reply(ack, { error: 'Champ "avatarUrl" requis : chemin d\'upload, ou null pour supprimer.' });
+      }
+      if (typeof avatarUrl === 'string' && !AVATAR_UPLOAD_PATH.test(avatarUrl)) {
+        return reply(ack, { error: 'Photo invalide : seul un fichier déposé via /api/uploads/avatar est accepté.' });
+      }
+
+      const conversation = await prisma.chatConversation.findUnique({ where: { id: conversationId } });
+      if (!conversation) return reply(ack, { error: 'Conversation introuvable.' });
+      // Filtre AVANT le test d'appartenance : une conversation privée affiche
+      // l'avatar de l'autre utilisateur et le Chat Général son icône #. Y écrire
+      // `avatarUrl` créerait un état stocké en base que rien n'affiche jamais.
+      // (C'est aussi pourquoi la branche `type === 'general'` du test d'appartenance
+      // de `mute` n'a pas d'équivalent ici : elle serait du code mort, ce n'est pas
+      // un oubli à « rétablir ».)
+      if (conversation.type !== 'group') {
+        return reply(ack, { error: 'Seule une conversation de groupe a une photo.' });
+      }
+      if (!conversation.participants.includes(userId)) {
+        return reply(ack, { error: "Vous n'êtes pas participant de cette conversation." });
+      }
+
+      const updatedConv = await prisma.chatConversation.update({
+        where: { id: conversationId },
+        data: { avatarUrl } // string = nouvelle photo, null = suppression
+      });
+      io.to(convRoom(conversationId)).emit('chat:conversation:updated', updatedConv);
+      reply(ack, updatedConv);
+    } catch (e) {
+      reply(ack, { error: 'Échec de la mise à jour de la photo du groupe.' });
     }
   });
 };
