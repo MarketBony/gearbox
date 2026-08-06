@@ -204,6 +204,12 @@ export interface ChatConversation {
   participants: string[]; // userIds
   adminIds?: string[];    // group admins (group type only)
   name?: string;
+  // Photo du groupe : URL relative servie par le backend (/uploads/avatar/...).
+  // La source de vérité est la BASE, comme `mutedBy` et contrairement à `pinnedBy` :
+  // c'est ce qui la rend visible de TOUS les participants. Avant le 06/08/2026 elle
+  // vivait en base64 dans le localStorage, donc visible du seul poste qui l'avait
+  // déposée. absent/null = pas de photo.
+  avatarUrl?: string | null;
   pinnedBy: string[]; // userIds — overlay localStorage, JAMAIS écrit en base
   // userIds ayant mis la conversation en sourdine. Contrairement à `pinnedBy`,
   // la source de vérité est la BASE : c'est le serveur qui décide d'envoyer les

@@ -101,8 +101,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const me = await db.updateMe({
         name: updatedUser.name,
         avatarColor: updatedUser.avatarColor,
+        // ⚠️ Chaîne vide et non `undefined` : la convention du serveur est
+        // « champ absent = inchangé, valeur vide = effacement » (routes/auth.ts).
+        // Envoyer `undefined` rendrait impossible d'effacer sa date de naissance.
+        birthdate: updatedUser.birthdate ?? '',
         ...(updatedUser.password ? { password: updatedUser.password } : {})
       });
+      // ⚠️ `me` (réponse serveur) est étalé APRÈS `updatedUser` : c'est volontaire, le
+      // serveur est la source de vérité. Corollaire à ne pas oublier — tout champ que
+      // l'on omet d'envoyer ci-dessus est ici RÉÉCRIT à son ancienne valeur, donc la
+      // saisie de l'utilisateur disparaît de l'écran sans message d'erreur. C'est ce
+      // qui masquait le bug de l'anniversaire : le formulaire revenait à l'ancienne
+      // valeur, ce qui se lit comme « ça n'enregistre pas » plutôt que comme un bug.
       const fullUser: User = { ...updatedUser, ...me, password: undefined } as User;
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUser));
       setUser(fullUser);

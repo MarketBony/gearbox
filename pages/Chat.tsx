@@ -24,6 +24,19 @@ const MAX_UPLOAD_SIZE = 100 * 1024 * 1024; // 100 Mo, tous formats
 // de pièce jointe — ce n'est plus une liste d'autorisation.
 const CHAT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
+// ⚠️ Doivent rester alignés sur la règle `avatar` de `backend/src/routes/uploads.ts`,
+// le seul garde-fou réel, et sur `pages/Settings.tsx` qui uploade l'autre avatar du
+// projet. Le client validait jpeg/png/webp et 2 Mo, soit plus strict que le serveur
+// sans rien économiser : ce qui part est TOUJOURS un JPEG 200×200 de ~20 Ko produit
+// par le recadrage, quel que soit le fichier d'origine. Le GIF est donc accepté en
+// entrée puis aplati, exactement comme pour la photo de profil d'un utilisateur.
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5 Mo
+const AVATAR_INPUT_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+// Plafond de hauteur de la barre de saisie, en phase avec la classe `max-h-32`
+// (8rem) du textarea : au-delà, le champ défile au lieu de continuer à grandir.
+const MAX_INPUT_HEIGHT = 128;
+
 // Poids lisible pour l'affichage d'une pièce jointe.
 const formatPoids = (octets?: number): string => {
   if (!octets || octets <= 0) return '';
@@ -94,8 +107,7 @@ const ConvAvatar: React.FC<{
   meId: string;
   isActive?: boolean;
   size?: number;
-  groupPhoto?: string;
-}> = ({ conv, members, meId, isActive, size = 38, groupPhoto }) => {
+}> = ({ conv, members, meId, isActive, size = 38 }) => {
   if (conv.type === 'general') {
     return (
       <div
@@ -115,11 +127,16 @@ const ConvAvatar: React.FC<{
     return <Avatar userId={other.id} name={other.name} color={isActive ? '#ffffff44' : other.avatarColor} size={size} />;
   }
 
-  // Group — custom photo takes priority
-  if (groupPhoto) {
+  // Groupe — la photo du groupe est prioritaire sur les avatars empilés des membres.
+  // Elle se lit directement dans la conversation (source de vérité : la base) : il n'y
+  // a plus de prop `groupPhoto` à passer, et donc plus de risque d'oublier de la câbler
+  // sur l'un des quatre points d'appel. Les branches `general` et `private` retournent
+  // avant, ce qui garantit structurellement qu'une conversation non-groupe n'affiche
+  // jamais de photo de groupe.
+  if (conv.avatarUrl) {
     return (
       <img
-        src={groupPhoto}
+        src={conv.avatarUrl}
         alt="Groupe"
         style={{ width: size, height: size }}
         className="rounded-full object-cover shrink-0 border border-bony-border"
@@ -158,9 +175,6 @@ const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
   </div>
 );
 
-// --- Group avatar localStorage key ---
-const convAvatarKey = (convId: string) => `gearbox_conv_avatar_${convId}`;
-
 // --- Crop helper (circular, 200×200) ---
 interface CropArea { x: number; y: number; width: number; height: number; }
 interface CropPoint { x: number; y: number; }
@@ -184,46 +198,83 @@ const getCroppedImg = (imageSrc: string, cropPixels: CropArea): Promise<string> 
   });
 
 // --- Group Avatar Crop Modal ---
-interface GroupAvatarModalProps { convId: string; convName: string; onClose: () => void; }
-const GroupAvatarCropModal: React.FC<GroupAvatarModalProps> = ({ convId, convName, onClose }) => {
+// `currentAvatarUrl` vient du SERVEUR (`conv.avatarUrl`) : la photo est partagée entre
+// tous les participants depuis le 06/08/2026. Elle était auparavant lue dans le
+// localStorage de ce poste, ce qui la rendait invisible de tout le monde sauf de son
+// auteur.
+interface GroupAvatarModalProps {
+  convId: string;
+  convName: string;
+  currentAvatarUrl?: string | null;
+  onClose: () => void;
+}
+const GroupAvatarCropModal: React.FC<GroupAvatarModalProps> = ({ convId, convName, currentAvatarUrl, onClose }) => {
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState<CropPoint>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<CropArea | null>(null);
   const [error, setError] = useState('');
   const [dragging, setDragging] = useState(false);
+  // L'enregistrement était un `localStorage.setItem` instantané ; c'est devenu un
+  // recadrage + un upload réseau + un aller-retour socket. Sans cet état, un
+  // double-clic envoie deux uploads et l'utilisateur n'a aucun retour pendant l'attente.
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const hasExisting = !!localStorage.getItem(convAvatarKey(convId));
+  const hasExisting = !!currentAvatarUrl;
 
   const handleFile = (file: File | null | undefined) => {
     if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setError('Format non supporté. Utilisez jpg, png ou webp.'); return; }
-    if (file.size > 2 * 1024 * 1024) { setError('Fichier trop lourd (max 2 Mo).'); return; }
+    if (!AVATAR_INPUT_TYPES.includes(file.type)) { setError('Format non supporté. Utilisez jpg, png, gif ou webp.'); return; }
+    if (file.size > MAX_AVATAR_SIZE) { setError('Fichier trop lourd (max 5 Mo).'); return; }
     setError('');
     const reader = new FileReader();
     reader.onload = e => { setCropSrc(e.target?.result as string); setZoom(1); setCrop({ x: 0, y: 0 }); };
     reader.readAsDataURL(file);
   };
 
+  // Même chemin que la photo de profil d'un utilisateur (pages/Settings.tsx) :
+  // recadrage 200×200 -> Blob -> POST /api/uploads/avatar -> l'URL est persistée par
+  // le socket, qui rediffuse la conversation à TOUS les participants.
+  // Aucune mise à jour optimiste à écrire : la diffusion inclut l'émetteur, donc cet
+  // onglet reçoit son propre `chat:conversation:updated`.
   const handleValidate = async () => {
-    if (!cropSrc || !croppedAreaPixels) return;
+    if (!cropSrc || !croppedAreaPixels || saving) return;
+    setSaving(true);
     try {
       const base64 = await getCroppedImg(cropSrc, croppedAreaPixels);
-      localStorage.setItem(convAvatarKey(convId), base64);
-      window.dispatchEvent(new CustomEvent('gearbox-conv-avatar-updated', { detail: { convId } }));
+      const blob = await (await fetch(base64)).blob();
+      const file = new File([blob], 'group-avatar.jpg', { type: 'image/jpeg' });
+      const url = await db.uploadFile('avatar', file);
+      await emitWithAck('chat:conversation:avatar', { conversationId: convId, avatarUrl: url });
       onClose();
-    } catch { setError('Erreur lors du recadrage. Réessayez.'); }
+    } catch (e) {
+      // On ne ferme PAS : le recadrage est conservé et l'utilisateur peut réessayer.
+      // Le message du serveur est affiché tel quel (413 « trop volumineux »,
+      // 415 « format non accepté »…) — un texte générique masquerait la cause.
+      setError(e instanceof Error ? e.message : "Échec de l'enregistrement. Réessayez.");
+      setSaving(false);
+    }
+    // Pas de `finally` : en cas de succès le composant est démonté par `onClose()`.
   };
 
-  const handleDelete = () => {
-    localStorage.removeItem(convAvatarKey(convId));
-    window.dispatchEvent(new CustomEvent('gearbox-conv-avatar-updated', { detail: { convId } }));
-    onClose();
+  const handleDelete = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await emitWithAck('chat:conversation:avatar', { conversationId: convId, avatarUrl: null });
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Échec de la suppression. Réessayez.');
+      setSaving(false);
+    }
   };
 
+  // ⚠️ Fermeture par le fond neutralisée pendant l'enregistrement (`saving`) : sinon on
+  // démonte le composant au milieu de l'upload et un éventuel message d'erreur n'a plus
+  // d'endroit où s'afficher.
   return (
-    <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { if (!saving) onClose(); }}>
       <div className="glass-strong rounded-2xl w-full max-w-sm shadow-glass-lg overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-bony-border">
           <div>
@@ -232,7 +283,7 @@ const GroupAvatarCropModal: React.FC<GroupAvatarModalProps> = ({ convId, convNam
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-bony-muted mt-0.5">{convName}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-bony-text transition"><X size={20} /></button>
+          <button onClick={onClose} disabled={saving} className="text-slate-400 hover:text-slate-700 dark:hover:text-bony-text transition disabled:opacity-40"><X size={20} /></button>
         </div>
         <div className="p-5 space-y-4">
           {!cropSrc ? (
@@ -247,9 +298,9 @@ const GroupAvatarCropModal: React.FC<GroupAvatarModalProps> = ({ convId, convNam
               <div className="text-center">
                 <p className="text-sm font-bold text-slate-700 dark:text-bony-text">Glisser une photo ici</p>
                 <p className="text-[11px] text-slate-500 dark:text-bony-muted mt-0.5">ou cliquer pour parcourir</p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-1">jpg, png, webp — max 2 Mo</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-1">jpg, png, gif, webp — max 5 Mo</p>
               </div>
-              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => handleFile(e.target.files?.[0])} />
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={e => handleFile(e.target.files?.[0])} />
             </div>
           ) : (
             <div className="space-y-3">
@@ -264,7 +315,7 @@ const GroupAvatarCropModal: React.FC<GroupAvatarModalProps> = ({ convId, convNam
                 <ZoomIn size={14} className="text-slate-400 shrink-0" />
                 <input type="range" min={1} max={3} step={0.05} value={zoom} onChange={e => setZoom(Number(e.target.value))} className="flex-1 accent-bony-orange" />
               </div>
-              <button onClick={() => setCropSrc(null)} className="text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-bony-text transition underline">
+              <button onClick={() => setCropSrc(null)} disabled={saving} className="text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-bony-text transition underline disabled:opacity-40">
                 Choisir une autre photo
               </button>
             </div>
@@ -272,13 +323,13 @@ const GroupAvatarCropModal: React.FC<GroupAvatarModalProps> = ({ convId, convNam
           {error && <p className="text-xs text-red-500 font-bold">{error}</p>}
           <div className="flex gap-2 pt-1">
             {cropSrc && (
-              <button onClick={handleValidate} className="flex-1 py-2.5 rounded-xl bg-bony-gradient text-white text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
-                <Check size={16} /> Valider
+              <button onClick={handleValidate} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-bony-gradient text-white text-sm font-bold hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60">
+                <Check size={16} /> {saving ? 'Enregistrement…' : 'Valider'}
               </button>
             )}
             {hasExisting && (
-              <button onClick={handleDelete} className="flex-1 py-2.5 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 text-sm font-bold hover:bg-red-500/20 transition flex items-center justify-center gap-2">
-                <Trash2 size={16} /> Supprimer la photo
+              <button onClick={handleDelete} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 text-sm font-bold hover:bg-red-500/20 transition flex items-center justify-center gap-2 disabled:opacity-60">
+                <Trash2 size={16} /> {saving ? 'Suppression…' : 'Supprimer la photo'}
               </button>
             )}
             {!cropSrc && !hasExisting && (
@@ -325,9 +376,8 @@ const Chat: React.FC = () => {
   const [editingGroupName, setEditingGroupName] = useState(false);
   const [tempGroupName, setTempGroupName] = useState('');
 
-  // Group avatar modal + cache
+  // Group avatar modal
   const [showGroupAvatarModal, setShowGroupAvatarModal] = useState(false);
-  const [convAvatars, setConvAvatars] = useState<Record<string, string>>({});
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -392,20 +442,25 @@ const Chat: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversations, activeConvId, me]);
 
-  // Load group avatar photos from localStorage + listen for updates
+  // Purge des photos de groupe base64 de l'ancien mécanisme localStorage
+  // (`gearbox_conv_avatar_<id>`), remplacé le 06/08/2026 par `ChatConversation.avatarUrl`.
+  //
+  // ⚠️ AUCUNE reprise vers le serveur, et c'est un choix : la photo est PARTAGÉE, or
+  // chaque poste en a sa propre version et rien ne dit laquelle est la bonne — le
+  // premier qui ouvrirait le Chat imposerait la sienne au groupe, le suivant
+  // l'écraserait. Et une migration déclenchée au chargement n'est pas sérialisable
+  // entre deux onglets (c'est le défaut de `migrateEquipmentIfNeeded`, en pire : ici la
+  // cible est un champ partagé, pas une ligne à soi). Même arbitrage que pour la date
+  // de naissance, qui n'a pas été reprise non plus.
+  //
+  // Bloc purement local, sans appel réseau, supprimable dans quelques mois.
   useEffect(() => {
-    const load = () => {
-      const avatars: Record<string, string> = {};
-      conversations.filter(c => c.type === 'group').forEach(c => {
-        const photo = localStorage.getItem(convAvatarKey(c.id));
-        if (photo) avatars[c.id] = photo;
-      });
-      setConvAvatars(avatars);
-    };
-    load();
-    window.addEventListener('gearbox-conv-avatar-updated', load);
-    return () => window.removeEventListener('gearbox-conv-avatar-updated', load);
-  }, [conversations]);
+    // Snapshot des clés AVANT suppression : itérer sur les index de localStorage en le
+    // mutant saute une clé sur deux.
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('gearbox_conv_avatar_'))
+      .forEach(k => localStorage.removeItem(k));
+  }, []);
 
   // Filter conversations visible to the current user
   const filterVisible = (all: ChatConversation[]): ChatConversation[] => {
@@ -487,6 +542,22 @@ const Chat: React.FC = () => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
   };
+
+  // ---- HAUTEUR DE LA BARRE DE SAISIE ----
+  // Un `<textarea rows={1}>` ne grandit JAMAIS tout seul : sans ce calcul, un message
+  // de plusieurs lignes défilait à l'intérieur de la hauteur d'une seule ligne, et le
+  // plafond `max-h-32` de la classe était du code mort (jamais atteint).
+  // On passe par un effet sur `input` plutôt que par `onChange` pour couvrir du même
+  // coup le collage, l'insertion programmatique, et la REMISE À ZÉRO après envoi —
+  // sans quoi la barre resterait haute une fois le message parti.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    // 'auto' d'abord : sans ça `scrollHeight` ne peut jamais REDESCENDRE, il reste
+    // celui de la hauteur déjà imposée.
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT)}px`;
+  }, [input]);
 
   // ---- EDIT ----
   const startEdit = (msg: ChatMessage) => { setEditingId(msg.id); setEditContent(msg.content); setMenuMsgId(null); };
@@ -713,7 +784,7 @@ const Chat: React.FC = () => {
                     onClick={() => handleSelectConv(conv.id)}
                   >
                     <div className="relative shrink-0">
-                      <ConvAvatar conv={conv} members={members} meId={me!.id} isActive={isActive} size={38} groupPhoto={conv.type === 'group' ? convAvatars[conv.id] : undefined} />
+                      <ConvAvatar conv={conv} members={members} meId={me!.id} isActive={isActive} size={38} />
                       {pinned && <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-bony-orange rounded-full flex items-center justify-center"><Star size={8} className="text-white fill-white" /></div>}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -757,7 +828,7 @@ const Chat: React.FC = () => {
                         onClick={() => handleSelectConv(conv.id)}
                       >
                         <div className="relative shrink-0">
-                          <ConvAvatar conv={conv} members={members} meId={me!.id} isActive={isActive} size={38} groupPhoto={conv.type === 'group' ? convAvatars[conv.id] : undefined} />
+                          <ConvAvatar conv={conv} members={members} meId={me!.id} isActive={isActive} size={38} />
                           {pinned && <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-bony-orange rounded-full flex items-center justify-center"><Star size={8} className="text-white fill-white" /></div>}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -800,7 +871,7 @@ const Chat: React.FC = () => {
                     onClick={() => handleSelectConv(conv.id)}
                   >
                     <div className="relative shrink-0">
-                      <ConvAvatar conv={conv} members={members} meId={me!.id} isActive={isActive} size={38} groupPhoto={conv.type === 'group' ? convAvatars[conv.id] : undefined} />
+                      <ConvAvatar conv={conv} members={members} meId={me!.id} isActive={isActive} size={38} />
                       {pinned && <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-bony-orange rounded-full flex items-center justify-center"><Star size={8} className="text-white fill-white" /></div>}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -842,8 +913,18 @@ const Chat: React.FC = () => {
                   className="relative group/ga shrink-0 rounded-full focus:outline-none"
                   title="Changer la photo du groupe"
                 >
-                  <ConvAvatar conv={activeConv} members={activeMembers} meId={me!.id} size={36} groupPhoto={convAvatars[activeConv.id]} />
-                  <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover/ga:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                  <ConvAvatar conv={activeConv} members={activeMembers} meId={me!.id} size={36} />
+                  {/* ⚠️ Deux indices distincts, et non le même rendu aux deux tailles.
+                      L'overlay au survol ne dit RIEN sur tactile (il n'y a pas de
+                      survol), or la photo est désormais collective : il faut un indice
+                      permanent. Mais réutiliser l'overlay en `opacity-100` sous `md`
+                      masquerait la photo derrière un voile noir en permanence — le
+                      contraire du but. D'où un petit badge d'angle sur mobile, et
+                      l'overlay au survol conservé tel quel sur ordinateur. */}
+                  <div className="md:hidden absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-bony-orange flex items-center justify-center pointer-events-none ring-2 ring-bony-panel">
+                    <Camera size={9} className="text-white" />
+                  </div>
+                  <div className="hidden md:flex absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover/ga:opacity-100 transition-opacity items-center justify-center pointer-events-none">
                     <Camera size={13} className="text-white" />
                   </div>
                 </button>
@@ -1111,35 +1192,62 @@ const Chat: React.FC = () => {
                   <div ref={bottomRef} />
                 </div>
 
-                {/* Reply bar */}
-                {replyTo && (
-                  <div className="px-4 py-2 border-t border-bony-border bg-bony-panel/50 flex items-center gap-2 shrink-0">
-                    <Reply size={14} className="text-bony-orange shrink-0" />
-                    <div className="flex-1 text-[11px] text-bony-muted truncate">
-                      <span className="font-bold text-bony-orange">{replyTo.senderName}</span>
-                      {' '}— {replyTo.type === 'image'
-                        ? '📷 Image'
-                        : replyTo.type === 'file'
-                          ? `📎 ${replyTo.fileName ?? 'Pièce jointe'}`
-                          : replyTo.content.slice(0, 80)}
+                {/* Bandeau de saisie : l'aperçu de réponse ET la barre vivent sur UNE
+                    seule surface. Ils étaient auparavant sur deux fonds distincts
+                    (`bg-bony-panel/50` sous `glass-strong`) séparés par une bordure,
+                    d'où un empilement discordant.
+                    ⚠️ Paddings en longhand uniquement : un raccourci `p-*` préfixé
+                    `md:` écrase un `pt-*`/`pb-*` écrit après lui (l'ordre des règles
+                    générées par la CDN Play ne suit pas l'ordre des classes). */}
+                <div className="px-3 md:px-4 pt-2 pb-2 md:pb-2.5 border-t border-bony-border glass-strong shrink-0">
+                  {/* Aperçu du message auquel on répond */}
+                  {replyTo && (
+                    <div className="flex items-center gap-2 mb-1.5 px-1">
+                      <Reply size={14} className="text-bony-orange shrink-0" />
+                      <div className="flex-1 text-[11px] text-bony-muted truncate">
+                        <span className="font-bold text-bony-orange">{replyTo.senderName}</span>
+                        {' '}— {replyTo.type === 'image'
+                          ? '📷 Image'
+                          : replyTo.type === 'file'
+                            ? `📎 ${replyTo.fileName ?? 'Pièce jointe'}`
+                            : replyTo.content.slice(0, 80)}
+                      </div>
+                      <button
+                        onClick={() => setReplyTo(null)}
+                        title="Annuler la réponse"
+                        className="shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[26px] md:min-w-[26px] rounded-lg text-slate-400 hover:text-bony-text hover:bg-white/5 transition"
+                      >
+                        <X size={14} />
+                      </button>
                     </div>
-                    <button onClick={() => setReplyTo(null)} className="text-slate-400 hover:text-bony-text"><X size={14} /></button>
-                  </div>
-                )}
-
-                {/* Input */}
-                <div className="px-4 py-3 border-t border-bony-border glass-strong shrink-0">
-                  <div className="flex items-end gap-2 bg-bony-dark border border-bony-border rounded-xl px-3 py-2 focus-within:border-bony-orange transition-colors">
+                  )}
+                  {/* ⚠️ `items-end` est voulu : quand le champ grandit sur plusieurs
+                      lignes, les pictos restent ancrés en bas (comportement de toute
+                      messagerie). L'alignement sur une seule ligne ne vient donc PAS
+                      d'`items-center` mais du fait que les quatre enfants ont la même
+                      hauteur — voir le commentaire du textarea. */}
+                  <div className="flex items-end gap-2 bg-[var(--bg-input)] border border-bony-border rounded-2xl px-2 py-1 focus-within:border-bony-orange/60 transition-colors">
                     {/* Deux déclencheurs pour un seul champ : l'un filtre sur les
                         images (usage le plus courant, la galerie s'ouvre directement
                         sur mobile), l'autre accepte tout. Le contrôle réel est côté
                         serveur, `accept` n'est qu'un confort de sélection. */}
-                    <button onClick={() => imageInputRef.current?.click()} className="text-slate-400 hover:text-bony-orange transition p-1 shrink-0 mb-0.5" title="Envoyer une image">
+                    <button onClick={() => imageInputRef.current?.click()} className="shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl text-slate-400 hover:text-bony-orange hover:bg-white/5 transition" title="Envoyer une image">
                       <Image size={18} />
                     </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="text-slate-400 hover:text-bony-orange transition p-1 shrink-0 mb-0.5" title="Joindre un fichier (tous formats, max 100 Mo)">
+                    <button onClick={() => fileInputRef.current?.click()} className="shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl text-slate-400 hover:text-bony-orange hover:bg-white/5 transition" title="Joindre un fichier (tous formats, max 100 Mo)">
                       <Paperclip size={18} />
                     </button>
+                    {/* ⚠️ PAS de `min-h-[...]` ici, et c'est tout le correctif de
+                        l'alignement. Tailwind Preflight met `padding: 0` sur un
+                        textarea, dont le texte se colle EN HAUT de sa boîte (un
+                        `<input>`, lui, centre le sien). Une hauteur minimale laissait
+                        donc ~13 px de vide mort sous le texte, et comme le textarea
+                        était l'élément le plus haut il imposait la hauteur de la
+                        rangée : texte, pictos et bouton d'envoi finissaient sur trois
+                        médianes différentes. On donne à la place un padding vertical
+                        SYMÉTRIQUE, qui centre la ligne dans sa propre boîte et cale
+                        cette boîte sur la hauteur des boutons (24 px de `leading-6`
+                        + 2×10 = 44 px au doigt, + 2×6 = 36 px sur ordinateur). */}
                     <textarea
                       ref={inputRef}
                       value={input}
@@ -1147,10 +1255,10 @@ const Chat: React.FC = () => {
                       onKeyDown={handleKeyDown}
                       onPaste={handlePaste}
                       placeholder="Écrire un message… (Entrée pour envoyer)"
-                      className="flex-1 bg-transparent text-sm text-bony-text outline-none resize-none max-h-32 min-h-[36px] placeholder-bony-muted leading-relaxed"
+                      className="flex-1 min-w-0 bg-transparent text-sm text-bony-text outline-none resize-none overflow-y-auto max-h-32 py-[10px] md:py-1.5 leading-6 placeholder-bony-muted"
                       rows={1}
                     />
-                    <button onClick={() => sendMessage(input)} disabled={!input.trim()} className="p-2 rounded-lg bg-bony-gradient text-white disabled:opacity-30 shrink-0 mb-0.5 transition-opacity hover:opacity-90">
+                    <button onClick={() => sendMessage(input)} disabled={!input.trim()} className="shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl bg-bony-gradient text-white disabled:opacity-30 transition-opacity hover:opacity-90" title="Envoyer">
                       <Send size={16} />
                     </button>
                   </div>
@@ -1374,6 +1482,7 @@ const Chat: React.FC = () => {
         <GroupAvatarCropModal
           convId={activeConv.id}
           convName={getConvName(activeConv)}
+          currentAvatarUrl={activeConv.avatarUrl}
           onClose={() => setShowGroupAvatarModal(false)}
         />
       )}

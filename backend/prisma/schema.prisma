@@ -242,6 +242,13 @@ model ChatConversation {
   participants  String[] // userIds (références libres)
   adminIds      String[]      @default([])
   name          String?
+  // Photo d'un groupe. Nom aligné sur `User.avatarUrl`, et comme lui on stocke
+  // l'URL relative d'un fichier déposé par POST /api/uploads/avatar, JAMAIS du
+  // base64 : la conversation est relue en entier à chaque GET /conversations, une
+  // image encodée dedans la ferait grossir sans fin.
+  // null = pas de photo, le client retombe sur les avatars empilés des membres.
+  // Ne concerne que type='group' (garanti par le handler `chat:conversation:avatar`).
+  avatarUrl     String?
   pinnedBy      String[]      @default([])
   // Sourdine par utilisateur. ⚠️ Contrairement à `pinnedBy`, qui n'est JAMAIS
   // écrit en base (l'épinglage est un overlay localStorage côté client), ce

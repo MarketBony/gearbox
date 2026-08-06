@@ -1,4 +1,4 @@
-# ÉTAT PROJET GEARBOX — synthèse au 5 août 2026
+# ÉTAT PROJET GEARBOX — synthèse au 6 août 2026
 
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
@@ -10,7 +10,9 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 32** (rôle « chef de
+- master = prod, synchronisés. Dernier lot déployé : **correctif 33** (patch
+  anniversaire / photo de groupe / barre de saisie / garde-fou plaques, 6 août) —
+  `api` **et** `web`, migration Prisma. Avant lui le **correctif 32** (rôle « chef de
   site », 5 août) — `api` **et** `web`, migration Prisma. Le correctif 31 (responsive
   mobile) s'était contenté de `web`. Le correctif 30 (refonte des Jeux) avait demandé `api`
   **et** `web` avec migration, comme les 27, 28 et 29 ; les 25 et 26 s'étaient contentés
@@ -1155,6 +1157,122 @@
     faisait échouer les vérifications avec « fetch failed ». Tester depuis l'extérieur
     du dossier surveillé.
 
+33. **PATCH — anniversaire enregistrable, photo de groupe partagée, barre de saisie
+    réalignée, garde-fou sur les plaques** (`feat/patch-chat-et-anniversaires`,
+    6 août). Backend + frontend, **migration Prisma** → `api` **et** `web`.
+    Quatre sujets indépendants regroupés à la demande de Théo (« un patch avec pleins
+    de petites modifs »).
+
+    **1 — Un utilisateur ne pouvait pas enregistrer son propre anniversaire.**
+    Le backend était **correct des deux côtés** : `PUT /me` lit et écrit bien
+    `birthdate`, `publicUser` le renvoie. La faute était dans le client —
+    `AuthContext.updateProfile` recevait un `User` complet puis **reconstruisait un
+    objet littéral à trois clés** avant l'appel réseau. Le champ n'atteignait jamais le
+    corps de la requête, le serveur le voyait `undefined`, sa garde sautait l'écriture,
+    et **rien ne levait d'erreur** : l'interface affichait « Profil mis à jour avec
+    succès ». Le chemin admin marchait parce que `db.updateUser` fait un rest spread,
+    sans whitelist.
+    - ⚠️ **C'est le piège du `nissanShare` / `birthdate` de `routes/users.ts`, mais
+      côté FRONTEND.** La leçon avait été tirée pour le backend seulement. La signature
+      de `db.updateMe` est désormais commentée comme ce qu'elle est : **une whitelist**
+      — ce qui n'y figure pas ne *peut pas* être envoyé.
+    - Chaîne vide et non `undefined`, pour que l'effacement reste possible.
+    - Défaut qui **masquait** le bug : `{ ...updatedUser, ...me }` laisse la réponse
+      serveur écraser la saisie, donc le champ revenait visuellement à l'ancienne
+      valeur juste après le clic — ce qui se lit comme « ça n'enregistre pas ».
+    - ℹ️ Le bouton de Théo était cassé aussi ; il ne l'avait pas vu parce qu'il
+      corrigeait les anniversaires via la Gestion des Utilisateurs.
+
+    **2 — La photo d'un groupe n'était visible que de son auteur.** Base64 dans le
+    `localStorage`, et le champ **n'existait pas** en base. **Troisième occurrence** du
+    même piège après la date de naissance et les jeux.
+    - Migration `20260806103000_add_chat_conversation_avatar` (`avatarUrl String?`),
+      handler `chat:conversation:avatar` calqué sur `chat:conversation:mute`, et le
+      modal réutilise le chemin **déjà éprouvé** de la photo de profil utilisateur
+      (crop 200×200 → `Blob` → `POST /api/uploads/avatar` → URL en base). `uploads.ts`
+      inchangé, le type `avatar` convenait.
+    - ⚠️ **Le point de sécurité du lot** : la valeur est écrite par un utilisateur et
+      **rendue dans un `<img>` chez tous les autres**. Le handler n'accepte que la
+      forme `/uploads/avatar/<uuid>.<jpg|png|gif|webp>` — sans quoi un participant
+      pointerait la photo vers une **URL externe** chargée par le navigateur de chaque
+      membre (fuite d'IP, pixel de traçage), ou vers `/uploads/chat/` où **aucun
+      format n'est filtré**.
+    - Droit **ouvert à tous les participants** (arbitrage de Théo), contrairement au
+      renommage réservé aux admins du groupe — mais l'appartenance reste vérifiée
+      côté serveur.
+    - **Aucune reprise des photos existantes**, volontairement : chaque poste avait sa
+      version et rien ne dit laquelle est la bonne ; et une migration client au
+      chargement n'est pas sérialisable entre deux onglets (défaut de
+      `migrateEquipmentIfNeeded`, en pire ici — la cible est un champ **partagé**).
+    - La prop `groupPhoto` de `ConvAvatar` a été **supprimée** plutôt que recâblée sur
+      ses 4 points d'appel : la donnée vit dans la conversation, la prop était une
+      redite et un oubli possible. L'overlay d'édition, jusque-là masqué au survol,
+      reçoit un **badge d'angle sur mobile** — et non le même voile noir en
+      `opacity-100`, qui aurait masqué la photo en permanence.
+
+    **3 — La barre de saisie du Chat avait trois lignes médianes.** Ce n'était pas un
+    `items-start` : le conteneur est en `items-end`. Cause réelle, **`min-h-[36px]` sur
+    un `<textarea>` sans padding vertical** — Preflight met `padding: 0` sur les
+    textareas et leur texte se colle **en haut** de la boîte (un `<input>` centre le
+    sien), d'où ~13 px de vide mort sous une ligne de 22,75 px ; et comme le textarea
+    était l'élément le plus haut, il imposait la hauteur de la rangée.
+    - ⚠️ **`items-center` seul n'aurait rien corrigé** : il ne recentre que les enfants
+      plus courts que la ligne. Correctif : padding vertical **symétrique**
+      (`leading-6` + `py-[10px] md:py-1.5`), qui centre la ligne dans sa propre boîte
+      et cale celle-ci sur la hauteur des boutons.
+    - `bg-bony-dark` valait `var(--bg-main)`, **la couleur du fond de page** — d'où la
+      « dalle noire plate ». Remplacé par le token des champs `--bg-input`, celui
+      qu'utilise tout le reste de l'app. Rayon et focus alignés sur la charte.
+    - Zones tactiles portées de 26/32 px à **44 px sous `md`**, 36 px au-delà.
+    - Aperçu de réponse ramené **sur la même surface** que la barre : il empilait un
+      `bg-bony-panel/50` sous le `glass-strong`, séparés par une bordure.
+    - **`max-h-32` était du code mort** : sans redimensionnement JS un
+      `textarea rows={1}` ne grandit jamais, il défile dans une seule ligne. La barre
+      grandit désormais jusqu'à 128 px. ⚠️ Le `height = 'auto'` préalable est
+      load-bearing — sans lui `scrollHeight` ne peut jamais redescendre.
+
+    **4 — Contrôles du lot « chef de site », et garde-fou sur une duplication.**
+    - `projects.ts` : PUT/DELETE sur un id inexistant renvoyaient **500 au lieu de
+      404**, contrairement à `budget.ts` et `fixedExpenses.ts`. La **transaction
+      entière** est passée dans le `try` — pas seulement le premier `update`, le diff
+      des tâches pouvant échouer aussi.
+    - **`scripts/check-plaques-sync.mjs`** : la duplication de `PLAQUES_STRUCTURE`
+      entre `constants.ts` et `backend/src/auth/siteScope.ts` était « à synchroniser à
+      la main », c'est-à-dire à oublier — et l'oubli est **silencieux**, il fausse le
+      périmètre d'un chef de site sans aucune erreur. Le script couvre **trois** tables
+      (plaques, `ALPINE_SITES`, sites hors plaque) et échoue à la divergence.
+      **Prouvé load-bearing** sur trois divergences fabriquées puis annulées
+      (`constants.ts` restauré au même md5).
+    - ⚠️ **Branché sur `predev`/`prebuild`, et surtout PAS sur le build Docker** :
+      `backend` est dans le `.dockerignore` du contexte frontend et le contexte du
+      backend est `./backend` — **aucune** des deux images ne voit les deux fichiers,
+      ce qui est la raison d'être de la duplication. Un échec dur aurait donc **cassé
+      la construction de l'image `web`**. Piège attrapé avant déploiement, et vérifié
+      en simulant le contexte Docker : le script sort en succès quand `backend/` est
+      absent. Le contrôle tourne à chaque `npm run dev`, donc dans la session où la
+      faute est commise.
+
+    **Vérifié** : `tsc` racine 12 lignes préexistantes (**0 dans les fichiers
+    touchés**), backend 0 ; l'API redémarre avec la nouvelle colonne et
+    `GET /api/chat/conversations` répond 401 et non 500 ; garde-fou déclenché au
+    démarrage réel du serveur de dev. **Validé fonctionnellement par Théo** dans
+    l'interface (anniversaire, barre de saisie, photo de groupe à deux onglets).
+    **Base et disque rendus à leur état initial** — 7 conversations toutes à
+    `avatarUrl = null`, 13 comptes aux anniversaires d'origine, et les trois dossiers
+    d'`uploads/` vides (contrôlé après les tests).
+
+    ℹ️ **Piège d'environnement à retenir** : le dossier `uploads/` local n'est **pas**
+    celui du VPS. Une photo déposée depuis `localhost` écrit en base une URL dont le
+    fichier n'existe que sur le poste — image cassée pour tous les vrais utilisateurs.
+    Le premier vrai dépôt doit se faire depuis le site déployé.
+
+    ℹ️ Deux résidus de session nettoyés au passage : un serveur Vite du 04/08 encore
+    vivant squattait le port 3000 (le motif d'empilement du lot 30 — vérifié qu'aucun
+    nodemon ne tournait en double), et la fabrication de comptes de test avec jetons
+    signés a été **refusée par le classifieur de sécurité** : la validation
+    fonctionnelle est passée par Théo, ce qui est de toute façon la méthode que ce
+    projet a déjà payé deux fois pour apprendre.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
@@ -1174,7 +1292,18 @@
   besoin se confirme : compter le temps écoulé **en mois**. Choix de lecture, pas un bug.
 - **Recoupement non fait** : le budget d'un chef de site (Mozac, 69 600 € de prévu)
   n'a pas été comparé à ce que voit un Master filtré sur Mozac. Les deux doivent
-  coïncider — contrôle rapide à faire.
+  coïncider — contrôle rapide à faire. ⚠️ **Toujours en attente au 06/08** : il exige
+  une session du compte de Lucien, que je n'ai pas, et la fabrication d'un jeton de
+  test est refusée par le classifieur de sécurité. C'est donc un contrôle **à faire
+  avec Théo connecté**, pas quelque chose que je peux solder seul — ne pas le laisser
+  glisser de lot en lot pour autant, c'est le seul trou de vérification du rôle
+  cloisonné.
+- **Renommer un groupe ou changer ses membres reste invisible des autres postes**
+  (overlay `gearbox_chat_overlay`). Même classe que la photo de groupe, corrigée au
+  correctif 33 ; laissé hors périmètre par décision de Théo. ⚠️ Le nom donné **à la
+  création** part bien au serveur, lui — c'est le renommage **après coup** qui ne sort
+  pas du navigateur. La gestion des membres a de vrais effets de bord (rooms socket,
+  compteurs de non-lus, notifications), d'où un lot dédié.
 
 ### Dette technique
 - **Build local non représentatif du build déployé** : Docker construit le front en
@@ -1194,11 +1323,24 @@
   (un flag `localStorage` ne suffit pas). Catalogue propre aujourd'hui ; s'il se
   re-duplique, la cause est là et la vraie parade est une contrainte d'unicité en base.
 - **Deux duplications à garder synchronisées à la main** :
-  1. `PLAQUES_STRUCTURE` est recopié dans `backend/src/auth/siteScope.ts` (le backend
-     ne peut pas importer le `constants.ts` racine). Un site ajouté d'un seul côté
-     fausserait le périmètre d'un chef de site.
+  1. ✅ `PLAQUES_STRUCTURE` recopié dans `backend/src/auth/siteScope.ts` : la
+     duplication **reste** (elle est structurelle, le backend ne peut pas importer le
+     `constants.ts` racine) mais elle n'est plus livrée à la vigilance — depuis le
+     06/08, `scripts/check-plaques-sync.mjs` échoue à la divergence, sur `predev` et
+     `prebuild`. Couvre aussi `ALPINE_SITES` et les sites hors plaque.
   2. `pages/Projects.tsx` garde sa barre de filtres inline et n'utilise pas
      `components/CollapsibleFilters.tsx`.
+- **`PUT /api/auth/me` ne valide pas la forme de `avatarUrl`** : un utilisateur peut y
+  écrire une URL **externe**, rendue dans un `<img>` chez tous ses collègues (fuite
+  d'IP, pixel de traçage). Trou préexistant, découvert en fermant le même risque sur la
+  photo de groupe — où le contrôle existe désormais (`AVATAR_UPLOAD_PATH`,
+  réutilisable tel quel). Non atteignable par l'interface, mais un appel direct suffit.
+- **Fichiers d'upload orphelins** : remplacer une photo (groupe ou utilisateur) laisse
+  l'ancien fichier sur le disque, rien ne le collecte. ~20 Ko par avatar, non borné.
+  À traiter avec la purge des avatars, volontairement absente (correctif 28).
+- **Aucune route de suppression de conversation** : un groupe créé n'est plus
+  supprimable depuis l'interface. Gênant en pratique, la base locale étant celle de
+  production — impossible de créer une conversation de test jetable sans SQL Supabase.
 
 ### Confort / UI, non bloquant
 - **Agenda** : pas de vue mobile dédiée pour Trimestre/Semestre/Année (les barres Gantt

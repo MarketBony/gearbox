@@ -4,9 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/check-plaques-sync.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/check-plaques-sync.mjs",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:plaques": "node scripts/check-plaques-sync.mjs"
   },
   "dependencies": {
     "date-fns": "^4.1.0",

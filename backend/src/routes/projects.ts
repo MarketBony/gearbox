@@ -73,44 +73,54 @@ router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) 
   // - id reçu connu en base pour ce projet  -> update en place (id conservé)
   // - pas d'id, ou id inconnu               -> create (id client conservé s'il est fourni)
   // - tâche en base absente du body         -> delete (retirée côté frontend)
-  const project = await prisma.$transaction(async (tx) => {
-    await tx.project.update({
-      where: { id },
-      data: withDates(projectData, ['startDate', 'endDate'])
-    });
+  // ⚠️ La transaction est ENTIÈREMENT dans le try : un id inexistant faisait remonter
+  // l'erreur Prisma au middleware global, qui répondait 500 alors que `budget.ts` et
+  // `fixedExpenses.ts` répondent 404 dans le même cas. Incohérence de traitement
+  // d'erreur entre routes, sans impact utilisateur (l'interface n'envoie jamais d'id
+  // inconnu) mais corrigée pour aligner les trois routes.
+  let project;
+  try {
+    project = await prisma.$transaction(async (tx) => {
+      await tx.project.update({
+        where: { id },
+        data: withDates(projectData, ['startDate', 'endDate'])
+      });
 
-    const existing = await tx.task.findMany({
-      where: { projectId: id },
-      select: { id: true }
-    });
-    const existingIds = new Set(existing.map(t => t.id));
-    const incoming: any[] = Array.isArray(tasks) ? tasks : [];
-    const keptIds = new Set<string>();
+      const existing = await tx.task.findMany({
+        where: { projectId: id },
+        select: { id: true }
+      });
+      const existingIds = new Set(existing.map(t => t.id));
+      const incoming: any[] = Array.isArray(tasks) ? tasks : [];
+      const keptIds = new Set<string>();
 
-    for (const t of incoming) {
-      if (typeof t?.id === 'string' && existingIds.has(t.id)) {
-        keptIds.add(t.id);
-        await tx.task.update({ where: { id: t.id }, data: pickTaskData(t) });
-      } else {
-        await tx.task.create({
-          data: {
-            ...pickTaskData(t),
-            projectId: id,
-            // id client conservé si fourni (le frontend génère ses propres ids) —
-            // sinon uuid généré par la base.
-            ...(typeof t?.id === 'string' && t.id.length > 0 ? { id: t.id } : {})
-          }
-        });
+      for (const t of incoming) {
+        if (typeof t?.id === 'string' && existingIds.has(t.id)) {
+          keptIds.add(t.id);
+          await tx.task.update({ where: { id: t.id }, data: pickTaskData(t) });
+        } else {
+          await tx.task.create({
+            data: {
+              ...pickTaskData(t),
+              projectId: id,
+              // id client conservé si fourni (le frontend génère ses propres ids) —
+              // sinon uuid généré par la base.
+              ...(typeof t?.id === 'string' && t.id.length > 0 ? { id: t.id } : {})
+            }
+          });
+        }
       }
-    }
 
-    const toDelete = [...existingIds].filter(tid => !keptIds.has(tid));
-    if (toDelete.length > 0) {
-      await tx.task.deleteMany({ where: { id: { in: toDelete } } });
-    }
+      const toDelete = [...existingIds].filter(tid => !keptIds.has(tid));
+      if (toDelete.length > 0) {
+        await tx.task.deleteMany({ where: { id: { in: toDelete } } });
+      }
 
-    return await tx.project.findUnique({ where: { id }, include: { tasks: true } });
-  });
+      return await tx.project.findUnique({ where: { id }, include: { tasks: true } });
+    });
+  } catch (e) {
+    return res.status(404).json({ error: 'Projet introuvable.' });
+  }
 
   emitEvent('projects:updated', project);
   res.json(project);
@@ -118,7 +128,11 @@ router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) 
 
 router.delete('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) => {
   const { id } = req.params;
-  await prisma.project.delete({ where: { id } });
+  try {
+    await prisma.project.delete({ where: { id } });
+  } catch (e) {
+    return res.status(404).json({ error: 'Projet introuvable.' });
+  }
   emitEvent('projects:deleted', id);
   res.sendStatus(204);
 });
