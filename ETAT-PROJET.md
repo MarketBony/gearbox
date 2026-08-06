@@ -986,7 +986,8 @@
     navires identifiés (cases + touches), phase de placement avec clic pour poser, clic
     pour pivoter, tirage aléatoire et réinitialisation ; retours **manqué / touché /
     coulé** avec le nom du navire ; **marquage automatique** du pourtour d'un navire
-    coulé ; flotte restante affichée. Toucher ne redonne pas la main — règle symétrique.
+    coulé ; flotte restante affichée. Toucher ne redonnait pas la main — « règle
+    symétrique », **arbitrage revu au correctif 34** (toucher redonne la main).
 
     **Refonte visuelle et responsive** : lobby avec cartes de jeu, adversaires et
     classement lisible ; plateaux au vocabulaire visuel du projet (dégradé charte,
@@ -1272,6 +1273,62 @@
     signés a été **refusée par le classifieur de sécurité** : la validation
     fonctionnelle est passée par Théo, ce qui est de toute façon la méthode que ce
     projet a déjà payé deux fois pour apprendre.
+
+34. **BATAILLE NAVALE — toucher redonne la main, cases déduites grisées, et
+    l'invariant de non-contact enfin gardé côté serveur** (6 août). **Backend seul**,
+    aucune migration → `api` seul. Un seul fichier de code :
+    `backend/src/utils/gameRules.ts`.
+
+    Signalé par Théo : « quand je touche un bateau, ça passe au tour de l'adversaire »
+    et « les cases autour devraient se griser, il ne peut pas y avoir 2 bateaux
+    côte-à-côte ».
+
+    **1 — Toucher redonne la main.** ⚠️ **Ce n'était pas un bug mais un arbitrage** du
+    lot 30, écrit noir sur blanc dans le code et dans deux `.md` (« Comme sur le site
+    de référence : toucher ne redonne PAS la main. Règle simple et symétrique »).
+    Théo tranche pour la règle classique. Une seule ligne (`nextTurn`), **et les trois
+    textes corrigés dans le même geste** — sinon la prochaine session « rétablit »
+    l'ancien comportement en croyant réparer une régression.
+    - Aucun changement client : `Battleship.tsx` dérive `monTour` de
+      `session.currentTurn`, le bandeau et la grille suivent tout seuls.
+    - Aucun risque pour les autres jeux : `applyMove` a trois branches indépendantes,
+      chacune avec son `nextTurn`. Vérifié par test.
+
+    **2 — Cases déduites vides : la demande était juste, mais pas littérale.**
+    « Les cases autour » ne peut pas s'appliquer tel quel à un simple touché :
+    - les **4 diagonales** sont forcément vides (un navire est une ligne droite, donc
+      ce n'est pas sa suite ; et deux navires ne se touchent pas, donc ce n'en est pas
+      un autre) → grisées ;
+    - les **4 orthogonales** peuvent être **la suite du navire qu'on vient de
+      toucher** → les griser le rendrait **insubmersible**. Jamais marquées.
+    Le pourtour complet du navire **coulé** existait déjà et fonctionnait : seul le cas
+    du touché-non-coulé manquait. Rien à changer au rendu, une case `miss` est déjà
+    grise.
+
+    **3 — Le vrai problème, non demandé.** `validateFleet` **n'interdisait pas le
+    contact** entre navires : elle testait la superposition, l'alignement et la
+    contiguïté, mais pas le voisinage. Le client l'interdit bien (`canPlace`), le
+    serveur non — alors que son propre commentaire annonce « on ne fait JAMAIS
+    confiance au placement reçu », et que c'est **l'invariant dont dépend tout le
+    marquage automatique**.
+    - **Conséquence : partie INGAGNABLE.** Couler le navire A marque des cases du
+      navire B en `miss` ; `applyMove` refuse de tirer sur une case déjà tirée. Ces
+      cases devenaient définitivement intirables, B insubmersible, `fleetSunk` jamais
+      vrai. Bug latent depuis le 05/08, non atteignable par l'interface (le client
+      produit des flottes correctes) mais ouvert à tout appel forgé.
+    - Test de non-contact ajouté, en réutilisant la logique de voisinage déjà
+      présente. Aucun changement visible pour les joueurs.
+
+    **Vérifié — 17 assertions sur les règles** (`applyMove` et `validateFleet` sont des
+    fonctions pures exportées, testées hors interface puis script supprimé) : touché →
+    main conservée + 4 diagonales grisées + **orthogonales intactes** ; touché en coin →
+    aucune case hors grille ; manqué → la main passe ; coulé → pourtour complet + main
+    conservée ; flotte entière coulée → `finished` + vainqueur, et tout coup ensuite
+    refusé ; contact orthogonal **et** diagonal refusés au placement ; flotte légitime
+    acceptée ; **morpion et puissance 4 alternent toujours**. `tsc` backend 0.
+    ℹ️ Les deux seuls échecs de la passe initiale venaient de **mes fixtures** de test
+    (plateau `{cells}` et non tableau nu), pas du code — vérifier son propre test avant
+    d'accuser l'implémentation.
 
 ## Backlog — ce qui reste à faire
 

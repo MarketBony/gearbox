@@ -92,9 +92,29 @@ Le frontend ne fait que proposer une case ; il ne décide de rien. Effets renvoy
 l'auteur du tir uniquement (`miss` / `hit` / `sunk` + nom du navire) : l'adversaire
 les déduit de sa grille.
 
-Bataille navale, règles retenues : toucher **ne redonne pas** la main (le tour passe
-à chaque tir, règle symétrique et simple) ; couler un navire **marque
-automatiquement** son pourtour en « manqué », ces cases ne pouvant rien contenir.
+**Bataille navale, règles retenues** (révisées le 06/08/2026, correctif 34) :
+
+- **Toucher REDONNE la main** — on rejoue jusqu'à manquer, règle classique.
+  ⚠️ Le lot 30 faisait l'inverse (« le tour passe à chaque tir, règle symétrique »),
+  ce n'était **pas un bug mais un arbitrage**, revu à la demande de Théo. Une seule
+  ligne dans `applyMove` (`nextTurn`) — ne pas le « rétablir » en croyant réparer.
+- **Cases déduites vides, marquées `miss` automatiquement.** Deux cas, à ne pas
+  confondre :
+  - navire **coulé** → **pourtour complet** (les 8 voisines, via `neighboursOf`) ;
+  - navire **touché mais pas coulé** → **les 4 DIAGONALES seulement**.
+  ⚠️ Ne JAMAIS marquer les 4 cases orthogonales d'un simple touché : elles peuvent
+  être la suite du navire qu'on vient de toucher, les griser le rendrait
+  insubmersible. Une diagonale est sûre parce qu'un navire est une ligne droite (ce
+  n'est donc pas sa suite) **et** que deux navires ne se touchent jamais (ce n'en est
+  donc pas un autre).
+- ⚠️⚠️ **`validateFleet` interdit le CONTACT entre navires**, même diagonal (depuis le
+  06/08/2026 ; elle ne testait que la superposition). Ce n'est pas du confort : c'est
+  **l'invariant dont dépend tout le marquage automatique**. Sans lui, une flotte
+  adjacente forgée hors interface rendait la partie **INGAGNABLE** — couler le navire
+  A marque des cases du navire B en `miss`, et `applyMove` refuse ensuite de tirer sur
+  une case déjà tirée, donc B ne pouvait plus jamais être coulé et `fleetSunk` jamais
+  devenir vrai. Le client l'appliquait déjà (`canPlace`), le serveur non — alors que
+  son propre commentaire annonce « on ne fait JAMAIS confiance au placement reçu ».
 
 #### Routes et temps réel
 

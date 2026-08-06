@@ -154,6 +154,9 @@ export const validateFleet = (ships: unknown): Ship[] => {
   }
 
   const occupees = new Set<string>();
+  // Cases des navires DÉJÀ validés — sert au contrôle de non-contact plus bas.
+  // Distinct d'`occupees`, qui contient aussi les cases du navire en cours d'examen.
+  const precedents = new Set<string>();
   const propres: Ship[] = [];
   for (const s of ships as any[]) {
     if (typeof s?.name !== 'string' || !FLEET.some(f => f.name === s.name)) {
@@ -180,6 +183,24 @@ export const validateFleet = (ships: unknown): Ship[] => {
     if (!aligne || !contigu) {
       throw new IllegalMoveError('Flotte invalide : navire non aligné ou discontinu.');
     }
+    // ⚠️ NON-CONTACT — deux navires ne peuvent pas se toucher, même en diagonale.
+    // Ce contrôle manquait côté serveur alors que le client l'applique déjà
+    // (`canPlace` dans components/games/Battleship.tsx), et il n'est pas cosmétique :
+    // c'est l'invariant dont dépend TOUT le marquage automatique des cases déduites
+    // vides. Sans lui, une flotte adjacente forgée hors interface rendait la partie
+    // INGAGNABLE — couler le navire A marque des cases du navire B en 'miss', et
+    // `applyMove` refuse ensuite de tirer sur une case déjà tirée : B devenait
+    // insubmersible et `fleetSunk` jamais vrai.
+    for (const [r, c] of cells) {
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (precedents.has(cellKey(r + dr, c + dc))) {
+            throw new IllegalMoveError('Flotte invalide : deux navires se touchent.');
+          }
+        }
+      }
+    }
+    cells.forEach(([r, c]) => precedents.add(cellKey(r, c)));
     propres.push({ name: s.name, size: cells.length, cells, hits: 0 });
   }
   return propres;
@@ -290,13 +311,34 @@ export const applyMove = (session: SessionLike, userId: string, move: any): Move
         const nk = cellKey(nr, nc);
         if (!cible.shots[nk]) cible.shots[nk] = 'miss';
       }
+    } else {
+      // Touché mais pas coulé : seules les DIAGONALES sont déductibles, et il ne
+      // faut SURTOUT pas marquer les 4 cases orthogonales — elles peuvent être la
+      // suite du navire qu'on vient de toucher, les griser le rendrait
+      // insubmersible. Une diagonale, elle, est forcément vide : un navire est une
+      // ligne droite (donc ce n'est pas sa suite) et deux navires ne se touchent
+      // jamais (donc ce n'en est pas un autre) — invariant garanti par
+      // `validateFleet`.
+      for (const [dr, dc] of [[-1, -1], [-1, 1], [1, -1], [1, 1]] as const) {
+        const nr = r + dr, nc = c + dc;
+        if (!inGrid(nr, nc)) continue;
+        const nk = cellKey(nr, nc);
+        // Ne jamais écraser un tir réel (un 'hit' notamment) : même garde que le
+        // marquage du pourtour ci-dessus.
+        if (!cible.shots[nk]) cible.shots[nk] = 'miss';
+      }
     }
     const fini = fleetSunk(cible);
     return {
       board,
-      // Comme sur le site de référence : toucher ne redonne PAS la main, le tour
-      // passe à chaque tir. Règle simple et symétrique.
-      nextTurn: fini ? userId : suivant,
+      // Toucher (ou couler) REDONNE la main : on rejoue jusqu'à manquer, règle
+      // classique de la bataille navale.
+      // ⚠️ Inversé le 06/08/2026 à la demande de Théo. Le lot 30 passait le tour à
+      // chaque tir (« règle symétrique », calquée sur un site de référence) — ce
+      // n'était pas un bug mais un arbitrage, revu depuis. Ne pas le « rétablir ».
+      // Le cas `fini` donne la même valeur : le gagnant reste `currentTurn`, comme
+      // en morpion et puissance 4, et `applyMove` refuse tout coup ensuite.
+      nextTurn: userId,
       winnerId: fini ? userId : undefined,
       status: fini ? 'finished' : 'playing',
       effect: coule ? 'sunk' : 'hit',
