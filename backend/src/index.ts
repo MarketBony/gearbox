@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth';
 import projectRoutes from './routes/projects';
+import taskRoutes from './routes/tasks';
 import campaignRoutes from './routes/campaigns';
 import socialRoutes from './routes/social';
 import budgetRoutes from './routes/budget';
@@ -54,6 +55,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/seed', seedRoutes);
 app.use('/api/projects', projectRoutes);
+// Tâches AUTONOMES uniquement (projectId null) — les tâches de projet passent
+// exclusivement par /api/projects. Voir l'en-tête de routes/tasks.ts.
+app.use('/api/tasks', taskRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/budget', budgetRoutes);

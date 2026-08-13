@@ -2,18 +2,26 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   CheckSquare, ChevronLeft, ChevronRight, Filter, Search, X,
-  ExternalLink, Calendar, Tag, Banknote, Radio, ChevronDown, ChevronUp
+  ExternalLink, Calendar, Tag, Banknote, Radio, ChevronDown, ChevronUp,
+  Plus, Pencil, Trash2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import DatePicker from '../components/DatePicker';
+import Select from '../components/Select';
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
-import { Project, Task, TaskStatus, BrandType, ServiceType, PlaqueName } from '../types';
-import { BRAND_COLORS, SERVICE_COLORS, PLAQUES_STRUCTURE, BRANDS, SERVICES } from '../constants';
+import { Project, Task, TaskStatus, TaskChannel, BrandType, ServiceType, PlaqueName } from '../types';
+import { BRAND_COLORS, SERVICE_COLORS, PLAQUES_STRUCTURE, BRANDS, SERVICES, TASK_CHANNELS } from '../constants';
 
 // ---- Types ----
+// Une carte de la To-do, quelle que soit sa nature. Les champs `project*` sont
+// SYNTHÉTISÉS pour une tâche autonome à partir de ses propres colonnes (deadline,
+// sites, brands, service) : tout le reste de l'écran — filtres, tri, urgence,
+// rendu — continue ainsi de fonctionner sans être dupliqué par nature de tâche.
 interface TodoTask extends Task {
-  projectId: string;
+  projectId: string;          // '' pour une tâche autonome
+  standalone: boolean;
+  taskSites: string[];        // sites réels, pour le filtre (le projet peut être multi-sites)
   projectName: string;
   projectSite: string;
   projectBrands: BrandType[];
@@ -90,10 +98,14 @@ function recalcProject(project: Project): Project {
 }
 
 // ---- Site filter dropdown ----
+// Réutilisé à DEUX endroits : la barre de filtres de la To-do, et le choix des sites
+// du formulaire de tâche autonome. `placeholder` n'existe que pour ça — le libellé
+// « Périmètre » de la barre de filtres reste le défaut, donc inchangé.
 const SiteFilterDropdown: React.FC<{
   selected: string[];
   onChange: (v: string[]) => void;
-}> = ({ selected, onChange }) => {
+  placeholder?: string;
+}> = ({ selected, onChange, placeholder = 'Périmètre' }) => {
   const [open, setOpen] = useState(false);
   const [expandedPlaques, setExpandedPlaques] = useState<Set<string>>(new Set());
   const ref = useRef<HTMLDivElement>(null);
@@ -129,7 +141,7 @@ const SiteFilterDropdown: React.FC<{
     });
   };
 
-  const label = selected.length === 0 ? 'Périmètre' : `${selected.length} site${selected.length > 1 ? 's' : ''}`;
+  const label = selected.length === 0 ? placeholder : `${selected.length} site${selected.length > 1 ? 's' : ''}`;
 
   return (
     <div ref={ref} className="relative">
@@ -201,9 +213,13 @@ const TaskCard: React.FC<{
   colIndex: number;
   onMove: (id: string, projectId: string, newStatus: TaskStatus) => void;
   onNavigate: () => void;
-}> = ({ task, colIndex, onMove, onNavigate }) => {
+  onEdit: () => void;
+}> = ({ task, colIndex, onMove, onNavigate, onEdit }) => {
+  // Une tâche autonome SANS deadline porte une date sentinelle très lointaine : elle
+  // ne doit jamais s'afficher comme urgente, ni comme datée.
+  const sansEcheance = task.standalone && !task.deadline;
   const days = daysUntil(task.projectEndDate);
-  const urgency = days < 0 ? 'overdue' : days <= 3 ? 'critical' : days <= 7 ? 'warning' : 'ok';
+  const urgency = sansEcheance ? 'ok' : days < 0 ? 'overdue' : days <= 3 ? 'critical' : days <= 7 ? 'warning' : 'ok';
 
   const urgencyBorder = urgency === 'overdue' || urgency === 'critical' ? 'border-l-red-500' : urgency === 'warning' ? 'border-l-bony-orange' : 'border-l-transparent';
 
@@ -211,24 +227,57 @@ const TaskCard: React.FC<{
   const canGoRight = colIndex < KANBAN_ORDER.length - 1;
 
   return (
-    <div className={`gx-card p-3 flex flex-col gap-2 border-l-4 ${urgencyBorder} transition-all hover:shadow-md`}>
-      {/* Task name */}
-      <p className="font-semibold text-sm text-slate-900 dark:text-bony-text leading-snug">{task.name}</p>
+    // Carte compacte : 3 rangées d'information au lieu de 5. Les rangées « projet »
+    // et « date » d'une part, « badges » et « coût » d'autre part, occupaient chacune
+    // une ligne entière pour quelques caractères — à 5 tâches la colonne était pleine.
+    // Rien n'est retiré, tout est regroupé. Mesuré : ~155 px -> ~105 px en desktop.
+    <div className={`gx-card px-3 py-2 flex flex-col gap-1.5 border-l-4 ${urgencyBorder} transition-all hover:shadow-md`}>
+      {/* Nom — borné à 2 lignes : un libellé à rallonge ne doit pas faire enfler la carte */}
+      <p className="font-semibold text-sm text-slate-900 dark:text-bony-text leading-snug line-clamp-2">{task.name}</p>
 
-      {/* Project badge */}
-      <button
-        onClick={onNavigate}
-        className="flex items-center gap-1.5 text-left group"
-      >
-        <span className="text-xs text-bony-text/60 dark:text-bony-text/50 group-hover:text-bony-orange transition-colors truncate max-w-[180px]">
-          {task.projectName}
+      {/* Projet + échéance sur la MÊME ligne (la date part à droite via ml-auto).
+          Le bouton reste limité au projet : la date ne doit pas être cliquable.
+          Une tâche AUTONOME n'a pas de projet où naviguer : elle affiche à la place
+          un bouton d'édition, seul moyen de la modifier ou de la supprimer. */}
+      <div className="flex items-center gap-2">
+        {task.standalone ? (
+          <button onClick={onEdit} className="flex items-center gap-1.5 text-left group min-w-0" title="Modifier cette tâche">
+            <span className="text-[10px] px-1.5 py-0.5 rounded border border-bony-violet/30 bg-bony-violet/10 text-bony-violet font-semibold shrink-0">
+              Libre
+            </span>
+            {task.projectSite && (
+              <span className="text-[10px] text-bony-text/40 dark:text-bony-text/30 truncate">{task.projectSite}</span>
+            )}
+            <Pencil size={10} className="text-bony-text/30 group-hover:text-bony-orange transition-colors shrink-0" />
+          </button>
+        ) : (
+          <button onClick={onNavigate} className="flex items-center gap-1.5 text-left group min-w-0">
+            <span className="text-xs text-bony-text/60 dark:text-bony-text/50 group-hover:text-bony-orange transition-colors truncate">
+              {task.projectName}
+            </span>
+            <span className="text-[10px] text-bony-text/40 dark:text-bony-text/30 shrink-0">{task.projectSite}</span>
+            <ExternalLink size={10} className="text-bony-text/30 group-hover:text-bony-orange transition-colors shrink-0" />
+          </button>
+        )}
+        <span className={`flex items-center gap-1 text-[10px] ml-auto shrink-0 font-medium ${
+          urgency === 'overdue' ? 'text-red-500' :
+          urgency === 'critical' ? 'text-red-400' :
+          urgency === 'warning' ? 'text-bony-orange' :
+          'text-slate-500 dark:text-bony-text/40'
+        }`}>
+          {!sansEcheance && <Calendar size={10} />}
+          {sansEcheance
+            ? 'Sans échéance'
+            : urgency === 'overdue'
+            ? `Expiré il y a ${Math.abs(days)}j`
+            : urgency === 'critical'
+            ? `${days}j restant${days > 1 ? 's' : ''}`
+            : formatDate(task.projectEndDate)}
         </span>
-        <span className="text-[10px] text-bony-text/40 dark:text-bony-text/30 shrink-0">{task.projectSite}</span>
-        <ExternalLink size={10} className="text-bony-text/30 group-hover:text-bony-orange transition-colors shrink-0" />
-      </button>
+      </div>
 
-      {/* Badges row */}
-      <div className="flex flex-wrap gap-1">
+      {/* Badges + coût sur la même ligne, le coût poussé à droite */}
+      <div className="flex flex-wrap items-center gap-1">
         {task.projectService.map(s => (
           <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${SERVICE_COLORS[s]}`}>{s}</span>
         ))}
@@ -240,47 +289,182 @@ const TaskCard: React.FC<{
             {task.channel}
           </span>
         )}
-      </div>
-
-      {/* Cost + date */}
-      <div className="flex items-center justify-between gap-2">
         {task.cost > 0 && (
-          <span className="flex items-center gap-1 text-xs text-slate-500 dark:text-bony-text/50">
+          <span className="flex items-center gap-1 text-[10px] ml-auto shrink-0 text-slate-500 dark:text-bony-text/50">
             <Banknote size={11} />
             {task.cost.toLocaleString('fr-FR')} €
           </span>
         )}
-        <span className={`flex items-center gap-1 text-[10px] ml-auto font-medium ${
-          urgency === 'overdue' ? 'text-red-500' :
-          urgency === 'critical' ? 'text-red-400' :
-          urgency === 'warning' ? 'text-bony-orange' :
-          'text-slate-500 dark:text-bony-text/40'
-        }`}>
-          <Calendar size={10} />
-          {urgency === 'overdue'
-            ? `Expiré il y a ${Math.abs(days)}j`
-            : urgency === 'critical'
-            ? `${days}j restant${days > 1 ? 's' : ''}`
-            : formatDate(task.projectEndDate)}
-        </span>
       </div>
 
-      {/* Move buttons */}
+      {/* Déplacement de colonne. ⚠️ La hauteur mobile (`py-2.5`) n'est PAS réduite :
+          elle est déjà sous le seuil tactile des 44 px, l'amincir aggraverait le
+          défaut. Seul le desktop, qui est ce que Théo regarde, passe à `md:py-0.5`. */}
       <div className="flex gap-1 pt-1 border-t border-slate-100 dark:border-white/5">
         <button
           onClick={() => canGoLeft && onMove(task.id, task.projectId, KANBAN_ORDER[colIndex - 1])}
           disabled={!canGoLeft}
-          className="flex-1 flex items-center justify-center gap-1 py-2.5 md:py-1 rounded text-xs text-slate-500 dark:text-bony-text/50 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 flex items-center justify-center gap-1 py-2.5 md:py-0.5 rounded text-xs text-slate-500 dark:text-bony-text/50 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft size={13} />
         </button>
         <button
           onClick={() => canGoRight && onMove(task.id, task.projectId, KANBAN_ORDER[colIndex + 1])}
           disabled={!canGoRight}
-          className="flex-1 flex items-center justify-center gap-1 py-2.5 md:py-1 rounded text-xs text-slate-500 dark:text-bony-text/50 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 flex items-center justify-center gap-1 py-2.5 md:py-0.5 rounded text-xs text-slate-500 dark:text-bony-text/50 hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronRight size={13} />
         </button>
+      </div>
+    </div>
+  );
+};
+
+// ---- Formulaire d'une tâche AUTONOME ----
+// ⚠️ Pas de champ COÛT, volontairement : une tâche autonome n'a pas de budget
+// (décision de Théo). Le serveur force `cost = 0` et n'accepte pas ce champ en
+// entrée — l'absence ici n'est donc pas la seule garantie.
+// ⚠️ Pas de champ « Assigné à » non plus : une tâche créée ici est TOUJOURS pour soi
+// (décision de Théo). L'assignation reste stockée — la To-do ne montre que les tâches
+// de l'utilisateur courant, il faut donc bien la renseigner — mais elle n'est pas
+// proposée à la saisie. À l'édition on préserve la valeur existante.
+const StandaloneTaskForm: React.FC<{
+  task: Task | null;                       // null = création
+  meId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}> = ({ task, meId, onClose, onSaved }) => {
+  const [name, setName] = useState(task?.name ?? '');
+  const [provider, setProvider] = useState(task?.provider ?? '');
+  const [channel, setChannel] = useState<TaskChannel>(task?.channel ?? '');
+  const [status, setStatus] = useState<TaskStatus>(task?.status ?? 'Todo');
+  const assignedUserId = task?.assignedUserId ?? meId;
+  const [deadline, setDeadline] = useState(task?.deadline ?? '');
+  const [sites, setSites] = useState<string[]>(task?.sites ?? []);
+  const [brands, setBrands] = useState<BrandType[]>(task?.brands ?? []);
+  const [service, setService] = useState<ServiceType[]>(task?.service ?? []);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const toggle = <T,>(list: T[], v: T, set: (x: T[]) => void) =>
+    set(list.includes(v) ? list.filter(x => x !== v) : [...list, v]);
+
+  const submit = async () => {
+    if (!name.trim()) { setError('Le nom de la tâche est obligatoire.'); return; }
+    setSaving(true);
+    setError('');
+    const payload = { name: name.trim(), provider, channel, status, assignedUserId, deadline, sites, brands, service };
+    try {
+      if (task) await db.updateStandaloneTask(task.id, payload);
+      else await db.createStandaloneTask(payload);
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Échec de l'enregistrement.");
+      setSaving(false);
+    }
+  };
+
+  const supprimer = async () => {
+    if (!task || !confirm('Supprimer définitivement cette tâche ?')) return;
+    setSaving(true);
+    try {
+      await db.deleteStandaloneTask(task.id);
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Échec de la suppression.');
+      setSaving(false);
+    }
+  };
+
+  const puce = (actif: boolean, couleur: string) =>
+    `text-[10px] px-2 py-1 rounded border font-semibold transition ${actif ? couleur : 'border-bony-border text-bony-text/40 hover:text-bony-text/70'}`;
+
+  return (
+    <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !saving && onClose()}>
+      <div className="glass-strong rounded-2xl w-full max-w-lg shadow-glass-lg overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-bony-border shrink-0">
+          <h3 className="font-title text-bony-text flex items-center gap-2">
+            <CheckSquare size={18} className="text-bony-orange" />
+            {task ? 'Modifier la tâche' : 'Nouvelle tâche'}
+          </h3>
+          <button onClick={onClose} disabled={saving} className="text-slate-400 hover:text-bony-text transition disabled:opacity-40"><X size={20} /></button>
+        </div>
+
+        <div className="p-5 space-y-4 overflow-y-auto custom-scrollbar">
+          <div>
+            <label className="text-[11px] font-bold text-bony-muted uppercase tracking-wide">Nom *</label>
+            <input value={name} onChange={e => setName(e.target.value)} autoFocus
+              className="w-full mt-1 bg-[var(--bg-input)] border border-bony-border rounded-xl px-3 py-2 text-sm text-bony-text outline-none focus:border-bony-orange/60" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-bold text-bony-muted uppercase tracking-wide">Prestataire</label>
+              <input value={provider} onChange={e => setProvider(e.target.value)}
+                className="w-full mt-1 bg-[var(--bg-input)] border border-bony-border rounded-xl px-3 py-2 text-sm text-bony-text outline-none focus:border-bony-orange/60" />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-bony-muted uppercase tracking-wide">Deadline</label>
+              <DatePicker value={deadline} onChange={setDeadline} />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-bony-muted uppercase tracking-wide">Canal</label>
+              <Select value={channel} onChange={v => setChannel(v as TaskChannel)}
+                options={[{ value: '', label: '—' }, ...TASK_CHANNELS.map(c => ({ value: c, label: c }))]} />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-bony-muted uppercase tracking-wide">Statut</label>
+              <Select value={status} onChange={v => setStatus(v as TaskStatus)}
+                options={KANBAN_COLS.map(c => ({ value: c.status, label: c.label }))} />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-bony-muted uppercase tracking-wide">Sites</label>
+            {/* Même menu déroulant que la barre de filtres de la To-do (plaques
+                repliables, cases à cocher) plutôt qu'une liste à plat de 19 boutons. */}
+            <div className="mt-1">
+              <SiteFilterDropdown selected={sites} onChange={setSites} placeholder="Choisir des sites" />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-bony-muted uppercase tracking-wide">Marques</label>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {BRANDS.map(b => (
+                <button key={b} onClick={() => toggle(brands, b, setBrands)}
+                  className={puce(brands.includes(b), BRAND_COLORS[b])}>{b}</button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-bony-muted uppercase tracking-wide">Services</label>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {SERVICES.map(s => (
+                <button key={s} onClick={() => toggle(service, s, setService)}
+                  className={puce(service.includes(s), SERVICE_COLORS[s])}>{s}</button>
+              ))}
+            </div>
+          </div>
+
+          {error && <p className="text-xs text-red-500 font-bold">{error}</p>}
+        </div>
+
+        <div className="flex gap-2 px-5 py-4 border-t border-bony-border shrink-0">
+          <button onClick={submit} disabled={saving}
+            className="flex-1 py-2.5 rounded-xl bg-bony-gradient text-white text-sm font-bold hover:opacity-90 transition disabled:opacity-60">
+            {saving ? 'Enregistrement…' : task ? 'Enregistrer' : 'Créer la tâche'}
+          </button>
+          {task && (
+            <button onClick={supprimer} disabled={saving}
+              className="px-4 py-2.5 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 text-sm font-bold hover:bg-red-500/20 transition disabled:opacity-60">
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -305,6 +489,14 @@ const TodoList: React.FC = () => {
   // Mobile kanban tab
   const [mobileCol, setMobileCol] = useState(0);
 
+  // Tâches autonomes : formulaire de création/édition
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Task | null>(null);
+
+  // Même liste de rôles que `EDIT_ROLES` de `backend/src/routes/tasks.ts`. ⚠️ Simple
+  // commodité d'affichage : le refus réel est côté serveur, et c'est lui qui compte.
+  const canCreate = !!user && ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'].includes(user.role);
+
   const todayStr = today();
 
   // ---- Load tasks ----
@@ -321,6 +513,8 @@ const TodoList: React.FC = () => {
           tasks.push({
             ...t,
             projectId: p.id,
+            standalone: false,
+            taskSites: projectSites(p),
             projectName: p.name,
             projectSite: p.site,
             projectBrands: p.brands,
@@ -331,11 +525,41 @@ const TodoList: React.FC = () => {
         }
       }
     }
+
+    // Tâches AUTONOMES : elles n'ont pas de projet, donc pas de `project.endDate`
+    // pour les faire disparaître. Leur règle est différente, et c'est voulu (arbitrage
+    // de Théo) : une tâche autonome ne disparaît que si elle est TERMINÉE **et** que sa
+    // deadline est atteinte. Une tâche en retard non faite reste donc visible — alors
+    // qu'une tâche de projet, elle, disparaît dès que le projet est échu, terminée ou
+    // non. Deux comportements distincts dans la même colonne, assumés.
+    const libres = await db.getStandaloneTasks();
+    for (const t of libres) {
+      if (t.assignedUserId !== user.id || t.status === 'Empty') continue;
+      const echue = !!t.deadline && t.deadline < todayStr;
+      if (echue && t.status === 'Done') continue;
+      const sites = t.sites ?? [];
+      tasks.push({
+        ...t,
+        projectId: '',
+        standalone: true,
+        taskSites: sites,
+        projectName: '',
+        projectSite: sites.join(', '),
+        projectBrands: t.brands ?? [],
+        projectService: t.service ?? [],
+        // Sans deadline, la tâche ne doit jamais paraître urgente ni expirée : on la
+        // place très loin dans le futur plutôt que de laisser `daysUntil` recevoir ''
+        // (qui donnerait NaN, donc `days < 0` faux mais un affichage cassé).
+        projectStartDate: t.deadline || todayStr,
+        projectEndDate: t.deadline || '9999-12-31',
+      });
+    }
+
     // Sort by end date asc
     tasks.sort((a, b) => a.projectEndDate.localeCompare(b.projectEndDate));
     setAllTasks(tasks);
     setLoading(false);
-  }, [user]);
+  }, [user, todayStr]);
 
   useEffect(() => {
     loadTasks();
@@ -344,22 +568,30 @@ const TodoList: React.FC = () => {
   // Temps réel : les tâches affichées sont celles des projets. Remplace le
   // polling toutes les 30 s qui compensait l'absence de temps réel — la mise à
   // jour est maintenant immédiate, et sans requête quand rien ne bouge.
-  useRealtimeSync(RT_EVENTS.projects, () => loadTasks());
+  useRealtimeSync([...RT_EVENTS.projects, ...RT_EVENTS.tasks], () => loadTasks());
 
   // ---- Update task status ----
+  // ⚠️ Deux chemins d'écriture selon la nature de la tâche, et il ne faut pas les
+  // mélanger : une tâche de projet se sauvegarde par un PUT du PROJET entier (qui
+  // recalcule au passage progression et budget), une tâche autonome par sa propre
+  // route. Un `projectId` vide identifie la seconde.
   const moveTask = useCallback(async (taskId: string, projectId: string, newStatus: TaskStatus) => {
     setSaving(true);
-    const projects = await db.getProjects();
-    const target = projects.find(p => p.id === projectId);
-    if (target) {
-      const newTasks = target.tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
-      // PUT unitaire du seul projet concerné (API réelle).
-      try {
-        await db.updateProject(recalcProject({ ...target, tasks: newTasks }));
-      } catch (error) {
-        console.error('Task move failed:', error);
-        alert('Échec de la sauvegarde (serveur injoignable ?).');
+    try {
+      if (!projectId) {
+        await db.updateStandaloneTask(taskId, { status: newStatus });
+      } else {
+        const projects = await db.getProjects();
+        const target = projects.find(p => p.id === projectId);
+        if (target) {
+          const newTasks = target.tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
+          // PUT unitaire du seul projet concerné (API réelle).
+          await db.updateProject(recalcProject({ ...target, tasks: newTasks }));
+        }
       }
+    } catch (error) {
+      console.error('Task move failed:', error);
+      alert('Échec de la sauvegarde (serveur injoignable ?).');
     }
     setSaving(false);
     await loadTasks();
@@ -378,8 +610,11 @@ const TodoList: React.FC = () => {
       if (!t.name.toLowerCase().includes(q) && !t.projectName.toLowerCase().includes(q)) return false;
     }
     if (filterSites.length) {
-      // Build a temp project-like object to reuse matchesSiteFilter
-      const fakeProject = { site: t.projectSite, sites: [t.projectSite] } as any;
+      // Réutilise `matchesSiteFilter` (qui gère les plaques) via un objet projet
+      // minimal. ⚠️ On lui passe `taskSites`, les sites RÉELS : `projectSite` est un
+      // libellé d'affichage, concaténé quand il y en a plusieurs, et il ne
+      // correspondrait à aucune valeur de site connue.
+      const fakeProject = { site: t.taskSites[0] ?? '', sites: t.taskSites } as any;
       if (!matchesSiteFilter(fakeProject, filterSites)) return false;
     }
     if (filterBrands.length && !filterBrands.some(b => t.projectBrands.includes(b))) return false;
@@ -510,6 +745,14 @@ const TodoList: React.FC = () => {
           {filteredTasks.length} tâche{filteredTasks.length !== 1 ? 's' : ''} assignée{filteredTasks.length !== 1 ? 's' : ''}
         </span>
         {saving && <span className="ml-auto text-xs text-bony-orange animate-pulse">Sauvegarde…</span>}
+        {canCreate && (
+          <button
+            onClick={() => { setEditing(null); setShowForm(true); }}
+            className={`${saving ? '' : 'ml-auto'} flex items-center gap-1.5 px-3 min-h-[44px] md:min-h-[34px] rounded-xl bg-bony-gradient text-white text-xs font-bold hover:opacity-90 transition shrink-0`}
+          >
+            <Plus size={14} /> Nouvelle tâche
+          </button>
+        )}
       </div>
 
       {/* Filter bar — desktop: always visible | mobile: collapsible */}
@@ -615,6 +858,7 @@ const TodoList: React.FC = () => {
                           colIndex={colIndex}
                           onMove={moveTask}
                           onNavigate={() => navigateToProject(task.projectId)}
+                          onEdit={() => { setEditing(task); setShowForm(true); }}
                         />
                       ))
                     )}
@@ -643,11 +887,21 @@ const TodoList: React.FC = () => {
                   colIndex={mobileCol}
                   onMove={moveTask}
                   onNavigate={() => navigateToProject(task.projectId)}
+                  onEdit={() => { setEditing(task); setShowForm(true); }}
                 />
               ));
             })()}
           </div>
         </div>
+      )}
+
+      {showForm && (
+        <StandaloneTaskForm
+          task={editing}
+          meId={user?.id ?? ''}
+          onClose={() => { setShowForm(false); setEditing(null); }}
+          onSaved={loadTasks}
+        />
       )}
     </div>
   );

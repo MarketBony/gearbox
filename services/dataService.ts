@@ -1,5 +1,5 @@
 
-import { Project, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo } from '../types';
+import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo } from '../types';
 import type { LobbyData, GameSession, GameChallenge, GameType } from '../components/games/gameTypes';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
@@ -208,6 +208,21 @@ class DataService {
   async updateProject(project: Project): Promise<Project> {
     return normalizeProject(await apiFetch(`/projects/${project.id}`, { method: 'PUT', body: JSON.stringify(project) }));
   }
+  // ---- Tâches AUTONOMES (To-do, sans projet) ----
+  // Ne concernent JAMAIS les tâches de projet, qui passent par updateProject.
+  async getStandaloneTasks(): Promise<Task[]> {
+    return apiFetch<Task[]>('/tasks');
+  }
+  async createStandaloneTask(task: Partial<Task>): Promise<Task> {
+    return apiFetch('/tasks', { method: 'POST', body: JSON.stringify(task) });
+  }
+  async updateStandaloneTask(id: string, task: Partial<Task>): Promise<Task> {
+    return apiFetch(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(task) });
+  }
+  async deleteStandaloneTask(id: string): Promise<void> {
+    await apiFetch(`/tasks/${id}`, { method: 'DELETE' });
+  }
+
   async deleteProject(id: string): Promise<void> {
     await apiFetch(`/projects/${id}`, { method: 'DELETE' });
   }

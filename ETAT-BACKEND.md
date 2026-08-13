@@ -37,6 +37,45 @@ dans Budget/FixedExpenses/Projects — voir `ETAT-PROJET.md`).
    **notifications push** — voir la section dédiée plus bas.
 10. **Notifications push** — `/api/push` (clé publique VAPID + abonnements) et
     `PushSubscription`. Voir la section dédiée.
+11. **Tâches autonomes** — `/api/tasks` CRUD, **tâches sans projet uniquement**. Voir
+    la section dédiée ci-dessous.
+
+### ✅ Tâches AUTONOMES — `/api/tasks` (06/08/2026)
+
+Migration `20260806160000_add_standalone_tasks` : `Task.projectId` devient **nullable**
+(+ `deadline String?`, `sites/brands/service String[]`).
+
+**Une tâche a désormais deux natures**, dans un **seul modèle** :
+- **tâche de projet** (`projectId` renseigné) : hérite site, marques, service et
+  échéance de son projet — d'où l'absence historique de ces colonnes ;
+- **tâche autonome** (`projectId = null`), créée depuis la To-do : n'ayant aucun projet
+  dont hériter, elle porte ces champs elle-même, plus une `deadline` propre.
+
+⚠️ **Un seul modèle et pas deux**, volontairement : dupliquer aurait recréé « le second
+chemin, plus pauvre, vers un besoin déjà couvert » du correctif 10 (rubrique Dépenses
+Ponctuelles, créée puis retirée le même jour).
+
+⚠️⚠️ **Deux chemins d'écriture, étanches, à ne jamais croiser.** Une tâche de projet
+s'écrit **exclusivement** par le diff transactionnel de `PUT /api/projects/:id` ; une
+tâche autonome **exclusivement** par `/api/tasks`. L'étanchéité n'est pas déclarative,
+elle est structurelle des deux côtés :
+- toutes les requêtes de `routes/tasks.ts` portent `projectId: null`, sans exception —
+  le PUT et le DELETE utilisent `updateMany`/`deleteMany` **et non `update` par id**,
+  de sorte qu'un id de tâche de projet envoyé là ne matche rien et rend 404 ;
+- réciproquement, le `deleteMany` du diff de `projects.ts` est borné par
+  `where: { projectId: id }`, que `null` ne matche jamais.
+
+**Pas de budget** : `cost` est absent de la liste blanche d'écriture et forcé à `0`.
+La colonne étant non-nullable, l'omettre laisserait une valeur non initialisée remonter
+dans les agrégations.
+
+⚠️ **Rôles** : `EDIT_ROLES` identique à celui de `projects.ts`. Le rôle « Site Manager »
+en est absent — **pas** parce que l'interface lui masque la rubrique To-do
+(`SITE_MANAGER_SECTIONS` ne contient pas `todo`), mais parce que masquer une rubrique
+ne ferme pas une route. C'est la leçon qui a coûté deux passes au lot du chef de site.
+
+Temps réel : `tasks:updated` / `tasks:deleted`, entrée `RT_EVENTS.tasks` distincte de
+`projects` — une mutation de l'un ne concerne pas l'autre.
 
 ### 🎮 Jeux — modèles, règles serveur et anti-triche (05/08/2026)
 

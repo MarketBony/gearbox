@@ -85,10 +85,25 @@ model Project {
   updatedAt          DateTime @updatedAt
 }
 
+// Une tâche a DEUX natures depuis le 06/08/2026 :
+//  - tâche de PROJET (`projectId` renseigné) : elle hérite du projet son site, ses
+//    marques, son service et son échéance — d'où l'absence historique de ces champs ;
+//  - tâche AUTONOME (`projectId = null`), saisie directement dans la To-do : n'ayant
+//    aucun projet dont hériter, elle porte ces champs elle-même, plus une `deadline`
+//    qui lui est propre. Elle n'a volontairement PAS de budget (`cost` reste à 0).
+// Un seul modèle et pas deux : dupliquer aurait recréé le « second chemin, plus
+// pauvre, vers un besoin déjà couvert » du correctif 10.
 model Task {
   id             String   @id @default(uuid())
-  projectId      String
-  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Nullable = tâche autonome. La relation devient donc optionnelle elle aussi.
+  projectId      String?
+  project        Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Champs propres aux tâches AUTONOMES (vides/nuls pour une tâche de projet, qui
+  // continue de tout hériter de son projet).
+  deadline       String? // 'yyyy-MM-dd' — String et non DateTime, comme User.birthdate
+  sites          String[] @default([])
+  brands         String[] @default([])
+  service        String[] @default([])
   name           String
   provider       String? // Prestataire (texte libre)
   channel        String

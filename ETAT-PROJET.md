@@ -1330,6 +1330,68 @@
     (plateau `{cells}` et non tableau nu), pas du code — vérifier son propre test avant
     d'accuser l'implémentation.
 
+35. **TO-DO — cartes compactes et tâches autonomes** (`feat/todo-taches-autonomes`,
+    6 août). Backend + frontend, **migration Prisma** → `api` **et** `web`.
+
+    **1 — Les cartes étaient trop hautes** : 5 tâches remplissaient une colonne.
+    Mesuré ~155 px. `TaskCard` (composant unique, deux points d'instanciation) passe de
+    **5 rangées empilées à 3**, sans rien retirer : projet + échéance fusionnés sur une
+    ligne, badges + coût sur une autre, `p-3` → `px-3 py-2`, `gap-2` → `gap-1.5`, nom
+    borné à 2 lignes (`line-clamp-2`) pour qu'un libellé à rallonge ne fasse plus enfler
+    la carte. **~155 → ~105 px**, soit ~8 cartes visibles au lieu de 5.
+    ⚠️ La hauteur **mobile** des chevrons n'a **pas** été réduite : ils sont déjà à
+    ~33 px, sous le seuil tactile de 44 px — l'amincir aggraverait un défaut existant.
+    Le gain porte sur le desktop, qui est ce que Théo regarde.
+
+    **2 — Créer des tâches sans projet, directement dans la To-do.** Ce que la demande
+    ne laissait pas deviner : une tâche n'a **ni date, ni site, ni marque, ni service**
+    en base, tout est hérité du projet. Une tâche sans projet doit donc les porter
+    elle-même — d'où une migration, et une route `/api/tasks` qui **n'existait pas du
+    tout** (les tâches ne transitaient que dans l'`include` des projets).
+    - **Un seul modèle `Task`, `projectId` nullable** — pas de second modèle. Décision
+      de Théo, et le projet avait déjà payé la leçon inverse au correctif 10.
+    - **Deux chemins d'écriture étanches** : `updateMany`/`deleteMany` bornés par
+      `projectId: null` côté `/api/tasks`, `where: { projectId: id }` côté diff de
+      `projects.ts`. Détail dans `ETAT-BACKEND.md`.
+    - **Pas de budget** : `cost` hors liste blanche et forcé à 0.
+    - **Règle de disparition différente, et c'est voulu** (arbitrage de Théo) : une
+      tâche autonome ne disparaît que si elle est **terminée ET sa deadline atteinte** ;
+      une tâche de projet disparaît dès que **le projet** est échu, terminée ou non. Les
+      deux natures cohabitent donc dans la même colonne avec deux comportements — à
+      savoir avant que ça ne ressorte comme un bug.
+    - Une tâche **sans deadline** n'est jamais urgente ni expirée (affichage « Sans
+      échéance ») : sans ce cas, une deadline vide produisait un `NaN`.
+    - Les champs `project*` de la carte sont **synthétisés** pour une tâche autonome à
+      partir de ses propres colonnes : filtres, tri, urgence et rendu continuent de
+      fonctionner sans être dupliqués par nature de tâche.
+    - ⚠️ **Le filtre de site lit `taskSites`, les sites RÉELS**, et non le libellé
+      d'affichage `projectSite` — qui est concaténé quand il y en a plusieurs et ne
+      correspondrait à aucune valeur de site connue.
+
+    **Retouches demandées par Théo après essai** : la liste à plat des 19 sites
+    remplacée par le **menu déroulant habituel** (plaques repliables) — en réutilisant
+    `SiteFilterDropdown`, déjà présent dans le fichier, avec un simple libellé
+    paramétrable pour que la barre de filtres reste inchangée ; et le champ « Assigné
+    à » **retiré** (une tâche créée est toujours pour soi ; l'assignation reste stockée,
+    la To-do ne montrant que ses propres tâches).
+
+    **Vérifié** : migration appliquée puis **279 tâches toutes encore rattachées à leur
+    projet, 0 orpheline**, nouvelles colonnes vides sur l'existant ; `/api/tasks` en 401
+    sans jeton et `/api/projects` toujours en 401 (pas de 500 après le passage en
+    nullable) ; `tsc` backend 0, racine 12 de référence. **Validé fonctionnellement par
+    Théo.**
+
+    ℹ️ **Conséquence assumée** : le Dashboard (charge d'équipe, campagnes programmées,
+    coût par canal et par prestataire) et l'écran Campagnes atteignent les tâches **via
+    les projets** (`projects.flatMap(p => p.tasks)`) — ils **ignorent** donc les tâches
+    autonomes. Sans impact budgétaire (elles n'ont pas de coût), mais le compteur de
+    charge d'équipe devient incomplet. À brancher dans un lot dédié si le besoin se
+    confirme.
+
+    ℹ️ **Piège d'environnement reconfirmé** : `prisma generate` échoue en `EPERM` sur
+    `query_engine-windows.dll.node` tant que l'API tourne — elle verrouille le moteur.
+    Arrêter le serveur, générer, relancer.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
@@ -1355,6 +1417,10 @@
   avec Théo connecté**, pas quelque chose que je peux solder seul — ne pas le laisser
   glisser de lot en lot pour autant, c'est le seul trou de vérification du rôle
   cloisonné.
+- **Les tâches AUTONOMES sont ignorées du Dashboard et des Campagnes** (correctif 35) :
+  ces écrans atteignent les tâches via les projets, une tâche sans projet n'y entre
+  donc pas. Charge d'équipe et campagnes programmées deviennent incomplètes. Sans
+  impact budgétaire (pas de coût sur ces tâches). À brancher si le besoin se confirme.
 - **Renommer un groupe ou changer ses membres reste invisible des autres postes**
   (overlay `gearbox_chat_overlay`). Même classe que la photo de groupe, corrigée au
   correctif 33 ; laissé hors périmètre par décision de Théo. ⚠️ Le nom donné **à la

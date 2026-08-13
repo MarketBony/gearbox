@@ -62,6 +62,16 @@ export interface Task {
   cost: number;
   status: TaskStatus;
   assignedUserId?: string;
+  // --- Tâches AUTONOMES (créées depuis la To-do, sans projet) ---
+  // Une tâche de PROJET hérite ces informations de son projet et laisse ces champs
+  // vides ; une tâche autonome n'a aucun projet dont hériter, elle les porte donc
+  // elle-même. `projectId` absent/null = tâche autonome.
+  // Pas de budget sur une tâche autonome : `cost` y vaut toujours 0.
+  projectId?: string | null;
+  deadline?: string;      // 'yyyy-MM-dd'
+  sites?: string[];
+  brands?: BrandType[];
+  service?: ServiceType[];
   // --- New Fields for Campaign Management ---
   volumetry?: number;
   openRate?: number;

@@ -29,6 +29,9 @@ import { getSocket, connectSocket } from './socket';
 // maintenir : les pages composent leurs abonnements à partir d'ici.
 export const RT_EVENTS = {
   projects: ['projects:updated', 'projects:deleted'],
+  // Tâches AUTONOMES (sans projet). Événement distinct de `projects` : elles ne
+  // transitent pas par /api/projects et une mutation de l'un ne concerne pas l'autre.
+  tasks: ['tasks:updated', 'tasks:deleted'],
   campaigns: ['campaigns:updated', 'campaigns:deleted'],
   budget: ['budget:updated', 'budget:deleted'],
   users: ['users:updated', 'users:deleted'],
