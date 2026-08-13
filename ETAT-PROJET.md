@@ -1392,6 +1392,58 @@
     `query_engine-windows.dll.node` tant que l'API tourne — elle verrouille le moteur.
     Arrêter le serveur, générer, relancer.
 
+36. **PROJETS — filtre par utilisateur, et listes de personnes limitées à l'équipe
+    marketing** (`feat/filtre-utilisateurs-projets`, 6 août). **Frontend seul**, aucune
+    migration → `web` seul.
+
+    Demande de Théo : filtrer les projets par utilisateur rattaché, et ne plus proposer
+    que des personnes « internes marketing » quand on compose l'équipe d'un projet ou
+    qu'on assigne une tâche — les listes proposaient jusque-là **tous** les comptes,
+    Guest, External et chef de site compris.
+
+    **Rôles retenus** : Master, Administrator, **Director**, Coordinator, Digital
+    Manager (`MARKETING_TEAM_ROLES` dans `constants.ts`).
+    ⚠️ **Théo n'avait pas listé Director** ; arbitré avec lui **données à l'appui** :
+    Director édite et crée des projets, et `handleCreateProject` met automatiquement le
+    créateur dans l'équipe — l'exclure aurait produit une équipe contenant quelqu'un
+    d'inéligible **dès la création**. Relevé en base au moment de l'arbitrage : 2 projets
+    et 2 tâches concernés, et **aucun** Guest / External / chef de site rattaché où que
+    ce soit — les exclure, eux, ne changeait rien.
+
+    ⚠️ **Liste d'AFFICHAGE, pas une règle de sécurité, et pas de jumeau côté serveur.**
+    L'absence est délibérée : ajouter une validation serveur ferait **échouer la
+    sauvegarde des projets existants** (aucune migration des données n'a été faite),
+    donc casserait l'édition de projets légitimes. Consigné dans `constants.ts` pour
+    qu'une session future ne « complète » pas la règle en croyant bien faire.
+
+    ⚠️⚠️ **Les deux vrais pièges du lot, tous deux liés au même principe : on restreint
+    les listes de CHOIX, jamais la liste de RÉSOLUTION.**
+    1. `users` n'est **pas** filtré — c'est lui qui résout les membres déjà rattachés.
+       L'avoir filtré aurait fait **disparaître de l'affichage** un membre hors liste
+       **tout en le laissant en base** : invisible, et impossible à retirer.
+    2. Le sélecteur d'assigné d'une tâche **réinjecte l'assigné courant** même hors
+       liste. Sans ça, `Select` ne trouvait pas sa valeur et affichait « — Non assigné — »
+       **avec l'avatar de la personne juste à côté** ; quelqu'un aurait « corrigé »
+       l'affichage en choisissant un autre nom et **écrasé l'assignation réelle**.
+       C'était le seul vrai vecteur de perte de données.
+
+    **UI, deuxième passe après retour de Théo** (« l'UI est vraiment dégueulasse ») : le
+    filtre était d'abord une puce par personne, ce qui mangeait quatre lignes du panneau.
+    Refait en **menu déroulant** décalqué sur `ProjSitePicker` (même `FloatingPanel`,
+    même recherche) plutôt qu'en inventant un troisième style de filtre. Le déclencheur
+    nomme la personne quand il n'y en a qu'une.
+    Corrigé dans la foulée : les pickers Périmètre / Marques / Services réaffichaient
+    **leur propre libellé** alors que le panneau en pose déjà un au-dessus de chaque
+    bloc — « PÉRIMÈTRE / Périmètre », « MARQUES / Marque »… Quatre lignes de texte
+    redondantes retirées. Défaut préexistant, sans rapport avec l'ajout.
+
+    ℹ️ **Erreur commise et corrigée en route, à retenir** : en retirant ces libellés,
+    un commentaire `{/* */}` s'est retrouvé **avant l'élément racine d'un `return`** —
+    ce n'est pas du JSX valide (on n'est pas encore dans du JSX à cet endroit), et Vite
+    a refusé de recompiler `Projects.tsx`. **Deuxième occurrence du même motif dans la
+    même journée** (déjà rencontré sur le modal d'avatar de groupe). Un commentaire
+    au-dessus du `return` s'écrit `//`, pas `{/* */}`.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
