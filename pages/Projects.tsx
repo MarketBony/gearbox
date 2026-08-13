@@ -5,7 +5,7 @@ import { Project, Task, TaskStatus, ServiceType, PlaqueName, Site, BrandType, Pr
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
-import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, PROJECT_TYPES, TASK_CHANNELS, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, ALPINE_SITES, NISSAN_SITES, RDM_BRANDS } from '../constants';
+import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, PROJECT_TYPES, TASK_CHANNELS, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, ALPINE_SITES, NISSAN_SITES, RDM_BRANDS, isMarketingRole } from '../constants';
 import {
     Plus, Save, Trash2, FolderKanban, CheckCircle2, Circle, PlayCircle,
     CalendarCheck, Coins, TrendingUp, TrendingDown, Search, Filter, X,
@@ -149,8 +149,9 @@ const ProjSitePicker: React.FC<ProjSitePickerProps> = ({ selected, onChange }) =
 
     return (
         <div ref={triggerRef} className="relative">
+            {/* Pas de libellé ici : le panneau de filtres en pose déjà un au-dessus
+                de chaque bloc, on affichait donc « PÉRIMÈTRE » deux fois de suite. */}
             <div className="flex flex-col">
-                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Périmètre</span>
                 <button onClick={handleOpen} className="flex items-center gap-1.5 text-xs font-bold text-bony-orange hover:text-bony-violet transition whitespace-nowrap">
                     {triggerLabel}
                     <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -215,9 +216,9 @@ interface ProjBrandPickerProps { selected: BrandType[]; onChange: (v: BrandType[
 const ProjBrandPicker: React.FC<ProjBrandPickerProps> = ({ selected, onChange }) => {
     const isAll = selected.length === 0;
     const toggle = (b: BrandType) => onChange(selected.includes(b) ? selected.filter(x => x !== b) : [...selected, b]);
+    // Libellé retiré : le panneau de filtres affiche déjà « Marques » juste au-dessus.
     return (
         <div className="flex flex-col gap-1">
-            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Marque</span>
             <div className="flex flex-wrap gap-1.5">
                 <button onClick={() => onChange([])} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${isAll ? 'bg-bony-gradient border-transparent text-white shadow' : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'}`}>Toutes</button>
                 {PROJ_BRAND_CHIPS.map(b => {
@@ -236,9 +237,9 @@ interface ProjServicePickerProps { selected: ServiceType[]; onChange: (v: Servic
 const ProjServicePicker: React.FC<ProjServicePickerProps> = ({ selected, onChange }) => {
     const isAll = selected.length === 0;
     const toggle = (s: ServiceType) => onChange(selected.includes(s) ? selected.filter(x => x !== s) : [...selected, s]);
+    // Libellé retiré : le panneau de filtres affiche déjà « Services » juste au-dessus.
     return (
         <div className="flex flex-col gap-1">
-            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Service</span>
             <div className="flex flex-wrap gap-1.5">
                 <button onClick={() => onChange([])} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${isAll ? 'bg-bony-gradient border-transparent text-white shadow' : 'bg-transparent border-bony-border text-slate-500 hover:border-bony-orange/50 dark:hover:text-white hover:text-slate-900'}`}>Tous</button>
                 {PROJ_SERVICE_CHIPS.map(s => {
@@ -248,6 +249,68 @@ const ProjServicePicker: React.FC<ProjServicePickerProps> = ({ selected, onChang
                     );
                 })}
             </div>
+        </div>
+    );
+};
+
+// Filtre « Utilisateur rattaché ».
+// ⚠️ En DROPDOWN et non en puces comme les marques et les services : une puce par
+// personne occupait quatre lignes du panneau à elle seule, et la liste grandit avec
+// l'équipe alors que marques et services sont des listes courtes et figées. On décalque
+// donc `ProjSitePicker` (même FloatingPanel, même recherche, mêmes conventions
+// visuelles) plutôt que d'inventer un troisième style de filtre.
+// ⚠️ Ne propose que l'ÉQUIPE MARKETING (voir MARKETING_TEAM_ROLES) : proposer un Guest
+// ou un chef de site n'aurait aucun sens, ils ne sont jamais rattachés à un projet.
+// La liste reçue est déjà filtrée par l'appelant, pour ne pas refaire le test ici.
+interface ProjUserPickerProps { users: User[]; selected: string[]; onChange: (v: string[]) => void; }
+const ProjUserPicker: React.FC<ProjUserPickerProps> = ({ users, selected, onChange }) => {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const triggerRef = useRef<HTMLDivElement>(null);
+
+    const isAll = selected.length === 0;
+    const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]);
+    const visibles = users.filter(u => !search || u.name.toLowerCase().includes(search.toLowerCase()));
+
+    // Un seul sélectionné : on nomme la personne plutôt que d'afficher « 1 utilisateur ».
+    const triggerLabel = isAll
+        ? 'Tous les utilisateurs'
+        : selected.length === 1
+            ? (users.find(u => u.id === selected[0])?.name ?? '1 utilisateur')
+            : `${selected.length} utilisateurs`;
+
+    return (
+        <div ref={triggerRef} className="relative">
+            <div className="flex flex-col">
+                <button onClick={() => setOpen(v => !v)} className="flex items-center gap-1.5 text-xs font-bold text-bony-orange hover:text-bony-violet transition whitespace-nowrap">
+                    {triggerLabel}
+                    <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
+            </div>
+            <FloatingPanel open={open} onClose={() => setOpen(false)} triggerRef={triggerRef} width={256} maxHeight={340} className="rounded-xl">
+                <div className="p-2 border-b border-bony-border shrink-0">
+                    <div className="flex items-center gap-2 bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5">
+                        <Search size={13} className="text-slate-500 shrink-0" />
+                        <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher une personne…" className="flex-1 bg-transparent text-xs text-bony-text outline-none placeholder-bony-muted" />
+                        {search && <button onClick={() => setSearch('')}><X size={12} className="text-slate-400" /></button>}
+                    </div>
+                </div>
+                <div className="flex gap-1 px-2 py-1.5 border-b border-bony-border shrink-0">
+                    <button onClick={() => onChange([])} className={`flex-1 text-[10px] font-bold py-1 rounded transition ${isAll ? 'bg-bony-orange/20 text-bony-orange border border-bony-orange/40' : 'text-slate-500 hover:text-bony-text hover:bg-white/5'}`}>Tous les utilisateurs</button>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar py-1">
+                    {visibles.length === 0 && (
+                        <div className="px-3 py-4 text-center text-[11px] text-slate-500">Aucune personne trouvée.</div>
+                    )}
+                    {visibles.map(u => (
+                        <button key={u.id} onClick={() => toggle(u.id)} className="w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-white/5 transition">
+                            <Avatar userId={u.id} name={u.name} color={u.avatarColor} size={20} />
+                            <span className={`flex-1 text-left truncate min-w-0 ${selected.includes(u.id) ? 'text-bony-text font-bold' : 'text-slate-500'}`}>{u.name}</span>
+                            {selected.includes(u.id) && <Check size={12} className="text-bony-orange shrink-0" />}
+                        </button>
+                    ))}
+                </div>
+            </FloatingPanel>
         </div>
     );
 };
@@ -333,11 +396,20 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const [filterSites, setFilterSites] = useSessionState<string[]>(`projects_${viewMode}_filterSites`, []);
   const [filterBrands, setFilterBrands] = useSessionState<BrandType[]>(`projects_${viewMode}_filterBrands`, []);
   const [filterServices, setFilterServices] = useSessionState<ServiceType[]>(`projects_${viewMode}_filterServices`, []);
+  const [filterUsers, setFilterUsers] = useSessionState<string[]>(`projects_${viewMode}_filterUsers`, []);
   const [filterType, setFilterType] = useSessionState<ProjectType | 'All'>(`projects_${viewMode}_filterType`, 'All');
   const [filterStatus, setFilterStatus] = useSessionState<string>(`projects_${viewMode}_filterStatus`, 'All');
   const [filterDateFrom, setFilterDateFrom] = useSessionState<string>(`projects_${viewMode}_filterDateFrom`, '');
   const [filterDateTo, setFilterDateTo] = useSessionState<string>(`projects_${viewMode}_filterDateTo`, '');
   const [sortOrder, setSortOrder] = useSessionState<'asc' | 'desc'>(`projects_${viewMode}_sortOrder`, 'desc');
+
+  // Équipe marketing : la seule liste PROPOSÉE au choix (filtre, ajout à l'équipe,
+  // assignation d'une tâche).
+  // ⚠️ NE JAMAIS filtrer `users` lui-même : c'est lui qui RÉSOUT les personnes déjà
+  // rattachées. Un membre d'équipe dont le rôle sortirait de la liste disparaîtrait
+  // alors de l'affichage tout en restant en base — invisible et impossible à retirer.
+  // On restreint donc les listes de CHOIX, jamais la liste de RÉSOLUTION.
+  const marketingUsers = useMemo(() => users.filter(u => isMarketingRole(u.role)), [users]);
 
   const scrollRef = useScrollRestore(`projects_${viewMode}`);
 
@@ -677,6 +749,14 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
             if (!hasBrand) return false;
         }
 
+        // Utilisateurs rattachés : OU entre les personnes sélectionnées (un projet
+        // remonte s'il compte AU MOINS un des utilisateurs choisis), comme les filtres
+        // marque et service juste au-dessus.
+        if (filterUsers.length > 0) {
+            const equipe = p.assignedUsers || [];
+            if (!filterUsers.some(id => equipe.includes(id))) return false;
+        }
+
         if (filterType !== 'All' && p.projectType !== filterType) return false;
         if (filterStatus !== 'All' && p.status !== filterStatus) return false;
 
@@ -696,7 +776,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
         return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
     });
 
-  }, [projects, viewMode, searchTerm, filterSites, filterServices, filterBrands, filterType, filterStatus, filterDateFrom, filterDateTo, sortOrder]);
+  }, [projects, viewMode, searchTerm, filterSites, filterServices, filterBrands, filterUsers, filterType, filterStatus, filterDateFrom, filterDateTo, sortOrder]);
 
   const budgetVariance = selectedProject ? (selectedProject.budgetPlanned - selectedProject.budgetActual) : 0;
   const isUnderBudget = budgetVariance >= 0;
@@ -704,7 +784,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
     ? Math.abs((budgetVariance / selectedProject.budgetPlanned) * 100).toFixed(1) 
     : '0.0';
 
-  const activeFilterCount = filterSites.length + filterBrands.length + filterServices.length
+  const activeFilterCount = filterSites.length + filterBrands.length + filterServices.length + filterUsers.length
       + (filterType !== 'All' ? 1 : 0) + (filterStatus !== 'All' ? 1 : 0)
       + (filterDateFrom ? 1 : 0) + (filterDateTo ? 1 : 0);
 
@@ -713,6 +793,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
       setFilterSites([]);
       setFilterBrands([]);
       setFilterServices([]);
+      setFilterUsers([]);
       setFilterType('All');
       setFilterStatus('All');
       setFilterDateFrom('');
@@ -873,6 +954,12 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                 <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Services</label>
                     <ProjServicePicker selected={filterServices} onChange={setFilterServices} />
+                </div>
+
+                {/* Utilisateurs rattachés */}
+                <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Utilisateurs</label>
+                    <ProjUserPicker users={marketingUsers} selected={filterUsers} onChange={setFilterUsers} />
                 </div>
 
                 {/* Type + Statut */}
@@ -1295,7 +1382,12 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                             {/* TEAM SECTION */}
                             {(() => {
                                 const assignedIds = selectedProject.assignedUsers || [];
-                                const unassignedUsers = users.filter(u => !assignedIds.includes(u.id));
+                                // ⚠️ `unassignedUsers` (ce qu'on PROPOSE d'ajouter) est restreint à
+                                // l'équipe marketing, mais `allUsers` (ce qui RÉSOUT les membres déjà
+                                // en place) reste complet : un membre hors liste continue donc de
+                                // s'afficher et de pouvoir être retiré, au lieu de disparaître
+                                // silencieusement en restant en base.
+                                const unassignedUsers = marketingUsers.filter(u => !assignedIds.includes(u.id));
                                 return (
                                     <TeamSection
                                         assignedIds={assignedIds}
@@ -1576,7 +1668,20 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                             disabled={!canEdit}
                                                             onChange={(v) => updateTask(task.id, 'assignedUserId', v || undefined)}
                                                             placeholder="— Non assigné —"
-                                                            options={[{ value: '', label: '— Non assigné —' }, ...users.map(u => ({ value: u.id, label: u.name }))]}
+                                                            // ⚠️ L'assigné COURANT est réinjecté même si son rôle n'est plus
+                                                            // dans l'équipe marketing. Sans ça, `Select` ne trouve pas la
+                                                            // valeur dans ses options et affiche « — Non assigné — » alors
+                                                            // que la tâche EST assignée — avec l'avatar de la personne juste
+                                                            // à côté. Quelqu'un « corrigerait » cet affichage en choisissant
+                                                            // un autre nom, et écraserait l'assignation réelle : c'est le
+                                                            // seul vrai vecteur de perte de données de ce lot.
+                                                            options={[
+                                                                { value: '', label: '— Non assigné —' },
+                                                                ...(task.assignedUserId && !marketingUsers.some(u => u.id === task.assignedUserId)
+                                                                    ? users.filter(u => u.id === task.assignedUserId)
+                                                                    : []),
+                                                                ...marketingUsers,
+                                                            ].map(o => ('id' in o ? { value: o.id, label: o.name } : o))}
                                                         />
                                                     </div>
                                                 </div>

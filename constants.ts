@@ -473,6 +473,41 @@ export const GAMES_ALLOWED_ROLES: string[] = [
 ];
 
 // ============================================================================
+// ÉQUIPE MARKETING — qui peut être RATTACHÉ à un projet ou à une tâche (06/08/2026)
+//
+// Sert à trois endroits de `pages/Projects.tsx` : le filtre « Utilisateur », le
+// dropdown d'ajout à l'équipe d'un projet, et le sélecteur d'assigné d'une tâche.
+// Avant, ces listes proposaient TOUS les comptes — y compris Guest, External et
+// chef de site, qui n'ont rien à faire dans une équipe projet.
+//
+// ⚠️ **Director EST inclus**, contrairement à `GAMES_ALLOWED_ROLES` juste au-dessus.
+// Ce n'est pas une incohérence : il édite et crée des projets, et `handleCreateProject`
+// met automatiquement le créateur dans l'équipe — l'exclure aurait produit des équipes
+// contenant quelqu'un d'inéligible dès la création. Arbitré avec Théo le 06/08/2026,
+// données à l'appui (2 projets et 2 tâches concernés en base).
+//
+// ⚠️ **Liste d'AFFICHAGE, pas une règle de sécurité**, et c'est délibéré : il n'existe
+// pas de contrôle serveur équivalent. En ajouter un rejetterait les projets existants
+// à la sauvegarde (aucune migration des données n'a été faite), ce qui casserait
+// l'édition de projets légitimes. C'est pourquoi il n'y a pas de jumeau dans
+// `backend/src/auth/roles.ts` — l'absence est voulue, ne pas la « corriger ».
+//
+// ⚠️ Le contenu ressemble à celui des `EDIT_ROLES` de `routes/projects.ts` : c'est une
+// COÏNCIDENCE de valeurs, pas la même règle (« qui peut éditer » ≠ « qui peut être
+// rattaché »). Ne pas les aliaser l'une sur l'autre.
+// ============================================================================
+export const MARKETING_TEAM_ROLES: string[] = [
+  'Master',
+  'Administrator',
+  'Director',
+  'Coordinator',
+  'Digital Manager',
+];
+
+export const isMarketingRole = (role?: string): boolean =>
+  !!role && MARKETING_TEAM_ROLES.includes(role);
+
+// ============================================================================
 // RÔLE « CHEF DE SITE » (Site Manager) — 05/08/2026
 //
 // Premier rôle dont les droits dépendent d'une DONNÉE du compte (`user.sites`) et
