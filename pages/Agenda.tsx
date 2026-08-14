@@ -7,6 +7,7 @@ import { Project, ServiceType, BrandType, ProjectType } from '../types';
 import { SERVICE_COLORS, BRANDS, SERVICES, PROJECT_TYPES, BRAND_COLORS } from '../constants';
 import { ChevronLeft, ChevronRight, Calendar, Filter, X } from 'lucide-react';
 import Select from '../components/Select';
+import ProjectSummary from '../components/ProjectSummary';
 import CalendarGrid, { EventRenderMeta } from '../components/calendar/CalendarGrid';
 import EventBar from '../components/calendar/EventBar';
 import { serviceAccent } from '../components/calendar/calendarShared';
@@ -87,36 +88,11 @@ const navigateToProject = (project: Project) => {
     }));
 };
 
-/** Contenu du tooltip projet — partagé entre la timeline (ProjectPill) et la grille. */
-const ProjectTooltipContent: React.FC<{ project: Project }> = ({ project }) => (
-    <>
-        <div className="flex justify-between items-start mb-2">
-            <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-tight">{project.name}</h4>
-            <span className="text-[10px] bg-slate-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-300">{project.progress}%</span>
-        </div>
-        <div className="space-y-2 mb-3">
-            <div className="flex flex-wrap gap-1">
-                <span className="text-[9px] bg-blue-100 dark:bg-bony-blue/20 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-bony-blue/30 px-1.5 rounded">{project.site}</span>
-                <span className="text-[9px] bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-300 border border-slate-200 dark:border-white/10 px-1.5 rounded">{project.projectType}</span>
-            </div>
-            <div className="flex flex-wrap gap-1">
-                {project.brands?.map(b => (
-                    <span key={b} className={`text-[8px] px-1.5 rounded border ${BRAND_COLORS[b]}`}>{b}</span>
-                ))}
-            </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-[10px] border-t border-bony-border pt-2">
-            <div>
-                <span className="block text-slate-500 font-bold uppercase">Dates</span>
-                <span className="text-slate-800 dark:text-white font-sans">{formatDateRange(project.startDate, project.endDate)}</span>
-            </div>
-            <div>
-                <span className="block text-slate-500 font-bold uppercase">Budget</span>
-                <span className="text-slate-800 dark:text-white font-sans">{project.budgetActual} €</span>
-            </div>
-        </div>
-    </>
-);
+/** Contenu du tooltip projet — partagé entre la timeline (ProjectPill) et la grille.
+ *  Définition unique dans `components/ProjectSummary.tsx` depuis le 06/08/2026 : le
+ *  Chat s'en sert aussi pour les projets cités. Cet alias garde les appels d'ici
+ *  inchangés. */
+const ProjectTooltipContent = ProjectSummary;
 
 const ProjectPill: React.FC<{ 
     project: Project; 

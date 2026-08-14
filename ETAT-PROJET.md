@@ -1444,12 +1444,106 @@
     même journée** (déjà rencontré sur le modal d'avatar de groupe). Un commentaire
     au-dessus du `return` s'écrit `//`, pas `{/* */}`.
 
+37. **CHAT — liens cliquables, GIF, projets cités** (`feat/chat-liens-gif-projets`,
+    6 août). Backend + frontend, **aucune migration** → `api` **et** `web`.
+    **Lot 1 sur 2** : les vocaux et les aperçus de liens suivront (voir le backlog).
+
+    **Liens cliquables.** Le contenu d'un message était rendu en `{msg.content}` brut :
+    sûr (React échappe le texte), mais aucune URL n'était cliquable. Nouvel utilitaire
+    `lib/richText.tsx`.
+    ⚠️ **Jamais de HTML, uniquement des éléments React.** Le chat affiche du texte écrit
+    par un utilisateur et rendu chez tous les autres — c'est le scénario type d'une XSS
+    stockée. **Ne pas introduire `dangerouslySetInnerHTML` dans ce fichier**, quelle que
+    soit la tentation (markdown, gras…) ; il n'y en a aujourd'hui aucun dans le dépôt.
+    ⚠️ Schéma restreint à `http`/`https` : un `javascript:` cliquable serait une XSS.
+
+    **⚠️ Deux défauts de mon propre linkify, trouvés en test — la leçon du lot.**
+    La première version cherchait des motifs **à l'intérieur** du texte :
+    1. Signalé par Théo : le clavier GIF de Windows colle un chemin
+       `file:///C:/Users/…/MicrosoftWindows.Client.CBS_…/x.gif`, dont le fragment
+       `MicrosoftWindows.Client.CBS` était pris pour un domaine et transformé en lien —
+       d'où une fenêtre qui s'ouvrait au lieu du GIF.
+    2. Trouvé par le test unitaire : « j'ai mis **rapport.pdf** dans le dossier »
+       fabriquait un lien vers `https://rapport.pdf`. Un nom de fichier ressemble à un
+       domaine.
+    → Réécrit pour analyser des **jetons entiers** (délimités par des espaces) et non
+    des motifs internes : un chemin est rejeté en bloc dès son schéma, et les
+    terminaisons de fichier connues sont exclues quand le jeton n'a ni schéma ni chemin
+    (`https://site.fr/rapport.pdf` reste donc un lien). **12 cas de contrôle**, dont les
+    chemins Windows en antislash, `javascript:` et `data:`.
+
+    **GIF.** L'audit a montré qu'un `.gif` **déposé en fichier fonctionnait déjà**
+    (accepté à l'upload, servi inline, affiché animé). Ce qui manquait : le GIF collé
+    sous forme d'**URL**, désormais rendu comme image quand le message ne contient que
+    ça. Détection faite **sur l'URL, côté client, sans aucune requête serveur** — aller
+    vérifier le type réel supposerait que le serveur fetche une URL fournie par un
+    utilisateur, c'est-à-dire ouvrir une surface SSRF.
+    ⚠️ **Le clavier GIF de Windows restera impossible à supporter tel quel** : il ne met
+    pas l'image dans le presse-papiers, il télécharge le fichier et colle son chemin
+    **local**, qui ne désigne rien chez les autres — et un navigateur interdit à une page
+    de lire un fichier local. Ce n'est pas une limite de Gearbox. Le collage d'un tel
+    chemin est donc **intercepté et expliqué** plutôt que laissé filer en message mort.
+    La vraie réponse est un bouton GIF avec recherche intégrée → lot 2.
+    ℹ️ **Choix volontaire : le collage n'est PAS détourné.** Le plan prévoyait d'envoyer
+    d'office une URL d'image collée ; abandonné en codant — ça empêche d'accompagner un
+    GIF d'un commentaire, et un envoi déclenché par un collage est déroutant.
+
+    **Projets cités.** 3ᵉ icône dans la barre de saisie, liste des projets **actifs**
+    (`status === 'Active'` + échéance non dépassée, même définition que la To-do) avec
+    recherche, et envoi d'une carte cliquable qui ouvre le projet.
+    - L'aperçu de l'Agenda (`ProjectTooltipContent`) a été **extrait** vers
+      `components/ProjectSummary.tsx` et est désormais **importé par les deux écrans** —
+      une seule définition, pas une copie. L'Agenda garde un alias pour ne pas toucher
+      ses appels.
+    - Le **nom du projet est résolu côté serveur** pour `lastMessage` : sans ça, l'id
+      brut serait apparu dans la liste des conversations **et dans la notification
+      push**.
+    - ⚠️ **Cloisonnement `External`** : ce rôle a le Chat mais **pas** les Projets
+      (`EXTERNAL_ALLOWED_TABS`). Or la carte montre site, marques, dates, avancement
+      **et budget**. Il ne voit donc qu'un libellé « Projet cité », et l'icône de
+      citation lui est masquée.
+
+    ℹ️ **Défaut PRÉEXISTANT signalé à Théo, non corrigé ici** : `GET /api/projects` n'a
+    **aucun** contrôle de rôle (`authenticateToken` seul). Un External ou un Guest peut
+    donc déjà lire tous les projets par l'API — l'interface les masque, la route non.
+    Même motif que le lot du chef de site. À traiter dans un lot dédié, avec l'inventaire
+    des rôles qui doivent lire les projets. Voir le backlog.
+
+    **Vérifié** : `tsc` backend 0 et racine 12 de référence ; 12 cas unitaires sur le
+    linkify. **Validé fonctionnellement par Théo**, qui a signalé le défaut du chemin
+    Windows — corrigé et revalidé.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
 > l'historique des correctifs ci-dessus et dans `BUGS-CONNUS.md`.
 
 ### Fonctionnel / produit
+- **CHAT — LOT 2, décidé et cadré avec Théo le 06/08/2026** (le lot 1 est le correctif 37) :
+  1. **Bouton GIF avec recherche** — la vraie réponse au clavier GIF de Windows, qui ne
+     peut pas fonctionner (il colle un chemin local, cf. correctif 37). Fournisseur
+     retenu : **Tenor** (API Google, palier gratuit, filtrage de contenu intégré et
+     paramétrable). Implique une clé d'API et des requêtes sortantes → même précaution
+     que le proxy de flux : **la clé reste côté serveur**, le client ne l'atteint jamais.
+     ⚠️ Piège de configuration connu : une variable doit être valorisée dans le `.env`
+     du VPS **ET** déclarée dans le bloc `environment:` du service `api` de
+     `docker-compose.yml` (leçon des clés VAPID, correctif 20).
+  2. **Messages vocaux** — `MediaRecorder` → upload par le chemin `chat` existant →
+     type `audio`. Purge à **180 jours** comme les autres pièces jointes (arbitrage de
+     Théo). ⚠️ **Deux bloquants déjà identifiés** : les extensions audio ne sont pas
+     dans `EXT_AFFICHABLES` (`backend/src/index.ts`) donc servies en
+     `Content-Disposition: attachment`, **illisibles par un `<audio>`** ; et le filtre
+     de `purgeOldChatFiles` est `type: { in: ['image','file'] }` — sans `'audio'`, les
+     vocaux **ne seraient jamais purgés**. Reste à vérifier le `Permissions-Policy` du
+     Caddyfile et le cas PWA iOS.
+  3. **Aperçu de liens sur LISTE BLANCHE de domaines** (YouTube, SharePoint/Microsoft,
+     + ceux que Théo ajoutera). Décision explicite : pas de fetch d'URL arbitraire, pour
+     ne pas rouvrir la surface SSRF que le proxy de flux a été conçu pour fermer.
+- **`GET /api/projects` n'a aucun contrôle de rôle** (`authenticateToken` seul) : un
+  `External` ou un `Guest` peut lire tous les projets par l'API alors que l'interface
+  les leur masque. Découvert le 06/08 en préparant les projets cités dans le chat.
+  Même motif que le lot du chef de site — masquer une rubrique ne ferme pas une route.
+  Demande un inventaire préalable des rôles qui doivent lire les projets.
 - **Campagnes et « Performance des campagnes » restent VIDES.** Ce n'est pas un bug :
   ces écrans dérivent des tâches au canal `SMS` ou `E-mail`, or le fichier source de
   l'import ne portait pas le canal — les 247 tâches importées l'ont vide. Chantier
