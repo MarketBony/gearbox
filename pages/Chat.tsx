@@ -1,6 +1,9 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ChatConversation, ChatMessage, User } from '../types';
+import { ChatConversation, ChatMessage, User, Project } from '../types';
+import FloatingPanel from '../components/FloatingPanel';
+import ProjectSummary from '../components/ProjectSummary';
+import { renduTexteRiche, messageEstImageDistante, estCheminLocalImage } from '../lib/richText';
 import { db, ApiError } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { getSocket, connectSocket, emitWithAck } from '../services/socket';
@@ -10,7 +13,8 @@ import {
   MessageSquare, Plus, Send, Star, StarOff, ArrowLeft,
   MoreHorizontal, Pencil, Trash2, X, Image, Reply, Check,
   Users, UserPlus, UserMinus, ChevronRight, Hash, Camera, Upload, ZoomIn,
-  Bell, BellOff, Paperclip, FileText, FileX, Download, SmilePlus
+  Bell, BellOff, Paperclip, FileText, FileX, Download, SmilePlus,
+  FolderKanban, Search, ExternalLink
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import Cropper from 'react-easy-crop';
@@ -36,6 +40,28 @@ const AVATAR_INPUT_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'
 // Plafond de hauteur de la barre de saisie, en phase avec la classe `max-h-32`
 // (8rem) du textarea : au-delà, le champ défile au lieu de continuer à grandir.
 const MAX_INPUT_HEIGHT = 128;
+
+// Une image distante ne s'affiche comme image que pour un message de type 'text' :
+// un message 'image'/'file' porte déjà une URL /uploads/ traitée par sa propre branche,
+// et un message expiré ne doit rien afficher du tout.
+const imageDistante = (msg: ChatMessage): string | null =>
+  msg.type === 'text' && !msg.fileExpiredAt ? messageEstImageDistante(msg.content) : null;
+
+// Résumé d'un message sur UNE ligne — aperçu de réponse et barre « répondre à ».
+// ⚠️ Le pendant SERVEUR de cette fonction est `lastMessage` dans
+// `backend/src/realtime/chat.ts`, qui sert aussi de corps aux notifications push :
+// tout nouveau type doit être traité AUX DEUX ENDROITS, sinon l'un des deux affiche
+// le contenu brut (une URL de fichier, ou pire un id de projet).
+const resumeMessage = (msg: ChatMessage, projets: Project[], max = 60): string => {
+  if (msg.type === 'image') return '📷 Image';
+  if (msg.type === 'file') return `📎 ${msg.fileName ?? 'Pièce jointe'}`;
+  if (msg.type === 'project') {
+    const p = projets.find(x => x.id === msg.content);
+    return `📋 ${p?.name ?? 'Projet'}`;
+  }
+  if (imageDistante(msg)) return '📷 GIF';
+  return msg.content.slice(0, max);
+};
 
 // Poids lisible pour l'affichage d'une pièce jointe.
 const formatPoids = (octets?: number): string => {
@@ -174,6 +200,62 @@ const SectionLabel: React.FC<{ label: string }> = ({ label }) => (
     <span className="text-[9px] font-bold text-bony-muted uppercase tracking-widest">{label}</span>
   </div>
 );
+
+// --- Carte d'un projet cité dans une conversation ---
+// ⚠️⚠️ CLOISONNEMENT : le rôle `External` a accès au Chat mais PAS aux Projets
+// (`EXTERNAL_ALLOWED_TABS` dans App.tsx : digital, chat, hello-marketing). Or cet
+// aperçu montre le site, les marques, les dates, l'avancement ET LE BUDGET du projet.
+// Une conversation où figure un intervenant externe lui livrerait donc des données
+// que son interface lui refuse. On ne lui montre qu'un libellé neutre, et la carte
+// n'est pas cliquable pour lui — la garde de routage d'`App.tsx` le renverrait de
+// toute façon sur `digital`.
+// ℹ️ Ce n'est PAS un cloisonnement complet : `GET /api/projects` n'a aucun contrôle
+// de rôle, donc un External peut déjà lire les projets par l'API. Défaut préexistant,
+// signalé à Théo, à traiter dans un lot dédié — ici on évite au moins de le lui
+// servir spontanément dans l'interface.
+const ProjectChatCard: React.FC<{ projectId: string; projects: Project[] }> = ({ projectId, projects }) => {
+  const { user } = useAuth();
+  const estExterne = user?.role === 'External';
+  const projet = projects.find(p => p.id === projectId);
+
+  if (estExterne) {
+    return (
+      <div className="px-3 py-2 rounded-xl border border-dashed border-bony-border bg-bony-panel/60 flex items-center gap-2 max-w-[260px]">
+        <FolderKanban size={16} className="text-bony-muted shrink-0" />
+        <p className="text-[11px] font-bold text-bony-muted">Projet cité</p>
+      </div>
+    );
+  }
+
+  // Projet introuvable : supprimé depuis, ou hors du périmètre renvoyé par l'API.
+  // On l'annonce au lieu d'afficher une carte vide.
+  if (!projet) {
+    return (
+      <div className="px-3 py-2 rounded-xl border border-dashed border-bony-border bg-bony-panel/60 flex items-center gap-2 max-w-[260px]">
+        <FolderKanban size={16} className="text-bony-muted shrink-0" />
+        <p className="text-[11px] font-bold text-bony-muted">Projet introuvable</p>
+      </div>
+    );
+  }
+
+  const ouvrir = () => {
+    window.sessionStorage.setItem('pendingProjectId', projet.id);
+    window.dispatchEvent(new CustomEvent('gearbox-navigate', { detail: { tab: 'projects', projectId: projet.id } }));
+  };
+
+  return (
+    <button
+      onClick={ouvrir}
+      title="Ouvrir le projet"
+      className="text-left w-[260px] max-w-full px-3 py-2.5 rounded-xl border border-bony-border bg-bony-panel hover:border-bony-orange/60 transition-colors"
+    >
+      <ProjectSummary project={projet} />
+      <span className="mt-2 flex items-center gap-1 text-[10px] font-bold text-bony-orange">
+        <ExternalLink size={11} /> Ouvrir le projet
+      </span>
+    </button>
+  );
+};
 
 // --- Crop helper (circular, 200×200) ---
 interface CropArea { x: number; y: number; width: number; height: number; }
@@ -434,6 +516,36 @@ const Chat: React.FC = () => {
   // sélectionnable dans une conversation sans rechargement.
   useRealtimeSync(RT_EVENTS.users, () => { db.getUsers().then(setUsers).catch(() => {}); });
 
+  // Projets — servent à DEUX choses : alimenter le sélecteur « citer un projet », et
+  // résoudre le nom/les infos d'une carte déjà envoyée (le message ne stocke qu'un id).
+  // ⚠️ Chargé pour TOUT le monde, y compris un External : sinon une carte reçue
+  // resterait « Projet introuvable » chez lui alors qu'on veut afficher un libellé
+  // neutre explicite. La restriction d'affichage est dans `ProjectChatCard`, pas ici.
+  // L'échec est silencieux : le chat doit rester utilisable même si /api/projects
+  // refuse ou tombe.
+  const [projets, setProjets] = useState<Project[]>([]);
+  const [showProjetPicker, setShowProjetPicker] = useState(false);
+  const [rechercheProjet, setRechercheProjet] = useState('');
+  const projetBtnRef = useRef<HTMLDivElement>(null);
+  const chargerProjets = useCallback(() => {
+    db.getProjects().then(setProjets).catch(() => setProjets([]));
+  }, []);
+  useEffect(() => { chargerProjets(); }, [chargerProjets]);
+  useRealtimeSync(RT_EVENTS.projects, chargerProjets);
+
+  // Projets proposés à la citation : les ACTIFS, même définition que la To-do
+  // (`status === 'Active'` et échéance non dépassée) — citer un projet clos ou en
+  // brouillon n'a pas de sens. Tri par échéance la plus proche, comme la To-do.
+  const projetsActifs = useMemo(() => {
+    const aujourdhui = new Date().toISOString().split('T')[0];
+    const q = rechercheProjet.trim().toLowerCase();
+    return projets
+      .filter(p => p.status === 'Active' && p.endDate >= aujourdhui)
+      .filter(p => !q || p.name.toLowerCase().includes(q) || (p.site ?? '').toLowerCase().includes(q))
+      .sort((a, b) => a.endDate.localeCompare(b.endDate))
+      .slice(0, 50); // la liste est déroulante et filtrable : au-delà, on affine par la recherche
+  }, [projets, rechercheProjet]);
+
   // Auto-ouverture de la 1re conversation visible une fois la liste chargée.
   useEffect(() => {
     if (activeConvId || !me || conversations.length === 0) return;
@@ -641,7 +753,22 @@ const Chat: React.FC = () => {
   // Coller : on prend le premier fichier quel qu'il soit, plus seulement une image.
   const handlePaste = (e: React.ClipboardEvent) => {
     const file = Array.from(e.clipboardData.files as FileList)[0];
-    if (file) { e.preventDefault(); handleAttachment(file); }
+    if (file) { e.preventDefault(); handleAttachment(file); return; }
+
+    // ⚠️ Le clavier GIF de Windows (Win+.) ne dépose PAS le fichier dans le
+    // presse-papiers : il télécharge le GIF puis colle un CHEMIN LOCAL, du type
+    // `file:///C:/Users/…/xxx.gif`. Ce chemin ne désigne rien chez les autres, et
+    // le navigateur interdit à une page d'ouvrir un fichier local — l'envoyer tel
+    // quel produit un message inutile chez tout le monde.
+    // On l'intercepte donc pour le dire, au lieu de laisser filer un texte mort.
+    const texte = e.clipboardData.getData('text/plain');
+    if (texte && estCheminLocalImage(texte)) {
+      e.preventDefault();
+      alert(
+        "Ce GIF est un fichier enregistré sur ton ordinateur, pas un lien : collé tel quel, personne d'autre ne pourrait le voir.\n\n"
+        + "Utilise le bouton image (ou glisse le fichier dans la conversation) pour l'envoyer vraiment."
+      );
+    }
   };
 
   // ---- NEW PRIVATE CONVERSATION ----
@@ -1028,11 +1155,7 @@ const Chat: React.FC = () => {
                                 if (!parent) return null;
                                 return (
                                   <div className="text-[10px] text-bony-muted border-l-2 border-bony-orange pl-2 mb-1 truncate max-w-full italic">
-                                    {parent.senderName}: {parent.type === 'image'
-                                      ? '📷 Image'
-                                      : parent.type === 'file'
-                                        ? `📎 ${parent.fileName ?? 'Pièce jointe'}`
-                                        : parent.content.slice(0, 60)}
+                                    {parent.senderName}: {resumeMessage(parent, projets)}
                                   </div>
                                 );
                               })()}
@@ -1100,12 +1223,24 @@ const Chat: React.FC = () => {
                                       </span>
                                       <Download size={14} className="text-bony-muted group-hover/pj:text-bony-orange transition-colors shrink-0" />
                                     </a>
+                                  ) : msg.type === 'project' ? (
+                                    <ProjectChatCard projectId={msg.content} projects={projets} />
+                                  ) : imageDistante(msg) ? (
+                                    // GIF ou image collée sous forme d'URL (clavier GIF) :
+                                    // rendue comme une image et non comme un lien nu.
+                                    // La détection est faite sur l'URL, côté client, sans
+                                    // aucune requête serveur — voir lib/richText.tsx.
+                                    <img
+                                      src={imageDistante(msg)!} alt="gif"
+                                      className="max-w-[240px] max-h-[200px] rounded-xl object-contain cursor-pointer border border-bony-border hover:opacity-90 transition"
+                                      onClick={() => setLightboxSrc(imageDistante(msg)!)}
+                                    />
                                   ) : (
                                     <div
                                       className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${isMe ? 'text-white rounded-br-sm' : 'bg-bony-panel border border-bony-border text-bony-text rounded-bl-sm'}`}
                                       style={isMe ? { background: 'linear-gradient(135deg, #f75632, #8f12ab)' } : {}}
                                     >
-                                      {msg.content}
+                                      {renduTexteRiche(msg.content)}
                                       {msg.edited && <span className="text-[9px] opacity-60 ml-1">(modifié)</span>}
                                     </div>
                                   )}
@@ -1206,11 +1341,7 @@ const Chat: React.FC = () => {
                       <Reply size={14} className="text-bony-orange shrink-0" />
                       <div className="flex-1 text-[11px] text-bony-muted truncate">
                         <span className="font-bold text-bony-orange">{replyTo.senderName}</span>
-                        {' '}— {replyTo.type === 'image'
-                          ? '📷 Image'
-                          : replyTo.type === 'file'
-                            ? `📎 ${replyTo.fileName ?? 'Pièce jointe'}`
-                            : replyTo.content.slice(0, 80)}
+                        {' '}— {resumeMessage(replyTo, projets, 80)}
                       </div>
                       <button
                         onClick={() => setReplyTo(null)}
@@ -1237,6 +1368,49 @@ const Chat: React.FC = () => {
                     <button onClick={() => fileInputRef.current?.click()} className="shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl text-slate-400 hover:text-bony-orange hover:bg-white/5 transition" title="Joindre un fichier (tous formats, max 100 Mo)">
                       <Paperclip size={18} />
                     </button>
+                    {/* Citer un projet. Masqué pour un External : il n'a pas accès aux
+                        Projets, lui proposer d'en citer un n'aurait aucun sens. */}
+                    {me?.role !== 'External' && (
+                      <div ref={projetBtnRef} className="shrink-0 relative">
+                        <button
+                          onClick={() => setShowProjetPicker(v => !v)}
+                          className="flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl text-slate-400 hover:text-bony-orange hover:bg-white/5 transition"
+                          title="Citer un projet"
+                        >
+                          <FolderKanban size={18} />
+                        </button>
+                        <FloatingPanel open={showProjetPicker} onClose={() => setShowProjetPicker(false)} triggerRef={projetBtnRef} width={280} maxHeight={340} className="rounded-xl">
+                          <div className="p-2 border-b border-bony-border shrink-0">
+                            <div className="flex items-center gap-2 bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5">
+                              <Search size={13} className="text-slate-500 shrink-0" />
+                              <input
+                                type="text"
+                                value={rechercheProjet}
+                                onChange={e => setRechercheProjet(e.target.value)}
+                                placeholder="Rechercher un projet…"
+                                className="flex-1 bg-transparent text-xs text-bony-text outline-none placeholder-bony-muted"
+                              />
+                              {rechercheProjet && <button onClick={() => setRechercheProjet('')}><X size={12} className="text-slate-400" /></button>}
+                            </div>
+                          </div>
+                          <div className="flex-1 overflow-y-auto custom-scrollbar py-1">
+                            {projetsActifs.length === 0 && (
+                              <div className="px-3 py-4 text-center text-[11px] text-slate-500">Aucun projet actif trouvé.</div>
+                            )}
+                            {projetsActifs.map(p => (
+                              <button
+                                key={p.id}
+                                onClick={() => { sendMessage(p.id, 'project'); setShowProjetPicker(false); setRechercheProjet(''); }}
+                                className="w-full text-left px-3 py-2 hover:bg-white/5 transition"
+                              >
+                                <span className="block text-xs text-bony-text truncate">{p.name}</span>
+                                <span className="block text-[10px] text-bony-muted truncate">{p.site}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </FloatingPanel>
+                      </div>
+                    )}
                     {/* ⚠️ PAS de `min-h-[...]` ici, et c'est tout le correctif de
                         l'alignement. Tailwind Preflight met `padding: 0` sur un
                         textarea, dont le texte se colle EN HAUT de sa boîte (un

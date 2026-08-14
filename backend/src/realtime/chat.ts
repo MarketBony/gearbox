@@ -102,7 +102,13 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       }
       // stockage brut, aucun traitement d'upload ici : le fichier est déjà déposé par
       // POST /api/uploads/chat, `content` n'en porte que l'URL relative.
-      const msgType = type === 'image' ? 'image' : type === 'file' ? 'file' : 'text';
+      // ⚠️ Liste FERMÉE, et c'est le point de passage obligé de tout nouveau type de
+      // message : ce qui n'est pas listé ici retombe silencieusement sur 'text'. Un
+      // type ajouté côté client sans être ajouté ici est envoyé, stocké et affiché
+      // comme du texte brut — l'échec est muet, pas une erreur.
+      // 'project' : `content` porte l'id du projet cité, résolu à l'affichage.
+      const TYPES_CONNUS = ['image', 'file', 'project'];
+      const msgType = TYPES_CONNUS.includes(type) ? type : 'text';
       if (replyToId !== undefined && replyToId !== null && typeof replyToId !== 'string') {
         return reply(ack, { error: 'Champ "replyToId" invalide.' });
       }
@@ -159,11 +165,20 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       // ℹ️ Sert AUSSI de corps à la notification push (voir plus bas, `body:`) : il n'y
       // a donc rien de plus à faire pour que les notifications de pièce jointe soient
       // correctes.
-      const apercu = msgType === 'image'
-        ? '📷 Image'
-        : msgType === 'file'
-          ? `📎 ${nomFichier ?? 'Pièce jointe'}`.slice(0, 60)
-          : content.slice(0, 60);
+      // ⚠️ Un type non traité ici retombe sur `content.slice(0, 60)` — soit, pour un
+      // message de type `project`, l'ID BRUT du projet affiché dans la liste des
+      // conversations ET dans la notification push. D'où la résolution du nom.
+      let apercu: string;
+      if (msgType === 'image') {
+        apercu = '📷 Image';
+      } else if (msgType === 'file') {
+        apercu = `📎 ${nomFichier ?? 'Pièce jointe'}`.slice(0, 60);
+      } else if (msgType === 'project') {
+        const projet = await prisma.project.findUnique({ where: { id: content }, select: { name: true } });
+        apercu = `📋 ${projet?.name ?? 'Projet'}`.slice(0, 60);
+      } else {
+        apercu = content.slice(0, 60);
+      }
       const updatedConv = await prisma.chatConversation.update({
         where: { id: conversationId },
         data: {

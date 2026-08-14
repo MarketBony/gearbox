@@ -440,6 +440,27 @@ colonne mais **n'est jamais écrit** (l'épinglage est un overlay `localStorage`
 client). La sourdine, elle, est bien en base : c'est le serveur qui décide d'envoyer
 le push. Elle coupe le push, **pas** le compteur non-lu (comportement Messenger).
 
+### 💬 Types de message — liste FERMÉE côté serveur (06/08/2026)
+
+`chat:message:send` normalisait ainsi : `type === 'image' ? 'image' : type === 'file' ?
+'file' : 'text'`. **Tout type inconnu retombait silencieusement sur `'text'`** — un type
+ajouté côté client sans l'être ici était stocké et affiché comme du texte brut, sans la
+moindre erreur. Remplacé par une liste explicite `TYPES_CONNUS`.
+
+Types actuels : `text`, `image`, `file`, **`project`** (citation d'un projet ;
+`content` porte l'**id** du projet, résolu à l'affichage).
+
+⚠️ **Trois points de passage obligés pour tout nouveau type**, sinon l'échec est muet :
+1. `TYPES_CONNUS` (`realtime/chat.ts`) — sans quoi le type est écrasé en `text` ;
+2. l'union de `ChatMessage.type` dans `types.ts` ;
+3. **`apercu` / `lastMessage`** — qui sert AUSSI de corps aux **notifications push**.
+   Le repli est `content.slice(0, 60)` : un type non traité affiche donc le contenu
+   brut, c'est-à-dire l'URL d'un fichier ou, pour `project`, **l'id du projet** dans la
+   liste des conversations et sur le téléphone. D'où la résolution du nom du projet en
+   base au moment de l'envoi.
+
+Aucune migration : `ChatMessage.type` est un `String` libre, pas un enum Prisma.
+
 ### 🖼️ Photo de groupe — `chat:conversation:avatar` (06/08/2026)
 
 Migration `20260806103000_add_chat_conversation_avatar` : `avatarUrl String?` sur
