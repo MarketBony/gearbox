@@ -70,6 +70,23 @@ const ouvertureApresEgal = (source, nom, chemin, ouvrant) => {
   return pos;
 };
 
+/**
+ * Comme `litteralObjet`, mais pour une table dont les VALEURS sont des chaînes :
+ * `{ 'Clermont': 'Alpine-Clermont', … }`. Rend une Map<clé, valeur>.
+ */
+const litteralObjetTexte = (source, nom, chemin) => {
+  const apresAccolade = ouvertureApresEgal(source, nom, chemin, '{');
+  const lignes = source.slice(apresAccolade + 1).split(/\r?\n/);
+  const table = new Map();
+  for (const ligne of lignes) {
+    if (/^\s*[}]\s*;?\s*$/.test(ligne)) break;
+    const m = ligne.match(/^\s*'([^']+)'\s*:\s*'([^']*)'/);
+    if (m) table.set(m[1], m[2]);
+  }
+  if (table.size === 0) throw new Error(`Aucune entrée lue dans "${nom}" (${chemin}) — format inattendu`);
+  return table;
+};
+
 /** Extrait un `NOM ... = [ 'a', 'b' ]` (éventuellement sur plusieurs lignes). */
 const litteralTableau = (source, nom, chemin) => {
   const ouvrante = ouvertureApresEgal(source, nom, chemin, '[');
@@ -116,6 +133,19 @@ const comparerTables = (etiquette, front, back) => {
   }
 };
 
+// Table clé -> chaîne : on compare les clés ET les valeurs. C'est la VALEUR qui
+// comptait pour le bug du 14/08/2026 (nom de bucket mal formé côté backend).
+const comparerTablesTexte = (etiquette, front, back) => {
+  const clefs = [...new Set([...front.keys(), ...back.keys()])].sort();
+  for (const clef of clefs) {
+    const a = front.get(clef);
+    const b = back.get(clef);
+    if (a === undefined) { ecarts.push(`${etiquette} : "${clef}" existe côté backend mais PAS dans constants.ts`); continue; }
+    if (b === undefined) { ecarts.push(`${etiquette} : "${clef}" existe dans constants.ts mais PAS côté backend`); continue; }
+    if (a !== b) ecarts.push(`${etiquette} / ${clef} : "${a}" (constants.ts) ≠ "${b}" (backend)`);
+  }
+};
+
 const comparerListes = (etiquette, front, back) => {
   const manquantsBack = front.filter(s => !back.includes(s));
   const manquantsFront = back.filter(s => !front.includes(s));
@@ -134,11 +164,17 @@ try {
   );
 
   // Seconde duplication du même fichier, tout aussi silencieuse : le backend décide
-  // avec elle si le bucket `Alpine-<site>` existe pour un site donné.
-  comparerListes(
-    'ALPINE_SITES',
-    litteralTableau(front, 'ALPINE_SITES', 'constants.ts'),
-    litteralTableau(back, 'ALPINE_SITES', 'backend/src/auth/siteScope.ts')
+  // avec elle quelle enveloppe Alpine un chef de site a le droit de voir.
+  //
+  // ⚠️ On compare la TABLE site -> nom de bucket, et pas seulement la liste des sites.
+  // Ne comparer que les sites est exactement ce qui a laissé passer le bug du
+  // 14/08/2026 : le backend fabriquait le nom par concaténation et produisait
+  // `Alpine-Le Puy-en-Velay` au lieu de `Alpine-Le Puy`. Les listes de sites étaient
+  // identiques des deux côtés, et le contrôle passait au vert.
+  comparerTablesTexte(
+    'ALPINE_BUCKETS',
+    litteralObjetTexte(front, 'ALPINE_BUCKETS', 'constants.ts'),
+    litteralObjetTexte(back, 'const ALPINE_BUCKETS', 'backend/src/auth/siteScope.ts')
   );
 
   // Les sites hors plaque (Montluçon, Saint-Etienne) : `SITES` côté frontend et

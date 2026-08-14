@@ -127,6 +127,37 @@ export const resolveBudgetLine = (
 };
 
 /**
+ * Une DESTINATION BUDGÉTAIRE est-elle dans le périmètre sélectionné ?
+ *
+ * `destination` est soit un site réel (`Clermont`), soit un bucket
+ * (`Alpine-Clermont`, `Nissan`) — c'est ce que rendent `splitShareToBuckets` et ce
+ * que portent les lignes de budget. `scope` est la liste des périmètres cochés, qui
+ * ne contient QUE des sites réels : les deux sélecteurs éclatent une plaque en ses
+ * sites au moment du clic, « PLAQUE CENTRE » n'y figure donc jamais.
+ *
+ * ⚠️ C'EST LA SEULE FONCTION QUI RÉPOND À CETTE QUESTION. Il en existait trois
+ * variantes divergentes (deux dans Dashboard.tsx, une dans Budget.tsx), et l'une
+ * d'elles testait une simple égalité de nom : `Alpine-Clermont` ne matchait donc
+ * jamais le périmètre « Clermont », et le consommé Alpine disparaissait du Dashboard
+ * alors que son enveloppe, elle, était comptée — d'où un « Reste à engager » faux et
+ * un désaccord avec la page Budget. **Cinquième divergence Budget/Dashboard** ; ne
+ * pas réintroduire de test local.
+ *
+ * ⚠️ NISSAN EST EXCLU TANT QU'IL N'EST PAS NOMMÉ EXPLICITEMENT. Son enveloppe est
+ * unique et globale, jamais ventilée : la rattacher à ses sites éligibles la
+ * compterait une fois par site (8 fois). Le `if (global) return false` ci-dessous
+ * est le seul garde-fou de cette règle — le retirer casserait tous les totaux.
+ * Alpine, à l'inverse, EST par site : c'est l'asymétrie voulue de CLAUDE.md.
+ */
+export const isDestinationInScope = (destination: string, scope: string[]): boolean => {
+  if (scope.length === 0) return true;              // aucun filtre = tout le réseau
+  if (scope.includes(destination)) return true;     // bucket coché directement
+  const { siteReel, global } = resolveBudgetLine(destination);
+  if (global) return false;                         // Nissan : jamais implicite
+  return siteReel !== null && scope.includes(siteReel);
+};
+
+/**
  * Les trois marques qui partagent un seul compte d'exploitation (règle métier :
  * aucune distinction budgétaire entre elles).
  */

@@ -224,9 +224,19 @@ retirer un site ne prendrait effet qu'à la reconnexion. Il est mis en cache et
 invalidé par `notifyUserChanged()`, déjà appelé après chaque modification de compte —
 effet immédiat, sans requête base à chaque appel.
 
-⚠️ **`PLAQUES_STRUCTURE` est DUPLIQUÉ** dans `siteScope.ts` : le backend ne peut pas
-importer le `constants.ts` racine, compilé seulement dans le bundle frontend. À garder
-synchronisé à la main.
+⚠️ **`PLAQUES_STRUCTURE` et `ALPINE_BUCKETS` sont DUPLIQUÉS** dans `siteScope.ts` : le
+backend ne peut pas importer le `constants.ts` racine, compilé seulement dans le bundle
+frontend. La synchronisation n'est plus laissée à la vigilance — `scripts/check-plaques-sync.mjs`
+compare les deux fichiers à chaque `npm run dev` / `npm run build`.
+
+⚠️⚠️ **Nom des buckets Alpine : table explicite, JAMAIS de concaténation** (14/08/2026).
+`expandBudgetScope` construisait `` `Alpine-${site}` `` et produisait donc
+`Alpine-Le Puy-en-Velay` pour Le Puy-en-Velay, là où le bucket réel s'appelle
+**`Alpine-Le Puy`** — **ce chef de site ne voyait pas son enveloppe Alpine**. Les trois
+autres sites Alpine ne révélaient rien, leur nom coïncidant avec la concaténation.
+Et le garde-fou restait **AU VERT** : il ne comparait que des listes de **sites**,
+identiques des deux côtés, jamais les **noms de buckets**. Il compare désormais la table
+`ALPINE_BUCKETS` elle-même — un garde-fou ne protège que ce qu'il compare.
 
 #### Portes fermées dans le même lot
 
