@@ -4,7 +4,7 @@ import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense, User } from '../types';
 import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
-import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS, isHoldingBrand, resolveBudgetLine, resolveSiteAlias, splitShareToBuckets, hasSocialFeatures, allowedSitesFor } from '../constants';
+import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS, SOCIAL_STATUS_COLORS, isHoldingBrand, isDestinationInScope, resolveSiteAlias, splitShareToBuckets, hasSocialFeatures, allowedSitesFor } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import {
   TrendingUp,
@@ -429,26 +429,17 @@ const Dashboard: React.FC = () => {
     const dEnd = new Date(dateEnd);
 
     // 1. Filter Logic Helpers
-    const isSiteInScope = (site: string) => {
-        if (filterContexts.length === 0) return true;
-        if (filterContexts.includes('GROUPE BONY')) return true;
-        return filterContexts.includes(site);
-    };
-
-    // Périmètre d'une LIGNE DE BUDGET, qui peut être un bucket (`Alpine-Clermont`,
-    // `Nissan`) et non un site réel. Sans ça, sélectionner « Clermont » masquait
-    // l'enveloppe Alpine-Clermont, et le croisement marque × périmètre était
-    // impossible (correctif du 03/08/2026, cf. BUGS-CONNUS.md).
-    const isBudgetLineInScope = (site: string) => {
-        if (filterContexts.length === 0) return true;
-        if (filterContexts.includes(site)) return true;        // sélection directe du bucket
-        if (filterContexts.includes('GROUPE BONY')) return true;
-        const { siteReel, global } = resolveBudgetLine(site);
-        // Nissan est GLOBAL : il n'entre dans un périmètre que s'il y est nommé
-        // explicitement, sinon on le compterait une fois par site éligible.
-        if (global) return false;
-        return siteReel !== null && filterContexts.includes(siteReel);
-    };
+    //
+    // ⚠️ UN SEUL test de périmètre, partagé avec Budget.tsx via `constants.ts`.
+    // Il y en avait DEUX ici : `isBudgetLineInScope` (correcte, écrite au correctif 23
+    // pour les enveloppes) et `isSiteInScope` (une simple égalité de nom, appliquée au
+    // CONSOMMÉ). Or les projets et les dépenses passent par `splitShareToBuckets`, qui
+    // rend des destinations comme `Alpine-Clermont` : l'égalité de nom ne matchait
+    // jamais le périmètre « Clermont ». L'enveloppe Alpine était donc comptée au prévu
+    // mais son consommé restait nul — « Reste à engager » faux, et désaccord avec la
+    // page Budget. Signalé par Théo le 14/08/2026 sur les plaques ; le défaut valait
+    // aussi pour un site seul.
+    const isSiteInScope = (site: string) => isDestinationInScope(site, filterContexts);
 
     const isBrandInScope = (projectBrands: BrandType[]) => {
         if (filterBrands.length === 0) return true;
@@ -469,7 +460,7 @@ const Dashboard: React.FC = () => {
     const chartYear = dStart.getFullYear();
 
     budgets.forEach(b => {
-        if (!isBudgetLineInScope(b.site)) return;
+        if (!isSiteInScope(b.site)) return;
         // ⚠️ Le filtre de MARQUE manquait ici alors que le consommé l'appliquait :
         // avec MARQUE = Alpine, on comparait 120 295 € consommés à l'enveloppe du
         // GROUPE ENTIER (1 480 800 €). Trois chiffres faux d'un coup — le

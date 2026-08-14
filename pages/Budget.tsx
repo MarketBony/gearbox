@@ -6,7 +6,7 @@ import { db } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, ChevronDown, ChevronRight, Calculator, PieChart, TrendingUp, TrendingDown, AlertTriangle, Filter, Coins, Calendar, Lock, Search, X, Check } from 'lucide-react';
-import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES, isHoldingBrand, ALPINE_BUCKETS, NISSAN_BUCKET, resolveBudgetLine, splitShareToBuckets, allowedSitesFor } from '../constants';
+import { SERVICE_COLORS, BRAND_COLORS, PLAQUES_STRUCTURE, SITES, SERVICES, ALPINE_SITES, NISSAN_SITES, isHoldingBrand, ALPINE_BUCKETS, NISSAN_BUCKET, resolveBudgetLine, isDestinationInScope, splitShareToBuckets, allowedSitesFor } from '../constants';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -620,13 +620,10 @@ const Budget: React.FC = () => {
       Object.entries(siteStats).forEach(([site, stats]) => {
           const plaque = getPlaqueForSite(site);
           
-          // Filter by Site (inclut les buckets Alpine associés aux sites sélectionnés)
-          if (filterSites.length > 0) {
-              const siteMatchesBucket = filterSites.some(fs =>
-                  fs === site || ALPINE_BUCKETS[fs] === site
-              );
-              if (!siteMatchesBucket) return;
-          }
+          // Filtre de périmètre — test partagé avec le Dashboard (constants.ts).
+          // Il inclut les buckets Alpine du site sélectionné et exclut Nissan tant
+          // qu'il n'est pas nommé explicitement.
+          if (!isDestinationInScope(site, filterSites)) return;
           
           stats.forecastMonthly.forEach((v, i) => finalForecastMonthly[i] += v);
           stats.actualMonthly.forEach((v, i) => finalActualMonthly[i] += v);
@@ -682,12 +679,10 @@ const Budget: React.FC = () => {
       // `Alpine-Clermont`. L'égalité stricte d'avant expliquait que le périmètre
       // Alpine ne ramenait rien (aucune ligne ne s'appelle « Alpine ») tandis que
       // Nissan fonctionnait — sa ligne porte exactement ce nom.
-      const displayBudgets = filterSites.length === 0 ? budgets : budgets.filter(b => {
-          if (filterSites.includes(b.site)) return true;          // bucket choisi directement
-          const { siteReel, global } = resolveBudgetLine(b.site);
-          if (global) return false;                                // Nissan : jamais implicite
-          return siteReel !== null && filterSites.includes(siteReel);
-      });
+      // Test partagé avec le Dashboard (constants.ts) depuis le 14/08/2026 : cette
+      // logique existait ici en local et le Dashboard en avait sa propre version,
+      // fausse pour le consommé. Une seule définition, plus de divergence possible.
+      const displayBudgets = budgets.filter(b => isDestinationInScope(b.site, filterSites));
       const groupedBudgets: Record<string, BudgetLine[]> = {};
       Object.keys(PLAQUES_STRUCTURE).forEach(p => groupedBudgets[p] = []);
       groupedBudgets['ENTITÉS SPÉCIFIQUES'] = [];

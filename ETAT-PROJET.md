@@ -1577,6 +1577,68 @@
     exactement le risque signalé au correctif 33 pour la photo de groupe — il faut y
     penser **avant** de tester un upload en local, pas après.
 
+39. **DASHBOARD — le consommé Alpine ne remontait pas dans le périmètre**
+    (`fix/alpine-perimetre-dashboard`, 14 août). Backend + frontend, **aucune
+    migration** → `api` **et** `web`.
+
+    Signalé par Théo : les dépenses `Alpine-Clermont` ne remontaient pas sur PLAQUE
+    CENTRE, ni `Alpine-Rodez` sur PLAQUE SUD-OUEST, `Alpine-Le Puy` sur PLAQUE SUD,
+    `Alpine-Vichy` sur PLAQUE NORD.
+
+    **Cause : une ligne.** `isSiteInScope` (`Dashboard.tsx`) testait une **égalité de
+    nom de site** alors qu'elle recevait les **destinations budgétaires** rendues par
+    `splitShareToBuckets` — donc `Alpine-Clermont`, qui ne matchait jamais un périmètre
+    contenant `Clermont`.
+    ⚠️ **La bonne logique existait SIX LIGNES PLUS BAS** : `isBudgetLineInScope`,
+    écrite au correctif 23… **pour les enveloppes uniquement**. Le correctif 23 corrigeait
+    précisément ce type d'oubli et l'a lui-même reproduit sur le consommé. Cinquième
+    divergence Budget/Dashboard.
+
+    **Trois choses que le signalement ne disait pas, trouvées à l'audit :**
+    1. **Le défaut n'était pas propre aux plaques.** Les deux sélecteurs **éclatent la
+       plaque en sites réels au clic** : le filtre ne contient jamais « PLAQUE CENTRE ».
+       **Clermont seul était cassé pareil.**
+    2. **Les compteurs aussi étaient faux** : le `return` d'exclusion s'exécute **avant**
+       « projets actifs », « campagnes programmées », « projets en retard », le top
+       sites et la performance des campagnes.
+    3. **L'enveloppe Alpine était comptée au prévu mais son consommé était nul** → « Reste
+       à engager » et pourcentage faux, et désaccord avec la page Budget (qui, elle,
+       était juste).
+
+    **Correctif** : `isDestinationInScope(destination, scope)` dans `constants.ts`,
+    **partagé par Dashboard et Budget**. Il existait **trois** variantes de ce test
+    (deux dans Dashboard, une dans Budget) — il n'en reste **qu'une**. C'est ce qui
+    empêche une sixième divergence, pas la vigilance.
+    ⚠️ **Nissan reste exclu tant qu'il n'est pas nommé explicitement** (`if (global)
+    return false`) : il est global et non ventilé, le rattacher à ses 8 sites éligibles
+    le compterait 8 fois. C'est le seul garde-fou de cette règle.
+
+    **Bug trouvé au passage, dans le CLOISONNEMENT.** `backend/src/auth/siteScope.ts`
+    fabriquait le nom du bucket par **concaténation** (`` `Alpine-${s}` ``) : pour
+    `Le Puy-en-Velay` il produisait `Alpine-Le Puy-en-Velay`, alors que le bucket réel
+    est **`Alpine-Le Puy`**. **Un chef de site du Puy ne voyait pas son enveloppe
+    Alpine.** Latent depuis le correctif 32. Remplacé par une table explicite.
+    ⚠️ **Et surtout : `scripts/check-plaques-sync.mjs` était AU VERT pendant ce
+    temps** — il ne comparait que des listes de sites, jamais les **noms de buckets**.
+    Le garde-fou a été étendu à la table `ALPINE_BUCKETS`, et **prouvé** en réintroduisant
+    le bug d'origine : il le détecte désormais, puis le fichier a été restauré.
+
+    **Vérifié** : **19 cas unitaires** sur le test partagé — les 4 plaques citées, le
+    cas site seul, le débordement inter-plaques, et **6 garde-fous Nissan** (dont
+    « Nissan avec ses 8 sites sélectionnés → dehors »). `tsc` backend 0, racine 12 de
+    référence. **Recoupement Budget ↔ Dashboard fait sur données réelles** : les deux
+    écrans affichent 311 697 € / 317 600 € / 5 903 € / 98,1 %, et la somme des lignes du
+    tableau Budget fait exactement 311 697 € (le Dashboard affichait 311 652 € avant,
+    soit les 45 € d'`Alpine-Clermont` perdus). **Validé par Théo**, Nissan absent de
+    PLAQUE CENTRE confirmé à l'écran.
+
+    ℹ️ **Fausse alerte levée avec Théo** : il a d'abord cru les deux écrans en
+    désaccord. Ils étaient identiques sur les quatre chiffres ; ce qui l'avait alerté
+    était la ligne `Alpine-Clermont — 45 € — 0 %`, c'est-à-dire le **résidu du routage
+    multi-marques** déjà au backlog depuis le 03/08 (un projet Alpine+Renault laisse sa
+    part Alpine dans le bucket, tandis que le filtre MARQUE = Renault écarte l'enveloppe
+    Alpine). Ce n'est pas un défaut de ce lot.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
@@ -1587,6 +1649,11 @@
   Reste à vérifier par Théo : le **vocal sur iPhone** (Safari produit du `m4a` là où
   Chrome fait du `webm` ; les deux sont prévus et servis correctement, mais seul un
   essai sur un vrai iPhone le confirmera), et le cas **PWA installée** sur iOS.
+- **« Prochaines Échéances » (Dashboard) écarte les projets MULTI-SITES** sous un filtre
+  de périmètre : le bloc teste `p.site` brut, qui vaut un libellé concaténé. Même classe
+  que le bug des montants corrigé le 29/07, mais le correctif est différent — il faut
+  ventiler par `sites[]`, pas changer un test. Repéré le 14/08, laissé hors du lot 39
+  pour ne pas le bâcler. Sans impact sur les montants.
 - **`GET /api/projects` n'a aucun contrôle de rôle** (`authenticateToken` seul) : un
   `External` ou un `Guest` peut lire tous les projets par l'API alors que l'interface
   les leur masque. Découvert le 06/08 en préparant les projets cités dans le chat.
