@@ -107,7 +107,7 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       // type ajouté côté client sans être ajouté ici est envoyé, stocké et affiché
       // comme du texte brut — l'échec est muet, pas une erreur.
       // 'project' : `content` porte l'id du projet cité, résolu à l'affichage.
-      const TYPES_CONNUS = ['image', 'file', 'project'];
+      const TYPES_CONNUS = ['image', 'file', 'project', 'audio'];
       const msgType = TYPES_CONNUS.includes(type) ? type : 'text';
       if (replyToId !== undefined && replyToId !== null && typeof replyToId !== 'string') {
         return reply(ack, { error: 'Champ "replyToId" invalide.' });
@@ -143,8 +143,11 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
           senderColor: user?.avatarColor ?? '#64748b',
           content,
           type: msgType,
-          fileName: msgType === 'file' ? nomFichier : null,
-          fileSize: msgType === 'file' || msgType === 'image' ? tailleFichier : null,
+          // 'audio' réutilise `fileName` pour porter la DURÉE formatée (« 0:12 ») :
+          // ajouter une colonne pour ça imposerait une migration là où un champ
+          // existant, non utilisé par ce type, fait exactement l'affaire.
+          fileName: msgType === 'file' || msgType === 'audio' ? nomFichier : null,
+          fileSize: msgType === 'file' || msgType === 'image' || msgType === 'audio' ? tailleFichier : null,
           timestamp: now,
           edited: false,
           deleted: false,
@@ -173,6 +176,11 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
         apercu = '📷 Image';
       } else if (msgType === 'file') {
         apercu = `📎 ${nomFichier ?? 'Pièce jointe'}`.slice(0, 60);
+      } else if (msgType === 'audio') {
+        // `fileName` porte la durée formatée (« 0:12 »), posée par le client : le
+        // modèle n'a pas de champ de durée et un vocal sans repère de longueur est
+        // désagréable à recevoir.
+        apercu = `🎤 Message vocal${nomFichier ? ` (${nomFichier})` : ''}`.slice(0, 60);
       } else if (msgType === 'project') {
         const projet = await prisma.project.findUnique({ where: { id: content }, select: { name: true } });
         apercu = `📋 ${projet?.name ?? 'Projet'}`.slice(0, 60);

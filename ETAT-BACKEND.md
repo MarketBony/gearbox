@@ -440,6 +440,56 @@ colonne mais **n'est jamais écrit** (l'épinglage est un overlay `localStorage`
 client). La sourdine, elle, est bien en base : c'est le serveur qui décide d'envoyer
 le push. Elle coupe le push, **pas** le compteur non-lu (comportement Messenger).
 
+### 🔗 Aperçu de liens — `/api/link-preview` (06/08/2026)
+
+⚠️⚠️ **La seule route du projet qui fetch une URL VENANT DU CLIENT.** C'est
+inévitable (un utilisateur colle ce qu'il veut), donc toute la conception est
+défensive. Quatre garde-fous, tous nécessaires :
+1. **Liste blanche d'hôtes validée AVANT toute requête sortante** (YouTube, Vimeo,
+   Dailymotion, Spotify, SoundCloud). Hors liste → `204`, aucun paquet ne quitte le VPS.
+2. **L'URL sortante n'est jamais celle du client** : seul un point d'entrée oEmbed
+   **écrit en dur** est appelé, avec l'URL validée en paramètre.
+3. **`redirect: 'error'`** — sans lui, un fournisseur compromis redirigerait vers
+   `169.254.169.254` (métadonnées cloud) ou le réseau Docker interne, et la validation
+   d'hôte serait **contournée**.
+4. Schéma http/https seulement, timeout 5 s, taille de réponse plafonnée, et on ne
+   renvoie au client que les champs utiles — jamais le JSON du tiers (il contient du
+   HTML d'iframe).
+
+**Vérifié sur 14 cas** : métadonnées cloud, `localhost`, IP privées, `api:3000`
+(réseau Docker), `file://`, `gopher://`, et les pièges de sous-domaine
+(`youtube.com.evil.com`, `youtube.com@evil.com`) → tous en `204` sans requête.
+
+⚠️ **Ne pas élargir à « tous les domaines »** : ce serait rouvrir la SSRF que ce
+projet a explicitement décidé de fermer. Les autres domaines reconnus (X, Instagram,
+SharePoint, Google Photos…) sont habillés **côté client sans aucune requête**
+(`lib/linkProviders.ts`) — ces plateformes exigent une authentification pour livrer
+leurs métadonnées, un fetch ne rendrait qu'une page de connexion.
+
+### 🎞️ Recherche de GIF — `/api/gifs` (06/08/2026)
+
+Proxy **Giphy**. ℹ️ Tenor était le choix initial mais **ne délivre plus de clé en
+libre-service** (constaté le 06/08/2026, son accès passe par Google Cloud).
+
+⚠️ **La clé ne quitte jamais le serveur** : un appel depuis le navigateur l'exposerait
+dans l'onglet Réseau et n'importe qui pourrait consommer le quota du groupe.
+⚠️ **Configuration en DEUX temps** (piège des clés VAPID, correctif 20) :
+`GIPHY_API_KEY` doit être dans le `.env` du VPS **ET** déclarée dans le bloc
+`environment:` du service `api` de `docker-compose.yml`. Sans la seconde, elle
+n'atteint pas le conteneur.
+Sans clé : `503` et le bouton est **masqué** côté client (`/api/gifs/status`) — la
+fonction s'éteint proprement au lieu d'afficher un bouton qui échoue.
+
+`rating=pg` : outil de travail. `g` ne renverrait presque rien, `pg-13` laisse passer
+trop. Les URL renvoyées sont **filtrées sur `https://…giphy.com/`** — sans ça une
+réponse inattendue injecterait une URL arbitraire, rendue en `<img>` chez tous les
+participants. Mention « Powered By GIPHY » imposée par la licence.
+
+ℹ️ Un GIF choisi est envoyé comme message **`text`** portant son URL, pas comme
+`image` : la purge marque « expiré » tout `image`/`file`/`audio` après 180 j, or un
+GIF Giphy n'est pas un fichier de notre disque — il serait marqué expiré alors que
+l'URL distante fonctionne toujours.
+
 ### 💬 Types de message — liste FERMÉE côté serveur (06/08/2026)
 
 `chat:message:send` normalisait ainsi : `type === 'image' ? 'image' : type === 'file' ?
@@ -448,7 +498,21 @@ ajouté côté client sans l'être ici était stocké et affiché comme du texte
 moindre erreur. Remplacé par une liste explicite `TYPES_CONNUS`.
 
 Types actuels : `text`, `image`, `file`, **`project`** (citation d'un projet ;
-`content` porte l'**id** du projet, résolu à l'affichage).
+`content` porte l'**id** du projet, résolu à l'affichage), **`audio`** (message vocal ;
+`content` = URL du fichier, et **`fileName` porte la DURÉE formatée** « 0:12 » — le
+modèle n'a pas de champ de durée, et ce champ est inutilisé par ce type, donc aucune
+migration).
+
+⚠️ **Quatrième point de passage pour un type porteur d'un FICHIER** : le filtre
+`type: { in: [...] }` de `purgeOldChatFiles` (`jobs/purge.ts`). Un type absent de cette
+liste n'est **jamais purgé**, silencieusement — le fichier reste sur le disque du VPS
+indéfiniment. `'audio'` y a été ajouté. `'project'` n'y est pas et ne doit pas y être :
+son `content` est un id, pas un fichier.
+
+⚠️ Les extensions **audio** ont été ajoutées à `EXT_AFFICHABLES` (`index.ts`) : servi
+en `Content-Disposition: attachment`, un enregistrement est téléchargé au lieu d'être
+lu, et un `<audio>` ne peut rien en faire. Formats **passifs**, sans le risque du
+`.svg` ; `nosniff` continue de s'appliquer.
 
 ⚠️ **Trois points de passage obligés pour tout nouveau type**, sinon l'échec est muet :
 1. `TYPES_CONNUS` (`realtime/chat.ts`) — sans quoi le type est écrasé en `text` ;

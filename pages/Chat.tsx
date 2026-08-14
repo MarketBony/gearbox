@@ -3,7 +3,10 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { ChatConversation, ChatMessage, User, Project } from '../types';
 import FloatingPanel from '../components/FloatingPanel';
 import ProjectSummary from '../components/ProjectSummary';
-import { renduTexteRiche, messageEstImageDistante, estCheminLocalImage } from '../lib/richText';
+import { renduTexteRiche, messageEstImageDistante, estCheminLocalImage, premierLien } from '../lib/richText';
+import LinkPreview from '../components/LinkPreview';
+import VoiceRecorder from '../components/VoiceRecorder';
+import GifPicker from '../components/GifPicker';
 import { db, ApiError } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { getSocket, connectSocket, emitWithAck } from '../services/socket';
@@ -14,7 +17,7 @@ import {
   MoreHorizontal, Pencil, Trash2, X, Image, Reply, Check,
   Users, UserPlus, UserMinus, ChevronRight, Hash, Camera, Upload, ZoomIn,
   Bell, BellOff, Paperclip, FileText, FileX, Download, SmilePlus,
-  FolderKanban, Search, ExternalLink
+  FolderKanban, Search, ExternalLink, Mic
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import Cropper from 'react-easy-crop';
@@ -55,6 +58,7 @@ const imageDistante = (msg: ChatMessage): string | null =>
 const resumeMessage = (msg: ChatMessage, projets: Project[], max = 60): string => {
   if (msg.type === 'image') return '📷 Image';
   if (msg.type === 'file') return `📎 ${msg.fileName ?? 'Pièce jointe'}`;
+  if (msg.type === 'audio') return `🎤 Message vocal${msg.fileName ? ` (${msg.fileName})` : ''}`;
   if (msg.type === 'project') {
     const p = projets.find(x => x.id === msg.content);
     return `📋 ${p?.name ?? 'Projet'}`;
@@ -524,6 +528,15 @@ const Chat: React.FC = () => {
   // L'échec est silencieux : le chat doit rester utilisable même si /api/projects
   // refuse ou tombe.
   const [projets, setProjets] = useState<Project[]>([]);
+  const [showVoice, setShowVoice] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [gifDispo, setGifDispo] = useState(false);
+  const gifBtnRef = useRef<HTMLDivElement>(null);
+  // Le bouton GIF n'apparaît que si le serveur a une clé Tenor : sans elle, la
+  // recherche renverrait 503 à chaque ouverture.
+  useEffect(() => {
+    db.getGifStatus().then(s => setGifDispo(!!s?.disponible)).catch(() => setGifDispo(false));
+  }, []);
   const [showProjetPicker, setShowProjetPicker] = useState(false);
   const [rechercheProjet, setRechercheProjet] = useState('');
   const projetBtnRef = useRef<HTMLDivElement>(null);
@@ -1223,6 +1236,15 @@ const Chat: React.FC = () => {
                                       </span>
                                       <Download size={14} className="text-bony-muted group-hover/pj:text-bony-orange transition-colors shrink-0" />
                                     </a>
+                                  ) : msg.type === 'audio' ? (
+                                    // `fileName` porte la durée (« 0:12 ») : le modèle
+                                    // n'a pas de champ dédié, et ce champ est inutilisé
+                                    // par ce type. Voir realtime/chat.ts.
+                                    <div className="px-3 py-2 rounded-xl border border-bony-border bg-bony-panel flex items-center gap-2 w-[240px] max-w-full">
+                                      <Mic size={15} className="text-bony-orange shrink-0" />
+                                      <audio src={msg.content} controls preload="none" className="flex-1 h-8 min-w-0" />
+                                      {msg.fileName && <span className="text-[10px] text-bony-muted tabular-nums shrink-0">{msg.fileName}</span>}
+                                    </div>
                                   ) : msg.type === 'project' ? (
                                     <ProjectChatCard projectId={msg.content} projects={projets} />
                                   ) : imageDistante(msg) ? (
@@ -1236,12 +1258,19 @@ const Chat: React.FC = () => {
                                       onClick={() => setLightboxSrc(imageDistante(msg)!)}
                                     />
                                   ) : (
-                                    <div
-                                      className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${isMe ? 'text-white rounded-br-sm' : 'bg-bony-panel border border-bony-border text-bony-text rounded-bl-sm'}`}
-                                      style={isMe ? { background: 'linear-gradient(135deg, #f75632, #8f12ab)' } : {}}
-                                    >
-                                      {renduTexteRiche(msg.content)}
-                                      {msg.edited && <span className="text-[9px] opacity-60 ml-1">(modifié)</span>}
+                                    <div>
+                                      <div
+                                        className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${isMe ? 'text-white rounded-br-sm' : 'bg-bony-panel border border-bony-border text-bony-text rounded-bl-sm'}`}
+                                        style={isMe ? { background: 'linear-gradient(135deg, #f75632, #8f12ab)' } : {}}
+                                      >
+                                        {renduTexteRiche(msg.content)}
+                                        {msg.edited && <span className="text-[9px] opacity-60 ml-1">(modifié)</span>}
+                                      </div>
+                                      {/* Aperçu du PREMIER lien seulement — voir premierLien(). */}
+                                      {(() => {
+                                        const lien = premierLien(msg.content);
+                                        return lien ? <LinkPreview href={lien} /> : null;
+                                      })()}
                                     </div>
                                   )}
                                   {/* Hover actions */}
@@ -1335,6 +1364,18 @@ const Chat: React.FC = () => {
                     `md:` écrase un `pt-*`/`pb-*` écrit après lui (l'ordre des règles
                     générées par la CDN Play ne suit pas l'ordre des classes). */}
                 <div className="px-3 md:px-4 pt-2 pb-2 md:pb-2.5 border-t border-bony-border glass-strong shrink-0">
+                  {showVoice && (
+                    <VoiceRecorder
+                      onClose={() => setShowVoice(false)}
+                      onSend={async (fichier, duree) => {
+                        // Même chemin d'upload que les pièces jointes : le vocal est un
+                        // fichier de conversation comme un autre, et hérite donc de la
+                        // purge à 180 jours (type 'audio' ajouté au filtre du job).
+                        const url = await db.uploadFile('chat', fichier);
+                        sendMessage(url, 'audio', { fileName: duree, fileSize: fichier.size });
+                      }}
+                    />
+                  )}
                   {/* Aperçu du message auquel on répond */}
                   {replyTo && (
                     <div className="flex items-center gap-2 mb-1.5 px-1">
@@ -1367,6 +1408,30 @@ const Chat: React.FC = () => {
                     </button>
                     <button onClick={() => fileInputRef.current?.click()} className="shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl text-slate-400 hover:text-bony-orange hover:bg-white/5 transition" title="Joindre un fichier (tous formats, max 100 Mo)">
                       <Paperclip size={18} />
+                    </button>
+                    {/* Bouton GIF — masqué tant que GIPHY_API_KEY n'est pas configurée
+                        sur le serveur : mieux vaut pas de bouton qu'un bouton qui
+                        échoue. */}
+                    {gifDispo && (
+                      <div ref={gifBtnRef} className="shrink-0 relative">
+                        <button
+                          onClick={() => setShowGifPicker(v => !v)}
+                          className={`flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl text-[11px] font-bold transition ${showGifPicker ? 'text-bony-orange bg-bony-orange/10' : 'text-slate-400 hover:text-bony-orange hover:bg-white/5'}`}
+                          title="Envoyer un GIF"
+                        >
+                          GIF
+                        </button>
+                        <FloatingPanel open={showGifPicker} onClose={() => setShowGifPicker(false)} triggerRef={gifBtnRef} width={300} maxHeight={360} className="rounded-xl">
+                          <GifPicker onPick={url => sendMessage(url)} onClose={() => setShowGifPicker(false)} />
+                        </FloatingPanel>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setShowVoice(v => !v)}
+                      className={`shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl transition ${showVoice ? 'text-bony-orange bg-bony-orange/10' : 'text-slate-400 hover:text-bony-orange hover:bg-white/5'}`}
+                      title="Message vocal"
+                    >
+                      <Mic size={18} />
                     </button>
                     {/* Citer un projet. Masqué pour un External : il n'a pas accès aux
                         Projets, lui proposer d'en citer un n'aurait aucun sens. */}
