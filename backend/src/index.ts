@@ -22,6 +22,8 @@ import chatRoutes from './routes/chat';
 import activityLogRoutes from './routes/activityLog';
 import userRoutes from './routes/users';
 import feedRoutes from './routes/feeds';
+import linkPreviewRoutes from './routes/linkPreview';
+import gifRoutes from './routes/gifs';
 import musicRoutes from './routes/music';
 import pushRoutes from './routes/push';
 import seedRoutes from './routes/seed';
@@ -78,6 +80,10 @@ app.use('/api/games', gamesRoutes);
 // Hello Marketing : proxy des flux RSS et de la playlist Deezer (le navigateur ne
 // peut pas les appeler en direct — CORS ; voir les commentaires de ces routes).
 app.use('/api/feeds', feedRoutes);
+// Aperçu de liens — liste blanche STRICTE de fournisseurs oEmbed (voir la route).
+app.use('/api/link-preview', linkPreviewRoutes);
+// Recherche de GIF (Tenor) — la clé d'API reste côté serveur, voir la route.
+app.use('/api/gifs', gifRoutes);
 app.use('/api/music', musicRoutes);
 
 // Abonnements aux notifications push (clé publique VAPID + subscribe/unsubscribe).
@@ -98,7 +104,16 @@ app.use('/api/push', pushRoutes);
 // La liste porte sur l'EXTENSION DU FICHIER SUR LE DISQUE, jamais sur un type MIME
 // fourni par le client — c'est lui qui le déclare, on ne s'y fie pas.
 // `.svg` en est volontairement absent : c'est un format actif, il se téléchargera.
-const EXT_AFFICHABLES = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf']);
+//
+// ⚠️ Les extensions AUDIO ont été ajoutées le 06/08/2026 pour les messages vocaux :
+// servi en `attachment`, un enregistrement est téléchargé au lieu d'être lu, et un
+// `<audio>` ne peut rien en faire. Ce sont des formats PASSIFS (le navigateur les
+// décode, il n'en exécute rien) — ils n'ont pas le risque du `.svg` ou du `.html`.
+// `nosniff` continue de s'appliquer à tout, y compris à eux.
+const EXT_AFFICHABLES = new Set([
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf',
+  '.webm', '.ogg', '.oga', '.mp3', '.m4a', '.aac', '.wav',
+]);
 
 app.use('/uploads', express.static(UPLOADS_ROOT, {
   setHeaders: (res, filePath) => {

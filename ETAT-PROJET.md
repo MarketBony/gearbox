@@ -1513,32 +1513,80 @@
     linkify. **Validé fonctionnellement par Théo**, qui a signalé le défaut du chemin
     Windows — corrigé et revalidé.
 
+38. **CHAT — messages vocaux, aperçus de liens, recherche de GIF**
+    (`feat/chat-vocaux-gif-apercus`, 6 août). Backend + frontend, **aucune migration**
+    → `api` **et** `web`. **Lot 2 sur 2**, le lot 1 étant le correctif 37.
+
+    **Messages vocaux.** Icône micro → `MediaRecorder` → upload par le chemin `chat`
+    existant → type `audio`. Durée plafonnée à 5 min. `fileName` porte la **durée
+    formatée** : le modèle n'a pas de champ de durée, et ce champ est inutilisé par ce
+    type — pas de migration pour ça.
+    - ⚠️ **Deux bloquants prévus au plan, tous deux réels et levés** : les extensions
+      audio n'étaient pas dans `EXT_AFFICHABLES` (donc servies en `attachment`,
+      **illisibles par un `<audio>`**), et le filtre de `purgeOldChatFiles` ignorait
+      `'audio'` — les vocaux n'auraient **jamais** été purgés, silencieusement.
+    - ⚠️ **Le flux micro est relâché explicitement** à l'arrêt, à l'annulation **et au
+      démontage** du composant. Sans ça le voyant d'enregistrement du navigateur reste
+      allumé : l'utilisateur croit être encore écouté, et la batterie se vide.
+    - Type audio laissé au navigateur (webm/opus sur Chrome, mp4/aac sur Safari) :
+      forcer un type ferait échouer l'un des deux. L'extension est déduite du type réel
+      pour que le backend serve bien le fichier « inline ».
+
+    **Aperçus de liens — deux niveaux, volontairement.**
+    - Titre, auteur et vignette **réels** pour YouTube, Vimeo, Dailymotion, Spotify,
+      SoundCloud, via `/api/link-preview` (liste blanche serveur).
+    - **Pastille identifiant le service, sans aucune requête**, pour ~35 domaines :
+      X, Facebook, Instagram, LinkedIn, TikTok, Pinterest, Twitch, SharePoint,
+      OneDrive, Teams, Outlook, Google Photos/Drive/Docs/Maps/Forms, Dropbox,
+      WeTransfer, Canva, Figma, Notion, GitHub, et les sites du groupe.
+      Raison : ces plateformes exigent une authentification pour livrer leurs
+      métadonnées — un fetch serveur ne rendrait qu'une page de connexion, au prix
+      d'une requête sortante par lien.
+    - Un **seul** aperçu par message (le premier lien) : cinq liens empileraient cinq
+      cartes.
+    - ⚠️ **Point de sécurité central** : c'est la seule route du projet qui fetch une
+      URL venant du client. Liste blanche validée **avant** toute requête,
+      `redirect: 'error'` (sans quoi une redirection contournerait la validation
+      d'hôte), schéma http/https, timeout, taille plafonnée, et on ne renvoie que les
+      champs utiles. **Vérifié sur 14 cas** : métadonnées cloud, localhost, IP privées,
+      `api:3000`, `file://`, `gopher://`, `youtube.com.evil.com`,
+      `youtube.com@evil.com` → tous refusés **sans requête sortante**.
+
+    **Recherche de GIF — Giphy.** ℹ️ **Tenor avait été retenu au lot 1 mais ne délivre
+    plus de clé en libre-service** (constaté le 06/08/2026) : bascule sur Giphy, dont
+    seule la forme de réponse diffère, isolée dans `routes/gifs.ts`.
+    - La clé **ne quitte jamais le serveur**. Sans clé, le bouton est **masqué** via
+      `/api/gifs/status` : la fonction s'éteint proprement.
+    - `rating=pg`, URL filtrées sur `https://…giphy.com/`, mention « Powered By GIPHY »
+      imposée par la licence.
+    - ⚠️ Un GIF est envoyé comme message **texte** portant son URL, **pas** comme
+      `image` : la purge marquerait sinon « pièce jointe expirée » un GIF distant qui
+      fonctionne toujours.
+    - ⚠️ `GIPHY_API_KEY` : `.env` du VPS **ET** bloc `environment:` de
+      `docker-compose.yml` — le piège en deux temps des clés VAPID.
+
+    **Vérifié** : `tsc` backend 0 et racine 12 de référence ; 14 cas sur la liste
+    blanche ; clé Giphy validée en 200 contre l'API réelle ; URL Giphy reconnues comme
+    images distantes (y compris `media0…`, `i.giphy.com`, format `.webp`).
+    **Validé fonctionnellement par Théo.**
+
+    ⚠️ **Piège d'environnement CONFIRMÉ, cette fois pour de bon** : deux vocaux
+    enregistrés pendant les tests **en local** ont écrit en base de PROD une URL dont le
+    fichier n'existait que sur le poste de Théo. Les deux fichiers ont été **copiés sur
+    le volume du VPS** au déploiement plutôt que de supprimer ses messages. C'est
+    exactement le risque signalé au correctif 33 pour la photo de groupe — il faut y
+    penser **avant** de tester un upload en local, pas après.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
 > l'historique des correctifs ci-dessus et dans `BUGS-CONNUS.md`.
 
 ### Fonctionnel / produit
-- **CHAT — LOT 2, décidé et cadré avec Théo le 06/08/2026** (le lot 1 est le correctif 37) :
-  1. **Bouton GIF avec recherche** — la vraie réponse au clavier GIF de Windows, qui ne
-     peut pas fonctionner (il colle un chemin local, cf. correctif 37). Fournisseur
-     retenu : **Tenor** (API Google, palier gratuit, filtrage de contenu intégré et
-     paramétrable). Implique une clé d'API et des requêtes sortantes → même précaution
-     que le proxy de flux : **la clé reste côté serveur**, le client ne l'atteint jamais.
-     ⚠️ Piège de configuration connu : une variable doit être valorisée dans le `.env`
-     du VPS **ET** déclarée dans le bloc `environment:` du service `api` de
-     `docker-compose.yml` (leçon des clés VAPID, correctif 20).
-  2. **Messages vocaux** — `MediaRecorder` → upload par le chemin `chat` existant →
-     type `audio`. Purge à **180 jours** comme les autres pièces jointes (arbitrage de
-     Théo). ⚠️ **Deux bloquants déjà identifiés** : les extensions audio ne sont pas
-     dans `EXT_AFFICHABLES` (`backend/src/index.ts`) donc servies en
-     `Content-Disposition: attachment`, **illisibles par un `<audio>`** ; et le filtre
-     de `purgeOldChatFiles` est `type: { in: ['image','file'] }` — sans `'audio'`, les
-     vocaux **ne seraient jamais purgés**. Reste à vérifier le `Permissions-Policy` du
-     Caddyfile et le cas PWA iOS.
-  3. **Aperçu de liens sur LISTE BLANCHE de domaines** (YouTube, SharePoint/Microsoft,
-     + ceux que Théo ajoutera). Décision explicite : pas de fetch d'URL arbitraire, pour
-     ne pas rouvrir la surface SSRF que le proxy de flux a été conçu pour fermer.
+- **CHAT — lot 2 LIVRÉ** au correctif 38 (vocaux, aperçus de liens, recherche de GIF).
+  Reste à vérifier par Théo : le **vocal sur iPhone** (Safari produit du `m4a` là où
+  Chrome fait du `webm` ; les deux sont prévus et servis correctement, mais seul un
+  essai sur un vrai iPhone le confirmera), et le cas **PWA installée** sur iOS.
 - **`GET /api/projects` n'a aucun contrôle de rôle** (`authenticateToken` seul) : un
   `External` ou un `Guest` peut lire tous les projets par l'API alors que l'interface
   les leur masque. Découvert le 06/08 en préparant les projets cités dans le chat.

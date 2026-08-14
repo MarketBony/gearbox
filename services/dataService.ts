@@ -597,6 +597,20 @@ class DataService {
     return apiFetch('/music/tracks');
   }
 
+  // Aperçu d'un lien. Rend `null` quand le domaine n'est pas dans la liste blanche
+  // serveur (204) — cas normal et majoritaire, pas une erreur.
+  async getLinkPreview(url: string): Promise<any | null> {
+    return apiFetch(`/link-preview?url=${encodeURIComponent(url)}`);
+  }
+
+  // Recherche de GIF (Tenor). La clé d'API ne transite jamais côté client.
+  async getGifStatus(): Promise<{ disponible: boolean }> {
+    return apiFetch('/gifs/status');
+  }
+  async searchGifs(q: string): Promise<{ id: string; apercu: string | null; url: string; description: string }[]> {
+    return apiFetch(`/gifs?q=${encodeURIComponent(q)}`);
+  }
+
   // ⚠️ Cette signature est une WHITELIST : un champ absent d'ici ne peut pas être
   // envoyé (excess property check sur l'objet littéral de l'appelant). C'est ce qui a
   // fait qu'un utilisateur ne pouvait pas enregistrer son propre anniversaire pendant

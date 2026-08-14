@@ -240,7 +240,9 @@ export interface ChatMessage {
   // ⚠️ Doit rester aligné sur `TYPES_CONNUS` de `backend/src/realtime/chat.ts` :
   // un type absent de la liste SERVEUR est stocké et affiché comme du texte, sans
   // erreur. 'project' : `content` porte l'id du projet cité.
-  type: 'text' | 'image' | 'file' | 'project';
+  // 'audio' : message vocal. `content` = URL du fichier, `fileName` = DURÉE
+  // formatée (« 0:12 ») — le modèle n'a pas de champ de durée.
+  type: 'text' | 'image' | 'file' | 'project' | 'audio';
   timestamp: string;
   edited: boolean;
   editedAt?: string;

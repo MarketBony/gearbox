@@ -120,6 +120,22 @@ export const estUrlImage = (brut: string): boolean => {
   }
 };
 
+/**
+ * Premier lien web d'un message, pour l'aperçu affiché sous la bulle.
+ * Un seul aperçu par message, volontairement : un message contenant cinq liens
+ * empilerait cinq cartes et noierait la conversation.
+ */
+export const premierLien = (contenu: string): string | null => {
+  for (const part of contenu.split(/\s+/)) {
+    if (!part) continue;
+    const reste = part.replace(PONCTUATION_INITIALE, '');
+    const brut = reste.replace(PONCTUATION_FINALE, '');
+    const href = hrefSur(brut);
+    if (href) return href;
+  }
+  return null;
+};
+
 /** Le message est-il UNIQUEMENT une URL d'image ? (un GIF collé seul) */
 export const messageEstImageDistante = (contenu: string): string | null => {
   const seul = contenu.trim();

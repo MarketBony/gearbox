@@ -12,6 +12,10 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
       VAPID_SUBJECT: ${VAPID_SUBJECT}
+      # Recherche de GIF (Giphy). Même règle que ci-dessus : la valeur vit dans le
+      # .env du VPS, mais SANS cette ligne elle n'atteint pas le conteneur.
+      # Absente ou vide, le bouton GIF est simplement masqué (la route rend 503).
+      GIPHY_API_KEY: ${GIPHY_API_KEY:-}
       NODE_ENV: production
       PORT: 3000
     volumes:

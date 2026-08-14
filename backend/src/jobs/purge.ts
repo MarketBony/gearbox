@@ -66,7 +66,13 @@ export const purgeOldChatFiles = async () => {
   const cutoff = new Date(Date.now() - CHAT_RETENTION_MS);
   const messages = await prisma.chatMessage.findMany({
     where: {
-      type: { in: ['image', 'file'] },
+      // ⚠️ Liste à tenir à jour à CHAQUE nouveau type de message porteur d'un
+      // fichier. Un type absent d'ici n'est JAMAIS purgé — silencieusement : le
+      // fichier reste sur le disque du VPS indéfiniment, sans erreur ni trace.
+      // 'audio' (messages vocaux) ajouté le 06/08/2026, même rétention de 180 j.
+      // 'project' n'y figure pas et ne doit pas y figurer : son `content` est un id
+      // de projet, pas un fichier.
+      type: { in: ['image', 'file', 'audio'] },
       fileExpiredAt: null,
       timestamp: { lt: cutoff }
     },
