@@ -603,6 +603,16 @@ class DataService {
     return apiFetch(`/link-preview?url=${encodeURIComponent(url)}`);
   }
 
+  // ---- Réglages d'application (interrupteurs de fonctionnalité) ----
+  // Lecture ouverte à tous ; la bascule est refusée par le SERVEUR à tout rôle
+  // autre que Master — masquer le bouton ne suffirait pas.
+  async getAppSettings(): Promise<{ gamesEnabled: boolean }> {
+    return apiFetch('/settings');
+  }
+  async setGamesEnabled(enabled: boolean): Promise<{ gamesEnabled: boolean }> {
+    return apiFetch('/settings/games', { method: 'PUT', body: JSON.stringify({ enabled }) });
+  }
+
   // Recherche de GIF (Tenor). La clé d'API ne transite jamais côté client.
   async getGifStatus(): Promise<{ disponible: boolean }> {
     return apiFetch('/gifs/status');

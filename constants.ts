@@ -503,6 +503,27 @@ export const GAMES_ALLOWED_ROLES: string[] = [
   'Digital Manager',
 ];
 
+/**
+ * Peut-on voir la rubrique Jeux ?
+ *
+ * DEUX conditions, et il faut les deux : l'interrupteur général doit être allumé,
+ * ET le rôle doit être autorisé. L'interrupteur est piloté en ligne par le Master
+ * depuis ses Paramètres (`services/appSettings.ts`), la liste de rôles reste, elle,
+ * une règle métier figée.
+ *
+ * ⚠️ TEST UNIQUE — `components/Sidebar.tsx` réécrivait cette liste EN DUR, si bien
+ * que la constante partagée ne pilotait ni le menu latéral ni la navigation groupée
+ * alors que le commentaire du fichier affirmait le contraire. Ne pas réintroduire de
+ * copie locale.
+ *
+ * ⚠️ Ce test ne décide que de l'AFFICHAGE. Le refus réel est côté serveur
+ * (`/api/games` et les handlers socket) : masquer une rubrique ne ferme pas une
+ * route, et ici c'est capital — envoyer un défi déclenche une notification push sur
+ * le téléphone d'un collègue.
+ */
+export const canSeeGames = (role: string | undefined, gamesEnabled: boolean): boolean =>
+  gamesEnabled && !!role && GAMES_ALLOWED_ROLES.includes(role);
+
 // ============================================================================
 // ÉQUIPE MARKETING — qui peut être RATTACHÉ à un projet ou à une tâche (06/08/2026)
 //

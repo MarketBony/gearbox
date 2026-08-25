@@ -379,3 +379,18 @@ model GameSession {
   // Le classement lit toutes les parties terminées.
   @@index([status])
 }
+
+// Réglages d'application modifiables EN LIGNE, sans redéploiement.
+//
+// Table générique clé/valeur, volontairement : le premier besoin est l'interrupteur
+// de la rubrique Jeux (14/08/2026), mais le suivant ne demandera plus de migration.
+//
+// ⚠️ ABSENCE DE LIGNE = valeur par défaut, et la valeur par défaut est toujours la
+// plus PRUDENTE (jeux éteints). Rien n'est semé à la migration : une table vide est
+// donc un état valide et sûr, et non un état « pas encore initialisé ».
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String? // userId, pour savoir qui a basculé quoi
+}

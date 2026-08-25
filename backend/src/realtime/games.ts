@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import { GAMES_ROLES } from '../auth/roles';
+import { jeuxActives } from '../settings/appSettings';
 import { applyMove, validateFleet, IllegalMoveError, BattleshipBoard } from '../utils/gameRules';
 import { projectSessionFor, SessionRow } from '../utils/gameView';
 
@@ -23,7 +24,14 @@ export const emitSessionToPlayers = (io: Server, session: SessionRow, event: str
   io.to(userRoom(session.player2Id)).emit(event, projectSessionFor(session.player2Id, session));
 };
 
+// ⚠️⚠️ PASSAGE OBLIGÉ DES TROIS HANDLERS (`game:fleet:place`, `game:move`,
+// `game:forfeit`) — c'est ici qu'on pose le verrou de l'interrupteur général, et non
+// à l'enregistrement des handlers : ceux-ci sont attachés UNE FOIS à la connexion,
+// donc un utilisateur déjà connecté continuerait de jouer après extinction.
+// Le placer dans le chargement de partie garantit aussi qu'un handler ajouté plus
+// tard héritera du verrou sans qu'on ait à y penser.
 const chargerPartie = async (sessionId: unknown, userId: string) => {
+  if (!(await jeuxActives())) throw new IllegalMoveError('La rubrique Jeux est désactivée.');
   if (typeof sessionId !== 'string' || !sessionId) throw new IllegalMoveError('Partie requise.');
   const session = await prisma.gameSession.findUnique({ where: { id: sessionId } });
   if (!session) throw new IllegalMoveError('Partie introuvable.');

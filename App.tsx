@@ -16,7 +16,9 @@ import HelloMarketing from './pages/HelloMarketing';
 import Games from './pages/Games';
 import TodoList from './pages/TodoList';
 import Export, { EXPORT_ALLOWED_ROLES } from './pages/Export';
-import { GAMES_ALLOWED_ROLES, SITE_MANAGER_SECTIONS, isSiteManager } from './constants';
+import { canSeeGames, SITE_MANAGER_SECTIONS, isSiteManager } from './constants';
+import { appSettingsStore, useAppSettings } from './services/appSettings';
+import { useRealtimeSync, RT_EVENTS } from './services/realtime';
 import AnimatedBackground from './components/AnimatedBackground';
 import { db } from './services/dataService';
 import { setMySection } from './services/socket';
@@ -31,6 +33,20 @@ const InnerApp: React.FC = () => {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dbReady, setDbReady] = useState(false);
+  // Interrupteurs de fonctionnalité : chargés une fois à l'ouverture de session,
+  // puis suivis en temps réel — une extinction par le Master doit être immédiate
+  // chez tout le monde, sans rechargement.
+  const { gamesEnabled } = useAppSettings();
+
+  // Réglages d'application : rechargés à chaque ouverture de session (le store part
+  // du défaut prudent « éteint », donc la rubrique n'apparaît qu'une fois la réponse
+  // reçue — jamais l'inverse).
+  useEffect(() => {
+    if (user) appSettingsStore.refresh();
+  }, [user]);
+
+  // Bascule par le Master : répercutée chez tout le monde sans rechargement.
+  useRealtimeSync(RT_EVENTS.settings, () => { appSettingsStore.refresh(); });
 
   useEffect(() => {
     // Initialize Data Service
@@ -46,13 +62,15 @@ const InnerApp: React.FC = () => {
     return () => window.removeEventListener('gearbox-navigate' as any, handleNavigation);
   }, []);
 
-  const EXTERNAL_ALLOWED_TABS = ['digital', 'chat', 'hello-marketing', 'games'];
+  // `games` retiré le 14/08/2026 : la rubrique est pilotée par un interrupteur, et un
+  // External n'y a de toute façon pas accès (la garde ci-dessous le rattrapait déjà).
+  const EXTERNAL_ALLOWED_TABS = ['digital', 'chat', 'hello-marketing'];
   // GAMES_ALLOWED_ROLES vient désormais de constants.ts (il était dupliqué ici
   // et dans pages/Games.tsx).
 
   // Onglet RÉSOLU (après redirections de rôle) — sert de `key` à la transition.
   const isExternal = user?.role === 'External';
-  const canAccessGames = GAMES_ALLOWED_ROLES.includes(user?.role ?? '');
+  const canAccessGames = canSeeGames(user?.role, gamesEnabled);
   const canExport = EXPORT_ALLOWED_ROLES.includes(user?.role ?? '');
   let resolvedTab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(activeTab)) ? 'digital' : activeTab;
   if (resolvedTab === 'games' && !canAccessGames) resolvedTab = 'dashboard';

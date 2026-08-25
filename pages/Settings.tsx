@@ -12,6 +12,7 @@ import Select from '../components/Select';
 import DatePicker from '../components/DatePicker';
 import InstallAppModal from '../components/InstallAppModal';
 import NotificationsToggle from '../components/NotificationsToggle';
+import GamesToggle from '../components/GamesToggle';
 import { SITES, isSiteManager } from '../constants';
 // `parseLocalDate` est exporté par DateRangePicker (et non par constants.ts).
 import { parseLocalDate } from '../components/DateRangePicker';
@@ -704,6 +705,16 @@ const Settings: React.FC = () => {
         <div className="mt-5 pt-5 border-t border-slate-200 dark:border-white/5">
           <NotificationsToggle />
         </div>
+
+        {/* Interrupteur de la rubrique Jeux — visible du MASTER seul, et
+            volontairement discret : une simple ligne en pied de section, sans
+            titre ni encadré. Le refus réel est côté serveur (`PUT /api/settings/games`
+            n'accepte que le Master) : masquer ce bouton ne ferme rien. */}
+        {user?.role === 'Master' && (
+          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/5">
+            <GamesToggle />
+          </div>
+        )}
       </div>
 
       {/* SECTION 1ter : STOCKAGE — visible par TOUS les rôles (demande de Théo) :

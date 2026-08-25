@@ -11,7 +11,8 @@ import { usePresence } from '../services/presenceStore';
 import { setAppBadge } from '../services/pushNotifications';
 import { ActivityLog } from '../types';
 // Source unique des rôles ayant accès aux Jeux (Director en est exclu, règle métier).
-import { GAMES_ALLOWED_ROLES, SITE_MANAGER_SECTIONS, isSiteManager, hasSocialFeatures } from '../constants';
+import { canSeeGames, SITE_MANAGER_SECTIONS, isSiteManager, hasSocialFeatures } from '../constants';
+import { useAppSettings } from '../services/appSettings';
 import {
   LayoutDashboard,
   FolderKanban,
@@ -54,6 +55,10 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const { logout, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  // Interrupteur général de la rubrique Jeux, piloté en ligne par le Master.
+  // Re-rendu automatique à la bascule : la rubrique disparaît/réapparaît sans
+  // que personne n'ait à recharger.
+  const { gamesEnabled } = useAppSettings();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [activityLog, setActivityLog] = useState<ActivityLog[]>([]);
@@ -85,7 +90,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   // Désormais serveur, et rafraîchi par l'événement socket (voir plus bas), donc
   // sans polling.
   const loadGamesChallenges = () => {
-    if (!user || !GAMES_ALLOWED_ROLES.includes(user.role)) {
+    if (!canSeeGames(user?.role, gamesEnabled)) {
       setGamesChallengeCount(0);
       return;
     }
@@ -188,7 +193,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const presence = showSocial ? presenceBrute : {};
 
   const isExternal = user?.role === 'External';
-  const canAccessGames = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Coordinator' || user?.role === 'Digital Manager';
+  // ⚠️ Cette ligne réécrivait la liste des rôles EN DUR, alors que le commentaire de
+  // l'import affirmait s'appuyer sur la constante partagée : la constante ne pilotait
+  // donc NI le menu latéral NI la nav groupée. Test unique désormais, qui intègre
+  // l'interrupteur général piloté par le Master.
+  const canAccessGames = canSeeGames(user?.role, gamesEnabled);
   const canExport = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Coordinator';
 
   const allMainItems = [
