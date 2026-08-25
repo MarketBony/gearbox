@@ -521,6 +521,30 @@ export const GAMES_ALLOWED_ROLES: string[] = [
  * route, et ici c'est capital — envoyer un défi déclenche une notification push sur
  * le téléphone d'un collègue.
  */
+/**
+ * Qui peut ÉDITER la rubrique Digital — publications, médias et tags.
+ *
+ * ⚠️ Doit rester aligné sur les `EDIT_ROLES` de `backend/src/routes/social.ts` ET de
+ * `backend/src/routes/tags.ts`, qui sont les garde-fous réels. Cette copie ne sert
+ * qu'à décider ce que l'écran propose.
+ *
+ * ⚠️ `External` en fait partie depuis le 25/08/2026 (décision de Théo : accès total au
+ * Digital, tags compris) — c'est le seul écran où ce rôle édite. Il y avait auparavant
+ * TROIS listes de rôles en dur dans `pages/Digital.tsx`, qui divergeaient entre elles
+ * et du serveur : celui-ci autorisait déjà l'External à supprimer une publication, ce
+ * que l'interface lui refusait.
+ */
+export const DIGITAL_EDIT_ROLES: string[] = [
+  'Master',
+  'Administrator',
+  'Director',
+  'Digital Manager',
+  'External',
+];
+
+export const canEditDigital = (role?: string): boolean =>
+  !!role && DIGITAL_EDIT_ROLES.includes(role);
+
 export const canSeeGames = (role: string | undefined, gamesEnabled: boolean): boolean =>
   gamesEnabled && !!role && GAMES_ALLOWED_ROLES.includes(role);
 

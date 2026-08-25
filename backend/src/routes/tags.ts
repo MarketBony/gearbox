@@ -6,7 +6,11 @@ import { emitEvent } from '../realtime';
 const router = Router();
 const prisma = new PrismaClient();
 // 'Digital Manager' avec espace (rôle réel en base) — 'DigitalManager' ne matchait jamais.
-const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Digital Manager'];
+// ⚠️ 'External' ajouté le 25/08/2026 : Théo lui a donné l'accès TOTAL au Digital,
+// tags compris. Sans cette ligne, l'écran lui afficherait des contrôles de tags que
+// l'API refuserait en 403 — le motif « l'interface ment » qui a déjà coûté deux passes.
+// Doit rester aligné sur `DIGITAL_EDIT_ROLES` de constants.ts et sur social.ts.
+const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Digital Manager', 'External'];
 
 router.get('/', authenticateToken, async (req, res) => {
   const tags = await prisma.digitalTags.findFirst();

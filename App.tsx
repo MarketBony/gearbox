@@ -64,7 +64,10 @@ const InnerApp: React.FC = () => {
 
   // `games` retiré le 14/08/2026 : la rubrique est pilotée par un interrupteur, et un
   // External n'y a de toute façon pas accès (la garde ci-dessous le rattrapait déjà).
-  const EXTERNAL_ALLOWED_TABS = ['digital', 'chat', 'hello-marketing'];
+  // 'settings' ajouté le 25/08/2026 : sans lui, un External ne pouvait ni changer son
+  // mot de passe, ni sa photo, ni renseigner son anniversaire. La gestion des comptes
+  // reste fermée — elle dépend de `canManageUsers`, qui ne contient pas ce rôle.
+  const EXTERNAL_ALLOWED_TABS = ['digital', 'chat', 'hello-marketing', 'settings'];
   // GAMES_ALLOWED_ROLES vient désormais de constants.ts (il était dupliqué ici
   // et dans pages/Games.tsx).
 
