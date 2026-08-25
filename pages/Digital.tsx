@@ -10,7 +10,7 @@ import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check,
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
 import CollapsibleFilters from '../components/CollapsibleFilters';
-import { isSiteManager } from '../constants';
+import { isSiteManager, canEditDigital } from '../constants';
 import DatePicker from '../components/DatePicker';
 
 type Tab = 'Calendrier Editorial' | 'Planning Digital' | 'Archives' | 'Gestion des TAGS';
@@ -834,11 +834,17 @@ const Digital: React.FC = () => {
   const [hoveredPostId, setHoveredPostId] = useState<string | null>(null);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
 
-  // Permissions
-  const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Digital Manager';
-  const canDelete = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Digital Manager';
-  // External role can edit in Calendrier Editorial only (create, modify, status, media)
-  const canEditCalendar = canEdit || user?.role === 'External';
+  // Permissions — UN SEUL test, partagé avec le serveur via constants.ts.
+  // ⚠️ Il y avait ici TROIS listes de rôles en dur (`canEdit`, `canDelete`,
+  // `canEditCalendar`) qui divergeaient entre elles ET du serveur : `routes/social.ts`
+  // autorisait déjà l'External à créer, modifier et SUPPRIMER une publication, mais
+  // l'écran lui refusait la suppression et les tags. C'est l'inverse du piège habituel
+  // — ici le serveur était ouvert et l'interface fermée.
+  // Depuis le 25/08/2026, l'External a l'accès complet au Digital (décision de Théo,
+  // tags compris), donc les trois listes n'en font plus qu'une.
+  const canEdit = canEditDigital(user?.role);
+  const canDelete = canEdit;
+  const canEditCalendar = canEdit;
   const isExternal = user?.role === 'External';
   const estChefDeSite = isSiteManager(user?.role);
 
@@ -1469,9 +1475,13 @@ const Digital: React.FC = () => {
                     {/* Tabs */}
                     <div className="bg-slate-100 dark:bg-black/30 p-1 rounded-lg border border-bony-border flex flex-wrap gap-1">
                         {/* Chef de site : SEUL « Planning Digital » lui est accessible
-                            (demande de Théo). External : seul le calendrier éditorial. */}
+                            (demande de Théo).
+                            ⚠️ L'External voyait lui aussi UN SEUL onglet (le calendrier
+                            éditorial) : c'était la vraie limite de son accès Digital,
+                            plus encore que les droits d'édition. Levé le 25/08/2026 —
+                            il a désormais les quatre onglets. */}
                         {(['Calendrier Editorial', 'Planning Digital', 'Archives', 'Gestion des TAGS'] as Tab[])
-                          .filter(tab => estChefDeSite ? tab === 'Planning Digital' : (!isExternal || tab === 'Calendrier Editorial'))
+                          .filter(tab => estChefDeSite ? tab === 'Planning Digital' : true)
                           .map(tab => (
                             <button 
                                 key={tab}

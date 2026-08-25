@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { authenticateToken, AuthRequest } from '../auth/middleware';
+import { hasSocialFeatures } from '../auth/roles';
 import { joinConversationRooms, notifyConversationCreated } from '../realtime';
 
 const router = Router();
@@ -69,6 +70,27 @@ router.post('/conversations', authenticateToken, async (req: AuthRequest, res) =
 
   // Le créateur est toujours participant (ajouté s'il manque), doublons dédupliqués.
   const allParticipants = Array.from(new Set([...participants, userId]));
+
+  // ⚠️ Aucun participant ne peut être un rôle SANS ACCÈS AU CHAT (chef de site).
+  // Sans ce contrôle, on créait une conversation FANTÔME : elle existait en base, elle
+  // apparaissait chez l'émetteur, et le destinataire ne la voyait jamais — ni rubrique
+  // Chat, ni handlers socket enregistrés pour lui. Filtrer la liste côté écran ne
+  // fermait rien : c'est ici que ça se joue.
+  // Le contrôle porte sur les rôles réellement en base, jamais sur ce que le client
+  // affirme envoyer.
+  const profils = await prisma.user.findMany({
+    where: { id: { in: allParticipants } },
+    select: { id: true, name: true, role: true },
+  });
+  if (profils.length !== allParticipants.length) {
+    return res.status(400).json({ error: 'Un des participants est introuvable.' });
+  }
+  const sansChat = profils.filter(u => !hasSocialFeatures(u.role));
+  if (sansChat.length > 0) {
+    return res.status(400).json({
+      error: `Impossible : ${sansChat.map(u => u.name).join(', ')} n'a pas accès au chat.`,
+    });
+  }
 
   if (type === 'private') {
     if (allParticipants.length !== 2) {

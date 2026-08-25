@@ -1711,6 +1711,64 @@
     global, l'état de test EST l'état de production : il faut le remettre comme on
     nettoie une donnée de test.
 
+41. **RÔLE EXTERNAL — Digital complet, chat élargi, accès aux Paramètres**
+    (`feat/droits-external`, 25 août). Backend + frontend, **aucune migration** →
+    `api` **et** `web`.
+
+    Demande de Théo : l'External (prestataire extérieur) était trop contraint —
+    accès total au Digital, discussion avec tout le monde sauf les chefs de site, et
+    accès aux Paramètres (il ne pouvait ni changer son mot de passe, ni sa photo, ni
+    renseigner son anniversaire).
+
+    **⚠️ Ce que l'audit a corrigé dans la demande : le vrai blocage du Digital n'était
+    pas les droits d'édition, mais les ONGLETS.** L'External n'en voyait **qu'un sur
+    quatre** (Calendrier Éditorial) — ni Planning, ni Archives, ni Gestion des TAGS.
+    Il avait déjà `canEditCalendar`. Sans cette découverte, on lui aurait ouvert des
+    droits sur un écran qu'il ne pouvait pas atteindre.
+
+    **⚠️ Situation INVERSE du piège habituel sur Digital** : `routes/social.ts`
+    autorisait **déjà** l'External à créer, modifier **et supprimer** — c'est l'écran
+    qui le lui refusait. Le serveur était ouvert, l'interface fermée.
+    Cet écran portait **TROIS listes de rôles en dur** (`canEdit`, `canDelete`,
+    `canEditCalendar`) divergentes entre elles et du serveur. Remplacées par un test
+    unique `canEditDigital` dans `constants.ts`. Vérifié après coup : les trois listes
+    (constants, `social.ts`, `tags.ts`) sont désormais **identiques au caractère**.
+
+    **Tags ouverts à l'External côté serveur** (`routes/tags.ts`) — arbitrage de Théo,
+    « accès total, tags compris ». Nécessaire et non cosmétique : `TagsManager` reçoit
+    le même droit que les publications, donc sans ça l'écran aurait affiché des
+    contrôles refusés en 403.
+
+    **⚠️ Défaut trouvé au passage, et qui NE concernait pas que l'External : les chefs
+    de site n'étaient exclus d'AUCUNE liste de contacts du chat.** Or ce rôle n'a aucun
+    accès au chat (rubrique absente, `registerChatHandlers` non enregistré). N'importe
+    qui pouvait donc lui ouvrir une conversation : elle existait en base, s'affichait
+    chez l'émetteur, et **restait invisible du destinataire à jamais**. Corrigé pour
+    tous les rôles — et **refusé côté serveur** dans `POST /api/chat/conversations`,
+    sur les rôles lus en base et non sur ce que le client affirme envoyer. Filtrer la
+    liste de l'écran n'aurait rien fermé.
+    Au passage, l'exclusion explicite des External des groupes (`u.role !== 'External'`)
+    est retirée : ils sont désormais proposables comme tout le monde.
+
+    **Paramètres** : `'settings'` ajouté à `EXTERNAL_ALLOWED_TABS`, et les deux gardes
+    `!isExternal` qui masquaient le bouton (carte utilisateur desktop, barre tablette)
+    retirées. `Settings.tsx` **non modifié** : la gestion des comptes reste fermée par
+    `canManageUsers`, qui ne contient pas ce rôle. `PUT /me` n'ayant aucun contrôle de
+    rôle, mot de passe / nom / photo / anniversaire fonctionnent sans rien ajouter, et
+    les uploads lui étaient déjà autorisés.
+    ⚠️ **Le menu « Plus » mobile de l'External était VIDE, à dessein** (correctif 31 :
+    ses rubriques tiennent dans la barre du bas). Lui donner les Paramètres sans y
+    toucher les aurait rendus **inatteignables depuis un téléphone** — or c'est
+    justement là qu'on change sa photo. Il contient désormais Paramètres, et rien d'autre.
+
+    **Vérifié** : `tsc` backend 0, racine 12 de référence ; concordance des trois listes
+    de rôles Digital contrôlée après coup ; `hasSocialFeatures` identique côté écran et
+    serveur. **Validé par Théo.**
+    ℹ️ Réserve honnête : le parcours complet avec le compte External réel (`ali`) dans
+    le navigateur a été demandé mais son résultat détaillé ne m'a pas été rapporté —
+    ma vérification porte sur les types, la concordance des listes et la logique du
+    verrou serveur.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans

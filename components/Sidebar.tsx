@@ -256,8 +256,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   // indice (`slice(5)`). Avec l'ancienne formule, changer la barre aurait fait
   // disparaître Hello Marketing et Jeux du mobile tout en dupliquant Agenda et Chat.
   const bottomIds = new Set(bottomNavItems.map(i => i.id));
+  // ⚠️ L'External avait un menu « Plus » VIDE, à dessein : ses trois rubriques tiennent
+  // déjà dans la barre du bas (correctif 31). Mais depuis qu'il a accès aux Paramètres,
+  // un menu vide les rendrait INATTEIGNABLES depuis un téléphone — or c'est justement
+  // là qu'on change sa photo de profil. On lui rend donc un « Plus » qui ne contient
+  // que ça.
   const moreNavItems = isExternal
-    ? []
+    ? [{ id: 'settings', icon: Settings, label: 'Paramètres' }]
     : [
         ...mainItems.filter(i => !bottomIds.has(i.id)),
         { id: 'archives', icon: Archive, label: 'Projets Archivés' },
@@ -482,14 +487,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                 <p className="text-[12px] font-semibold text-bony-text truncate leading-tight">{user?.name}</p>
                 <p className="text-[10px] text-bony-muted truncate leading-tight">{user?.role}</p>
               </div>
-              {!isExternal && (
-                <button
-                  onClick={() => setActiveTab('settings')}
-                  className="p-1 rounded hover:bg-white/5 text-bony-text/40 hover:text-bony-text transition-colors shrink-0"
-                >
-                  <Settings size={14} />
-                </button>
-              )}
+              <button
+                onClick={() => setActiveTab('settings')}
+                className="p-1 rounded hover:bg-white/5 text-bony-text/40 hover:text-bony-text transition-colors shrink-0"
+              >
+                <Settings size={14} />
+              </button>
             </div>
 
             {/* Fil d'actualité — outil d'équipe marketing. Un chef de site n'y a pas
@@ -549,11 +552,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
             <button onClick={toggleTheme} className="p-2 rounded hover:bg-white/10 text-bony-text/50 hover:text-bony-text transition-colors">
               {theme === 'dark' ? <Sun size={18} className="text-yellow-400" /> : <Moon size={18} className="text-blue-600" />}
             </button>
-            {!isExternal && (
-              <button onClick={() => setActiveTab('settings')} className="p-2 rounded hover:bg-white/10 text-bony-text/50 hover:text-bony-text transition-colors">
-                <Settings size={18} />
-              </button>
-            )}
+            <button onClick={() => setActiveTab('settings')} className="p-2 rounded hover:bg-white/10 text-bony-text/50 hover:text-bony-text transition-colors">
+              <Settings size={18} />
+            </button>
             <button onClick={logout} className="p-2 rounded hover:bg-red-500/10 text-red-400 transition-colors">
               <LogOut size={18} />
             </button>

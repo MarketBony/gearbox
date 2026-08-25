@@ -450,6 +450,30 @@ colonne mais **n'est jamais écrit** (l'épinglage est un overlay `localStorage`
 client). La sourdine, elle, est bien en base : c'est le serveur qui décide d'envoyer
 le push. Elle coupe le push, **pas** le compteur non-lu (comportement Messenger).
 
+### 💬 Création de conversation — refus des rôles SANS chat (25/08/2026)
+
+`POST /api/chat/conversations` vérifie désormais que **tous** les participants ont
+accès au chat (`hasSocialFeatures`), sur les rôles **lus en base** et jamais sur ce que
+le client envoie.
+
+**Pourquoi** : un chef de site n'a ni rubrique Chat, ni handlers socket enregistrés.
+Rien n'empêchait pourtant de l'ajouter à une conversation — qui existait alors en base,
+s'affichait chez l'émetteur, et **restait invisible du destinataire à jamais**.
+Une conversation fantôme, pour tous les rôles, pas seulement pour l'External.
+Les listes de l'écran (`pages/Chat.tsx`) sont filtrées en plus, mais elles ne ferment
+rien : c'est ce contrôle-ci qui décide.
+
+### 🎨 Digital — l'External édite tout (25/08/2026)
+
+`routes/social.ts` autorisait **déjà** l'External à créer, modifier et supprimer une
+publication ; `routes/tags.ts` lui a été ouvert le 25/08/2026 (arbitrage de Théo :
+accès total, tags compris).
+
+⚠️ **Trois listes doivent rester alignées** : `DIGITAL_EDIT_ROLES` (`constants.ts`,
+copie d'affichage), `EDIT_ROLES` de `social.ts` et `EDIT_ROLES` de `tags.ts`. C'est
+l'écran qui divergeait — il portait **trois** listes en dur qui refusaient à l'External
+ce que le serveur lui accordait déjà.
+
 ### 🎛️ Réglages d'application — `/api/settings` et `settings/appSettings.ts` (14/08/2026)
 
 Table `AppSetting` (clé/valeur), migration `20260814120000_add_app_settings`. Premier

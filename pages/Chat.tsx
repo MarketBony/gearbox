@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { ChatConversation, ChatMessage, User, Project } from '../types';
 import FloatingPanel from '../components/FloatingPanel';
 import ProjectSummary from '../components/ProjectSummary';
+import { hasSocialFeatures } from '../constants';
 import { renduTexteRiche, messageEstImageDistante, estCheminLocalImage, premierLien } from '../lib/richText';
 import LinkPreview from '../components/LinkPreview';
 import VoiceRecorder from '../components/VoiceRecorder';
@@ -869,10 +870,22 @@ const Chat: React.FC = () => {
     }, []),
   [messages]);
 
-  // Users for private modal (all except me)
-  const usersForPrivate = users.filter(u => u.id !== me?.id);
-  // Users for group modal (non-External only)
-  const usersForGroup = users.filter(u => u.id !== me?.id && u.role !== 'External');
+  // Interlocuteurs proposés — MÊME liste pour une conversation privée et pour un
+  // groupe, depuis le 25/08/2026.
+  //
+  // ⚠️ Deux corrections, dont une qui ne concernait pas que l'External :
+  //  1. les External étaient exclus des GROUPES (`u.role !== 'External'`) : personne ne
+  //     pouvait les y ajouter. Théo a tranché — ils discutent avec tout le monde.
+  //  2. ni l'une ni l'autre des listes n'excluait les CHEFS DE SITE, alors qu'ils n'ont
+  //     aucun accès au chat (rubrique absente, handlers socket non enregistrés). Les
+  //     proposer créait une conversation FANTÔME, que le destinataire ne voyait jamais.
+  //     Défaut valable pour tous les rôles, pas seulement pour l'External.
+  //
+  // `hasSocialFeatures` est le test partagé avec le serveur : c'est lui qui définit
+  // « a une vie d'équipe ». Le refus réel est côté serveur, à la création.
+  const interlocuteurs = users.filter(u => u.id !== me?.id && hasSocialFeatures(u.role));
+  const usersForPrivate = interlocuteurs;
+  const usersForGroup = interlocuteurs;
   // Users not yet in active group
   const membersNotInGroup = activeConv?.type === 'group'
     ? usersForGroup.filter(u => !activeConv.participants.includes(u.id))
