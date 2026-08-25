@@ -29,6 +29,9 @@ import { getSocket, connectSocket } from './socket';
 // maintenir : les pages composent leurs abonnements à partir d'ici.
 export const RT_EVENTS = {
   projects: ['projects:updated', 'projects:deleted'],
+  // Interrupteurs de fonctionnalité (rubrique Jeux). Diffusé à tous : l'extinction
+  // doit être immédiate partout, sans rechargement.
+  settings: ['settings:updated'],
   // Tâches AUTONOMES (sans projet). Événement distinct de `projects` : elles ne
   // transitent pas par /api/projects et une mutation de l'un ne concerne pas l'autre.
   tasks: ['tasks:updated', 'tasks:deleted'],

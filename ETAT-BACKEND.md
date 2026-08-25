@@ -450,6 +450,41 @@ colonne mais **n'est jamais écrit** (l'épinglage est un overlay `localStorage`
 client). La sourdine, elle, est bien en base : c'est le serveur qui décide d'envoyer
 le push. Elle coupe le push, **pas** le compteur non-lu (comportement Messenger).
 
+### 🎛️ Réglages d'application — `/api/settings` et `settings/appSettings.ts` (14/08/2026)
+
+Table `AppSetting` (clé/valeur), migration `20260814120000_add_app_settings`. Premier
+usage : l'**interrupteur de la rubrique Jeux**, piloté en ligne par le Master, sans
+redéploiement. Table générique volontairement — le prochain interrupteur n'exigera pas
+de migration.
+
+⚠️⚠️ **`settings/appSettings.ts` est la SEULE porte** de la question « les Jeux
+sont-ils allumés ? », au même titre que `siteScope.ts` pour le périmètre. Aucune route
+ne lit la table directement.
+
+⚠️ **ABSENCE DE LIGNE = ÉTEINT.** Rien n'est semé à la migration : base vierge,
+migration fraîche ou lecture en échec laissent les Jeux **fermés**, jamais ouverts par
+accident. Le démarrage journalise `[settings] Jeux eteints|ALLUMES`.
+
+⚠️ Valeur **en mémoire**, rafraîchie à l'écriture : les routes de jeu la consultent à
+chaque appel. Cache **par process** — un seul conteneur `api` aujourd'hui ; s'il en
+fallait plusieurs, il faudrait diffuser l'invalidation.
+
+⚠️ **Écriture réservée au Master CÔTÉ SERVEUR** (`PUT /api/settings/games`). La page
+Paramètres se contente de masquer le bouton : masquer un bouton ne ferme pas une route.
+Lecture ouverte à tout compte authentifié — chaque client doit savoir quoi afficher.
+
+**Pourquoi le verrou serveur est indispensable, et où il est posé.** Envoyer un défi
+déclenche une **notification push** par une chaîne indépendante de l'affichage : masquer
+la rubrique aurait laissé un onglet ouvert ou un appel direct faire vibrer le téléphone
+d'un collègue. Deux points de blocage :
+- `routes/games.ts` — middleware après `requireRole`, testé **à chaque appel** ;
+- `realtime/games.ts` — dans **`chargerPartie`**, passage obligé des trois handlers,
+  et **pas** à l'enregistrement : `registerGameHandlers` s'exécute une seule fois à la
+  connexion, donc un utilisateur déjà connecté aurait continué de jouer après
+  extinction. Un handler ajouté plus tard hérite du verrou sans qu'on y pense.
+
+Temps réel : `settings:updated` diffusé à tous — l'extinction est immédiate partout.
+
 ### 🔗 Aperçu de liens — `/api/link-preview` (06/08/2026)
 
 ⚠️⚠️ **La seule route du projet qui fetch une URL VENANT DU CLIENT.** C'est

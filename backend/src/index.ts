@@ -30,8 +30,10 @@ import seedRoutes from './routes/seed';
 import uploadsRoutes, { UPLOADS_ROOT } from './routes/uploads';
 import storageRoutes from './routes/storage';
 import gamesRoutes from './routes/games';
+import settingsRoutes from './routes/settings';
 import { setupRealtime, withEmitterContext } from './realtime';
 import { startPurgeJob } from './jobs/purge';
+import { chargerReglages } from './settings/appSettings';
 
 dotenv.config();
 
@@ -77,6 +79,8 @@ app.use('/api/storage', storageRoutes);
 // Jeux : défis et parties. Accès restreint aux rôles autorisés — Director en est
 // exclu, seule exception à sa parité avec Administrator (règle métier).
 app.use('/api/games', gamesRoutes);
+// Interrupteurs de fonctionnalite : lecture pour tous, ecriture Master seul.
+app.use('/api/settings', settingsRoutes);
 // Hello Marketing : proxy des flux RSS et de la playlist Deezer (le navigateur ne
 // peut pas les appeler en direct — CORS ; voir les commentaires de ces routes).
 app.use('/api/feeds', feedRoutes);
@@ -130,6 +134,9 @@ app.use(errorHandler);
 
 // Realtime
 setupRealtime(io);
+
+// Reglages d'application (interrupteur Jeux) : charges une fois au demarrage.
+chargerReglages().catch((e: unknown) => console.error('[settings] prechargement', e));
 
 // Job de purge des médias calendar archivés depuis > 30j.
 startPurgeJob();

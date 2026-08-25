@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { GAMES_ROLES } from '../auth/roles';
+import { jeuxActives } from '../settings/appSettings';
 import { isGameType, initBoard, initStatus } from '../utils/gameRules';
 import { projectSessionFor, projectSessionSummary } from '../utils/gameView';
 import { notifyChallenge, notifySessionToPlayers } from '../realtime';
@@ -12,6 +13,22 @@ const prisma = new PrismaClient();
 // Toutes les routes de jeu sont réservées aux rôles autorisés (règle métier :
 // Director en est exclu, contrairement à ses autres droits d'Administrator).
 router.use(authenticateToken, requireRole(GAMES_ROLES));
+
+// ⚠️⚠️ INTERRUPTEUR GÉNÉRAL — c'est LE verrou de l'extinction de la rubrique.
+// Masquer la rubrique côté interface ne ferme rien : un onglet resté ouvert ou un
+// simple appel direct suffirait à envoyer un défi, et donc à déclencher une
+// NOTIFICATION PUSH (« X vous défie ! ») sur le téléphone d'un collègue — exactement
+// ce que l'extinction doit empêcher. Pire, ce push est normalement sauté quand le
+// destinataire est déjà SUR la rubrique Jeux : une fois éteinte, plus personne n'y
+// est, donc il partirait systématiquement.
+// Le test est fait à CHAQUE appel et non au montage : l'interrupteur peut basculer
+// pendant qu'un utilisateur est connecté.
+router.use(async (_req, res, next) => {
+  if (!(await jeuxActives())) {
+    return res.status(403).json({ error: 'La rubrique Jeux est désactivée.' });
+  }
+  next();
+});
 
 // GET /api/games/lobby — tout ce dont le lobby a besoin, en un appel.
 router.get('/lobby', async (req: AuthRequest, res) => {

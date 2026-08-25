@@ -1639,6 +1639,78 @@
     part Alpine dans le bucket, tandis que le filtre MARQUE = Renault écarte l'enveloppe
     Alpine). Ce n'est pas un défaut de ce lot.
 
+40. **RUBRIQUE JEUX ÉTEINTE — interrupteur piloté par le Master**
+    (`feat/interrupteur-jeux`, 14 août). Backend + frontend, **migration Prisma** →
+    `api` **et** `web`.
+
+    Demande de Théo : l'application grandit et sert dans un cadre professionnel, la
+    rubrique Jeux ne doit plus apparaître. Mais elle reste une bonne fonctionnalité —
+    **on ne supprime rien**, et Théo voulait pouvoir l'éteindre et la rallumer
+    **lui-même**, sans dépendre d'un déploiement.
+
+    **Ce qu'il a** : une ligne discrète en pied de la section « Application » de ses
+    Paramètres (« *Espace détente* » + petit interrupteur), **visible du Master seul**.
+    Un clic bascule la rubrique **pour tout le monde, sans rechargement**.
+    ⚠️ Volontairement discret, sans titre ni encadré : c'est la demande explicite
+    (« un petit bouton discret, pas un gros truc avec écrit JEUX »).
+
+    **⚠️ CE N'ÉTAIT PAS UNE MODIF D'INTERFACE — le point central du lot.** Envoyer un
+    défi déclenche une **notification push** (« *X vous défie !* ») par une chaîne qui
+    ne dépend pas du tout de l'affichage. Masquer la rubrique aurait laissé un onglet
+    resté ouvert, ou un simple appel direct, faire vibrer le téléphone d'un collègue —
+    exactement l'image « pas sérieuse » à éviter. Pire : ce push est normalement
+    **sauté** quand le destinataire est déjà SUR la rubrique Jeux ; une fois éteinte,
+    plus personne n'y est, donc il **serait parti systématiquement**.
+    → Le verrou est **côté serveur** : `/api/games` refuse en 403, et les handlers
+    socket aussi.
+
+    **⚠️ Le verrou socket est posé dans `chargerPartie`, pas à l'enregistrement des
+    handlers.** `registerGameHandlers` s'exécute UNE FOIS à la connexion : un
+    utilisateur déjà connecté aurait gardé ses handlers actifs après extinction. Les
+    trois handlers (`game:fleet:place`, `game:move`, `game:forfeit`) passant tous par
+    `chargerPartie`, un handler ajouté plus tard héritera du verrou sans qu'on y pense.
+
+    **⚠️ Le levier évident ne marchait pas** : `components/Sidebar.tsx` **réécrivait la
+    liste des rôles EN DUR**, alors que le commentaire de son import affirmait
+    s'appuyer sur `GAMES_ALLOWED_ROLES`. La constante partagée ne pilotait donc ni le
+    menu latéral ni la nav groupée. Reliquat du 05/08, corrigé : test unique
+    `canSeeGames(role, gamesEnabled)` dans `constants.ts`.
+
+    **Comment l'état est mémorisé** : nouvelle table `AppSetting` (clé/valeur),
+    migration `20260814120000_add_app_settings`, **neuve et purement additive**.
+    Générique volontairement : le prochain interrupteur ne demandera pas de migration.
+    ⚠️ **Absence de ligne = ÉTEINT.** Rien n'est semé : une base vierge, une migration
+    fraîche ou une lecture qui échoue laissent les Jeux fermés, jamais ouverts par
+    accident. Confirmé au démarrage : `[settings] Jeux eteints`.
+    Valeur tenue **en mémoire** et rafraîchie à l'écriture — les routes de jeu la
+    consultent à chaque appel, une requête base par appel serait du gaspillage.
+    ℹ️ Cache **par process** : un seul conteneur `api` tourne ; s'il en fallait
+    plusieurs, il faudrait diffuser l'invalidation.
+
+    **Droits** : `PUT /api/settings/games` est réservé au **Master côté serveur**. La
+    page ne fait que masquer le bouton aux autres — masquer un bouton ne ferme pas une
+    route.
+
+    **Rien n'est supprimé** : la page, les règles, l'anti-triche, les modèles et les
+    parties restent. **Vérifié en base : 21 sessions et 25 défis conservés** avant et
+    après extinction — c'est ce qui prouve qu'on a bien éteint et non supprimé.
+
+    **Vérifié** : `tsc` backend 0 et racine 12 de référence ; `[settings] Jeux eteints`
+    au démarrage avec table vide ; les 3 routes en 401 sans jeton.
+    **Validé par Théo** — bascule, disparition/réapparition et libellé conformes.
+    ℹ️ **Défaut d'affichage corrigé après son retour** : le curseur du bouton débordait
+    de sa piste. Cause : la pastille était en `absolute` **sans propriété de position**,
+    donc ancrée à sa position dans le FLUX et non au bord gauche du parent — le
+    décalage s'ajoutait à un point de départ déjà avancé. `left-0.5` explicite ;
+    géométrie revérifiée, 2 px de marge de chaque côté dans les deux états.
+
+    ⚠️ **Piège d'environnement, rencontré pour de bon** : la base locale étant celle de
+    PROD, l'interrupteur laissé **allumé** après les tests de Théo l'était déjà en
+    production. Déployer en l'état aurait rendu la rubrique visible de toute l'équipe —
+    l'inverse de la demande. **Remis à `false` avant le déploiement.** Pour un réglage
+    global, l'état de test EST l'état de production : il faut le remettre comme on
+    nettoie une donnée de test.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
