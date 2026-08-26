@@ -36,7 +36,7 @@ model User {
   //
   // ⚠️ Liste VIDE = ne voit RIEN (fail closed). Un chef de site sans site rattaché ne
   // doit pas hériter d'un accès complet par accident : c'est l'inverse du défaut sûr.
-  sites             String[] @default([])
+  sites             String[]           @default([])
   pushSubscriptions PushSubscription[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
@@ -45,9 +45,9 @@ model User {
 // Abonnement Web Push d'un NAVIGATEUR (pas d'un utilisateur) : un même
 // utilisateur en a autant qu'il a d'appareils/navigateurs installés.
 model PushSubscription {
-  id     String @id @default(uuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Clé naturelle de l'abonnement : un navigateur qui se réabonne renvoie le
   // même endpoint. Sans @unique, chaque rechargement créerait un doublon et
   // l'utilisateur recevrait N fois la même notification.
@@ -61,10 +61,10 @@ model PushSubscription {
 }
 
 model Project {
-  id                 String   @id @default(uuid())
+  id                 String        @id @default(uuid())
   name               String
   site               String
-  sites              String[] @default([])
+  sites              String[]      @default([])
   budgetDistribution Json? // Record<string, number> — % par site
   service            String[]
   brands             String[]
@@ -76,13 +76,25 @@ model Project {
   budgetActual       Float
   description        String
   progress           Float
-  assignedUsers      String[] @default([])
+  assignedUsers      String[]      @default([])
   alpineShare        Float? // % Alpine vs RDM (0-100) — null = 100 % Alpine
   nissanShare        Float? // % Nissan vs RDM (0-100) — null = 100 % Nissan
-  proPlus            Boolean  @default(false)
+  proPlus            Boolean       @default(false)
+  // ⚠️⚠️ NE PAS CONFONDRE `expertMode` ET `proPlus`, qui se suivent ici et n'ont
+  // AUCUN rapport :
+  //  - `proPlus` = PRO+ (B2B), un marqueur MÉTIER qui pilote un filtre à trois états
+  //    dans le Dashboard, le Budget et l'Export. Il change des CHIFFRES.
+  //  - `expertMode` = mode Expert, un marqueur d'INTERFACE qui débloque KPI, Gantt,
+  //    fichiers et notes sur ce projet. Il ne change AUCUN montant, n'entre dans
+  //    aucune agrégation, et n'est lu que par l'écran Projets.
+  // C'est précisément pour éviter cette collision que le mode ne s'appelle pas
+  // « PRO » : « PRO » et « PRO+ » côte à côte dans le même formulaire, c'est le
+  // scénario qui a laissé le bug Holding/GROUPE BONY en place des mois.
+  expertMode         Boolean       @default(false)
   tasks              Task[]
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  files              ProjectFile[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 }
 
 // Une tâche a DEUX natures depuis le 06/08/2026 :
@@ -94,16 +106,26 @@ model Project {
 // Un seul modèle et pas deux : dupliquer aurait recréé le « second chemin, plus
 // pauvre, vers un besoin déjà couvert » du correctif 10.
 model Task {
-  id             String   @id @default(uuid())
+  id             String        @id @default(uuid())
   // Nullable = tâche autonome. La relation devient donc optionnelle elle aussi.
   projectId      String?
-  project        Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project        Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   // Champs propres aux tâches AUTONOMES (vides/nuls pour une tâche de projet, qui
   // continue de tout hériter de son projet).
+  // ⚠️ `deadline` a cessé d'être réservée aux tâches autonomes le 26/08/2026
+  // (correctif 42) : une tâche de projet porte désormais sa propre échéance.
   deadline       String? // 'yyyy-MM-dd' — String et non DateTime, comme User.birthdate
-  sites          String[] @default([])
-  brands         String[] @default([])
-  service        String[] @default([])
+  sites          String[]      @default([])
+  brands         String[]      @default([])
+  service        String[]      @default([])
+  // --- MODE EXPERT (27/08/2026) ---
+  // Saisis dans le mode Expert d'un projet, et lus NULLE PART ailleurs : ni To-do, ni
+  // Agenda, ni Campagnes, ni Export. `startDate` est ce qui permet au Gantt de tracer
+  // une vraie barre — sans elle, une tâche n'a qu'un point dans le temps et se rend en
+  // jalon. Même convention 'yyyy-MM-dd' que `deadline`, pour la même raison.
+  startDate      String?
+  notes          String?
+  files          ProjectFile[]
   name           String
   provider       String? // Prestataire (texte libre)
   channel        String
@@ -117,8 +139,48 @@ model Task {
   clickRate      Float?
   codTxt         String?
   billedAmount   Float?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+// ============================================================================
+// FICHIERS DE PROJET — mode Expert (27/08/2026)
+// ============================================================================
+//
+// ⚠️ UN SEUL modèle pour les fichiers de PROJET et les fichiers de TÂCHE :
+// `taskId = null` -> le fichier est rattaché au projet, sinon à la tâche.
+// C'est le même patron que `Task.projectId` nullable (correctif 35), et le contraire
+// de l'erreur du correctif 10, où l'on avait ouvert « un second chemin, plus pauvre,
+// vers un besoin déjà couvert ». Deux tables auraient dupliqué la route, la purge, la
+// redaction de périmètre et la logique d'upload.
+//
+// ⚠️ `projectId` reste renseigné MÊME pour un fichier de tâche. Ce n'est pas
+// redondant : c'est ce qui permet de lister tous les fichiers d'un projet en une
+// requête, et surtout d'appliquer le cloisonnement par site (`siteScope`) sans avoir à
+// remonter la tâche pour retrouver son projet.
+//
+// ⚠️ AUCUNE purge par ancienneté, contrairement aux pièces jointes de chat (180 j) et
+// aux médias calendar (30 j) : un devis ou un bon à tirer n'a pas à s'évaporer. La
+// seule suppression est EXPLICITE, depuis l'interface. Conséquence assumée : ce dossier
+// croît sans borne, il se surveille dans l'indicateur d'espace des Paramètres.
+model ProjectFile {
+  id         String   @id @default(uuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId     String?
+  task       Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  url        String
+  // Le fichier sur disque porte un nom en uuid, JAMAIS celui fourni par le client
+  // (règle absolue de routes/uploads.ts) : le nom d'origine doit donc vivre ici, comme
+  // pour `ChatMessage.fileName`. `fileSize` évite une requête de plus pour afficher
+  // « 2,4 Mo ».
+  fileName   String
+  fileSize   Int
+  uploadedBy String // userId, référence libre vers User (pas de FK, style du schéma)
+  createdAt  DateTime @default(now())
+
+  @@index([projectId])
+  @@index([taskId])
 }
 
 model Campaign {
@@ -137,7 +199,7 @@ model Campaign {
 }
 
 model SocialPost {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   title       String
   status      String
   date        DateTime
@@ -151,10 +213,10 @@ model SocialPost {
   wording     String
   lom         String
   co2         String
-  archived    Boolean  @default(false)
+  archived    Boolean   @default(false)
   archivedAt  DateTime? // Renseigné à la bascule archived->true ; ancre la purge des médias (30j)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model DigitalTags {

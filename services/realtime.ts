@@ -35,6 +35,10 @@ export const RT_EVENTS = {
   // Tâches AUTONOMES (sans projet). Événement distinct de `projects` : elles ne
   // transitent pas par /api/projects et une mutation de l'un ne concerne pas l'autre.
   tasks: ['tasks:updated', 'tasks:deleted'],
+  // Fichiers du mode Expert. Événement distinct de `projects` : un dépôt ne modifie ni
+  // le projet ni ses tâches, et recharger tout le projet à chaque fichier ferait
+  // clignoter le formulaire de qui est en train de le remplir.
+  projectFiles: ['project-files:updated'],
   campaigns: ['campaigns:updated', 'campaigns:deleted'],
   budget: ['budget:updated', 'budget:deleted'],
   users: ['users:updated', 'users:deleted'],

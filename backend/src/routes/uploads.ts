@@ -21,7 +21,7 @@ export const UPLOADS_ROOT = fs.existsSync(path.join(cwd, 'backend', 'src'))
   ? path.join(cwd, 'backend', 'uploads') // cwd = racine du repo
   : path.join(cwd, 'uploads');           // cwd = backend/
 
-export const UPLOAD_TYPES = ['chat', 'avatar', 'calendar'] as const;
+export const UPLOAD_TYPES = ['chat', 'avatar', 'calendar', 'project'] as const;
 export type UploadType = typeof UPLOAD_TYPES[number];
 
 // RÈGLES FIGÉES — formats acceptés + tailles max par type.
@@ -51,6 +51,20 @@ const RULES: Record<UploadType, { mimes: string[] | null; maxBytes: number; labe
     mimes: ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime'],
     maxBytes: 2 * 1024 * 1024 * 1024, // 2 GB
     label: 'JPEG, PNG, WebP, MP4, MOV'
+  },
+  // Pièces jointes du mode EXPERT (projet et tâche), 27/08/2026. Même choix que `chat`
+  // et pour la même raison : un projet reçoit des devis, des BAT, des plans, des
+  // tableurs — imposer une liste de formats reviendrait à la rouvrir chaque mois.
+  // ⚠️ La sécurité ne repose donc PAS sur le filtrage à l'entrée mais sur la façon de
+  // SERVIR les fichiers : l'`express.static` d'`index.ts` applique `nosniff` à tout et
+  // force le téléchargement de ce qui n'est ni image ni PDF ni média — sans quoi un
+  // `.html` ou un `.svg` déposé ici s'exécuterait dans la session de qui l'ouvre, les
+  // fichiers étant servis depuis le domaine de Gearbox. Ce sous-dossier est couvert
+  // automatiquement, il n'y a rien à y ajouter.
+  project: {
+    mimes: null,
+    maxBytes: 100 * 1024 * 1024, // 100 MB, comme le chat
+    label: 'tous formats'
   }
 };
 

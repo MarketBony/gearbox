@@ -69,6 +69,12 @@ export interface Task {
   // Pas de budget sur une tâche autonome : `cost` y vaut toujours 0.
   projectId?: string | null;
   deadline?: string;      // 'yyyy-MM-dd'
+  // --- MODE EXPERT (27/08/2026) ---
+  // Saisis dans le mode Expert d'un projet, et lus NULLE PART ailleurs : ni To-do, ni
+  // Agenda, ni Campagnes, ni Export. `startDate` est ce qui permet au Gantt de tracer
+  // une vraie barre ; sans elle, la tâche se rend en jalon sur son échéance.
+  startDate?: string | null;   // 'yyyy-MM-dd'
+  notes?: string | null;
   sites?: string[];
   brands?: BrandType[];
   service?: ServiceType[];
@@ -106,6 +112,30 @@ export interface Project {
   // `splitShareToBuckets` dans constants.ts.
   alpineShare?: number; // % Alpine vs RDM (0-100)
   nissanShare?: number; // % Nissan vs RDM (0-100)
+  // ⚠️⚠️ NE PAS CONFONDRE avec `proPlus` plus haut, qui n'a AUCUN rapport :
+  //  - `proPlus`    = PRO+ (B2B), marqueur MÉTIER, pilote un filtre du Dashboard, du
+  //                   Budget et de l'Export. Il change des CHIFFRES.
+  //  - `expertMode` = mode Expert, marqueur d'INTERFACE, débloque KPI / Gantt /
+  //                   fichiers / notes sur ce projet. Il ne change AUCUN montant et
+  //                   n'entre dans aucune agrégation.
+  // C'est pour éviter cette collision que le mode ne s'appelle pas « PRO ».
+  expertMode?: boolean;
+}
+
+/**
+ * Fichier déposé dans le mode Expert. `taskId` renseigné = fichier d'une TÂCHE,
+ * `taskId` absent = fichier du PROJET — un seul type pour les deux, comme en base.
+ * Le disque ne porte qu'un uuid : `fileName` est le nom d'origine, seul affichable.
+ */
+export interface ProjectFile {
+  id: string;
+  projectId: string;
+  taskId?: string | null;
+  url: string;
+  fileName: string;
+  fileSize: number;
+  uploadedBy: string;
+  createdAt: string;
 }
 
 export interface Campaign {

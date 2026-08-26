@@ -10,7 +10,10 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 42** (échéance par
+- master = prod, synchronisés. Dernier lot déployé : **correctif 43** (mode Expert :
+  KPI, Gantt, fichiers de projet et de tâche, notes, 27 août) — `api` **et** `web`,
+  **avec migration** (`20260826142519_add_expert_mode`, purement additive).
+  Avant lui le **correctif 42** (échéance par
   tâche, tri et redimensionnement du tableau des tâches, 26 août) — `api` **et**
   `web`, **sans migration** : `Task.deadline` existait depuis le correctif 35, seule
   la liste blanche `TASK_FIELDS` du backend l'ignorait. Avant lui le **correctif 41**
@@ -1899,6 +1902,129 @@
     comportement déjà en place sur les dates de projet, pas une régression — mais ce lot
     l'étend d'une colonne.
 
+43. **MODE EXPERT — pilotage avancé des gros projets** (`feat/mode-expert`, 27 août).
+    Backend + frontend, **migration Prisma** (`20260826142519_add_expert_mode`) →
+    `api` **et** `web`.
+
+    Un interrupteur par projet débloque quatre modules : KPI, Gantt par personne, dépôt
+    de fichiers (projet et tâche) et notes de tâche. Demande de Théo pour les gros
+    projets type « Forum Pièces 2026 » (20 tâches, 96 525 €, 5 intervenants), là où le
+    formulaire simple ne suffit plus.
+
+    **⚠️⚠️ POURQUOI CE N'EST PAS UN « MODE PRO » — à lire avant de renommer quoi que ce
+    soit.** `Project.proPlus` existe depuis l'origine et signifie **PRO+ (B2B)** : c'est
+    un marqueur MÉTIER qui pilote un filtre à trois états dans le Dashboard, le Budget et
+    l'Export, et qui change des CHIFFRES. Poser un champ `pro` à côté de `proPlus`, sur le
+    même modèle et dans le même formulaire, aurait mis « PRO » et « PRO+ » côte à côte —
+    exactement le scénario qui a laissé le bug Holding/GROUPE BONY en place des mois.
+    D'où **`expertMode`**, marqueur d'INTERFACE qui n'entre dans **aucune** agrégation.
+    Les deux champs se suivent dans `schema.prisma` et dans `types.ts`, chacun avec
+    l'avertissement en toutes lettres.
+
+    **Migration, purement additive** : `Project.expertMode Boolean @default(false)`,
+    `Task.startDate String?`, `Task.notes String?`, et la table `ProjectFile`. SQL relu
+    avant application : aucun `DROP`, aucune colonne existante touchée.
+
+    **⚠️ UN SEUL modèle `ProjectFile` pour les fichiers de projet ET de tâche**,
+    `taskId = null` désignant le projet. Même patron que `Task.projectId` nullable
+    (correctif 35), et le contraire de l'erreur du correctif 10. Deux tables auraient
+    dupliqué la route, la purge, le cloisonnement et l'upload.
+    `projectId` reste renseigné même pour un fichier de tâche : c'est ce qui permet de
+    lister en une requête et surtout d'appliquer `siteScope` sans remonter la tâche.
+
+    **⚠️ `TASK_FIELDS` — LE MÊME PIÈGE QUE LA VEILLE, deuxième fois en deux lots.**
+    `startDate` et `notes` devaient y être ajoutés, faute de quoi la saisie aurait été
+    acceptée, le serveur aurait répondu 200, et la valeur aurait disparu au rechargement.
+    Anticipé cette fois (le correctif 42 venait de l'apprendre), mais c'est le signe que
+    cette liste blanche est le point de passage obligé de **tout** nouveau champ de tâche.
+    `pickTaskData` normalise désormais `'' -> null` pour les trois champs nullables.
+
+    **⚠️ Le `catch` du PUT projets masquait TOUTE erreur de transaction en 404 muet.**
+    Découvert en cherchant pourquoi une échéance ne se sauvegardait pas : la réponse était
+    « Projet introuvable », rien dans les logs, et le projet existait. Un `console.error`
+    y a été ajouté — le message rendu au client reste vague, la cause part dans les logs.
+    Sans cette trace, le symptôme est « ça ne s'enregistre pas » et aucune piste.
+
+    **Fichiers** : `UPLOAD_TYPES` gagne `'project'` avec `{ mimes: null, maxBytes: 100 Mo }`,
+    même choix que `chat` — un projet reçoit des devis, des BAT, des plans, des tableurs.
+    ⚠️ **Rien à ajouter côté sécurité** : l'`express.static` d'`index.ts` applique déjà
+    `nosniff` et force le téléchargement de tout ce qui n'est ni image, ni PDF, ni média,
+    et couvre automatiquement le nouveau sous-dossier. Sans cela un `.html` ou un `.svg`
+    déposé s'exécuterait dans la session de qui l'ouvre.
+    `GET /api/storage` itérant sur `UPLOAD_TYPES`, les fichiers de projet apparaissent
+    seuls dans l'indicateur d'espace des Paramètres.
+
+    **⚠️ AUCUNE purge par ancienneté sur les fichiers de projet**, contrairement au chat
+    (180 j) et aux médias calendar (30 j) : un devis ne s'évapore pas. Seul un balayage des
+    **orphelins** a été ajouté (`purgeOrphanProjectFiles`) — fichiers qu'aucune ligne ne
+    référence, cas de la suppression en cascade d'un projet. Marge de sécurité d'une heure
+    sur la date du fichier, sinon on supprimerait l'upload de quelqu'un dont la métadonnée
+    n'est pas encore enregistrée (le dépôt se fait en deux appels).
+    La suppression EXPLICITE depuis l'écran, elle, retire **la ligne ET le fichier disque**
+    — pour ne pas recréer le défaut « fichiers d'upload orphelins » de `BUGS-CONNUS.md`.
+
+    **Cloisonnement** : `routes/projectFiles.ts` ne recopie aucun `where` de site. Un
+    helper `projetAutorise()` réutilise `scopeOf` + `arrayScopeWhere`, et rend
+    indistinctement « introuvable » pour un projet inexistant ou hors périmètre, afin de ne
+    pas transformer la route en révélateur d'existence. POST et DELETE sous `EDIT_ROLES` ;
+    le chef de site **consulte** les modules de ses projets mais n'y écrit rien.
+    L'url reçue au POST est validée contre `/^\/uploads\/project\/[A-Za-z0-9._-]+$/` : sans
+    ce contrôle on enregistrerait une url externe, rendue ensuite chez tous les collègues.
+
+    **Les 4 KPI** (`components/expert/ExpertKpis.tsx`), tous recoupés à la main sur le
+    projet de test — aucun n'entre dans un budget ni une agrégation :
+    1. **Tenue des échéances** : en retard / sous 7 j / sans échéance. Une tâche terminée
+       n'est jamais « en retard », le retard qualifie ce qui reste à faire.
+    2. **Charge par personne** : tâches restantes et euros portés, non-assignées mises en
+       évidence et jamais masquées.
+    3. **Avancement pondéré par le budget, face à l'avancement à l'unité.** Le `progress`
+       du projet compte chaque tâche pour 1 : mesuré sur le projet de test, **38 % à
+       l'unité contre 10 % pondéré**, parce que la ligne à 24 000 € n'était pas commencée.
+       C'est l'écart entre les deux qui informe, pas chaque chiffre isolément.
+    4. **Concentration des coûts** : top prestataires et part des 3 plus grosses lignes.
+    ⚠️ **Pas de burndown ni de vélocité, volontairement** : il n'existe AUCUN historique de
+    changement de statut. `Task.updatedAt` bouge à chaque modification, pas au passage en
+    « Terminé ». Une courbe bâtie dessus serait fausse — le projet a déjà payé cette
+    approximation avec le KPI de rythme biaisé (correctif 25).
+
+    **Gantt** (`ExpertGantt.tsx`) : lignes = **personnes**, non-assignées en dernier.
+    ⚠️ **Deux formes de marque, et c'est structurel** : `startDate` + `deadline` donnent une
+    BARRE ; `deadline` seule donne un **JALON** (losange). Faire partir la barre du début du
+    PROJET aurait été plus joli et FAUX — toutes les tâches sembleraient démarrer le même
+    jour. Une tâche sans aucune date ne peut pas être placée : elle est **listée sous le
+    graphique**, jamais escamotée. Arithmétique left/width reprise de `ProjectBarGantt`
+    (`pages/Agenda.tsx`), rendu différent.
+
+    **Notes et fichiers de tâche : un PANNEAU latéral, pas deux colonnes de plus.** Le
+    tableau des tâches en compte déjà 8 et vient d'être recalibré au pixel (correctif 42) ;
+    y pousser une note libre aurait ré-écrasé la colonne « Nom de la tâche ».
+    ⚠️ La note est **locale puis sauvée au blur**, pas à chaque frappe : ailleurs dans cet
+    écran une frappe déclenche un PUT du projet entier, acceptable pour un champ court,
+    ruineux pour un bloc-notes.
+    ⚠️ La colonne d'action passe de 40 à 76 px en mode Expert (second bouton), et le
+    `min-w` du tableau suit exactement (1060 → 1096) : l'élargir sans toucher au `min-w`
+    aurait repris les pixels à la colonne « Nom », c'est-à-dire le défaut du correctif 42.
+
+    **`formatPoids` extrait dans `utils/fichiers.ts`** : il était local à `Chat.tsx` et
+    allait l'être une seconde fois. Deux copies d'une même règle, c'est ce qui a fait
+    diverger trois listes de rôles au correctif 41. Le Chat consomme désormais l'utilitaire.
+
+    **Vérifié dans le navigateur** (projet `ZZ-TEST-EXPERT`, supprimé ensuite, 0 résidu) :
+    persistance après F5 de `startDate`, `deadline` et `notes` ; dépôt de 4 fichiers
+    (PNG avec vignette, TXT, CSV, PDF) avec nommage en uuid sur le disque et nom d'origine
+    en base ; suppression retirant bien le fichier du disque ; balayage des orphelins
+    confirmé par les logs (`[purge] 3 fichier(s) de projet orphelin(s) supprimé(s)`) après
+    antidatage ; Gantt avec barre, jalon en retard, deux personnes distinctes et la tâche
+    sans date listée à part ; **KPI recoupés à la main** (1/1/1, 38 % vs 10 %, 97 % sur les
+    3 premières lignes, GL Events 82 %) ; **temps réel vérifié à DEUX onglets** (dépôt dans
+    l'un, apparition dans l'autre sans rechargement) ; extinction du mode rendant l'écran
+    strictement identique à avant le lot (9 colonnes, un seul bouton d'action, panneau
+    absent) et rallumage sans aucune perte.
+    `tsc` backend 0, racine **9** de référence.
+    ℹ️ Non éprouvé : le parcours avec un compte **chef de site** réel. Le verrou est en
+    place côté serveur (`projetAutorise`) et l'écriture lui est fermée, mais la leçon du
+    projet est qu'un 403 exact ne vaut pas un test dans l'interface — à faire avec Théo.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
@@ -1948,6 +2074,21 @@
   création** part bien au serveur, lui — c'est le renommage **après coup** qui ne sort
   pas du navigateur. La gestion des membres a de vrais effets de bord (rooms socket,
   compteurs de non-lus, notifications), d'où un lot dédié.
+
+- **Suite naturelle du mode Expert, par ordre de rapport valeur/effort** :
+  1. **Rappel push d'échéance** (« ta tâche X est due demain ») — toute l'infrastructure
+     existe déjà depuis le correctif 20 (`sendPushToUsers`, `PushSubscription`), et
+     l'échéance par tâche depuis le 42. C'est le meilleur ratio du lot suivant.
+  2. **Dépendances entre tâches** (« ne peut commencer qu'après ») et **chemin critique** :
+     le vrai palier Gantt professionnel, mais c'est un chantier à lui seul — il faut un
+     modèle de liaison, la détection de cycles, et le recalcul en cascade des dates.
+  3. **Vue Gantt par TÂCHE plutôt que par personne**, en bascule : utile quand on pilote
+     l'enchaînement plutôt que la charge.
+- **Le mode Expert n'a pas été parcouru avec un compte CHEF DE SITE réel.** Le verrou est
+  côté serveur (`projetAutorise` dans `routes/projectFiles.ts`) et l'écriture lui est
+  fermée par `EDIT_ROLES`, mais la leçon du projet est qu'un 403 exact ne vaut pas un
+  test dans l'interface — deux fois les contrôles d'API étaient bons et l'écran mentait.
+  À faire avec Théo connecté, comme le recoupement du budget de Mozac.
 
 ### Dette technique
 - **Build local non représentatif du build déployé** : Docker construit le front en

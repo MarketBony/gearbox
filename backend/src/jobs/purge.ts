@@ -109,6 +109,7 @@ const runSafe = async () => {
   try {
     await purgeArchivedCalendarMedia();
     await purgeOldChatFiles();
+    await purgeOrphanProjectFiles();
   } catch (e) {
     console.error('[purge] erreur (DB injoignable ?):', (e as Error).message);
   } finally {
@@ -116,9 +117,53 @@ const runSafe = async () => {
   }
 };
 
+/**
+ * Fichiers du mode EXPERT devenus orphelins — ceux de `/uploads/project/` qu'aucune
+ * ligne `ProjectFile` ne référence plus.
+ *
+ * ⚠️⚠️ CE N'EST PAS UNE PURGE PAR ANCIENNETÉ, et il ne faut jamais en faire une ici.
+ * Contrairement aux médias calendar (30 j) et aux pièces jointes de chat (180 j), un
+ * devis ou un bon à tirer n'a aucune raison de s'évaporer : tant qu'une ligne existe,
+ * le fichier reste, quel que soit son âge. Seule la suppression EXPLICITE depuis
+ * l'interface retire un fichier.
+ *
+ * Ce balayage ne ramasse donc que les résidus : suppression en cascade d'un projet ou
+ * d'une tâche (la ligne part avec la FK, pas le fichier), et échec de l'`unlink` de la
+ * route DELETE. C'est la réponse au défaut « fichiers d'upload orphelins » ouvert dans
+ * BUGS-CONNUS.md, appliquée dès l'origine sur ce dossier plutôt qu'après coup.
+ *
+ * ⚠️ Marge de sécurité d'une heure sur la date du fichier : sans elle, on supprimerait
+ * le fichier d'un utilisateur qui vient de le téléverser et dont l'enregistrement de la
+ * métadonnée n'est pas encore arrivé — les deux appels sont séparés.
+ */
+export const purgeOrphanProjectFiles = async () => {
+  const dir = path.join(UPLOADS_ROOT, 'project');
+  if (!fs.existsSync(dir)) return;
+
+  const connus = new Set(
+    (await prisma.projectFile.findMany({ select: { url: true } })).map(f => path.basename(f.url))
+  );
+
+  const limite = Date.now() - 60 * 60 * 1000; // 1 h
+  let supprimes = 0;
+  for (const nom of fs.readdirSync(dir)) {
+    if (connus.has(nom)) continue;
+    const chemin = path.join(dir, nom);
+    try {
+      if (fs.statSync(chemin).mtimeMs > limite) continue; // trop récent, on laisse
+      fs.unlinkSync(chemin);
+      supprimes++;
+    } catch (e) {
+      console.error('[purge] orphelin projet', chemin, (e as Error).message);
+    }
+  }
+  if (supprimes > 0) console.log(`[purge] ${supprimes} fichier(s) de projet orphelin(s) supprimé(s)`);
+};
+
 // Démarre le job : une passe ~15s après le boot, puis toutes les 24h.
-// Les deux purges (calendar 30j, chat 180j) partagent ce SEUL timer — pas de second
-// intervalle à faire vivre, et `running` garantit qu'elles ne se chevauchent jamais.
+// Les trois purges (calendar 30j, chat 180j, orphelins de projet) partagent ce SEUL
+// timer — pas de second intervalle à faire vivre, et `running` garantit qu'elles ne se
+// chevauchent jamais.
 export const startPurgeJob = () => {
   setTimeout(runSafe, 15000);
   setInterval(runSafe, DAY_MS);

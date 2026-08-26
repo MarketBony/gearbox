@@ -1,5 +1,5 @@
 
-import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo } from '../types';
+import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile } from '../types';
 import type { LobbyData, GameSession, GameChallenge, GameType } from '../components/games/gameTypes';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
@@ -223,6 +223,24 @@ class DataService {
     await apiFetch(`/tasks/${id}`, { method: 'DELETE' });
   }
 
+  // ---- FICHIERS du mode EXPERT (projet et tâche) ----
+  // Le dépôt se fait en DEUX temps, volontairement : `uploadFile` écrit le fichier via
+  // la route uploads (seule à toucher le disque, avec ses règles de taille et son
+  // nommage en uuid), puis `addProjectFile` enregistre la métadonnée. Refaire un
+  // multer ici aurait dupliqué ces garde-fous.
+  async getProjectFiles(projectId: string): Promise<ProjectFile[]> {
+    return apiFetch<ProjectFile[]>(`/project-files/${projectId}`);
+  }
+  async addProjectFile(
+    projectId: string,
+    data: { url: string; fileName: string; fileSize: number; taskId?: string | null }
+  ): Promise<ProjectFile> {
+    return apiFetch(`/project-files/${projectId}`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async deleteProjectFile(fileId: string): Promise<void> {
+    await apiFetch(`/project-files/item/${fileId}`, { method: 'DELETE' });
+  }
+
   async deleteProject(id: string): Promise<void> {
     await apiFetch(`/projects/${id}`, { method: 'DELETE' });
   }
@@ -404,10 +422,10 @@ class DataService {
     window.dispatchEvent(new CustomEvent('gearbox-avatar-updated'));
     return users;
   }
-  // Upload d'un fichier (chat|avatar|calendar) via POST /api/uploads/:type.
+  // Upload d'un fichier (chat|avatar|calendar|project) via POST /api/uploads/:type.
   // multipart/form-data : on NE fixe PAS Content-Type (le navigateur ajoute la
   // boundary). Renvoie l'URL relative servie par le backend.
-  async uploadFile(type: 'chat' | 'avatar' | 'calendar', file: File): Promise<string> {
+  async uploadFile(type: 'chat' | 'avatar' | 'calendar' | 'project', file: File): Promise<string> {
     const form = new FormData();
     form.append('file', file);
     const token = getToken();

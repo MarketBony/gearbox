@@ -43,6 +43,50 @@ ne pas les réécrire.
     `PushSubscription`. Voir la section dédiée.
 11. **Tâches autonomes** — `/api/tasks` CRUD, **tâches sans projet uniquement**. Voir
     la section dédiée ci-dessous.
+12. **Fichiers de projet** — `/api/project-files` (mode Expert). Voir la section dédiée.
+
+### 📎 Fichiers du mode EXPERT — `/api/project-files` (27/08/2026)
+
+Migration `20260826142519_add_expert_mode` : `Project.expertMode`, `Task.startDate`,
+`Task.notes`, et la table **`ProjectFile`**.
+
+⚠️⚠️ **`expertMode` n'a AUCUN rapport avec `proPlus`**, qui le précède dans le même
+modèle. `proPlus` = PRO+ (B2B), marqueur métier qui pilote un filtre du Dashboard, du
+Budget et de l'Export — il change des chiffres. `expertMode` ne fait qu'ouvrir des
+modules d'affichage et n'entre dans **aucune** agrégation. C'est pour éviter cette
+collision que le mode ne s'appelle pas « PRO ».
+
+⚠️ **UN SEUL modèle pour les fichiers de projet ET de tâche** : `taskId = null` désigne
+le projet. Même patron que `Task.projectId` nullable, et le contraire de l'erreur du
+correctif 10. `projectId` reste renseigné même sur un fichier de tâche — c'est ce qui
+permet de lister en une requête, et surtout d'appliquer le cloisonnement sans remonter
+la tâche pour retrouver son projet.
+
+**Trois routes**, `GET /:projectId`, `POST /:projectId`, `DELETE /item/:fileId` :
+- ⚠️ **le cloisonnement passe par `projetAutorise()`**, qui réutilise `scopeOf` +
+  `arrayScopeWhere` — **aucun `where` de site n'est recopié ici**. Un projet inexistant
+  et un projet hors périmètre rendent tous deux « introuvable », indistinctement, pour
+  ne pas faire de cette route un révélateur d'existence ;
+- POST et DELETE sous `EDIT_ROLES` : le chef de site **consulte** les modules de ses
+  projets et n'y écrit rien ;
+- ⚠️ l'url reçue au POST est validée contre
+  `/^\/uploads\/project\/[A-Za-z0-9._-]+$/`. Sans ce contrôle, un client pourrait
+  enregistrer une url **externe**, rendue ensuite dans un `<img>` chez tous les
+  collègues — même risque que celui fermé sur la photo de groupe ;
+- le DELETE retire **la ligne ET le fichier disque**, avec `path.basename` et jamais
+  l'url brute.
+
+**Le dépôt se fait en DEUX appels** (`POST /api/uploads/project` puis
+`POST /api/project-files/:id`) : `uploads.ts` reste le **seul** endroit qui écrit sur le
+disque, avec ses règles de taille et son nommage en uuid. Refaire un multer ici aurait
+dupliqué ces garde-fous, et c'est la duplication qui les fait diverger.
+
+⚠️ **AUCUNE purge par ancienneté** sur ces fichiers, contrairement au chat (180 j) et
+aux médias calendar (30 j) : un devis ou un bon à tirer n'a pas à s'évaporer. Seul
+`purgeOrphanProjectFiles` balaie les fichiers qu'aucune ligne ne référence (suppression
+en cascade d'un projet), avec une **marge d'une heure** sur la date du fichier — sans
+elle on supprimerait l'upload de quelqu'un dont la métadonnée n'est pas encore
+enregistrée, les deux appels étant séparés.
 
 ### ✅ Tâches AUTONOMES — `/api/tasks` (06/08/2026)
 
@@ -346,8 +390,15 @@ Trois choses à retenir avant de toucher à un champ de tâche :
 2. `pickTaskData` teste `t[f] !== undefined` : **`undefined` = « champ absent, non
    modifié »**, ce n'est PAS un effacement. Pour vider un champ nullable il faut
    envoyer `null` explicitement (le frontend écrit `v || null`) ;
-3. `deadline` y est normalisée `'' -> null`, côté SERVEUR pour couvrir tout appelant :
-   un `String?` doit valoir NULL en base et non une chaîne vide.
+3. `deadline`, `startDate` et `notes` y sont normalisés `'' -> null`, côté SERVEUR pour
+   couvrir tout appelant : un `String?` doit valoir NULL en base et non une chaîne vide.
+
+⚠️ **Le `catch` du PUT rendait 404 pour TOUTE erreur de transaction, sans aucune
+trace.** Pas seulement pour un id inconnu : une contrainte violée ou un champ refusé par
+Prisma sortaient là aussi, et le client recevait « Projet introuvable » sur un projet qui
+existe. Symptôme à l'écran : « la valeur ne se sauvegarde pas », et rien nulle part. Un
+`console.error` a été ajouté le 27/08/2026 — le message rendu au client reste
+volontairement vague, la cause part dans les logs de l'`api`.
 
 Le frontend utilise la couche unique `services/dataService.ts` (`apiFetch` + JWT). Résidus
 `localStorage` **assumés et hors périmètre** (pas des données serveur) : overlay client-only chat

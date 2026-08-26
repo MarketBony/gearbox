@@ -9,6 +9,9 @@ import LinkPreview from '../components/LinkPreview';
 import VoiceRecorder from '../components/VoiceRecorder';
 import GifPicker from '../components/GifPicker';
 import { db, ApiError } from '../services/dataService';
+// `formatPoids` était défini dans ce fichier ; extrait le 27/08/2026 pour être partagé
+// avec les fichiers du mode Expert plutôt que recopié à l'identique.
+import { formatPoids } from '../utils/fichiers';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { getSocket, connectSocket, emitWithAck } from '../services/socket';
 import { chatStore } from '../services/chatStore';
@@ -68,13 +71,6 @@ const resumeMessage = (msg: ChatMessage, projets: Project[], max = 60): string =
   return msg.content.slice(0, max);
 };
 
-// Poids lisible pour l'affichage d'une pièce jointe.
-const formatPoids = (octets?: number): string => {
-  if (!octets || octets <= 0) return '';
-  if (octets < 1024) return `${octets} o`;
-  if (octets < 1024 * 1024) return `${(octets / 1024).toFixed(0)} Ko`;
-  return `${(octets / 1024 / 1024).toFixed(octets < 10 * 1024 * 1024 ? 1 : 0)} Mo`;
-};
 
 // Overlay client-only pour les features HORS PÉRIMÈTRE (épingle, renommage et
 // membres de groupe) : le backend n'expose aucun événement pour elles. Stocké
