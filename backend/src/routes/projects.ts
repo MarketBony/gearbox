@@ -57,8 +57,12 @@ router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) =>
 // bien au serveur et disparaissait au rechargement suivant, SANS erreur. C'est la seule
 // porte d'écriture des tâches de projet : le POST reçoit toujours `tasks: []` (un projet
 // est créé sans tâche), tout passe donc par le diff du PUT ci-dessous.
+// ⚠️ `startDate` et `notes` ajoutés le 27/08/2026 (mode Expert) — MÊME PIÈGE que
+// `deadline` la veille : les oublier ici aurait fait accepter la saisie, répondre 200,
+// et perdre la valeur au rechargement suivant, sans erreur nulle part.
 const TASK_FIELDS = [
   'name', 'provider', 'channel', 'cost', 'status', 'assignedUserId', 'deadline',
+  'startDate', 'notes',
   'volumetry', 'openRate', 'npaiRate', 'stopRate', 'clickRate', 'codTxt', 'billedAmount'
 ] as const;
 
@@ -67,12 +71,14 @@ const pickTaskData = (t: any) => {
   for (const f of TASK_FIELDS) {
     if (t[f] !== undefined) data[f] = t[f];
   }
-  // `deadline` est un String? : une échéance effacée doit valoir NULL en base, pas ''.
-  // Le DatePicker vidé renvoie une chaîne vide — on normalise ICI plutôt que dans
+  // Les champs texte NULLABLES doivent valoir NULL en base, pas ''. Un DatePicker vidé
+  // ou une note effacée renvoient une chaîne vide — on normalise ICI plutôt que dans
   // l'écran, pour que n'importe quel appelant de cette route soit couvert.
   // ⚠️ Ne pas confondre avec `undefined`, qui signifie « champ absent du body, donc
   // non modifié » et ne doit surtout pas devenir un effacement.
-  if (data.deadline === '') data.deadline = null;
+  for (const f of ['deadline', 'startDate', 'notes'] as const) {
+    if (data[f] === '') data[f] = null;
+  }
   return data;
 };
 
@@ -131,6 +137,12 @@ router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) 
       return await tx.project.findUnique({ where: { id }, include: { tasks: true } });
     });
   } catch (e) {
+    // ⚠️ Ce catch rend 404 pour TOUTE erreur de la transaction, pas seulement pour un
+    // id inconnu : une contrainte violée ou un champ refusé par Prisma sortent ici
+    // aussi. Sans cette trace, le symptôme côté écran est « la valeur ne se sauvegarde
+    // pas » et il n'y a rien nulle part — c'est ce qui a coûté du temps le 27/08/2026.
+    // Le message rendu au client reste volontairement vague, la cause va dans les logs.
+    console.error('[projects] PUT échoué sur', id, ':', (e as Error).message);
     return res.status(404).json({ error: 'Projet introuvable.' });
   }
 
@@ -143,6 +155,12 @@ router.delete('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, re
   try {
     await prisma.project.delete({ where: { id } });
   } catch (e) {
+    // ⚠️ Ce catch rend 404 pour TOUTE erreur de la transaction, pas seulement pour un
+    // id inconnu : une contrainte violée ou un champ refusé par Prisma sortent ici
+    // aussi. Sans cette trace, le symptôme côté écran est « la valeur ne se sauvegarde
+    // pas » et il n'y a rien nulle part — c'est ce qui a coûté du temps le 27/08/2026.
+    // Le message rendu au client reste volontairement vague, la cause va dans les logs.
+    console.error('[projects] PUT échoué sur', id, ':', (e as Error).message);
     return res.status(404).json({ error: 'Projet introuvable.' });
   }
   emitEvent('projects:deleted', id);

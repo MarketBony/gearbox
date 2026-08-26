@@ -31,6 +31,7 @@ import uploadsRoutes, { UPLOADS_ROOT } from './routes/uploads';
 import storageRoutes from './routes/storage';
 import gamesRoutes from './routes/games';
 import settingsRoutes from './routes/settings';
+import projectFilesRoutes from './routes/projectFiles';
 import { setupRealtime, withEmitterContext } from './realtime';
 import { startPurgeJob } from './jobs/purge';
 import { chargerReglages } from './settings/appSettings';
@@ -81,6 +82,10 @@ app.use('/api/storage', storageRoutes);
 app.use('/api/games', gamesRoutes);
 // Interrupteurs de fonctionnalite : lecture pour tous, ecriture Master seul.
 app.use('/api/settings', settingsRoutes);
+// Fichiers de projet et de tache (mode Expert). Route separee de /api/projects :
+// elle a son propre cycle de vie (upload puis enregistrement), et melanger les deux
+// aurait alourdi le diff transactionnel des taches pour rien.
+app.use('/api/project-files', projectFilesRoutes);
 // Hello Marketing : proxy des flux RSS et de la playlist Deezer (le navigateur ne
 // peut pas les appeler en direct — CORS ; voir les commentaires de ces routes).
 app.use('/api/feeds', feedRoutes);

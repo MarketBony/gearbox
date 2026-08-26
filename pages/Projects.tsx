@@ -9,12 +9,14 @@ import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLOR
 import {
     Plus, Save, Trash2, FolderKanban, CheckCircle2, Circle, PlayCircle,
     CalendarCheck, Coins, TrendingUp, TrendingDown, Search, Filter, X,
-    Archive, AlertTriangle, ArrowRight, Wallet, ArrowUp, ArrowDown, Lock, ChevronDown, ChevronRight, Check, PieChart, UserCircle
+    Archive, AlertTriangle, ArrowRight, Wallet, ArrowUp, ArrowDown, Lock, ChevronDown, ChevronRight, Check, PieChart, UserCircle, Sparkles, Maximize2
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import DatePicker from '../components/DatePicker';
 import Select from '../components/Select';
 import FloatingPanel from '../components/FloatingPanel';
+import ExpertPanel, { useProjectFiles } from '../components/expert/ExpertPanel';
+import TaskDetailPanel from '../components/expert/TaskDetailPanel';
 
 // Puces marque minimalistes (mêmes teintes que BRAND_COLORS, charte identique)
 const BRAND_DOT: Record<string, string> = {
@@ -540,6 +542,19 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const gelerOrdre = useCallback(() => {
     setOrdreGele(prev => prev ?? tachesAffichees.map(t => t.id));
   }, [tachesAffichees]);
+
+  // --- MODE EXPERT ---------------------------------------------------------------
+  // ⚠️ Le hook ne charge RIEN tant que le mode est éteint : `useProjectFiles` rend une
+  // liste vide sans appeler l'API. Un projet ordinaire ne paie donc pas une requête de
+  // plus, et l'écran reste strictement celui d'avant ce lot.
+  const modeExpert = !!selectedProject?.expertMode;
+  const { fichiers, rechargerFichiers } = useProjectFiles(selectedProject?.id ?? null, modeExpert);
+  const [tacheOuverte, setTacheOuverte] = useState<string | null>(null);
+
+  // Changer de projet ferme le détail de tâche : son id ne désigne rien dans le nouveau.
+  useEffect(() => { setTacheOuverte(null); }, [selectedProject?.id]);
+  // Éteindre le mode ferme aussi le panneau, qui n'aurait plus de raison d'être ouvert.
+  useEffect(() => { if (!modeExpert) setTacheOuverte(null); }, [modeExpert]);
 
   const scrollRef = useScrollRestore(`projects_${viewMode}`);
 
@@ -1343,6 +1358,31 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                             <Archive size={16}/>
                                         </button>
                                     </div>
+
+                                    {/* INTERRUPTEUR DU MODE EXPERT.
+                                        ⚠️ Rien à voir avec le marqueur PRO+ (B2B) plus bas dans ce
+                                        même formulaire : celui-ci ne change AUCUN montant et n'entre
+                                        dans aucune agrégation — il ne fait qu'ouvrir des modules
+                                        d'affichage sur ce projet.
+                                        Masqué (et non désactivé) pour un rôle en lecture seule : lui
+                                        montrer un interrupteur mort n'apporte rien, alors qu'il voit
+                                        bien les modules une fois le mode allumé par quelqu'un. */}
+                                    {canEdit && (
+                                        <button
+                                            onClick={() => handleUpdateProject({ ...selectedProject, expertMode: !selectedProject.expertMode })}
+                                            title={selectedProject.expertMode
+                                                ? "Revenir à la vue simple. Aucune donnée n'est supprimée."
+                                                : 'Débloquer les indicateurs, le planning et les fichiers'}
+                                            className={`mt-2 w-full py-2 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wide flex items-center justify-center gap-2 transition-all ${
+                                                selectedProject.expertMode
+                                                    ? 'gx-btn-gradient text-white shadow-glow'
+                                                    : 'border border-bony-violet/40 text-bony-violet hover:bg-bony-violet/10'
+                                            }`}
+                                        >
+                                            <Sparkles size={13} />
+                                            {selectedProject.expertMode ? 'Mode Expert actif' : 'Activer le mode Expert'}
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="w-full md:w-64">
                                      <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2">Période</label>
@@ -1752,7 +1792,13 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                 194 px alors qu'on demandait 128 et 160. En `table-fixed` les largeurs de la
                                 première rangée sont respectées à la lettre, et la seule colonne SANS
                                 largeur (« Nom ») absorbe l'espace restant. */}
-                            <table className="w-full table-fixed min-w-[1060px] text-left">
+                            {/* ⚠️ Le mode Expert ajoute un second bouton dans la dernière colonne :
+                                elle passe de 40 à 76 px, et le `min-w` suit exactement (1060 -> 1096).
+                                Sans cet ajustement les deux boutons se chevaucheraient — et surtout,
+                                élargir la colonne SANS toucher au `min-w` reprendrait les 36 px à la
+                                colonne « Nom de la tâche », c'est-à-dire le défaut corrigé au
+                                correctif 42. */}
+                            <table className={`w-full table-fixed text-left ${modeExpert ? 'min-w-[1096px]' : 'min-w-[1060px]'}`}>
                                 <thead className="bg-slate-100 dark:bg-black/20 text-[10px] uppercase font-bold text-slate-500">
                                     <tr>
                                         <th className="p-3 w-10"></th>
@@ -1763,7 +1809,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                         <th className="px-1.5 py-3 w-36"><TriTache champ="assignedUserId" libelle="Assigné" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} /></th>
                                         <th className="px-1.5 py-3 w-20"><TriTache champ="cost" libelle="Coût (€)" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} /></th>
                                         <th className="px-1.5 py-3 w-36"><TriTache champ="deadline" libelle="Échéance" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} /></th>
-                                        <th className="p-3 w-10"></th>
+                                        <th className={modeExpert ? 'p-3 w-[76px]' : 'p-3 w-10'}></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-bony-border">
@@ -1886,11 +1932,31 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                 />
                                             </td>
                                             <td className="p-3 text-center">
-                                                {canEdit && (
-                                                    <button onClick={() => removeTask(task.id)} className="p-2 text-slate-400 hover:text-red-500 transition opacity-100 md:opacity-0 md:group-hover:opacity-100">
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                )}
+                                                <div className="flex items-center justify-center gap-0.5">
+                                                    {/* Détail de la tâche — mode Expert seulement : c'est là que
+                                                        vivent la date de début, la note et les fichiers. En mode
+                                                        simple le bouton n'existe pas, il n'ouvrirait rien d'utile.
+                                                        Visible aussi en lecture seule : on consulte une note et on
+                                                        télécharge une pièce jointe sans droit d'écriture. */}
+                                                    {modeExpert && (
+                                                        <button
+                                                            onClick={() => setTacheOuverte(task.id)}
+                                                            title="Détail : dates, note et fichiers"
+                                                            className={`p-2 rounded-lg transition ${
+                                                                task.notes || task.startDate || fichiers.some(f => f.taskId === task.id)
+                                                                    ? 'text-bony-violet hover:bg-bony-violet/10'
+                                                                    : 'text-slate-400 hover:text-bony-violet hover:bg-bony-violet/10'
+                                                            }`}
+                                                        >
+                                                            <Maximize2 size={14} />
+                                                        </button>
+                                                    )}
+                                                    {canEdit && (
+                                                        <button onClick={() => removeTask(task.id)} className="p-2 text-slate-400 hover:text-red-500 transition opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -1905,6 +1971,20 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                             </table>
                         </div>
                     </div>
+
+                    {/* MODULES DU MODE EXPERT — montés UNIQUEMENT si le mode est actif.
+                        Le mode est additif : éteint, rien de ce bloc n'existe, et l'écran
+                        est celui d'avant ce lot au caractère près. */}
+                    {modeExpert && selectedProject && (
+                        <ExpertPanel
+                            projet={selectedProject}
+                            users={users}
+                            canEdit={canEdit}
+                            fichiers={fichiers}
+                            onFichiersChange={rechargerFichiers}
+                            onOuvrirTache={setTacheOuverte}
+                        />
+                    )}
 
                     <div className="space-y-2 pt-4">
                         <label className="block text-xs font-bold text-slate-500 tracking-widest uppercase">Description Globale</label>
@@ -1935,6 +2015,31 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
           </div>
         )}
       </div>
+
+      {/* DÉTAIL D'UNE TÂCHE — surcouche plein écran, donc montée à la RACINE et non dans
+          le flux du panneau : à l'intérieur, l'`overflow-y-auto` du conteneur la
+          rognerait et son voile ne couvrirait que la colonne de droite.
+          La tâche est relue dans `selectedProject.tasks` à chaque rendu plutôt que
+          copiée dans l'état : une modification faite depuis le panneau se reflète ainsi
+          immédiatement, sans second exemplaire à garder synchronisé. */}
+      {(() => {
+        if (!tacheOuverte || !selectedProject || !modeExpert) return null;
+        const t = selectedProject.tasks.find(x => x.id === tacheOuverte);
+        // La tâche a pu être supprimée entre-temps (ici ou par un collègue).
+        if (!t) return null;
+        return (
+          <TaskDetailPanel
+            tache={t}
+            projectId={selectedProject.id}
+            fichiers={fichiers}
+            users={users}
+            canEdit={canEdit}
+            onFermer={() => setTacheOuverte(null)}
+            onChangerTache={updateTask}
+            onFichiersChange={rechargerFichiers}
+          />
+        );
+      })()}
     </div>
   );
 };
