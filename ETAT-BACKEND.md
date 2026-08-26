@@ -9,8 +9,12 @@ devenait périmée à chaque lot : `ls backend/prisma/migrations`, ou le log de 
 conteneur `api` qui annonce combien il en trouve. Les trois dernières, pour mémoire :
 `add_chat_attachments`, `add_games`, `add_user_sites`.
 
-`tsc --noEmit` backend : 0 erreur. Frontend : 12 lignes préexistantes (jeu de référence,
-dans Budget/FixedExpenses/Projects — voir `ETAT-PROJET.md`).
+`tsc --noEmit` backend : 0 erreur. Frontend : **9** lignes préexistantes (jeu de
+référence, dans Budget/FixedExpenses/Projects — voir `ETAT-PROJET.md`).
+⚠️ Ce chiffre valait **12** jusqu'au 26/08/2026, et il est resté périmé plusieurs lots
+durant : la valeur à comparer aujourd'hui est **9**, mesurée en confrontant `master` à
+une branche de travail. Les entrées de correctifs qui citent 12 décrivent leur époque,
+ne pas les réécrire.
 
 > ⚠️ **Trois modules ont chacun leur « seule porte », à ne jamais contourner** :
 > `utils/publicUser.ts` (jamais l'objet Prisma brut, il porte `passwordHash`),
