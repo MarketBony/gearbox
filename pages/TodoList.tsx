@@ -27,7 +27,12 @@ interface TodoTask extends Task {
   projectBrands: BrandType[];
   projectService: ServiceType[];
   projectStartDate: string;
-  projectEndDate: string;
+  // Date qui pilote TOUT l'affichage d'une carte : urgence, couleur, libellé, tri, et le
+  // filtre de plage de dates. Elle s'appelait `projectEndDate` jusqu'au 26/08/2026, nom
+  // devenu mensonger depuis que l'échéance de la TÂCHE prend le dessus quand elle est
+  // renseignée — une tâche de projet retombe sur la fin de son projet, une tâche
+  // autonome sur sa propre deadline (ou une sentinelle très lointaine).
+  dateReference: string;
 }
 
 interface KanbanCol {
@@ -218,7 +223,7 @@ const TaskCard: React.FC<{
   // Une tâche autonome SANS deadline porte une date sentinelle très lointaine : elle
   // ne doit jamais s'afficher comme urgente, ni comme datée.
   const sansEcheance = task.standalone && !task.deadline;
-  const days = daysUntil(task.projectEndDate);
+  const days = daysUntil(task.dateReference);
   const urgency = sansEcheance ? 'ok' : days < 0 ? 'overdue' : days <= 3 ? 'critical' : days <= 7 ? 'warning' : 'ok';
 
   const urgencyBorder = urgency === 'overdue' || urgency === 'critical' ? 'border-l-red-500' : urgency === 'warning' ? 'border-l-bony-orange' : 'border-l-transparent';
@@ -272,7 +277,7 @@ const TaskCard: React.FC<{
             ? `Expiré il y a ${Math.abs(days)}j`
             : urgency === 'critical'
             ? `${days}j restant${days > 1 ? 's' : ''}`
-            : formatDate(task.projectEndDate)}
+            : formatDate(task.dateReference)}
         </span>
       </div>
 
@@ -520,7 +525,15 @@ const TodoList: React.FC = () => {
             projectBrands: p.brands,
             projectService: p.service,
             projectStartDate: p.startDate,
-            projectEndDate: p.endDate,
+            // L'échéance de la TÂCHE prend le dessus ; à défaut, la fin du projet
+            // (comportement d'avant le 26/08/2026). Le fallback est délibéré : les
+            // tâches importées n'ont pas d'échéance, elles gardent donc exactement la
+            // date, l'urgence et la place dans le tri qu'elles avaient.
+            // ⚠️ La VISIBILITÉ, elle, reste pilotée par le projet (`p.endDate >=
+            // todayStr` au filtre ci-dessus) : une tâche dont l'échéance est dépassée
+            // dans un projet encore actif reste affichée, en « Expiré il y a Xj ».
+            // C'est précisément l'intérêt de l'échéance par tâche.
+            dateReference: t.deadline || p.endDate,
           });
         }
       }
@@ -551,12 +564,12 @@ const TodoList: React.FC = () => {
         // place très loin dans le futur plutôt que de laisser `daysUntil` recevoir ''
         // (qui donnerait NaN, donc `days < 0` faux mais un affichage cassé).
         projectStartDate: t.deadline || todayStr,
-        projectEndDate: t.deadline || '9999-12-31',
+        dateReference: t.deadline || '9999-12-31',
       });
     }
 
     // Sort by end date asc
-    tasks.sort((a, b) => a.projectEndDate.localeCompare(b.projectEndDate));
+    tasks.sort((a, b) => a.dateReference.localeCompare(b.dateReference));
     setAllTasks(tasks);
     setLoading(false);
   }, [user, todayStr]);
@@ -619,7 +632,7 @@ const TodoList: React.FC = () => {
     }
     if (filterBrands.length && !filterBrands.some(b => t.projectBrands.includes(b))) return false;
     if (filterServices.length && !filterServices.some(s => t.projectService.includes(s))) return false;
-    if (filterDateStart && t.projectEndDate < filterDateStart) return false;
+    if (filterDateStart && t.dateReference < filterDateStart) return false;
     if (filterDateEnd && t.projectStartDate > filterDateEnd) return false;
     return true;
   });

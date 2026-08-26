@@ -32,6 +32,51 @@ const parseLocalDate = (iso: string): Date => {
     return new Date(y, (m || 1) - 1, d || 1);
 };
 
+// --- TRI DU TABLEAU DES TÂCHES ---------------------------------------------------
+// Colonnes triables, dans l'ordre du tableau.
+type TaskSortField = 'name' | 'provider' | 'channel' | 'status' | 'assignedUserId' | 'cost' | 'deadline';
+
+// Ordre d'avancement des statuts, et NON l'ordre alphabétique : trier par statut doit
+// suivre la progression du travail (« En cours » avant « Terminé »), pas l'alphabet, qui
+// donnerait Programmé → Terminé → À faire → En cours.
+// ℹ️ Volontairement local à cet écran : c'est un ordre d'AFFICHAGE, il n'a rien d'une
+// règle métier et n'a donc pas sa place dans `constants.ts`.
+const TASK_STATUS_ORDER: Record<string, number> = {
+    Empty: 0, Todo: 1, InProgress: 2, Programmed: 3, Done: 4,
+};
+
+// En-tête de colonne cliquable. Reprend le vocabulaire visuel déjà en place sur l'en-tête
+// triable de `pages/Campaigns.tsx` (libellé + flèche à 10 px), pour ne pas inventer un
+// second style de tri dans l'application.
+// La flèche n'apparaît que sur la colonne ACTIVE : afficher une double flèche grise sur
+// les six autres surchargerait une ligne d'en-tête déjà dense.
+// ⚠️ `whitespace-nowrap` OBLIGATOIRE : « NOM DE LA TÂCHE » mesure 91 px et se cassait
+// en trois lignes quand sa colonne était comprimée, ce qui déformait toute la rangée
+// d'en-tête. Le nowrap force la colonne à réclamer sa place au lieu de se replier.
+// L'alignement suit le CONTENU de la colonne (centré pour les contrôles, à gauche pour
+// le texte libre) : un titre centré au-dessus d'un champ texte aligné à gauche produit
+// exactement le décalage qu'on cherche à corriger.
+const TriTache: React.FC<{
+    champ: TaskSortField;
+    libelle: string;
+    actif: TaskSortField;
+    sens: 'asc' | 'desc';
+    onTri: (c: TaskSortField) => void;
+    align?: 'left' | 'center' | 'right';
+}> = ({ champ, libelle, actif, sens, onTri, align = 'center' }) => (
+    <button
+        type="button"
+        onClick={() => onTri(champ)}
+        title={`Trier par ${libelle.toLowerCase()}`}
+        className={`w-full flex items-center gap-1 uppercase whitespace-nowrap transition-colors hover:text-slate-900 dark:hover:text-white ${
+            align === 'center' ? 'justify-center' : align === 'right' ? 'justify-end' : ''
+        } ${champ === actif ? 'text-slate-900 dark:text-white' : ''}`}
+    >
+        {libelle}
+        {champ === actif && (sens === 'asc' ? <ArrowUp size={10} className="shrink-0" /> : <ArrowDown size={10} className="shrink-0" />)}
+    </button>
+);
+
 // --- TEAM SECTION COMPONENT (extracted to use its own ref for fixed dropdown) ---
 interface TeamSectionProps {
     assignedIds: string[];
@@ -403,6 +448,16 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const [filterDateTo, setFilterDateTo] = useSessionState<string>(`projects_${viewMode}_filterDateTo`, '');
   const [sortOrder, setSortOrder] = useSessionState<'asc' | 'desc'>(`projects_${viewMode}_sortOrder`, 'desc');
 
+  // --- Tri du tableau des TÂCHES (interne au projet ouvert) ---
+  // Clé NON préfixée par `viewMode` : c'est une préférence d'affichage du tableau, elle
+  // n'a pas de raison de différer entre les projets courants et les archives.
+  // Défaut « échéance croissante » = ce que l'équipe doit traiter en premier. Avant ce
+  // lot il n'y avait aucun tri du tout : `include: { tasks: true }` est envoyé SANS
+  // `orderBy`, l'ordre renvoyé par Postgres n'était donc même pas stable d'une
+  // sauvegarde à l'autre.
+  const [taskSortField, setTaskSortField] = useSessionState<TaskSortField>('projects_taskSortField', 'deadline');
+  const [taskSortDir, setTaskSortDir] = useSessionState<'asc' | 'desc'>('projects_taskSortDir', 'asc');
+
   // Équipe marketing : la seule liste PROPOSÉE au choix (filtre, ajout à l'équipe,
   // assignation d'une tâche).
   // ⚠️ NE JAMAIS filtrer `users` lui-même : c'est lui qui RÉSOUT les personnes déjà
@@ -410,6 +465,81 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   // alors de l'affichage tout en restant en base — invisible et impossible à retirer.
   // On restreint donc les listes de CHOIX, jamais la liste de RÉSOLUTION.
   const marketingUsers = useMemo(() => users.filter(u => isMarketingRole(u.role)), [users]);
+
+  // --- ORDRE D'AFFICHAGE DES TÂCHES ------------------------------------------------
+  // ⚠️ GEL PENDANT LA SAISIE, sans quoi le tri rend le tableau inutilisable :
+  // `updateTask` appelle `handleUpdateProject`, donc un PUT, à CHAQUE FRAPPE. Avec un
+  // tri par nom, taper « Flyer » ferait sauter la ligne cinq fois et le champ perdrait
+  // le focus à la première lettre. On fige donc l'ordre tant qu'un champ texte est en
+  // cours d'édition (onFocus), et on le libère en sortant (onBlur) : la ligne se
+  // replace une fois la saisie finie.
+  // Les Select et le DatePicker ne gèlent rien — ils changent leur valeur en une seule
+  // action, le réordonnancement immédiat y est le comportement attendu.
+  const [ordreGele, setOrdreGele] = useState<string[] | null>(null);
+
+  const compareTasks = useCallback((a: Task, b: Task): number => {
+    const sens = taskSortDir === 'asc' ? 1 : -1;
+    const texte = (x?: string) => (x || '').toLocaleLowerCase('fr');
+    switch (taskSortField) {
+      case 'deadline': {
+        // Une tâche SANS échéance reste toujours en dernier, dans les DEUX sens : en
+        // décroissant, une chaîne vide remonterait sinon en tête du tableau alors
+        // qu'elle ne porte aucune information de date.
+        if (!a.deadline && !b.deadline) return 0;
+        if (!a.deadline) return 1;
+        if (!b.deadline) return -1;
+        return a.deadline.localeCompare(b.deadline) * sens;
+      }
+      case 'cost':
+        return ((a.cost || 0) - (b.cost || 0)) * sens;
+      case 'status':
+        return ((TASK_STATUS_ORDER[a.status] ?? 0) - (TASK_STATUS_ORDER[b.status] ?? 0)) * sens;
+      case 'assignedUserId': {
+        // Tri sur le NOM résolu, jamais sur l'uuid : un classement par identifiant
+        // technique est illisible. Les non-assignés partent en dernier, comme les
+        // tâches sans échéance.
+        const nom = (id?: string) => (id ? users.find(u => u.id === id)?.name || '' : '');
+        const na = nom(a.assignedUserId), nb = nom(b.assignedUserId);
+        if (!na && !nb) return 0;
+        if (!na) return 1;
+        if (!nb) return -1;
+        return na.localeCompare(nb, 'fr') * sens;
+      }
+      default:
+        return texte(a[taskSortField] as string).localeCompare(texte(b[taskSortField] as string), 'fr') * sens;
+    }
+  }, [taskSortField, taskSortDir, users]);
+
+  const tachesAffichees = useMemo(() => {
+    const taches = selectedProject?.tasks ?? [];
+    if (ordreGele) {
+      // Ordre figé : on rejoue les ids mémorisés, en écartant ceux qui ont disparu et
+      // en ajoutant en fin ceux qui sont apparus depuis. Sans ces deux précautions,
+      // supprimer ou ajouter une tâche en pleine saisie ferait disparaître une ligne.
+      const parId = new Map(taches.map(t => [t.id, t]));
+      const ordonnees = ordreGele.map(id => parId.get(id)).filter((t): t is Task => !!t);
+      const vues = new Set(ordonnees.map(t => t.id));
+      return [...ordonnees, ...taches.filter(t => !vues.has(t.id))];
+    }
+    // `tasks` n'est jamais réordonné en place : c'est un ordre d'AFFICHAGE. `updateTask`
+    // et `removeTask` opèrent par `task.id`, jamais par index — le tri ne peut donc pas
+    // faire modifier la mauvaise ligne.
+    return [...taches].sort(compareTasks);
+  }, [selectedProject?.tasks, ordreGele, compareTasks]);
+
+  // Clic sur un en-tête : même colonne = inversion du sens, autre colonne = tri
+  // croissant sur elle. Libère le gel au passage (on ne trie pas un ordre figé).
+  const trierTaches = useCallback((field: TaskSortField) => {
+    setOrdreGele(null);
+    if (field === taskSortField) setTaskSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    else { setTaskSortField(field); setTaskSortDir('asc'); }
+  }, [taskSortField, setTaskSortField, setTaskSortDir]);
+
+  // Gèle l'ordre courant à l'entrée dans un champ texte (sans écraser un gel déjà posé,
+  // le passage d'un champ à l'autre enchaînant blur puis focus).
+  const gelerOrdre = useCallback(() => {
+    setOrdreGele(prev => prev ?? tachesAffichees.map(t => t.id));
+  }, [tachesAffichees]);
 
   const scrollRef = useScrollRestore(`projects_${viewMode}`);
 
@@ -450,6 +580,14 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   useEffect(() => {
       setShowDeleteConfirm(false);
   }, [selectedProject]);
+
+  // Changer de PROJET libère le gel de l'ordre des tâches : celui de l'ancien projet ne
+  // désigne aucune tâche du nouveau, et un gel orphelin annulerait le tri.
+  // ⚠️ Dépendance sur l'`id` et non sur `selectedProject` : l'objet est recréé à chaque
+  // sauvegarde (donc à chaque frappe), ce qui libérerait le gel aussitôt qu'il est posé.
+  useEffect(() => {
+      setOrdreGele(null);
+  }, [selectedProject?.id]);
 
   const loadProjects = async () => {
     const data = await db.getProjects();
@@ -1591,29 +1729,56 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                         </div>
 
                         <div className="gx-glass-panel rounded-xl border border-bony-border overflow-x-auto shadow-sm">
-                            <table className="w-full min-w-[760px] text-left">
+                            {/* LARGEURS CALIBRÉES SUR LE CONTENU RÉEL (mesuré en Albert Sans, 26/08/2026)
+                                — un Select `sm` occupe la largeur du texte + 48 px (pl-3 + pr-9 du chevron) :
+                                  Canal « Street Market » 74 → 122 · Statut « Programmé » 65 → 113 ·
+                                  Échéance « 21 août 2026 » 72 + 48 → 120 · Assigné « — Non assigné — » 95 + avatar.
+                                ⚠️ Le défaut d'avant : les colonnes FIXES totalisaient 944 px pour un
+                                `min-w` de 920 px. La colonne « Nom », seule sans largeur, absorbait le
+                                déficit et tombait à zéro — d'où son en-tête cassé en trois lignes alors
+                                que c'est la colonne la plus utile. Elle a désormais un plancher explicite
+                                (260 px) et récupère TOUT l'espace disponible au-delà du `min-w`.
+                                Somme des fixes = 832 px, et « Nom » prend TOUT le reste au-delà.
+                                Calibré sur les 311 noms de tâches réels : médiane 140 px, et la colonne
+                                obtient ~318 px sur un écran 1920 — 9 % des libellés défilent encore dans
+                                leur champ, contre 14 % avec 40 px de moins.
+                                ⚠️ Les colonnes à CONTRÔLE (Canal → Échéance) sont en `px-1.5` et non `p-3` :
+                                un Select ou un DatePicker porte déjà son propre padding interne, et les
+                                24 px de la cellule s'ajoutaient par-dessus. C'est ce qui tronquait
+                                « Audiovisuel » en « Audiovi… » — 12 px repris par colonne, rendus au Nom.
+                                ⚠️ `table-fixed` est INDISPENSABLE : en `table-layout: auto` (le défaut), les
+                                `w-*` ne sont que des suggestions et le navigateur redistribue selon le
+                                contenu — mesuré le 26/08 : Prestataire écrasé à 90 px et Assigné gonflé à
+                                194 px alors qu'on demandait 128 et 160. En `table-fixed` les largeurs de la
+                                première rangée sont respectées à la lettre, et la seule colonne SANS
+                                largeur (« Nom ») absorbe l'espace restant. */}
+                            <table className="w-full table-fixed min-w-[1060px] text-left">
                                 <thead className="bg-slate-100 dark:bg-black/20 text-[10px] uppercase font-bold text-slate-500">
                                     <tr>
                                         <th className="p-3 w-10"></th>
-                                        <th className="p-3">Nom de la tâche</th>
-                                        <th className="p-3 w-40">Prestataire</th>
-                                        <th className="p-3 w-32">Canal</th>
-                                        <th className="p-3 w-40">Statut</th>
-                                        <th className="p-3 w-36">Assigné</th>
-                                        <th className="p-3 w-28 text-right">Coût (€)</th>
+                                        <th className="p-3"><TriTache champ="name" libelle="Nom de la tâche" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} align="left" /></th>
+                                        <th className="p-3 w-32"><TriTache champ="provider" libelle="Prestataire" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} align="left" /></th>
+                                        <th className="px-1.5 py-3 w-36"><TriTache champ="channel" libelle="Canal" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} /></th>
+                                        <th className="px-1.5 py-3 w-32"><TriTache champ="status" libelle="Statut" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} /></th>
+                                        <th className="px-1.5 py-3 w-36"><TriTache champ="assignedUserId" libelle="Assigné" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} /></th>
+                                        <th className="px-1.5 py-3 w-20"><TriTache champ="cost" libelle="Coût (€)" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} /></th>
+                                        <th className="px-1.5 py-3 w-36"><TriTache champ="deadline" libelle="Échéance" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} /></th>
                                         <th className="p-3 w-10"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-bony-border">
-                                    {selectedProject.tasks.map((task, index) => (
+                                    {tachesAffichees.map((task, index) => (
                                         <tr key={task.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition group">
+                                            {/* Numéro de ligne : suit l'ordre AFFICHÉ, ce n'est pas un identifiant. */}
                                             <td className="p-3 text-center text-slate-400 text-xs font-sans">{index + 1}</td>
                                             <td className="p-3">
-                                                <input 
-                                                    type="text" 
+                                                <input
+                                                    type="text"
                                                     disabled={!canEdit}
                                                     value={task.name}
                                                     onChange={(e) => updateTask(task.id, 'name', e.target.value)}
+                                                    onFocus={gelerOrdre}
+                                                    onBlur={() => setOrdreGele(null)}
                                                     placeholder="Description de la tâche..."
                                                     className="w-full bg-transparent outline-none text-bony-text text-sm placeholder-slate-400 disabled:opacity-50"
                                                 />
@@ -1624,11 +1789,13 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                     disabled={!canEdit}
                                                     value={task.provider || ''}
                                                     onChange={(e) => updateTask(task.id, 'provider', e.target.value)}
+                                                    onFocus={gelerOrdre}
+                                                    onBlur={() => setOrdreGele(null)}
                                                     placeholder="Prestataire..."
                                                     className="w-full bg-transparent outline-none text-bony-text text-sm placeholder-slate-400 disabled:opacity-50"
                                                 />
                                             </td>
-                                            <td className="p-3">
+                                            <td className="px-1.5 py-3">
                                                 <Select
                                                     size="sm"
                                                     value={task.channel || ''}
@@ -1638,22 +1805,27 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                     options={[{ value: '', label: '-- Aucun --' }, ...TASK_CHANNELS.map(c => ({ value: c, label: c }))]}
                                                 />
                                             </td>
-                                            <td className="p-3">
+                                            <td className="px-1.5 py-3">
                                                 <Select
                                                     size="sm"
                                                     value={task.status}
                                                     disabled={!canEdit}
                                                     onChange={(v) => updateTask(task.id, 'status', v)}
+                                                    // Libellés SANS les pourcentages depuis le 26/08/2026 : « Programmé (100%) »
+                                                    // mesure 106 px, ce qui imposait 154 px à la colonne — plus que l'Échéance,
+                                                    // et pris sur le Nom de la tâche. Retirés, le maximum tombe à 65 px et la
+                                                    // colonne rentre dans 128 px. La pondération qu'ils annonçaient reste
+                                                    // lisible là où elle sert : la barre « Avancement Tâches » du projet.
                                                     options={[
                                                         { value: 'Empty', label: 'Vierge' },
-                                                        { value: 'Todo', label: 'À faire (0%)' },
-                                                        { value: 'InProgress', label: 'En cours (50%)' },
-                                                        { value: 'Programmed', label: 'Programmé (100%)' },
-                                                        { value: 'Done', label: 'Terminé (100%)' },
+                                                        { value: 'Todo', label: 'À faire' },
+                                                        { value: 'InProgress', label: 'En cours' },
+                                                        { value: 'Programmed', label: 'Programmé' },
+                                                        { value: 'Done', label: 'Terminé' },
                                                     ]}
                                                 />
                                             </td>
-                                            <td className="p-3">
+                                            <td className="px-1.5 py-3">
                                                 <div className="flex items-center gap-1.5">
                                                     {task.assignedUserId ? (() => {
                                                         const au = users.find(u => u.id === task.assignedUserId);
@@ -1686,13 +1858,31 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="p-3">
+                                            <td className="px-1.5 py-3">
                                                 <input
                                                     type="number"
                                                     disabled={!canEdit}
                                                     value={task.cost}
                                                     onChange={(e) => updateTask(task.id, 'cost', Number(e.target.value))}
-                                                    className="w-full bg-transparent outline-none text-bony-text text-sm text-right font-sans focus:text-bony-orange disabled:opacity-50"
+                                                    onFocus={gelerOrdre}
+                                                    onBlur={() => setOrdreGele(null)}
+                                                    // Centré (et non plus à droite) pour se caler sous son en-tête : ce sont
+                                                    // des champs de saisie courts, pas une colonne de totaux à aligner.
+                                                    className="w-full bg-transparent outline-none text-bony-text text-sm text-center font-sans focus:text-bony-orange disabled:opacity-50"
+                                                />
+                                            </td>
+                                            {/* Échéance de la TÂCHE — date de référence de la To-do quand elle est
+                                                renseignée (sinon la To-do retombe sur la fin du projet).
+                                                ⚠️ `v || null` et non `|| undefined` : côté serveur, `undefined`
+                                                signifie « champ absent du body, donc non modifié », un effacement
+                                                ne partirait donc jamais. Voir pickTaskData dans routes/projects.ts. */}
+                                            <td className="px-1.5 py-3">
+                                                <DatePicker
+                                                    size="sm"
+                                                    clearable
+                                                    value={task.deadline || ''}
+                                                    onChange={(v) => updateTask(task.id, 'deadline', v || null)}
+                                                    placeholder="—"
                                                 />
                                             </td>
                                             <td className="p-3 text-center">
@@ -1706,7 +1896,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                     ))}
                                     {selectedProject.tasks.length === 0 && (
                                         <tr>
-                                            <td colSpan={8} className="p-8 text-center text-slate-500 text-sm italic">
+                                            <td colSpan={9} className="p-8 text-center text-slate-500 text-sm italic">
                                                 Aucune tâche définie. Ajoutez des tâches pour piloter le budget et l'avancement.
                                             </td>
                                         </tr>
