@@ -51,8 +51,14 @@ router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) =>
 // Champs de tâche modifiables (aligné sur le modèle Task) — liste blanche pour
 // que le diff ne crashe pas si le frontend renvoie des objets issus d'un GET
 // (createdAt/updatedAt/projectId ne sont pas des données d'entrée).
+// ⚠️ `deadline` ajouté le 26/08/2026 : le champ existait déjà en base (créé au
+// correctif 35 pour les tâches AUTONOMES) mais il manquait à cette liste blanche, donc
+// `pickTaskData` le jetait silencieusement. Une échéance saisie dans un projet partait
+// bien au serveur et disparaissait au rechargement suivant, SANS erreur. C'est la seule
+// porte d'écriture des tâches de projet : le POST reçoit toujours `tasks: []` (un projet
+// est créé sans tâche), tout passe donc par le diff du PUT ci-dessous.
 const TASK_FIELDS = [
-  'name', 'provider', 'channel', 'cost', 'status', 'assignedUserId',
+  'name', 'provider', 'channel', 'cost', 'status', 'assignedUserId', 'deadline',
   'volumetry', 'openRate', 'npaiRate', 'stopRate', 'clickRate', 'codTxt', 'billedAmount'
 ] as const;
 
@@ -61,6 +67,12 @@ const pickTaskData = (t: any) => {
   for (const f of TASK_FIELDS) {
     if (t[f] !== undefined) data[f] = t[f];
   }
+  // `deadline` est un String? : une échéance effacée doit valoir NULL en base, pas ''.
+  // Le DatePicker vidé renvoie une chaîne vide — on normalise ICI plutôt que dans
+  // l'écran, pour que n'importe quel appelant de cette route soit couvert.
+  // ⚠️ Ne pas confondre avec `undefined`, qui signifie « champ absent du body, donc
+  // non modifié » et ne doit surtout pas devenir un effacement.
+  if (data.deadline === '') data.deadline = null;
   return data;
 };
 

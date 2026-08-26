@@ -37,9 +37,18 @@ interface DatePickerProps {
   size?: 'sm' | 'md';
   /** Date minimale sélectionnable (ISO 'YYYY-MM-DD') — les jours antérieurs sont désactivés. */
   minDate?: string;
+  /**
+   * Affiche un bouton « Effacer » quand une date est posée (renvoie '' à `onChange`).
+   * Opt-in DÉLIBÉRÉ : le composant n'offrait aucun moyen de vider un champ, ce qui
+   * convient aux dates OBLIGATOIRES (début/fin de projet, date de dépense) mais pas à
+   * une échéance de tâche, qui est optionnelle. Laisser le défaut à `false` garde les
+   * usages existants inchangés — un bouton « Effacer » sur une date obligatoire
+   * inviterait à créer un état interdit.
+   */
+  clearable?: boolean;
 }
 
-const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 'Choisir une date', className = '', size = 'md', minDate }) => {
+const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 'Choisir une date', className = '', size = 'md', minDate, clearable = false }) => {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('jours');
   const selected = fromISO(value);
@@ -236,14 +245,30 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
               </div>
               </>)}
 
-              <button
-                type="button"
-                disabled={todayDisabled}
-                onClick={() => handlePick(new Date())}
-                className={`w-full mt-3 py-2 rounded-full text-xs font-bold transition-colors shrink-0 ${todayDisabled ? 'text-bony-muted/30 cursor-not-allowed' : 'text-bony-orange hover:bg-bony-orange/[0.08]'}`}
-              >
-                Aujourd'hui
-              </button>
+              {/* Pied de panneau : « Aujourd'hui », et « Effacer » quand le champ est
+                  effaçable ET rempli. Le bouton d'effacement est ICI et non dans le
+                  déclencheur : celui-ci est un <button>, un bouton imbriqué dans un
+                  bouton est du HTML invalide, et le restructurer casserait le
+                  `triggerRef` dont FloatingPanel se sert pour se positionner. */}
+              <div className="flex items-center gap-2 mt-3 shrink-0">
+                <button
+                  type="button"
+                  disabled={todayDisabled}
+                  onClick={() => handlePick(new Date())}
+                  className={`flex-1 py-2 rounded-full text-xs font-bold transition-colors ${todayDisabled ? 'text-bony-muted/30 cursor-not-allowed' : 'text-bony-orange hover:bg-bony-orange/[0.08]'}`}
+                >
+                  Aujourd'hui
+                </button>
+                {clearable && !!value && (
+                  <button
+                    type="button"
+                    onClick={() => { onChange(''); setOpen(false); }}
+                    className="flex-1 py-2 rounded-full text-xs font-bold text-bony-muted hover:text-red-500 hover:bg-red-500/[0.08] transition-colors"
+                  >
+                    Effacer
+                  </button>
+                )}
+              </div>
       </FloatingPanel>
     </>
   );

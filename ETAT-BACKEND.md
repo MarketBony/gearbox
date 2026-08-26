@@ -46,10 +46,17 @@ Migration `20260806160000_add_standalone_tasks` : `Task.projectId` devient **nul
 (+ `deadline String?`, `sites/brands/service String[]`).
 
 **Une tâche a désormais deux natures**, dans un **seul modèle** :
-- **tâche de projet** (`projectId` renseigné) : hérite site, marques, service et
-  échéance de son projet — d'où l'absence historique de ces colonnes ;
+- **tâche de projet** (`projectId` renseigné) : hérite site, marques et service de son
+  projet — d'où l'absence historique de ces colonnes ;
 - **tâche autonome** (`projectId = null`), créée depuis la To-do : n'ayant aucun projet
   dont hériter, elle porte ces champs elle-même, plus une `deadline` propre.
+
+⚠️ **Mise à jour du 26/08/2026 (correctif 42) : `deadline` n'est PLUS réservée aux
+tâches autonomes.** Une tâche de projet porte désormais sa propre échéance, saisie dans
+le tableau du projet, et c'est elle qui fait office de date de référence dans la To-do
+(à défaut, la To-do retombe sur la fin du PROJET). Aucune migration n'a été nécessaire :
+la colonne existait déjà, créée ici. **Seule** la liste blanche `TASK_FIELDS` de
+`routes/projects.ts` l'ignorait.
 
 ⚠️ **Un seul modèle et pas deux**, volontairement : dupliquer aurait recréé « le second
 chemin, plus pauvre, vers un besoin déjà couvert » du correctif 10 (rubrique Dépenses
@@ -314,12 +321,29 @@ que stocker et valider.
 
 Côté routes, deux comportements distincts à connaître :
 - `projects.ts` fait `const { tasks, ...projectData } = req.body` puis passe le
-  reste à Prisma → **un nouveau champ transite sans modification de code**, mais
-  n'est pas validé non plus.
+  reste à Prisma → **un nouveau champ de PROJET transite sans modification de code**,
+  mais n'est pas validé non plus.
 - `fixedExpenses.ts` **déstructure explicitement** chaque champ → il a fallu
   ajouter `nissanShare` en **trois** endroits : `optionalFieldsError` (validation
   `isFiniteNumber`), le `create` et le `update`. Oublier l'un des trois fait
   disparaître la valeur silencieusement.
+
+⚠️⚠️ **PRÉCISION AJOUTÉE LE 26/08/2026, et elle vaut d'être lue : la tolérance du
+`...projectData` de `projects.ts` ne s'applique QU'AUX CHAMPS DU PROJET. Les champs de
+TÂCHE, eux, passent par une liste blanche `TASK_FIELDS` + `pickTaskData`** — un champ
+qui n'y figure pas est **jeté en silence**. La formulation précédente laissait croire
+que la route acceptait tout nouveau champ : c'est ce qui a fait perdre du temps au
+correctif 42, où `Task.deadline` existait en base depuis le correctif 35, était bien
+envoyé par l'écran, et disparaissait au rechargement **sans erreur nulle part**.
+Trois choses à retenir avant de toucher à un champ de tâche :
+1. `TASK_FIELDS` est la **seule porte d'écriture** des tâches de projet — le POST
+   `/api/projects` reçoit toujours `tasks: []` (un projet est créé sans tâche), tout
+   passe donc par le diff du PUT ;
+2. `pickTaskData` teste `t[f] !== undefined` : **`undefined` = « champ absent, non
+   modifié »**, ce n'est PAS un effacement. Pour vider un champ nullable il faut
+   envoyer `null` explicitement (le frontend écrit `v || null`) ;
+3. `deadline` y est normalisée `'' -> null`, côté SERVEUR pour couvrir tout appelant :
+   un `String?` doit valoir NULL en base et non une chaîne vide.
 
 Le frontend utilise la couche unique `services/dataService.ts` (`apiFetch` + JWT). Résidus
 `localStorage` **assumés et hors périmètre** (pas des données serveur) : overlay client-only chat

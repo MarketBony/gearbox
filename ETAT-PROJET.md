@@ -10,10 +10,14 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 33** (patch
-  anniversaire / photo de groupe / barre de saisie / garde-fou plaques, 6 août) —
-  `api` **et** `web`, migration Prisma. Avant lui le **correctif 32** (rôle « chef de
-  site », 5 août) — `api` **et** `web`, migration Prisma. Le correctif 31 (responsive
+- master = prod, synchronisés. Dernier lot déployé : **correctif 42** (échéance par
+  tâche, tri et redimensionnement du tableau des tâches, 26 août) — `api` **et**
+  `web`, **sans migration** : `Task.deadline` existait depuis le correctif 35, seule
+  la liste blanche `TASK_FIELDS` du backend l'ignorait. Avant lui le **correctif 41**
+  (rôle External, 25 août) — `api` **et** `web`, sans migration. Le **correctif 33**
+  (patch anniversaire / photo de groupe / barre de saisie / garde-fou plaques, 6 août)
+  demandait `api` **et** `web` avec migration Prisma, comme le **correctif 32** (rôle
+  « chef de site », 5 août). Le correctif 31 (responsive
   mobile) s'était contenté de `web`. Le correctif 30 (refonte des Jeux) avait demandé `api`
   **et** `web` avec migration, comme les 27, 28 et 29 ; les 25 et 26 s'étaient contentés
   de `web`. Le
@@ -1769,6 +1773,132 @@
     ma vérification porte sur les types, la concordance des listes et la logique du
     verrou serveur.
 
+42. **ÉCHÉANCE PAR TÂCHE, et tableau des tâches triable et redimensionné**
+    (`feat/echeance-taches`, 26 août). Backend + frontend, **aucune migration** →
+    `api` **et** `web`.
+
+    Demande de Théo : une échéance par tâche dans le tableau du projet, qui devienne
+    la date de référence de la To-do, plus la possibilité de trier les tâches par
+    n'importe quelle colonne, échéance chronologique par défaut.
+
+    **⚠️ Aucune migration Prisma : le champ existait déjà.** `Task.deadline`
+    (`String?`, `'yyyy-MM-dd'` comme `User.birthdate`) avait été créé au correctif 35
+    pour les tâches AUTONOMES. Il était simplement inutilisé par les tâches de projet.
+    C'est aussi pour ça que `dataService` n'a besoin d'aucun normaliseur : la valeur
+    n'est pas un `DateTime` Prisma.
+
+    **⚠️ LE PIÈGE, et il aurait été muet : `TASK_FIELDS` ne contenait pas
+    `deadline`.** Cette liste blanche (`backend/src/routes/projects.ts`) filtre le diff
+    transactionnel du PUT via `pickTaskData`. Sans l'ajout, l'échéance s'affichait,
+    partait au serveur et disparaissait au rechargement suivant — **sans la moindre
+    erreur, ni côté client, ni dans les logs**. C'est la SEULE porte d'écriture des
+    tâches de projet : le POST reçoit toujours `tasks: []` (un projet est créé sans
+    tâche), tout transite donc par ce PUT.
+    `pickTaskData` normalise en plus `'' -> null` pour `deadline` : le DatePicker vidé
+    renvoie une chaîne vide, et un `String?` doit valoir NULL en base. La normalisation
+    est CÔTÉ SERVEUR pour couvrir tout appelant, pas seulement cet écran.
+    ⚠️ Ne pas confondre avec `undefined`, qui signifie « champ absent du body, donc non
+    modifié » — c'est pour ça que l'écran envoie `v || null` et non `v || undefined`,
+    sans quoi un effacement ne partirait jamais.
+
+    **`DatePicker` : nouvelle prop `clearable`** (`components/DatePicker.tsx`). Le
+    composant n'offrait **aucun moyen de vider une date** une fois posée — acceptable
+    pour les dates obligatoires (début/fin de projet, date de dépense), pas pour une
+    échéance optionnelle. Un bouton « Effacer » apparaît dans le panneau, à côté
+    d'« Aujourd'hui ». Opt-in délibéré : les 12 usages existants sont inchangés au
+    caractère, et un bouton « Effacer » sur une date obligatoire inviterait à créer un
+    état interdit.
+    ⚠️ Le bouton est dans le PANNEAU et non dans le déclencheur : celui-ci est un
+    `<button>`, un bouton imbriqué dans un bouton est du HTML invalide, et restructurer
+    casserait le `triggerRef` dont `FloatingPanel` se sert pour se positionner.
+
+    **Tri du tableau** : les 7 colonnes sont triables (en-tête cliquable, flèche sur la
+    colonne active, vocabulaire visuel repris de `pages/Campaigns.tsx` pour ne pas
+    inventer un second style). État en `useSessionState`, défaut `deadline` / `asc`.
+    Trois règles non évidentes :
+    - une tâche **sans échéance reste en dernier dans les DEUX sens** — en décroissant,
+      une chaîne vide remonterait sinon en tête sans porter aucune information ;
+    - le tri par **assigné** porte sur le NOM résolu via `users`, jamais sur l'uuid ;
+    - le tri par **statut** suit `TASK_STATUS_ORDER` (Empty → Todo → InProgress →
+      Programmed → Done), l'ordre d'avancement et non l'alphabet des valeurs internes,
+      qui placerait `Done` en premier.
+    C'est un ordre d'AFFICHAGE : `tasks` n'est jamais réordonné, aucun champ `order`
+    n'est ajouté au modèle, et `updateTask`/`removeTask` opèrent déjà par `task.id`.
+    Bénéfice de bord : l'ordre était jusqu'ici **non déterministe** — `include: { tasks:
+    true }` est envoyé SANS `orderBy`, Postgres pouvait donc le changer d'une
+    sauvegarde à l'autre.
+
+    **⚠️ GEL DE L'ORDRE PENDANT LA SAISIE — sans lui la fonction est inutilisable.**
+    `updateTask` appelle `handleUpdateProject`, donc un PUT, **à chaque frappe**. Avec
+    un tri par nom, taper « Flyer » ferait sauter la ligne cinq fois et le champ
+    perdrait le focus dès la première lettre. L'ordre est donc figé tant qu'un des
+    trois champs texte a le focus (`onFocus`) et libéré en sortant (`onBlur`). Le gel
+    filtre les ids disparus et ajoute en fin les tâches apparues, sinon une suppression
+    en pleine saisie ferait disparaître une ligne. Les Select et le DatePicker ne
+    gèlent rien : ils changent leur valeur en une action, le réordonnancement immédiat
+    y est le comportement attendu.
+    ⚠️ Le `useEffect` qui libère le gel dépend de `selectedProject?.id` et **non** de
+    `selectedProject` : l'objet est recréé à chaque sauvegarde, donc à chaque frappe,
+    ce qui annulerait le gel aussitôt posé.
+
+    **To-do** : `projectEndDate` renommé **`dateReference`** dans `TodoTask`, et
+    alimenté par `t.deadline || p.endDate`. Le renommage n'est pas cosmétique — le nom
+    serait devenu mensonger, et c'est exactement le genre de nom qui fait repartir une
+    session suivante sur une fausse piste. Le fallback sur la fin du projet est un
+    arbitrage explicite de Théo : les 313 tâches existantes n'ont pas d'échéance et
+    gardent donc **exactement** la date, l'urgence et la place dans le tri qu'elles
+    avaient.
+    ⚠️ **La VISIBILITÉ n'a pas changé** : elle reste pilotée par le PROJET
+    (`p.endDate >= todayStr`). Une tâche dont l'échéance est dépassée dans un projet
+    encore actif **reste affichée**, en « Expiré il y a Xj ». C'est précisément
+    l'intérêt de l'échéance par tâche, pas un effet de bord.
+
+    **Mise en page du tableau, reprise après un premier jet refusé par Théo.** Le
+    défaut n'était pas esthétique mais arithmétique : les colonnes fixes totalisaient
+    **944 px** pour un `min-w` de **920 px**. « Nom de la tâche », seule colonne sans
+    largeur, absorbait le déficit et tombait à zéro — d'où son en-tête cassé en trois
+    lignes sur la colonne la plus utile. Trois corrections, toutes mesurées :
+    1. **`table-fixed` au lieu de `table-layout: auto`** : les `w-*` n'étaient que des
+       suggestions et le navigateur redistribuait selon le contenu (mesuré : Prestataire
+       écrasé à 90 px, Assigné gonflé à 194 px alors qu'on demandait 128 et 160). La
+       seule colonne sans largeur (« Nom ») absorbe désormais tout l'espace restant.
+    2. **`px-1.5` au lieu de `p-3` sur les colonnes à contrôle** : un Select ou un
+       DatePicker porte déjà son padding interne et les 24 px de la cellule s'y
+       ajoutaient — c'est ce qui tronquait « Audiovisuel » en « Audiovi… ».
+    3. **Libellés de statut sans les pourcentages.** « Programmé (100%) » mesure 106 px
+       et imposait 154 px à la colonne, plus que l'Échéance, au détriment du Nom.
+       « Programmé » tombe à 65 px. Effet de bord heureux : le formulaire affiche
+       désormais **les mêmes libellés que la To-do**, qui n'a jamais montré ces
+       pourcentages ; la pondération reste lisible sur la barre « Avancement Tâches ».
+    En-têtes en `whitespace-nowrap` et centrés, **sauf « Nom » et « Prestataire »**
+    laissés à gauche : leur contenu est du texte libre aligné à gauche, et centrer le
+    titre au-dessus recrée le décalage qu'on corrige.
+    Résultat mesuré : colonne « Nom » à **302 px** sur un écran 1920 (contre ~0),
+    9 cellules d'en-tête à 39 px de haut donc **une seule ligne chacune**, **aucune
+    troncature** dans les Select, et sur les 311 noms de tâches réels 9 % débordent
+    encore (contre 14 % avec 40 px de moins). Le tableau fait 1060 px au minimum :
+    **aucun scroll horizontal à 1920 px**, il en reste à 1440 px — structurel à
+    huit colonnes.
+
+    **Vérifié dans le navigateur** (projet jetable `ZZ-TEST-ECHEANCES`, supprimé
+    ensuite, 0 résidu contrôlé et Dashboard revenu de 33 à 32 projets actifs) :
+    persistance après F5 (le test qui valide `TASK_FIELDS`), effacement écrivant bien
+    `null` en base, tri nom/échéance/coût/statut dans les deux sens, « sans échéance »
+    toujours en dernier, tri numérique et non lexicographique (`0 / -250 / -2100 /
+    -2300`), gel de l'ordre pendant la frappe puis replacement au blur, To-do affichant
+    « Expiré il y a 10j » sur une tâche échue d'un projet actif et le fallback projet
+    sur une tâche sans échéance, et non-régression du `DatePicker` ailleurs (« Effacer »
+    absent des dates de projet).
+    `tsc` backend 0, racine **9** de référence — et non 12 : la doc citait un chiffre
+    périmé depuis plusieurs lots, vérifié en comparant `master` et la branche.
+    ℹ️ Réserve honnête : le tri par **assigné** n'a été éprouvé qu'avec une seule
+    personne (toutes les tâches au même nom) — les noms sont bien résolus, mais le
+    classement entre plusieurs personnes n'a pas été observé à l'écran.
+    ℹ️ Le `DatePicker` n'a pas de prop `disabled` : pour un rôle en lecture seule le
+    calendrier s'ouvre et le clic ne fait rien (`updateTask` teste `canEdit`). C'est le
+    comportement déjà en place sur les dates de projet, pas une régression — mais ce lot
+    l'étend d'une colonne.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
@@ -1867,6 +1997,14 @@
   corrigée au correctif 31 ; celui-ci était hors périmètre.
 - **Cellules JOUR du sélecteur de date** : 36 px sur mobile, sous le seuil des 44 px.
   Préexistant, non touché au correctif 31 pour ne pas modifier la grille existante.
+- **Tableau des tâches d'un projet** : défile horizontalement sous ~1500 px (1060 px
+  pour huit colonnes utiles). Aucun scroll à 1920 px, résiduel à 1440. Si le besoin se
+  confirme, la parade est de **masquer une colonne secondaire** sous un seuil, pas de
+  resserrer l'ensemble — resserrer, c'est réintroduire le défaut du correctif 42.
+- **`DatePicker` sans prop `disabled`** : pour un rôle en lecture seule le calendrier
+  s'ouvre et le clic ne change rien (le refus vient de `updateTask`, qui teste
+  `canEdit`). Préexistant sur les dates de projet ; le correctif 42 l'étend à la
+  colonne Échéance. Les `Select` du même tableau reçoivent bien `disabled`.
 
 ### ⚠️ Contrainte permanente Tailwind (à relire avant toute retouche visuelle)
 Tailwind est chargé en **CDN Play** : les variantes `md:`/`lg:` **ne fonctionnent pas**
@@ -1911,6 +2049,21 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 - **Les serveurs de dev se lancent par nom** depuis `.claude/launch.json` (ajouté
   le 04/08) : `gearbox-web` (port 3000) et `gearbox-api` (port 3001), au lieu de
   lancer `npm run dev` à la main.
+- **`tsc --noEmit` à la racine rend 9 erreurs de référence, plus 12.** Le chiffre 12
+  est recopié dans une dizaine d'entrées de correctifs ci-dessus : il était juste à
+  l'époque, il ne l'est plus. Constaté le 26/08/2026 en comparant `master` et une
+  branche de travail. Les 9 restantes sont dans `Budget.tsx`, `FixedExpenses.tsx` et
+  `Projects.tsx` (inférences `unknown` sur des `reduce`), toutes préexistantes.
+  ⚠️ Ne pas réécrire les entrées historiques pour autant — elles décrivent l'état du
+  jour où elles ont été écrites. C'est la valeur à comparer AUJOURD'HUI qui est 9.
+- **Un `min-width` de tableau doit être vérifié contre la SOMME de ses colonnes
+  fixes.** Sur le tableau des tâches, 944 px de colonnes fixes pour un `min-w` de
+  920 px : la seule colonne sans largeur (« Nom de la tâche ») absorbait le déficit et
+  tombait à zéro. Et en `table-layout: auto` — le défaut — les `w-*` ne sont que des
+  suggestions, le navigateur redistribue selon le contenu (mesuré : 90 px pour une
+  colonne à qui on demandait 128). `table-fixed` est le seul moyen d'obtenir les
+  largeurs demandées. Enfin, le padding de la cellule s'AJOUTE au padding interne d'un
+  Select ou d'un DatePicker : le compter deux fois tronque les libellés.
 
 ## Contraintes d'environnement toujours actives
 - Réseau bureau bloque les ports sortants 22 (SSH) et 5432/6543 (Postgres/Supabase)
