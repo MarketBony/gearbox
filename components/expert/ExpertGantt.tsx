@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState, useLayoutEffect } from 'react';
 import { Project, Task, User } from '../../types';
 import Avatar from '../Avatar';
 
@@ -41,6 +41,81 @@ const iso = (d: Date): string => {
 const EST_FINIE = (t: Task) => t.status === 'Done' || t.status === 'Programmed';
 
 const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+/**
+ * Largeur RÉELLE d'un libellé, mesurée au canvas dans la police de la page.
+ *
+ * ⚠️ Mesurer et ne pas estimer : la première version supposait « 130 px pour tout le
+ * monde » et alternait sur deux niveaux en ne regardant que le jalon précédent. Sur
+ * « Forum Pièces 2026 », trois jalons rapprochés retombaient donc au même niveau et
+ * leurs noms se chevauchaient — « Grande Halle d'Auvergne » et « Visuel Ticket d'Or »
+ * s'écrivaient l'un sur l'autre. Même méthode que le calibrage des colonnes du tableau
+ * des tâches (correctif 42) : on mesure, on ne devine pas.
+ */
+let ctxMesure: CanvasRenderingContext2D | null = null;
+const largeurTexte = (texte: string): number => {
+  if (!ctxMesure) {
+    const c = document.createElement('canvas').getContext('2d');
+    if (!c) return texte.length * 5;
+    c.font = `600 9px ${getComputedStyle(document.body).fontFamily}`;
+    ctxMesure = c;
+  }
+  return Math.ceil(ctxMesure.measureText(texte).width);
+};
+
+// Crans verticaux ou se posent les libelles.
+// ⚠️ AUCUN cran a la hauteur de l'axe (0). Un cran 0 semblait pourtant le plus lisible,
+// et il l'etait pour SON jalon — mais rien n'empeche le LOSANGE d'un jalon voisin de
+// tomber par-dessus le texte : constate le 27/08/2026, « Visuel Ticket D'or » s'affichait
+// « uel Ticket D'or », son debut mange par le losange suivant. L'algorithme ci-dessous
+// evite les collisions entre LIBELLES ; les losanges, eux, sont toujours sur l'axe. En
+// n'ecrivant jamais sur l'axe, le probleme disparait par construction.
+// Ordre volontaire : on remplit d'abord les crans proches de l'axe (plus lisibles).
+// Ecarts mesures le 27/08/2026 : le losange est un carre de 12 px tourne a 45 deg, sa
+// DIAGONALE fait donc ~17 px et il deborde de +/-8,5 px autour de l'axe. Un libelle de
+// 9 px occupe ~+/-6 px autour de son cran. En dessous de 15 px, les deux se touchent
+// encore — mesure a l'appui, +/-11 px laissait 3 losanges mordre un libelle.
+const CRANS = [-17, 17, -32, 32];
+const LARGEUR_MAX_LIBELLE = 150;
+
+interface Jalon { left: number; aGauche: boolean; niveau: number; largeur: number; }
+
+/**
+ * Place les libellés de jalons sur les crans disponibles, sans collision.
+ *
+ * Pour chaque jalon (de gauche à droite) on calcule l'intervalle horizontal qu'occupera
+ * son texte, puis on lui donne le PREMIER cran dont le dernier libellé se termine avant
+ * — algorithme classique de placement d'étiquettes. Quand aucun cran n'est libre, le
+ * libellé est masqué (`niveau = -1`) : le losange reste, son nom s'affiche au survol.
+ * Mieux vaut un nom en moins qu'une bouillie de texte.
+ */
+const placerLibelles = (
+  marques: { t: Task; jalon: boolean; left: number; width: number }[],
+  largeurPiste: number
+): Map<string, Jalon> => {
+  const place = new Map<string, Jalon>();
+  if (largeurPiste <= 0) return place;
+
+  const finParCran = CRANS.map(() => -Infinity);
+  const MARGE = 8; // respiration entre deux étiquettes voisines
+
+  for (const m of marques) {
+    if (!m.jalon) continue;
+    const xLosange = (m.left / 100) * largeurPiste;
+    const largeur = Math.min(largeurTexte(m.t.name || 'Sans nom') + 4, LARGEUR_MAX_LIBELLE);
+    // Près du bord droit, le texte s'écrit à gauche du losange, sinon il sort du cadre.
+    const aGauche = xLosange + largeur + 14 > largeurPiste;
+    const debut = aGauche ? xLosange - 10 - largeur : xLosange + 10;
+    const fin = debut + largeur;
+
+    let niveau = -1;
+    for (let i = 0; i < CRANS.length; i++) {
+      if (debut >= finParCran[i] + MARGE) { niveau = i; finParCran[i] = fin; break; }
+    }
+    place.set(m.t.id, { left: m.left, aGauche, niveau, largeur });
+  }
+  return place;
+};
 
 interface Props {
   projet: Project;
@@ -125,6 +200,26 @@ const ExpertGantt: React.FC<Props> = ({ projet, users, onOuvrirTache }) => {
     };
   }, [projet.tasks, projet.startDate, projet.endDate, users]);
 
+  // Largeur RÉELLE d'une piste, observée dans le DOM : le placement des libellés se
+  // fait en pixels, pas en pourcentages estimés. Toutes les pistes ont la même largeur
+  // (elles partagent `flex-1` après une colonne de gauche fixe), une seule mesure suffit.
+  const pisteRef = useRef<HTMLDivElement>(null);
+  const [largeurPiste, setLargeurPiste] = useState(0);
+  useLayoutEffect(() => {
+    const el = pisteRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(entries => setLargeurPiste(entries[0].contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [g.lignes.length]);
+
+  // Un placement par ligne : les jalons d'une personne n'entrent jamais en collision
+  // avec ceux d'une autre, elles sont sur des pistes distinctes.
+  const placements = useMemo(
+    () => new Map(g.lignes.map(l => [l.userId, placerLibelles(l.taches, largeurPiste)])),
+    [g.lignes, largeurPiste]
+  );
+
   if (g.lignes.length === 0) {
     return (
       <div className="gx-card p-8 text-center text-slate-500 text-sm italic border border-dashed border-bony-border">
@@ -156,7 +251,7 @@ const ExpertGantt: React.FC<Props> = ({ projet, users, onOuvrirTache }) => {
 
           {/* Lignes : une par personne */}
           <div className="space-y-2">
-            {g.lignes.map(ligne => (
+            {g.lignes.map((ligne, idxLigne) => (
               <div key={ligne.userId || 'non-assigne'} className="flex items-center gap-2">
 
                 {/* Colonne de gauche : l'intervenant */}
@@ -171,7 +266,10 @@ const ExpertGantt: React.FC<Props> = ({ projet, users, onOuvrirTache }) => {
                 </div>
 
                 {/* Piste temporelle */}
-                <div className="relative flex-1 h-8 rounded-lg bg-slate-100 dark:bg-white/[0.03] border border-bony-border/60">
+                <div
+                  ref={idxLigne === 0 ? pisteRef : undefined}
+                  className="relative flex-1 h-20 rounded-lg bg-slate-100 dark:bg-white/[0.03] border border-bony-border/60"
+                >
                   {/* Repères de mois, discrets */}
                   {g.graduations.map(gr => (
                     <div key={gr.libelle} className="absolute top-0 bottom-0 w-px bg-bony-border/40" style={{ left: `${gr.pos}%` }} />
@@ -186,23 +284,52 @@ const ExpertGantt: React.FC<Props> = ({ projet, users, onOuvrirTache }) => {
                     const titre = `${t.name || 'Sans nom'}${t.startDate ? ` — du ${t.startDate}` : ''}${t.deadline ? ` au ${t.deadline}` : ''}${enRetard ? ' (en retard)' : ''}`;
 
                     if (jalon) {
+                      // Position et cran calcules en AMONT par `placerLibelles`, sur des
+                      // largeurs de texte mesurees : c'est ce qui garantit qu'aucun libelle
+                      // n'en recouvre un autre. `niveau === -1` = pas de place, on n'affiche
+                      // que le losange et son infobulle.
+                      const pl = placements.get(ligne.userId)?.get(t.id);
+                      const aGauche = pl?.aGauche ?? false;
+                      const niveau = pl?.niveau ?? -1;
+                      const couleur = enRetard
+                        ? 'bg-red-500 border-red-300'
+                        : EST_FINIE(t) ? 'bg-green-500 border-green-300'
+                        : 'bg-bony-violet border-bony-violet/50';
+
                       return (
-                        <button
-                          key={t.id}
-                          onClick={() => onOuvrirTache(t.id)}
-                          title={titre}
-                          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 group"
-                          style={{ left: `${left}%` }}
-                        >
-                          {/* Losange = jalon. Un carré tourné à 45°, pas d'image. */}
-                          <span
-                            className={`block w-3 h-3 rotate-45 border transition-transform group-hover:scale-125 ${
-                              enRetard ? 'bg-red-500 border-red-300'
-                              : EST_FINIE(t) ? 'bg-green-500 border-green-300'
-                              : 'bg-bony-violet border-bony-violet/50'
-                            }`}
-                          />
-                        </button>
+                        <React.Fragment key={t.id}>
+                          {/* Le LOSANGE, toujours sur l'axe du temps : sa position verticale
+                              ne doit jamais bouger, c'est elle qui aligne le jalon sur les
+                              graduations et sur les barres des autres taches. */}
+                          <button
+                            onClick={() => onOuvrirTache(t.id)}
+                            title={titre}
+                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 group"
+                            style={{ left: `${left}%` }}
+                          >
+                            <span className={`block w-3 h-3 rotate-45 border transition-transform group-hover:scale-125 ${couleur}`} />
+                          </button>
+
+                          {/* Le LIBELLE, pose sur son cran. Il porte sa largeur mesuree :
+                              pas de `truncate` a l'aveugle, la troncature n'arrive que si le
+                              nom depasse vraiment la largeur maximale. */}
+                          {niveau >= 0 && (
+                            <button
+                              onClick={() => onOuvrirTache(t.id)}
+                              title={titre}
+                              className="absolute top-1/2 z-20 text-[9px] font-semibold text-bony-text/80 hover:text-bony-orange truncate text-left transition-colors"
+                              style={{
+                                width: `${pl!.largeur}px`,
+                                transform: `translateY(calc(-50% + ${CRANS[niveau]}px))`,
+                                ...(aGauche
+                                  ? { right: `calc(${100 - left}% + 10px)`, textAlign: 'right' as const }
+                                  : { left: `calc(${left}% + 10px)` })
+                              }}
+                            >
+                              {t.name}
+                            </button>
+                          )}
+                        </React.Fragment>
                       );
                     }
                     return (

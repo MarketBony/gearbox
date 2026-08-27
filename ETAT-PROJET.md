@@ -10,7 +10,10 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 43** (mode Expert :
+- master = prod, synchronisés. Dernier lot déployé : **correctif 44** (reprise du mode
+  Expert après recette : KPI refaits, Gantt lisible, fichiers de tâche visibles, retour
+  dans la charte liquid glass, 27 août) — **`web` seul**, aucune migration.
+  Avant lui le **correctif 43** (mode Expert :
   KPI, Gantt, fichiers de projet et de tâche, notes, 27 août) — `api` **et** `web`,
   **avec migration** (`20260826142519_add_expert_mode`, purement additive).
   Avant lui le **correctif 42** (échéance par
@@ -2025,6 +2028,100 @@
     place côté serveur (`projetAutorise`) et l'écriture lui est fermée, mais la leçon du
     projet est qu'un 403 exact ne vaut pas un test dans l'interface — à faire avec Théo.
 
+44. **MODE EXPERT — reprise complète après recette de Théo** (`fix/mode-expert-retours`,
+    27 août). Frontend seul, **aucune migration** → `web`.
+
+    ⚠️⚠️ **CE LOT EXISTE PARCE QUE LE 43 A ÉTÉ DÉPLOYÉ SANS RECETTE.** L'autorisation
+    « .md, push and deploy » donnée pour le correctif 42 a été reconduite seule sur le 43,
+    alors que la méthode du projet impose l'étape « JE VALIDE le fonctionnel — tu
+    t'arrêtes ici et tu me montres » AVANT les `.md`, le push et le déploiement. Théo a
+    donc découvert **en production** quatre modules qu'il aurait recalés en local :
+    « très décevant ». **Une autorisation de push vaut pour LE lot en cours, jamais pour
+    le suivant.** C'est la leçon la plus chère de la journée, elle vaut plus que tout ce
+    qui suit.
+
+    **Ce que la recette sur « Forum Pièces 2026 » a démontré, chiffres à l'appui :**
+    - « Charge par personne » affichait *Théo 8 tâches / **0 €*** : le bloc ne comptait que
+      le RESTANT, et sur ce projet le restant ne coûte rien. Des barres vides. Le montant
+      réellement porté par Claire Richard — **95 700 €**, la donnée la plus importante du
+      projet — était tout simplement invisible.
+    - Le Pilotage annonçait **7 sans échéance** quand le Planning annonçait **14 sans
+      date** : deux définitions différentes côte à côte dans le même écran.
+    - « Avancement réel » (97 % pondéré vs 53 % à l'unité, plus trois lignes
+      d'explication) : « je comprends pas ton truc, c'est beaucoup trop complexe ».
+    - L'onglet **Fichiers** annonçait « 2 autres fichiers sont rattachés à une tâche » sans
+      les montrer — dans l'onglet qui s'appelle « Fichiers ».
+    - L'icône de la ligne de tâche passait au violet sans dire s'il s'agissait d'une note,
+      d'un fichier ou d'une date.
+    - Un **halo orange** derrière le bouton « MODE EXPERT ACTIF ».
+
+    **STYLE — la faute la mieux documentée.** Le CSS de `.gx-btn-gradient` dans
+    `index.html` porte ce commentaire : « Fini verre sobre : ombre neutre douce + très fin
+    liseré haut (**pas de glow orange plastique**) ». Y ajouter `shadow-glow`
+    (`rgba(247,86,50,0.45)`) écrasait précisément ce box-shadow. Retiré du bouton
+    d'activation et des onglets. Le bandeau du panneau, lui, était un aplat
+    `gx-gradient opacity-[0.12]` — l'exact contraire du verre : remplacé par un vrai
+    `gx-card` (translucide + `backdrop-filter`) avec le liseré dégradé vertical déjà
+    utilisé sur le panneau de contexte du projet.
+    ⚠️ `shadow-glow` reste légitime ailleurs (Export, DatePicker) sur de PETITS éléments.
+    Ce qui est proscrit, c'est de l'empiler sur `gx-btn-gradient`.
+
+    **PILOTAGE — refait, et « Avancement réel » SUPPRIMÉ.** Trois blocs :
+    - **« À traiter »** (remplace « Tenue des échéances ») : en retard / sans personne
+      assignée / à faire sans date. Un bloc de pilotage doit faire AGIR : chaque compteur
+      déplie sa liste et **chaque ligne ouvre la tâche** pour la corriger sur place. Une
+      catégorie vide passe au vert avec une coche.
+    - **« Qui fait quoi »** : TOUTES les tâches de chacun, terminées comprises, avec
+      `faites/total`, barre de progression et budget porté. C'est le correctif des 0 €.
+    - **« Où part l'argent »** : inchangé, seul bloc que Théo n'avait pas critiqué.
+    ⚠️ L'incohérence 7/14 est levée par les LIBELLÉS, pas en alignant les chiffres :
+    « à faire sans date » (6, ce qui reste à corriger) et « sans date, absentes du
+    planning » (11, tout ce qui n'est pas plaçable). Deux nombres différents sont
+    légitimes tant que chacun dit ce qu'il compte.
+    ⚠️ Toujours pas de burndown ni de vélocité : aucun historique de changement de statut
+    n'existe (`Task.updatedAt` bouge à chaque modification, pas au passage en « Terminé »).
+
+    **GANTT — placement d'étiquettes mesuré, et non estimé.** Les jalons écrivent
+    désormais leur nom à côté du losange. Deux défauts successifs, chacun trouvé par la
+    MESURE dans le navigateur et non à l'œil :
+    1. la première version alternait sur **deux** crans en ne regardant que le jalon
+       précédent, avec une largeur de texte devinée à 130 px : trois jalons rapprochés
+       retombaient au même cran (« Grande Halle d'Auvergne » écrit par-dessus « Visuel
+       Ticket d'Or »). Remplacé par un vrai placement — largeur **mesurée au canvas** dans
+       la police réelle, puis premier cran libre parmi quatre, et libellé masqué (le
+       losange et son infobulle restent) quand aucun cran ne l'est ;
+    2. les crans à ±11 px étaient trop proches de l'axe pour la **DIAGONALE** du losange
+       (un carré de 12 px tourné à 45° déborde de ±8,5 px) : un losange voisin mangeait le
+       début d'un libellé — « uel Ticket D'or ». Crans portés à **±17 et ±32**, piste en
+       `h-20`. ⚠️ Aucun cran n'est posé sur l'axe : les losanges y sont toujours, le
+       problème disparaît par construction.
+    **Mesuré après correction, sur les deux pistes : 0 chevauchement de libellés,
+    0 losange sur libellé, 0 débordement de piste.**
+
+    **FICHIERS** : les fichiers de tâche sont **listés**, groupés sous leur tâche dont le
+    nom est cliquable. Le dépôt reste au niveau de la tâche (`canEdit={false}` sur ces
+    listes) : c'est là qu'on choisit le rattachement.
+
+    **LIGNE DE TÂCHE** : trombone **avec le nombre de fichiers**, icône de note si elle
+    existe, « agrandir » en gris neutre. Les marqueurs sont dans le MÊME bouton pour ne
+    pas multiplier les zones cliquables sur une ligne déjà dense. Colonne d'action
+    ramenée de 116 à **92 px** après mesure (le bouton n'en occupe que 75), `min-w` du
+    tableau de 1136 à 1112 — les 24 px rendus vont au nom de la tâche.
+
+    **Vérifié** en lecture seule sur « Forum Pièces 2026 » (aucun `PUT` dans l'onglet
+    réseau, projet contrôlé intact après coup) : compteurs « À traiter » recoupés à la
+    main contre l'API (1 / 0 / 6 — identiques), « Qui fait quoi » recoupé (Claire 4/6 —
+    95 700 € · Théo 5/13 — 825 € · Bastien 0/1, total 20 tâches / 96 525 €), parcours
+    « cliquer une ligne → la tâche s'ouvre » testé, les 2 fichiers de tâche affichés,
+    thème **clair ET sombre**, tous les en-têtes du tableau sur une seule ligne.
+    `tsc` backend 0, racine 9 de référence.
+    ℹ️ Réserve honnête : le **dépôt** et la **suppression** d'un fichier, ainsi que le cas
+    « note seule sans fichier », n'ont pas été rejoués — ils exigent d'écrire, et le seul
+    projet en mode Expert était un vrai projet de Théo.
+    ⚠️ Incident signalé à Théo : un clic mal placé a déclenché la confirmation de
+    suppression de « Forum Pièces 2026 ». Annulée immédiatement, projet vérifié intact
+    (20 tâches, 96 525 €, mode Expert actif).
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
@@ -2190,6 +2287,23 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 - **Les serveurs de dev se lancent par nom** depuis `.claude/launch.json` (ajouté
   le 04/08) : `gearbox-web` (port 3000) et `gearbox-api` (port 3001), au lieu de
   lancer `npm run dev` à la main.
+- **⚠️⚠️ UNE AUTORISATION DE PUSH VAUT POUR *LE* LOT EN COURS, JAMAIS POUR LE SUIVANT.**
+  Le 27/08/2026, le « .md, push and deploy » donné pour le correctif 42 a été reconduit
+  seul sur le correctif 43 : le mode Expert est parti en production **sans recette**.
+  Théo y a découvert quatre modules qu'il aurait recalés en local (KPI sans intérêt,
+  fichiers de tâche annoncés mais invisibles, halo hors charte), d'où le correctif 44
+  entièrement consacré à réparer. La méthode du projet est explicite et non négociable :
+  **étape 3 = « JE VALIDE le fonctionnel — tu t'arrêtes ici et tu me montres »**, AVANT
+  les `.md`, le push et le déploiement. Ce n'est pas une demande de permission — c'est
+  une étape de recette qui appartient à Théo. Sur un nouveau lot : on teste en local, on
+  montre, on attend.
+- **Une mesure vaut mieux qu'un coup d'œil, et deux mesures valent mieux qu'une.** Le
+  Gantt du mode Expert a demandé DEUX passes correctives, chacune trouvée en mesurant
+  dans le navigateur ce que l'œil ne voyait pas : d'abord des libellés qui se
+  chevauchaient (largeur de texte devinée au lieu d'être mesurée au canvas), puis des
+  losanges qui mangeaient un libellé (les crans verticaux ignoraient que la DIAGONALE
+  d'un carré de 12 px tourné à 45° fait ~17 px). Même leçon qu'au correctif 42 sur les
+  colonnes du tableau : on mesure, on ne devine pas.
 - **`tsc --noEmit` à la racine rend 9 erreurs de référence, plus 12.** Le chiffre 12
   est recopié dans une dizaine d'entrées de correctifs ci-dessus : il était juste à
   l'époque, il ne l'est plus. Constaté le 26/08/2026 en comparant `master` et une
