@@ -9,7 +9,7 @@ import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLOR
 import {
     Plus, Save, Trash2, FolderKanban, CheckCircle2, Circle, PlayCircle,
     CalendarCheck, Coins, TrendingUp, TrendingDown, Search, Filter, X,
-    Archive, AlertTriangle, ArrowRight, Wallet, ArrowUp, ArrowDown, Lock, ChevronDown, ChevronRight, Check, PieChart, UserCircle, Sparkles, Maximize2
+    Archive, AlertTriangle, ArrowRight, Wallet, ArrowUp, ArrowDown, Lock, ChevronDown, ChevronRight, Check, PieChart, UserCircle, Sparkles, Maximize2, Paperclip, StickyNote
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import DatePicker from '../components/DatePicker';
@@ -1373,9 +1373,14 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                             title={selectedProject.expertMode
                                                 ? "Revenir à la vue simple. Aucune donnée n'est supprimée."
                                                 : 'Débloquer les indicateurs, le planning et les fichiers'}
+                                            // ⚠️ PAS de `shadow-glow` ici. `gx-btn-gradient` porte déjà son
+                                            // ombre dans index.html, et son commentaire est explicite :
+                                            // « Fini verre sobre […] pas de glow orange plastique ». Ajouter
+                                            // `shadow-glow` écrasait ce box-shadow par un halo orange —
+                                            // signalé par Théo le 27/08/2026 comme hors charte.
                                             className={`mt-2 w-full py-2 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wide flex items-center justify-center gap-2 transition-all ${
                                                 selectedProject.expertMode
-                                                    ? 'gx-btn-gradient text-white shadow-glow'
+                                                    ? 'gx-btn-gradient text-white'
                                                     : 'border border-bony-violet/40 text-bony-violet hover:bg-bony-violet/10'
                                             }`}
                                         >
@@ -1798,7 +1803,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                 élargir la colonne SANS toucher au `min-w` reprendrait les 36 px à la
                                 colonne « Nom de la tâche », c'est-à-dire le défaut corrigé au
                                 correctif 42. */}
-                            <table className={`w-full table-fixed text-left ${modeExpert ? 'min-w-[1096px]' : 'min-w-[1060px]'}`}>
+                            <table className={`w-full table-fixed text-left ${modeExpert ? 'min-w-[1112px]' : 'min-w-[1060px]'}`}>
                                 <thead className="bg-slate-100 dark:bg-black/20 text-[10px] uppercase font-bold text-slate-500">
                                     <tr>
                                         <th className="p-3 w-10"></th>
@@ -1809,7 +1814,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                         <th className="px-1.5 py-3 w-36"><TriTache champ="assignedUserId" libelle="Assigné" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} /></th>
                                         <th className="px-1.5 py-3 w-20"><TriTache champ="cost" libelle="Coût (€)" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} /></th>
                                         <th className="px-1.5 py-3 w-36"><TriTache champ="deadline" libelle="Échéance" actif={taskSortField} sens={taskSortDir} onTri={trierTaches} /></th>
-                                        <th className={modeExpert ? 'p-3 w-[76px]' : 'p-3 w-10'}></th>
+                                        <th className={modeExpert ? 'p-3 w-[92px]' : 'p-3 w-10'}></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-bony-border">
@@ -1938,19 +1943,37 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                         simple le bouton n'existe pas, il n'ouvrirait rien d'utile.
                                                         Visible aussi en lecture seule : on consulte une note et on
                                                         télécharge une pièce jointe sans droit d'écriture. */}
-                                                    {modeExpert && (
-                                                        <button
-                                                            onClick={() => setTacheOuverte(task.id)}
-                                                            title="Détail : dates, note et fichiers"
-                                                            className={`p-2 rounded-lg transition ${
-                                                                task.notes || task.startDate || fichiers.some(f => f.taskId === task.id)
-                                                                    ? 'text-bony-violet hover:bg-bony-violet/10'
-                                                                    : 'text-slate-400 hover:text-bony-violet hover:bg-bony-violet/10'
-                                                            }`}
-                                                        >
-                                                            <Maximize2 size={14} />
-                                                        </button>
-                                                    )}
+                                                    {/* ⚠️ Le bouton doit dire CE QU'IL Y A DANS la tâche, pas seulement
+                                                        qu'il y a « quelque chose ». La première version se contentait de
+                                                        passer l'icône en violet : impossible de savoir s'il s'agissait
+                                                        d'une note, d'un fichier ou d'une date (relevé par Théo le
+                                                        27/08/2026). On affiche donc des marqueurs DISTINCTS — trombone
+                                                        + nombre de fichiers, et une note — dans le même bouton, pour ne
+                                                        pas multiplier les zones cliquables sur une ligne déjà dense. */}
+                                                    {modeExpert && (() => {
+                                                        const nbFichiers = fichiers.filter(f => f.taskId === task.id).length;
+                                                        const aNote = !!task.notes;
+                                                        return (
+                                                            <button
+                                                                onClick={() => setTacheOuverte(task.id)}
+                                                                title={[
+                                                                    'Détail : dates, note et fichiers',
+                                                                    nbFichiers > 0 ? `${nbFichiers} fichier${nbFichiers > 1 ? 's' : ''}` : null,
+                                                                    aNote ? 'une note' : null
+                                                                ].filter(Boolean).join(' — ')}
+                                                                className="px-1.5 py-2 rounded-lg flex items-center gap-1 text-slate-400 hover:text-bony-violet hover:bg-bony-violet/10 transition"
+                                                            >
+                                                                <Maximize2 size={14} className="shrink-0" />
+                                                                {nbFichiers > 0 && (
+                                                                    <span className="flex items-center gap-0.5 text-bony-violet shrink-0">
+                                                                        <Paperclip size={12} />
+                                                                        <span className="text-[10px] font-bold font-sans">{nbFichiers}</span>
+                                                                    </span>
+                                                                )}
+                                                                {aNote && <StickyNote size={12} className="text-bony-violet shrink-0" />}
+                                                            </button>
+                                                        );
+                                                    })()}
                                                     {canEdit && (
                                                         <button onClick={() => removeTask(task.id)} className="p-2 text-slate-400 hover:text-red-500 transition opacity-100 md:opacity-0 md:group-hover:opacity-100">
                                                             <Trash2 size={14} />

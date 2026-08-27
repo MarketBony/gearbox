@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Gauge, CalendarRange, Paperclip, Sparkles } from 'lucide-react';
+import { Gauge, CalendarRange, Paperclip, Sparkles, ChevronRight } from 'lucide-react';
 import { Project, ProjectFile, User } from '../../types';
 import { db } from '../../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../../services/realtime';
@@ -37,6 +37,13 @@ const ExpertPanel: React.FC<Props> = ({ projet, users, canEdit, fichiers, onFich
   const fichiersProjet = fichiers.filter(f => !f.taskId);
   const nbFichiersTaches = fichiers.length - fichiersProjet.length;
 
+  // Fichiers de tâche regroupés par tâche, dans l'ordre du tableau. Une tâche supprimée
+  // emporte ses fichiers (cascade en base), donc `find` ne devrait jamais échouer — on
+  // se protège quand même plutôt que d'afficher un groupe sans nom.
+  const groupesParTache = projet.tasks
+    .map(t => ({ taskId: t.id, nom: t.name || 'Sans nom', fichiers: fichiers.filter(f => f.taskId === t.id) }))
+    .filter(g => g.fichiers.length > 0);
+
   const ONGLETS: { id: Onglet; libelle: string; icone: React.ReactNode; badge?: number }[] = [
     { id: 'pilotage', libelle: 'Pilotage', icone: <Gauge size={14} /> },
     { id: 'planning', libelle: 'Planning', icone: <CalendarRange size={14} /> },
@@ -46,10 +53,17 @@ const ExpertPanel: React.FC<Props> = ({ projet, users, canEdit, fichiers, onFich
   return (
     <section className="space-y-4">
 
-      {/* En-tête du mode : c'est lui qui dit « on a changé de dimension » */}
-      <div className="relative overflow-hidden rounded-2xl border border-bony-violet/30">
-        <div className="absolute inset-0 gx-gradient opacity-[0.12]" />
-        <div className="relative px-4 py-3 flex items-center gap-3 flex-wrap">
+      {/* En-tête du mode.
+          ⚠️ EN VERRE, pas en dégradé délavé. La première version posait un
+          `gx-gradient opacity-[0.12]` en aplat sur toute la surface : l'exact contraire
+          de la charte liquid glass, qui veut du translucide + `backdrop-filter`. Théo
+          l'a qualifié d'« immonde » le 27/08/2026, à raison.
+          On reprend donc `gx-card` (le verre de l'application) et le liseré dégradé
+          vertical déjà utilisé sur le panneau de contexte du projet — un accent de
+          charte sur le bord, pas un voile sur le fond. */}
+      <div className="gx-card relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-bony-orange to-bony-violet" />
+        <div className="relative px-4 py-3 pl-5 flex items-center gap-3 flex-wrap">
           <Sparkles size={18} className="text-bony-violet shrink-0" />
           <div className="min-w-0">
             <h3 className="font-title text-lg text-bony-text leading-none">MODE EXPERT</h3>
@@ -64,9 +78,11 @@ const ExpertPanel: React.FC<Props> = ({ projet, users, canEdit, fichiers, onFich
               <button
                 key={o.id}
                 onClick={() => setOnglet(o.id)}
+                // Onglet actif en dégradé plein, SANS `shadow-glow` : même raison que le
+                // bouton d'activation, le halo orange est hors charte.
                 className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 transition-all ${
                   onglet === o.id
-                    ? 'gx-gradient text-white shadow-glow'
+                    ? 'gx-gradient text-white'
                     : 'text-slate-500 hover:text-bony-text'
                 }`}
               >
@@ -83,14 +99,16 @@ const ExpertPanel: React.FC<Props> = ({ projet, users, canEdit, fichiers, onFich
         </div>
       </div>
 
-      {onglet === 'pilotage' && <ExpertKpis projet={projet} users={users} />}
+      {onglet === 'pilotage' && (
+        <ExpertKpis projet={projet} users={users} onOuvrirTache={onOuvrirTache} />
+      )}
 
       {onglet === 'planning' && (
         <ExpertGantt projet={projet} users={users} onOuvrirTache={onOuvrirTache} />
       )}
 
       {onglet === 'fichiers' && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div>
             <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
               Fichiers du projet
@@ -104,11 +122,50 @@ const ExpertPanel: React.FC<Props> = ({ projet, users, canEdit, fichiers, onFich
               onChange={onFichiersChange}
             />
           </div>
+
+          {/* ⚠️ Les fichiers de TÂCHE sont LISTÉS ICI, plus seulement annoncés.
+              La première version affichait « 2 autres fichiers sont rattachés à une
+              tâche — ouvrez la tâche pour les voir » : on signalait des fichiers sans
+              les montrer, dans l'onglet qui s'appelle « Fichiers ». Théo l'a relevé le
+              27/08/2026 (« complètement con »), à raison.
+              Le dépôt reste au niveau de la TÂCHE (`canEdit={false}` ici) : c'est là
+              qu'on choisit à quoi le fichier se rattache. */}
           {nbFichiersTaches > 0 && (
-            <p className="text-[11px] text-slate-500 border-t border-bony-border pt-3">
-              {nbFichiersTaches} autre{nbFichiersTaches > 1 ? 's' : ''} fichier{nbFichiersTaches > 1 ? 's sont rattachés' : ' est rattaché'} à une tâche —
-              ouvrez la tâche depuis le tableau pour {nbFichiersTaches > 1 ? 'les' : 'le'} voir.
-            </p>
+            <div className="border-t border-bony-border pt-4">
+              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                Fichiers rattachés à une tâche
+                <span className="ml-1.5 text-bony-violet font-sans">{nbFichiersTaches}</span>
+              </h4>
+              <div className="space-y-3">
+                {groupesParTache.map(g => (
+                  <div key={g.taskId}>
+                    <button
+                      onClick={() => onOuvrirTache(g.taskId)}
+                      title="Ouvrir cette tâche"
+                      className="flex items-center gap-1.5 mb-1.5 group"
+                    >
+                      <Paperclip size={11} className="text-bony-violet shrink-0" />
+                      <span className="text-[11px] font-semibold text-bony-text group-hover:text-bony-orange transition-colors truncate max-w-[320px]">
+                        {g.nom}
+                      </span>
+                      <ChevronRight size={12} className="text-slate-400 group-hover:text-bony-orange transition-colors shrink-0" />
+                    </button>
+                    <ExpertFiles
+                      projectId={projet.id}
+                      taskId={g.taskId}
+                      fichiers={g.fichiers}
+                      users={users}
+                      canEdit={false}
+                      onChange={onFichiersChange}
+                      compact
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-3">
+                Pour en ajouter ou en retirer un, ouvrez la tâche concernée.
+              </p>
+            </div>
           )}
         </div>
       )}
