@@ -389,12 +389,16 @@ const rollback = async (fichier) => {
   const lignes = fs.readFileSync(fichier, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
   console.log(`\n${lignes.length} publication(s) à SUPPRIMER de ${API} :\n`);
   lignes.forEach((l) => console.log(`  · ${l.date}  ${l.title}`));
-  if (!process.stdin.isTTY) {
-    console.error('\n✗ Confirmation impossible : stdin n\'est pas un terminal. Relance depuis un vrai terminal.\n');
+  // Confirmation obligatoire, sous une forme ou l'autre. Hors terminal (agent, CI), la
+  // saisie interactive est impossible : on exige alors le même mot en argument, ce qui
+  // garde le geste explicite sans le rendre inexécutable.
+  if (process.stdin.isTTY) {
+    const rep = await demander('\nTape SUPPRIMER en toutes lettres pour confirmer : ');
+    if (rep.trim() !== 'SUPPRIMER') { console.log('Annulé, rien n\'a été supprimé.'); process.exit(0); }
+  } else if (opt('--confirmer') !== 'SUPPRIMER') {
+    console.error('\n✗ stdin n\'est pas un terminal : ajoute --confirmer SUPPRIMER pour valider cette suppression.\n');
     process.exit(1);
   }
-  const rep = await demander('\nTape SUPPRIMER en toutes lettres pour confirmer : ');
-  if (rep.trim() !== 'SUPPRIMER') { console.log('Annulé, rien n\'a été supprimé.'); process.exit(0); }
   let ok = 0;
   for (const l of lignes) {
     const r = await api(`/social/${l.id}`, { method: 'DELETE' });

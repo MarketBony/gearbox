@@ -2275,8 +2275,22 @@
     Dacia 12 · Renault 10 · Nissan 3 ; VN 22 · APV 11 · RH 10 ; GROUPE BONY 37 puis 12
     concessions nommées). `RH` confirmé présent dans le sélecteur de filtre **dans le
     navigateur**. `tsc` 9 racine / 0 backend.
-    ℹ️ **Restent à faire** : l'aller-retour `--limit 1` commit + rollback (à prouver
-    AVANT les 42 autres), puis l'import complet, puis le dépôt manuel des 7 fichiers.
+    **IMPORT EXÉCUTÉ le 02/09/2026** — 43/43 créées, via `localhost:3001` (qui écrit
+    dans la base de production). Aller-retour `--limit 1` commit + rollback prouvé
+    AVANT, sur « ADAM - CONSEIL » : création, contrôle des champs en base, refus de
+    l'annulation sans confirmation, annulation effective, retour à 3 publications.
+    Contrôlé après l'import complet : **46 publications en base** (43 + les 3 de Théo),
+    première au **2026-09-01**, dernière au **2026-12-29**, **0 doublon**, **0 mojibake**
+    (`Validé`, `Pensez à covoiturer`, apostrophes typographiques U+2019 et retours à la
+    ligne du wording conservés), 5 publications portant un lien SharePoint, répartition
+    identique au dry-run (Holding 24 · Dacia 12 · Renault 10 · Nissan 3 ; VN 22 · APV 11
+    · **RH 10**). Vérifié à l'écran : le sélecteur de service affiche bien **RH** et non
+    un champ vide.
+    Fichier d'annulation : `~/Downloads/import-edito-20260902-152859.jsonl` (43 ids).
+    ⚠️ `--rollback` exige désormais une confirmation : `SUPPRIMER` tapé à la main dans un
+    terminal, ou `--confirmer SUPPRIMER` hors terminal (agent, CI) — le geste reste
+    explicite sans rendre le script inexécutable en automatisation.
+    ℹ️ **Reste à faire** : le dépôt manuel des 7 fichiers listés dans le rapport.
 
 ## Backlog — ce qui reste à faire
 
@@ -2284,20 +2298,16 @@
 > l'historique des correctifs ci-dessus et dans `BUGS-CONNUS.md`.
 
 ### Fonctionnel / produit
-- **⏳ IMPORT DU CALENDRIER ÉDITORIAL — le code est en ligne, les 43 posts NON.**
-  Suite immédiate du correctif 46, dans cet ordre strict :
-  1. `$env:GEARBOX_TOKEN` = le jeton de session (console du navigateur,
-     `localStorage.gearbox_token`, 24 h) — **remplacer le texte d'exemple**, piège
-     rencontré le 02/09 ;
-  2. dry-run contre la prod → recoupement anti-doublon (`titre+date`) ;
-  3. **aller-retour `--limit 1` commit + rollback, à prouver AVANT les 42 autres** ;
-  4. import complet, **hors heures de bureau** : 43 `POST` = 43 `social:updated`, donc
-     autant de rechargements chez chaque client connecté ;
-  5. dépôt **manuel** des 7 fichiers listés dans le rapport (`MINUTE DE L'AUTO` EP 5/7/8/9,
-     `Offre emploi…jpg`, `SEPTEMBRE 2026`, `Vidéos_Bony_Lamarck`) — le classeur ne les
-     contenait pas, rien n'a été inventé en base.
-  ℹ️ Aucune entrée d'`ActivityLog` ne sera créée (le journal est alimenté côté client) :
-  les 43 posts apparaîtront sans auteur ni trace dans le fil. Attendu, pas un bug.
+- **✅ IMPORT DU CALENDRIER ÉDITORIAL FAIT le 02/09/2026** — 43 publications en base,
+  du 01/09 au 29/12/2026. Détail et contrôles dans le correctif 46.
+  **Reste le dépôt MANUEL des 7 fichiers** que le classeur ne contenait pas
+  (`MINUTE DE L'AUTO` EP 5/7/8/9, `Offre emploi…jpg`, `SEPTEMBRE 2026`,
+  `Vidéos_Bony_Lamarck`) : rien n'a été inventé en base, ils sont listés avec leur
+  publication dans le rapport de dry-run, qu'on régénère à volonté sans rien écrire.
+  ℹ️ Ces 43 posts n'ont **aucune entrée d'`ActivityLog`** (le journal est alimenté côté
+  client) : ils apparaissent sans auteur ni trace dans le fil d'actualité. Attendu.
+  ℹ️ Le fichier d'annulation `~/Downloads/import-edito-20260902-152859.jsonl` permet de
+  tout retirer d'un coup tant qu'il existe — ne pas le supprimer à la légère.
 - **Non-régression de la branche FICHIER de la modale Médias, non rejouée** (correctif
   45) : aucune publication de la base ne portait de fichier au moment de la recette.
   Contrôle de 30 secondes à faire par Théo — déposer un JPG et un MP4, vérifier
