@@ -10,7 +10,10 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctifs 45 et 46** (Digital —
+- master = prod, synchronisés. Dernier lot déployé : **correctif 47** (Digital — refonte
+  de la ligne d'édito et correction de DEUX bugs d'empilement, 2 septembre) — **`web`
+  seul**, aucune migration.
+  Avant lui les **correctifs 45 et 46** (Digital —
   liens externes dans les médias + validation de `mediaFiles` ; service `RH` et script
   d'import du calendrier éditorial, 2 septembre) — **`api` ET `web`** (`social.ts` bouge
   au 45), **aucune migration**.
@@ -2291,6 +2294,73 @@
     terminal, ou `--confirmer SUPPRIMER` hors terminal (agent, CI) — le geste reste
     explicite sans rendre le script inexécutable en automatisation.
     ℹ️ **Reste à faire** : le dépôt manuel des 7 fichiers listés dans le rapport.
+
+47. **DIGITAL — REFONTE DE LA LIGNE D'ÉDITO, et DEUX bugs d'empilement**
+    (`fix/edito-empilement-et-refonte-ligne`, 2 septembre). Frontend seul → `web`,
+    **aucune migration**.
+
+    ⚠️⚠️ **LE DÉFAUT STRUCTURANT DE CE LOT, à retenir avant tout le reste :
+    `.gx-glass-panel` porte un `backdrop-filter`, et `backdrop-filter` CRÉE UN CONTEXTE
+    D'EMPILEMENT.** Tout élément positionné à l'intérieur d'une ligne d'édito y est donc
+    enfermé : son `z-index`, quelle qu'en soit la valeur, ne le fera jamais passer
+    au-dessus de la ligne SUIVANTE, qui est un simple frère plus bas dans le DOM.
+    Deux composants en souffraient :
+    1. le menu de `VisualMultiSelect` (`absolute … z-50`) — signalé par Théo ;
+    2. le **wording**, qui passait en `absolute` au focus pour s'agrandir.
+    ⚠️ **Le second a survécu au correctif du premier**, dans un fichier que je venais de
+    modifier : j'avais traité le symptôme signalé sans chercher ses jumeaux. Théo l'a
+    trouvé à la recette suivante. **Quand une cause est structurelle, chercher TOUS ses
+    porteurs, pas seulement celui qu'on vous montre.**
+    Les deux passent désormais par `components/FloatingPanel.tsx` — portalisé sur
+    `document.body`, `position: fixed`, `z-[10000]`, ancré au déclencheur. La brique
+    existait déjà et `components/Select.tsx` s'en servait : c'est exactement pour ça que
+    les sélecteurs Statut/Service/LOM/CO² n'ont JAMAIS eu le problème, et que seuls
+    Marques/Sites/Réseaux l'avaient. Vérifié en mesurant l'élément réellement peint à la
+    jonction des deux lignes : une option de menu, puis le textarea.
+
+    **REFONTE — deux passes, la première REFUSÉE, et c'est instructif.**
+    La première version privilégiait la compacité : 178 → 99 px par ligne, en rognant le
+    wording à 44 px et en gardant les réglages répartis de part et d'autre du texte.
+    Verdict de Théo : « *c'est pire qu'avant* ». Deux enseignements :
+    - **la hauteur n'était pas le vrai grief** — la lisibilité et la cohérence l'étaient ;
+    - **les réglages étaient séparés en deux paquets** (Date/Statut/Service/Diffusion d'un
+      côté, Marques/Sites/Réseaux/LOM/CO² de l'autre), donc on cherchait un réglage dans
+      deux zones que le texte séparait. Défaut hérité de la version d'origine, que la
+      première passe n'avait pas corrigé, seulement déplacé.
+
+    **Version retenue** — deux zones et une seule grammaire :
+    - **CONTENU** à gauche : titre + lien sur une ligne, puis un aperçu de wording de
+      78 px, cliquable, qui ouvre un vrai panneau d'écriture de **456 × 217 px** (avec
+      compteur de caractères, fermeture par Échap ou par le bouton) ;
+    - **RÉGLAGES** à droite : les **neuf** contrôles dans UNE grille (5 colonnes × 2
+      rangées), chacun sous un micro-intitulé. Les sélecteurs se ressemblaient tous et
+      n'étaient identifiables que par leur texte de remplacement, qui disparaît dès
+      qu'une valeur est posée ;
+    - **ACTIONS** à droite, en ligne (elles occupaient une colonne verticale qui
+      réservait 152 px pour trois boutons).
+
+    ⚠️ **La zone de wording a une hauteur FIXE (`h-[78px]`) et non `flex-1`.** Laissée
+    libre, elle suivait la longueur du texte : mesuré, l'édito « FORUM PR » faisait monter
+    sa ligne à **507 px**. Le texte intégral se lit et s'édite dans le panneau.
+
+    ⚠️ **Pastilles à hauteur fixe, 1 visible + « +N »**, infobulle donnant la liste
+    complète. En les laissant passer à la ligne, « Réseaux » atteignait 72 px dès 5
+    réseaux cochés et imposait 152 px à toute la colonne. Contrepartie assumée : plus de
+    croix de suppression sur la pastille, on décoche dans le menu.
+
+    **`DatePicker` : nouvelle prop `compact`** → `01/09/2026` au lieu de « 1 sept. 2026 ».
+    Opt-in délibéré, le format long reste le défaut partout ailleurs ; seule la ligne
+    d'édito l'utilise, parce qu'elle aligne neuf contrôles côte à côte.
+
+    **Mesuré** (et non estimé), à 1669 px : ligne **126 px** contre 178, uniforme sur les
+    44 éditos, d'un seul tenant, sans débordement horizontal. Idem à 1440. À 375 px, deux
+    colonnes de réglages.
+    ⚠️ Piège corrigé en route : `min-w-[480px]` sur la grille de réglages **coupait la
+    troisième colonne sur mobile** — les minimums en pixels doivent être préfixés `sm:`.
+    Autre piège : le repli d'un conteneur `flex-wrap` se décide sur les **bases**
+    (`flex-basis`), pas sur les `min-width` ; des bases trop larges faisaient basculer le
+    bloc d'actions seul sur une deuxième rangée.
+    `tsc` 9 racine / 0 backend, `check-plaques-sync` vert.
 
 ## Backlog — ce qui reste à faire
 

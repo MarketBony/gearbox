@@ -12,6 +12,7 @@ import Select from '../components/Select';
 import CollapsibleFilters from '../components/CollapsibleFilters';
 import { isSiteManager, canEditDigital } from '../constants';
 import DatePicker from '../components/DatePicker';
+import FloatingPanel from '../components/FloatingPanel';
 import { fournisseurDe, libelleCourt } from '../lib/linkProviders';
 
 type Tab = 'Calendrier Editorial' | 'Planning Digital' | 'Archives' | 'Gestion des TAGS';
@@ -65,6 +66,21 @@ const getSocialIcon = (network: string, size: number = 14) => {
 };
 
 // --- COMPONENT: VISUAL MULTI-SELECT (CHIPS) ---
+//
+// ⚠️ Le menu passe par `FloatingPanel`, comme `components/Select.tsx`, et ce n'est PAS
+// un détail d'implémentation : ce composant rendait auparavant son menu en
+// `absolute … z-50` À L'INTÉRIEUR de la ligne d'édito. Or la ligne porte
+// `.gx-glass-panel`, donc un `backdrop-filter`, **qui crée un contexte d'empilement** :
+// le z-index du menu s'y trouvait enfermé et l'édito SUIVANT — simple frère plus bas
+// dans le DOM — se peignait par-dessus. Aucune valeur de z-index n'y changeait rien.
+// `FloatingPanel` portalise sur `document.body` en `position: fixed`, ce qui échappe à
+// tout ancêtre. Mesuré le 02/09/2026 : le seul contexte d'empilement de la chaîne était
+// bien la ligne elle-même.
+//
+// ⚠️ HAUTEUR FIXE, et c'est ce qui tient la compacité de la ligne. Avec les pastilles
+// libres de passer à la ligne, « Réseaux » montait à 72 px dès 5 réseaux cochés et
+// imposait à lui seul 152 px à toute la colonne. On affiche donc au plus
+// `maxVisible` pastilles, le reste en « +N ».
 interface VisualMultiSelectProps {
     label: string;
     options: string[];
@@ -72,84 +88,96 @@ interface VisualMultiSelectProps {
     onChange: (newSelected: string[]) => void;
     disabled?: boolean;
     type?: 'brand' | 'default';
+    /** Pastilles affichées avant le « +N ». */
+    maxVisible?: number;
 }
 
-const VisualMultiSelect: React.FC<VisualMultiSelectProps> = ({ label, options, selected, onChange, disabled, type = 'default' }) => {
+const VisualMultiSelect: React.FC<VisualMultiSelectProps> = ({ label, options, selected, onChange, disabled, type = 'default', maxVisible = 2 }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    // Pas de gestion de clic extérieur ici : FloatingPanel s'en charge (et de Échap).
 
     const toggleOption = (opt: string) => {
         if (selected.includes(opt)) onChange(selected.filter(s => s !== opt));
         else onChange([...selected, opt]);
     };
 
-    const removeItem = (e: React.MouseEvent, item: string) => {
-        e.stopPropagation();
-        onChange(selected.filter(s => s !== item));
-    };
+    const visibles = selected.slice(0, maxVisible);
+    const reste = selected.length - visibles.length;
 
     return (
-        <div className="relative w-full" ref={containerRef}>
-            <div 
-                onClick={() => !disabled && setIsOpen(!isOpen)}
-                className={`min-h-[32px] w-full bg-black/5 dark:bg-black/40 border border-bony-border rounded px-2 py-1 cursor-pointer hover:border-slate-400 dark:hover:border-white/20 transition-colors flex flex-wrap gap-1 items-center ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        <>
+            <button
+                type="button"
+                ref={triggerRef}
+                onClick={() => !disabled && setIsOpen(o => !o)}
+                disabled={disabled}
+                title={selected.length ? selected.join(' · ') : label}
+                className={`h-11 md:h-[34px] w-full min-w-0 bg-[var(--bg-input)] border rounded-lg px-1.5 flex items-center gap-1 overflow-hidden text-left transition-colors ${isOpen ? 'border-bony-orange/60' : 'border-bony-border hover:border-bony-orange/40'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
                 {selected.length > 0 ? (
-                    selected.map(item => {
-                        let badgeStyle = "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600";
-                        if (type === 'brand') {
-                             const colorClass = BRAND_COLORS[item as BrandType];
-                             if (colorClass) badgeStyle = colorClass;
-                        }
-
-                        return (
-                            <span key={item} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${badgeStyle} shadow-sm`}>
-                                {item}
-                                {!disabled && <X size={10} className="cursor-pointer hover:opacity-70" onClick={(e) => removeItem(e, item)}/>}
-                            </span>
-                        );
-                    })
-                ) : (
-                    <span className="text-xs text-slate-500 dark:text-slate-600 italic">{label}</span>
-                )}
-                <div className="flex-1"></div>
-                <ChevronDown size={12} className="text-slate-500 dark:text-slate-600"/>
-            </div>
-
-            {isOpen && (
-                <div className="glass-menu absolute top-full left-0 mt-1 w-64 rounded-lg z-50 p-2 max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in zoom-in duration-100">
-                    <div className="flex flex-col gap-1">
-                        {options.map(opt => {
-                            const isSelected = selected.includes(opt);
+                    <>
+                        {visibles.map(item => {
+                            const badgeStyle = (type === 'brand' && BRAND_COLORS[item as BrandType])
+                                || 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600';
                             return (
-                                <button
-                                    key={opt}
-                                    onClick={() => toggleOption(opt)}
-                                    className={`flex items-center gap-2 px-2 py-2 rounded text-xs text-left transition-colors min-w-0 ${isSelected ? 'bg-bony-orange/10 dark:bg-white/10 text-bony-orange dark:text-white font-bold' : 'text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
-                                >
-                                    <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isSelected ? 'border-bony-orange bg-bony-orange' : 'border-slate-300 dark:border-slate-600'}`}>
-                                        {isSelected && <Check size={10} className="text-white"/>}
-                                    </div>
-                                    <span className="truncate min-w-0">{opt}</span>
-                                </button>
+                                <span key={item} className={`shrink-0 max-w-[92px] truncate px-1.5 py-0.5 rounded text-[10px] font-bold border ${badgeStyle}`}>
+                                    {item}
+                                </span>
                             );
                         })}
-                    </div>
+                        {reste > 0 && (
+                            <span className="shrink-0 px-1 py-0.5 rounded text-[10px] font-bold text-bony-muted border border-bony-border">
+                                +{reste}
+                            </span>
+                        )}
+                    </>
+                ) : (
+                    <span className="truncate text-[11px] text-bony-muted italic">{label}</span>
+                )}
+                <span className="flex-1" />
+                <ChevronDown size={12} className={`shrink-0 transition-transform ${isOpen ? 'rotate-180 text-bony-orange' : 'text-bony-muted'}`} />
+            </button>
+
+            <FloatingPanel
+                open={isOpen}
+                onClose={() => setIsOpen(false)}
+                triggerRef={triggerRef}
+                minWidth={220}
+                role="listbox"
+                className="rounded-2xl p-1.5"
+            >
+                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-0.5">
+                    {options.map(opt => {
+                        const isSelected = selected.includes(opt);
+                        return (
+                            <button
+                                key={opt}
+                                type="button"
+                                role="option"
+                                aria-selected={isSelected}
+                                onClick={() => toggleOption(opt)}
+                                className={`flex items-center gap-2 px-2 py-2 rounded-xl text-xs text-left transition-colors min-w-0 ${isSelected ? 'bg-bony-orange/10 dark:bg-white/10 text-bony-orange dark:text-white font-bold' : 'text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5'}`}
+                            >
+                                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'border-bony-orange bg-bony-orange' : 'border-slate-300 dark:border-slate-600'}`}>
+                                    {isSelected && <Check size={10} className="text-white" />}
+                                </span>
+                                <span className="truncate min-w-0">{opt}</span>
+                            </button>
+                        );
+                    })}
                 </div>
-            )}
-        </div>
+            </FloatingPanel>
+        </>
     );
 };
+
+// Micro-intitulé d'un contrôle de la ligne. Les sélecteurs se ressemblaient tous et
+// n'étaient identifiables que par leur texte de remplacement — qui disparaît dès qu'une
+// valeur est choisie. Reproche direct de Théo (« mal agencé »).
+const Etiquette: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <span className="block text-[8px] leading-none uppercase tracking-wider text-bony-muted mb-1 truncate">{children}</span>
+);
 
 // --- MEDIA HELPERS ---
 //
@@ -526,7 +554,8 @@ interface EditoRowProps {
 }
 
 const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, canDelete, isArchivedView, networkOptions, co2Options, mediaCount, onOpenMedia }) => {
-    const [isWordingFocused, setIsWordingFocused] = useState(false);
+    const [wordingOuvert, setWordingOuvert] = useState(false);
+    const wordingRef = useRef<HTMLDivElement>(null);
     const [confirmDelete, setConfirmDelete] = useState(false);
     
     // Status Color Strip
@@ -545,28 +574,118 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
         onUpdate({ ...post, archived: !post.archived });
     };
 
+    // Ligne d'edito : `flex-wrap` + bases explicites, PAS un enchainement de largeurs
+    // fixes. La version precedente alignait 5 colonnes rigides (128+250+224+160+48 =
+    // 810 px de minimum) qui se comprimaient mutuellement sous ~900 px, et deux piles
+    // verticales de selecteurs imposaient 178 px de hauteur a chaque ligne pendant que
+    // Date/Statut et Contenu laissaient 78 px de vide (mesure du 02/09/2026).
     return (
-        <div className={`group relative flex flex-col md:flex-row md:items-start gap-3 md:gap-4 gx-glass-panel rounded-xl hover:bg-slate-50 dark:hover:bg-[#252525] transition-colors p-3 ${post.archived ? 'opacity-60 grayscale' : ''}`}>
+        <div className={`group relative flex flex-wrap items-start gap-x-3 gap-y-2 gx-glass-panel rounded-xl hover:bg-slate-50 dark:hover:bg-[#252525] transition-colors p-2.5 ${post.archived ? 'opacity-60 grayscale' : ''}`}>
             
             {/* Status Strip */}
-            <div className={`h-1.5 w-full md:h-auto md:w-1.5 md:self-stretch rounded-full ${stripColor} shrink-0 shadow-[0_0_10px_rgba(0,0,0,0.5)]`}></div>
+            <div className={`h-1 w-full sm:h-auto sm:w-1 sm:self-stretch rounded-full ${stripColor} shrink-0`}></div>
 
-            {/* COL 1: Date & Status */}
-            <div className="w-full grid grid-cols-2 gap-2 md:w-32 md:flex md:flex-col md:shrink-0">
-                <div className="relative">
-                    <label className="text-[9px] text-slate-500 uppercase font-bold mb-0.5 block">Date</label>
+            {/* CONTENU — la moitie gauche, et la plus large. Titre + lien sur une ligne,
+                puis le wording. Cliquer le wording ouvre un vrai panneau d'ecriture. */}
+            <div className="flex-[1_1_340px] min-w-0 sm:min-w-[260px] flex flex-col gap-1.5 self-stretch">
+                <div className="flex items-center gap-2 min-w-0">
+                    <input
+                        type="text"
+                        value={post.title}
+                        disabled={!canEdit}
+                        onChange={e => onUpdate({...post, title: e.target.value})}
+                        className="flex-1 min-w-0 bg-transparent border-none p-0 text-sm font-bold text-slate-900 dark:text-white outline-none placeholder-slate-400 dark:placeholder-slate-600 focus:text-bony-orange transition-colors"
+                        placeholder="Titre de la publication..."
+                    />
+                    <div className="flex items-center gap-1 shrink-0 w-[34%] max-w-[230px]">
+                        <LinkIcon size={11} className={post.link ? "text-blue-500 dark:text-blue-400 shrink-0" : "text-slate-400 dark:text-slate-600 shrink-0"}/>
+                        <input
+                            type="text"
+                            value={post.link}
+                            disabled={!canEdit}
+                            onChange={e => onUpdate({...post, link: e.target.value})}
+                            placeholder="Lien…"
+                            title={post.link || undefined}
+                            className="bg-transparent text-[11px] text-blue-500 dark:text-blue-300 w-full min-w-0 truncate outline-none placeholder-slate-400 dark:placeholder-slate-700 hover:text-blue-600 dark:hover:text-blue-200 transition-colors"
+                        />
+                    </div>
+                </div>
+
+                {/* ⚠️⚠️ LE WORDING NE S'AGRANDIT PLUS « EN PLACE ».
+                    L'ancienne version passait le textarea en `absolute` au focus : piegee
+                    dans le contexte d'empilement de la ligne (cree par le backdrop-filter
+                    de .gx-glass-panel), elle passait SOUS les editos suivants — exactement
+                    le meme defaut que les menus deroulants, et il a survecu a leur
+                    correctif parce que je n'avais regarde que les menus.
+                    L'edition se fait donc dans un FloatingPanel, portalise sur
+                    document.body : rien ne peut passer devant. */}
+                <div
+                    ref={wordingRef}
+                    onClick={() => canEdit && setWordingOuvert(true)}
+                    className={`h-[78px] shrink-0 w-full bg-slate-50 dark:bg-black/30 border rounded-lg px-2.5 py-1.5 text-[11px] leading-[1.45] text-slate-700 dark:text-slate-300 overflow-hidden whitespace-pre-wrap transition-colors ${wordingOuvert ? 'border-bony-violet' : 'border-bony-border'} ${canEdit ? 'cursor-text hover:border-bony-violet/60' : ''}`}
+                >
+                    {post.wording
+                        ? post.wording
+                        : <span className="text-slate-400 dark:text-slate-600 italic">Rédiger le post ici…</span>}
+                </div>
+                {/* ⚠️ Hauteur FIXE et non `flex-1` : laissee libre, la zone suivait la
+                    longueur du texte et une ligne montait a 507 px (mesure). Le texte
+                    complet se lit et s'edite dans le panneau. */}
+
+                <FloatingPanel
+                    open={wordingOuvert}
+                    onClose={() => setWordingOuvert(false)}
+                    triggerRef={wordingRef}
+                    width="trigger"
+                    minWidth={420}
+                    maxHeight={340}
+                    className="rounded-2xl p-2"
+                >
+                    <textarea
+                        autoFocus
+                        value={post.wording}
+                        onChange={e => onUpdate({...post, wording: e.target.value})}
+                        onKeyDown={e => { if (e.key === 'Escape') setWordingOuvert(false); }}
+                        className="w-full h-56 bg-transparent border-none outline-none resize-none text-xs leading-relaxed text-bony-text custom-scrollbar"
+                        placeholder="Rédiger le post ici..."
+                    />
+                    <div className="flex items-center justify-between px-1 pt-1 border-t border-bony-border">
+                        <span className="text-[10px] text-bony-muted">{post.wording.length} caractères</span>
+                        <button
+                            type="button"
+                            onClick={() => setWordingOuvert(false)}
+                            className="text-[11px] font-bold text-bony-orange hover:opacity-80 transition-opacity px-2 py-1"
+                        >
+                            Fermer
+                        </button>
+                    </div>
+                </FloatingPanel>
+            </div>
+
+            {/* REGLAGES — TOUS les controles au meme endroit.
+                Ils etaient repartis en deux paquets de part et d'autre du contenu
+                (Date/Statut/Service/Diffusion d'un cote, Marques/Sites/Reseaux/LOM/CO2 de
+                l'autre) : on cherchait un reglage dans deux zones separees par le texte.
+                Reproche direct de Theo. Neuf controles, une grille, un seul endroit. */}
+            <div className="flex-[1_1_560px] min-w-0 sm:min-w-[480px] grid grid-cols-2 sm:grid-cols-5 gap-x-1.5 gap-y-1.5 self-stretch content-start">
+                <div className="min-w-0">
+                    <Etiquette>Date</Etiquette>
                     {canEdit ? (
                         <DatePicker
                             value={post.date}
                             onChange={v => onUpdate({...post, date: v})}
                             size="sm"
+                            compact
                         />
                     ) : (
-                        <div className="w-full bg-[var(--bg-input)] border border-bony-border rounded-2xl px-3 py-2 text-sm text-bony-text">{post.date ? parseLocalDate(post.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : '—'}</div>
+                        <div className="w-full h-11 md:h-[34px] flex items-center bg-[var(--bg-input)] border border-bony-border rounded-2xl px-3 text-xs text-bony-text">
+                            {post.date ? parseLocalDate(post.date).toLocaleDateString('fr-FR') : '—'}
+                        </div>
                     )}
                 </div>
-                <div>
-                    <label className="text-[9px] text-slate-500 uppercase font-bold mb-0.5 block">Statut</label>
+
+                <div className="min-w-0">
+                    <Etiquette>Statut</Etiquette>
                     <Select
                         value={post.status}
                         disabled={!canEdit}
@@ -575,124 +694,107 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                         size="sm"
                     />
                 </div>
-            </div>
 
-            {/* COL 2: Content (Title, Link, Wording) */}
-            <div className="flex-1 flex flex-col gap-3 min-w-0 md:min-w-[250px]">
-                <div className="flex flex-col gap-1">
-                    <input 
-                        type="text" 
-                        value={post.title}
+                <div className="min-w-0">
+                    <Etiquette>Service</Etiquette>
+                    <Select
+                        value={post.service}
                         disabled={!canEdit}
-                        onChange={e => onUpdate({...post, title: e.target.value})}
-                        className="w-full bg-transparent border-none p-0 text-sm font-bold text-slate-900 dark:text-white outline-none placeholder-slate-400 dark:placeholder-slate-600 focus:text-bony-orange transition-colors"
-                        placeholder="Titre de la publication..."
+                        onChange={v => onUpdate({...post, service: v as SocialServiceType})}
+                        options={SOCIAL_SERVICES.map(s => ({ value: s, label: s }))}
+                        size="sm"
                     />
-                    <div className="flex items-center gap-2">
-                        <LinkIcon size={12} className={post.link ? "text-blue-500 dark:text-blue-400" : "text-slate-400 dark:text-slate-600"}/>
-                        <input 
-                            type="text"
-                            value={post.link}
-                            disabled={!canEdit}
-                            onChange={e => onUpdate({...post, link: e.target.value})}
-                            placeholder="Ajouter un lien..."
-                            className="bg-transparent text-xs text-blue-500 dark:text-blue-300 w-full outline-none placeholder-slate-400 dark:placeholder-slate-700 hover:text-blue-600 dark:hover:text-blue-200 transition-colors"
-                        />
+                </div>
+
+                <div className="min-w-0">
+                    <Etiquette>Marques</Etiquette>
+                    <VisualMultiSelect
+                        label="Marques…"
+                        options={BRANDS}
+                        selected={post.brands}
+                        onChange={v => onUpdate({...post, brands: v as BrandType[]})}
+                        disabled={!canEdit}
+                        type="brand"
+                        maxVisible={1}
+                    />
+                </div>
+
+                <div className="min-w-0">
+                    <Etiquette>Sites</Etiquette>
+                    <VisualMultiSelect
+                        label="Sites…"
+                        options={['GROUPE BONY', ...Object.keys(PLAQUES_STRUCTURE), ...SITES]}
+                        selected={post.concessions}
+                        onChange={v => onUpdate({...post, concessions: v})}
+                        disabled={!canEdit}
+                        maxVisible={1}
+                    />
+                </div>
+
+                <div className="min-w-0">
+                    <Etiquette>Réseaux</Etiquette>
+                    <VisualMultiSelect
+                        label="Réseaux…"
+                        options={networkOptions}
+                        selected={post.networks}
+                        onChange={v => onUpdate({...post, networks: v as SocialNetwork[]})}
+                        disabled={!canEdit}
+                        maxVisible={1}
+                    />
+                </div>
+
+                <div className="min-w-0">
+                    <Etiquette>Diffusion</Etiquette>
+                    <div className="flex gap-1 h-11 md:h-[34px]">
+                        {(['Internet', 'Collaborateurs'] as const).map(t => (
+                            <button
+                                key={t}
+                                type="button"
+                                disabled={!canEdit}
+                                onClick={() => {
+                                    const newTargets = post.targets.includes(t)
+                                        ? post.targets.filter(x => x !== t)
+                                        : [...post.targets, t];
+                                    onUpdate({...post, targets: newTargets});
+                                }}
+                                className={`flex-1 min-w-0 rounded-lg text-[9px] font-bold uppercase border flex items-center justify-center transition-colors ${post.targets.includes(t) ? 'bg-bony-orange/15 text-bony-orange border-bony-orange/50' : 'text-slate-500 dark:text-slate-600 border-bony-border hover:border-slate-400 dark:hover:border-slate-500 bg-[var(--bg-input)]'}`}
+                                title={t === 'Internet' ? 'Site internet' : 'Collaborateurs'}
+                            >
+                                {t === 'Internet' ? 'WEB' : 'COLLAB.'}
+                            </button>
+                        ))}
                     </div>
                 </div>
-                
-                <div className="relative">
-                    <textarea 
-                        value={post.wording}
+
+                <div className="min-w-0">
+                    <Etiquette>Loi LOM</Etiquette>
+                    <Select
+                        value={post.lom}
                         disabled={!canEdit}
-                        onChange={e => onUpdate({...post, wording: e.target.value})}
-                        onFocus={() => setIsWordingFocused(true)}
-                        onBlur={() => setIsWordingFocused(false)}
-                        className={`w-full bg-slate-50 dark:bg-black/30 border border-bony-border rounded px-3 py-2 text-xs text-slate-700 dark:text-slate-300 outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/50 resize-none transition-all z-10 
-                            ${isWordingFocused ? 'absolute top-0 left-0 h-40 shadow-2xl bg-white dark:bg-[#1a1a1a] border-bony-violet' : 'h-16'}`}
-                        placeholder="Rédiger le post ici..."
+                        onChange={v => onUpdate({...post, lom: v})}
+                        options={[{ value: '', label: 'Aucune' }, ...LOI_LOM_OPTIONS.map(l => ({ value: l, label: l }))]}
+                        size="sm"
+                    />
+                </div>
+
+                <div className="min-w-0">
+                    <Etiquette>Classe CO²</Etiquette>
+                    <Select
+                        value={post.co2}
+                        disabled={!canEdit}
+                        onChange={v => onUpdate({...post, co2: v})}
+                        options={[{ value: '', label: 'Aucune' }, ...co2Options.map(c => ({ value: c, label: c }))]}
+                        size="sm"
                     />
                 </div>
             </div>
 
-            {/* COL 3: Context (Brands, Services, Sites, Networks) */}
-            <div className="w-full md:w-56 flex flex-col gap-2 md:shrink-0">
-                <VisualMultiSelect 
-                    label="Choisir Marques..." 
-                    options={BRANDS} 
-                    selected={post.brands} 
-                    onChange={v => onUpdate({...post, brands: v as BrandType[]})} 
-                    disabled={!canEdit}
-                    type="brand"
-                />
-                
-                <VisualMultiSelect 
-                    label="Choisir Sites..." 
-                    options={['GROUPE BONY', ...Object.keys(PLAQUES_STRUCTURE), ...SITES]} 
-                    selected={post.concessions} 
-                    onChange={v => onUpdate({...post, concessions: v})} 
-                    disabled={!canEdit}
-                />
-
-                <VisualMultiSelect 
-                    label="Choisir Réseaux..." 
-                    options={networkOptions} 
-                    selected={post.networks} 
-                    onChange={v => onUpdate({...post, networks: v as SocialNetwork[]})} 
-                    disabled={!canEdit}
-                />
-            </div>
-
-            {/* COL 4: Details (Service, LOM, CO2, Target) */}
-            <div className="w-full md:w-40 flex flex-col gap-2 md:shrink-0">
-                 <Select
-                    value={post.service}
-                    disabled={!canEdit}
-                    onChange={v => onUpdate({...post, service: v as SocialServiceType})}
-                    options={SOCIAL_SERVICES.map(s => ({ value: s, label: s }))}
-                    size="sm"
-                />
-
-                <div className="flex gap-1">
-                    {(['Internet', 'Collaborateurs'] as const).map(t => (
-                        <button
-                            key={t}
-                            disabled={!canEdit}
-                            onClick={() => {
-                                const newTargets = post.targets.includes(t) 
-                                    ? post.targets.filter(x => x !== t) 
-                                    : [...post.targets, t];
-                                onUpdate({...post, targets: newTargets});
-                            }}
-                            className={`flex-1 py-1 rounded text-[9px] font-bold uppercase border flex items-center justify-center transition-colors ${post.targets.includes(t) ? 'bg-white text-black border-slate-300 dark:border-white' : 'text-slate-500 dark:text-slate-600 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 bg-slate-100 dark:bg-black/40'}`}
-                            title={t}
-                        >
-                            {t === 'Internet' ? 'WEB' : 'COLLABORATEURS'}
-                        </button>
-                    ))}
-                </div>
-
-                <Select
-                    value={post.lom}
-                    disabled={!canEdit}
-                    onChange={v => onUpdate({...post, lom: v})}
-                    options={[{ value: '', label: 'Loi LOM...' }, ...LOI_LOM_OPTIONS.map(l => ({ value: l, label: l }))]}
-                    size="sm"
-                />
-                <Select
-                    value={post.co2}
-                    disabled={!canEdit}
-                    onChange={v => onUpdate({...post, co2: v})}
-                    options={[{ value: '', label: 'Classe CO²...' }, ...co2Options.map(c => ({ value: c, label: c }))]}
-                    size="sm"
-                />
-            </div>
-
-            {/* COL 5: Media & Actions */}
-            <div className="w-full flex flex-row md:w-12 md:flex-col items-center gap-3 md:shrink-0 border-t md:border-t-0 md:border-l border-bony-border pt-2 md:pt-0 md:pl-2 md:py-2">
+            {/* ACTIONS — en ligne, et non plus en colonne verticale : la pile forcait la
+                ligne a 152 px pour trois boutons de 40 px. */}
+            <div className="w-full sm:w-auto sm:ml-auto flex flex-row items-center justify-end gap-1 shrink-0 border-t sm:border-t-0 sm:border-l border-bony-border pt-2 sm:pt-0 sm:pl-2 self-stretch">
                 <button
                     onClick={() => onOpenMedia(post.id)}
-                    className={`relative w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${mediaCount > 0 ? 'bg-bony-orange/10 border-bony-orange text-bony-orange shadow-[0_0_10px_rgba(247,86,50,0.15)]' : 'bg-slate-100 dark:bg-black/40 border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-600 hover:text-slate-900 dark:hover:text-white hover:border-bony-orange/50'}`}
+                    className={`relative w-11 h-11 md:w-9 md:h-9 rounded-lg border flex items-center justify-center transition-all shrink-0 ${mediaCount > 0 ? 'bg-bony-orange/10 border-bony-orange text-bony-orange shadow-[0_0_10px_rgba(247,86,50,0.15)]' : 'bg-slate-100 dark:bg-black/40 border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-600 hover:text-slate-900 dark:hover:text-white hover:border-bony-orange/50'}`}
                     title={mediaCount > 0 ? libelleMedias(post.mediaFiles ?? []) : 'Gérer les médias'}
                 >
                     <Image size={18}/>
@@ -702,8 +804,6 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                         </span>
                     )}
                 </button>
-
-                <div className="flex-1"></div>
 
                 <button
                     disabled={!canEdit}
@@ -1508,16 +1608,14 @@ const Digital: React.FC = () => {
       return (
           <div className="flex-1 flex flex-col min-h-0">
               {/* TABLE HEADER */}
-              <div className="hidden md:flex items-center gap-4 px-6 py-3 border-b border-bony-border bg-slate-100 dark:bg-black/40 text-[10px] font-bold text-slate-500 uppercase tracking-widest sticky top-0 z-20 shadow-lg backdrop-blur-md">
-                  <div className="w-1.5"></div>
-                  <div className="w-32 flex items-center gap-1 cursor-pointer hover:text-bony-text transition-colors" onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}>
-                      DATE / STATUT
+              <div className="hidden lg:flex items-center gap-x-3 px-5 py-2.5 border-b border-bony-border bg-slate-100 dark:bg-black/40 text-[10px] font-bold text-slate-500 uppercase tracking-widest sticky top-0 z-20 shadow-lg backdrop-blur-md">
+                  <div className="w-1"></div>
+                  <div className="flex-[1_1_340px] min-w-[260px]">CONTENU DU POST</div>
+                  <div className="flex-[1_1_560px] min-w-[480px] flex items-center gap-1 cursor-pointer hover:text-bony-text transition-colors" onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}>
+                      RÉGLAGES · TRI PAR DATE
                       {sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>}
                   </div>
-                  <div className="flex-1 min-w-[250px]">CONTENU DU POST</div>
-                  <div className="w-56">CONTEXTE & CIBLAGE</div>
-                  <div className="w-40">DÉTAILS TECHNIQUES</div>
-                  <div className="w-12 text-center">MÉDIA</div>
+                  <div className="shrink-0 w-[116px] text-right">MÉDIA / ACTIONS</div>
               </div>
 
               {/* LIST */}

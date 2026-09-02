@@ -46,9 +46,15 @@ interface DatePickerProps {
    * inviterait à créer un état interdit.
    */
   clearable?: boolean;
+  /**
+   * Affiche « 01/09/2026 » au lieu de « 1 sept. 2026 ». Opt-in : le format long reste
+   * le defaut partout ailleurs. Utile la ou la largeur est comptee — une ligne de
+   * calendrier editorial en aligne neuf cote a cote.
+   */
+  compact?: boolean;
 }
 
-const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 'Choisir une date', className = '', size = 'md', minDate, clearable = false }) => {
+const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 'Choisir une date', className = '', size = 'md', minDate, clearable = false, compact = false }) => {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('jours');
   const selected = fromISO(value);
@@ -140,7 +146,7 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
       >
         <Calendar size={iconSize} className={`absolute ${iconLeft} top-1/2 -translate-y-1/2 ${open ? 'text-bony-orange' : 'text-bony-muted'} transition-colors`} />
         {selected
-          ? <span className="block truncate">{format(selected, 'd MMM yyyy', { locale: fr })}</span>
+          ? <span className="block truncate">{format(selected, compact ? 'dd/MM/yyyy' : 'd MMM yyyy', { locale: fr })}</span>
           : <span className="block truncate text-bony-muted">{placeholder}</span>}
       </button>
 
