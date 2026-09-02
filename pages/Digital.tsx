@@ -6,12 +6,13 @@ import { db, ApiError } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { SocialPost, SocialStatus, SocialNetwork, BrandType, ServiceType, SocialTarget, Site, PlaqueName, DigitalTags, ActivityLog } from '../types';
 import { SOCIAL_STATUS_COLORS, BRANDS, SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTIONS, SITES, BRAND_COLORS } from '../constants';
-import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload } from 'lucide-react';
+import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload, ExternalLink } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
 import CollapsibleFilters from '../components/CollapsibleFilters';
 import { isSiteManager, canEditDigital } from '../constants';
 import DatePicker from '../components/DatePicker';
+import { fournisseurDe, libelleCourt } from '../lib/linkProviders';
 
 type Tab = 'Calendrier Editorial' | 'Planning Digital' | 'Archives' | 'Gestion des TAGS';
 type CalendarView = 'Mois' | 'Semaine';
@@ -150,12 +151,40 @@ const VisualMultiSelect: React.FC<VisualMultiSelectProps> = ({ label, options, s
     );
 };
 
-// --- MEDIA HELPERS (branchés uploads : les médias sont des URLs stockées dans
-// post.mediaFiles ; upload via POST /api/uploads/calendar). ---
+// --- MEDIA HELPERS ---
+//
+// `post.mediaFiles` porte DEUX formes, volontairement disjointes :
+//  - un fichier hébergé par Gearbox  → `/uploads/calendar/<uuid>.<ext>` (POST /api/uploads/calendar) ;
+//  - un LIEN EXTERNE                 → `https://…` (WeTransfer, SharePoint, Drive…).
+// Aucun modèle Prisma dédié n'est nécessaire : `mediaFiles` est un `String[]`, et les
+// deux purges (30j des archives, suppression de post) ne touchent QUE les urls préfixées
+// `/uploads/calendar/` — voir backend/src/jobs/purge.ts et backend/src/routes/social.ts.
+// ⚠️ Conséquence à connaître : un LIEN survit à la purge 30j alors que les fichiers du
+// même post disparaissent. C'est voulu (le lien reste la source), d'où la ventilation
+// « n fichiers · n liens » dans les libellés plutôt qu'un total opaque.
 const MEDIA_MAX_SIZE = 2 * 1024 * 1024 * 1024; // 2 Go
 const MEDIA_ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime'];
-const isVideoUrl = (url: string) => /\.(mp4|mov)$/i.test(url);
-const mediaFilename = (url: string) => url.split('/').pop() ?? url;
+
+const estLienExterne = (url: string) => /^https?:\/\//i.test(url);
+
+// ⚠️ Le garde `!estLienExterne` est LOAD-BEARING : sans lui, un lien de partage se
+// terminant par `/video.mp4` (WeTransfer en produit) partirait dans un `<video src>`,
+// c'est-à-dire une requête sortante vers un tiers depuis le navigateur de chaque
+// collègue — exactement la fuite qu'on refuse d'ouvrir (cf. le trou `avatarUrl`).
+const isVideoUrl = (url: string) => !estLienExterne(url) && /\.(mp4|mov)$/i.test(url);
+
+const mediaFilename = (url: string) =>
+    estLienExterne(url) ? libelleCourt(url) : (url.split('/').pop() ?? url);
+
+/** « 2 fichiers · 1 lien », ou la forme simple quand il n'y a qu'un genre. */
+const libelleMedias = (urls: string[]): string => {
+    const liens = urls.filter(estLienExterne).length;
+    const fichiers = urls.length - liens;
+    const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+    if (liens === 0) return pluriel(fichiers, 'fichier');
+    if (fichiers === 0) return pluriel(liens, 'lien');
+    return `${pluriel(fichiers, 'fichier')} · ${pluriel(liens, 'lien')}`;
+};
 
 // --- COMPONENT: MEDIA MANAGER MODAL ---
 interface MediaManagerModalProps {
@@ -172,6 +201,7 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
     const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [uploading, setUploading] = useState(false);
+    const [lienSaisi, setLienSaisi] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Upload séquentiel : chaque fichier -> POST /api/uploads/calendar -> URL
@@ -213,11 +243,50 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
         }
     };
 
-    const handleDownload = (url: string) => {
+    // ⚠️ Deux comportements, et ce n'est pas cosmétique : l'attribut `download` est
+    // IGNORÉ en cross-origin. Sur un lien externe, la version « <a download> » faisait
+    // NAVIGUER l'onglet Gearbox au lieu de télécharger — donc perte de la saisie en
+    // cours dans le calendrier. Un lien s'ouvre à part, avec noopener (sans lui, la
+    // page ouverte accède à window.opener).
+    const handleOuvrirOuTelecharger = (url: string) => {
+        if (estLienExterne(url)) {
+            window.open(url, '_blank', 'noopener,noreferrer');
+            return;
+        }
         const a = document.createElement('a');
         a.href = url;
         a.download = mediaFilename(url);
         a.click();
+    };
+
+    // Ajout d'un LIEN externe (WeTransfer, SharePoint, Drive…). Même chemin de
+    // persistance que l'upload : onSaveMedia → PUT /api/social/:id.
+    const handleAjouterLien = async () => {
+        const brut = lienSaisi.trim();
+        if (!brut) return;
+        setError(null);
+        if (!estLienExterne(brut)) {
+            setError('Colle un lien commençant par http:// ou https:// — WeTransfer, SharePoint, Drive…');
+            return;
+        }
+        try {
+            new URL(brut);
+        } catch {
+            setError("Ce lien n'est pas une adresse valide.");
+            return;
+        }
+        if (medias.includes(brut)) {
+            setError('Ce lien est déjà attaché à ce post.');
+            return;
+        }
+        const updated = [...medias, brut];
+        try {
+            await onSaveMedia(post.id, updated);
+            setMedias(updated);
+            setLienSaisi('');
+        } catch (e) {
+            setError(e instanceof ApiError ? e.message : "Échec de l'ajout du lien.");
+        }
     };
 
     return (
@@ -270,6 +339,31 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                         </div>
                     )}
 
+                    {/* Ajout d'un LIEN externe — dans le même garde `canEdit` que la zone de
+                        dépôt, donc fermé au chef de site (lecture seule) sans test en plus. */}
+                    {canEdit && (
+                        <div className="mx-5 mt-3 flex items-center gap-2">
+                            <div className="relative flex-1">
+                                <LinkIcon size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                                <input
+                                    type="url"
+                                    value={lienSaisi}
+                                    onChange={e => setLienSaisi(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAjouterLien(); } }}
+                                    placeholder="…ou colle un lien WeTransfer, SharePoint, Drive…"
+                                    className="w-full bg-[var(--bg-input)] border border-bony-border rounded-xl pl-9 pr-3 py-2 text-xs text-bony-text outline-none transition-all placeholder-slate-400 dark:placeholder-slate-600 focus:border-bony-orange/60"
+                                />
+                            </div>
+                            <button
+                                onClick={handleAjouterLien}
+                                disabled={!lienSaisi.trim()}
+                                className="px-3 py-2 rounded-xl text-xs font-bold bg-bony-orange/10 text-bony-orange border border-bony-orange/30 hover:bg-bony-orange/20 transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                            >
+                                Ajouter
+                            </button>
+                        </div>
+                    )}
+
                     {/* Error */}
                     {error && (
                         <div className="mx-5 mt-3 px-3 py-2.5 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-400 flex items-start gap-2 shrink-0">
@@ -287,7 +381,60 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {medias.map(url => (
+                                {medias.map(url => estLienExterne(url) ? (
+                                    // ⚠️⚠️ TUILE LIEN — un lien externe ne doit JAMAIS atteindre
+                                    // un <img src>, un <video src> ni la lightbox : ce serait une
+                                    // requête sortante émise par le navigateur de CHAQUE collègue
+                                    // qui ouvre la modale, donc une fuite d'IP et un accusé de
+                                    // consultation offerts au tiers (pixel de traçage). C'est
+                                    // exactement le trou ouvert de `avatarUrl` (BUGS-CONNUS.md),
+                                    // sauf qu'ici on le créerait volontairement. On RECONNAÎT donc
+                                    // le domaine, sans jamais charger quoi que ce soit : zéro
+                                    // requête réseau tant que l'utilisateur n'a pas cliqué.
+                                    //
+                                    // `components/LinkPreview.tsx` n'est PAS réutilisé ici : sa
+                                    // branche « aperçu riche » rend une vignette <img> servie par
+                                    // un tiers. Arbitrage acté pour le Chat, non étendu au Digital
+                                    // — et `aUnApercuRiche()` est faux sur SharePoint/WeTransfer,
+                                    // la branche ne servirait à rien.
+                                    <a
+                                        key={url}
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title={url}
+                                        className="group relative rounded-xl overflow-hidden border border-bony-border bg-white/45 dark:bg-white/[0.04] aspect-square flex flex-col items-center justify-center gap-2 p-3 text-center hover:border-bony-orange/50 transition-colors"
+                                    >
+                                        <LinkIcon size={20} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                                        {(() => {
+                                            const f = fournisseurDe(url);
+                                            const classe = f ? f.classe : 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+                                            return (
+                                                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border shrink-0 ${classe}`}>
+                                                    {f ? f.nom : 'Lien'}
+                                                </span>
+                                            );
+                                        })()}
+                                        <span className="text-[9px] text-bony-muted leading-tight break-all line-clamp-3">
+                                            {libelleCourt(url)}
+                                        </span>
+                                        {/* Overlay : Ouvrir (le <a> le fait déjà) + Retirer */}
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/55 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 pointer-events-none">
+                                            <span className="p-2 bg-bony-panel/90 rounded-lg text-bony-blue" title="Ouvrir dans un nouvel onglet">
+                                                <ExternalLink size={16} />
+                                            </span>
+                                            {canEdit && (
+                                                <button
+                                                    onClick={e => { e.preventDefault(); e.stopPropagation(); handleDelete(url); }}
+                                                    className="p-2 bg-bony-panel/90 rounded-lg text-red-400 hover:bg-red-500/20 transition pointer-events-auto"
+                                                    title="Retirer"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </a>
+                                ) : (
                                     <div key={url} className="group relative rounded-xl overflow-hidden border border-bony-border bg-bony-dark aspect-square">
                                         {isVideoUrl(url) ? (
                                             <video
@@ -307,7 +454,7 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                                         {/* Overlay on hover (pointer-events-none pour laisser les contrôles vidéo cliquables) */}
                                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/55 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 pointer-events-none">
                                             <button
-                                                onClick={e => { e.stopPropagation(); handleDownload(url); }}
+                                                onClick={e => { e.stopPropagation(); handleOuvrirOuTelecharger(url); }}
                                                 className="p-2 bg-bony-panel/90 rounded-lg text-bony-blue hover:bg-bony-panel transition pointer-events-auto"
                                                 title="Télécharger"
                                             >
@@ -336,7 +483,7 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                     {/* Footer */}
                     <div className="px-5 py-3 border-t border-bony-border shrink-0 flex items-center justify-between">
                         <span className="text-[10px] text-bony-muted uppercase tracking-widest">
-                            {medias.length} média{medias.length !== 1 ? 's' : ''}
+                            {medias.length === 0 ? '0 média' : libelleMedias(medias)}
                         </span>
                         <button onClick={onClose} className="px-4 py-1.5 rounded-lg text-sm font-bold text-slate-500 hover:text-bony-text transition">
                             Fermer
@@ -546,7 +693,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                 <button
                     onClick={() => onOpenMedia(post.id)}
                     className={`relative w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${mediaCount > 0 ? 'bg-bony-orange/10 border-bony-orange text-bony-orange shadow-[0_0_10px_rgba(247,86,50,0.15)]' : 'bg-slate-100 dark:bg-black/40 border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-600 hover:text-slate-900 dark:hover:text-white hover:border-bony-orange/50'}`}
-                    title={mediaCount > 0 ? `${mediaCount} média${mediaCount > 1 ? 's' : ''}` : 'Gérer les médias'}
+                    title={mediaCount > 0 ? libelleMedias(post.mediaFiles ?? []) : 'Gérer les médias'}
                 >
                     <Image size={18}/>
                     {mediaCount > 0 && (
