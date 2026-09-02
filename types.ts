@@ -167,7 +167,11 @@ export interface SocialPost {
   service: ServiceType;
   networks: SocialNetwork[];
   concessions: string[]; // Sites, plaques ou 'GROUPE BONY' — périmètres, PAS des marques
-  mediaFiles: string[]; // Placeholders for now
+  // Deux formes, disjointes : `/uploads/calendar/<uuid>.<ext>` pour un fichier déposé
+  // dans Gearbox, `https://…` pour un lien externe (WeTransfer, SharePoint, Drive…).
+  // Validé côté serveur par `validerMediaFiles` (backend/src/routes/social.ts) ; les
+  // purges ne touchent QUE les urls `/uploads/calendar/`, un lien n'est jamais purgé.
+  mediaFiles: string[];
   link: string;
   wording: string;
   lom: string;
