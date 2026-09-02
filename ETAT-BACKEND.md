@@ -45,6 +45,38 @@ ne pas les réécrire.
     la section dédiée ci-dessous.
 12. **Fichiers de projet** — `/api/project-files` (mode Expert). Voir la section dédiée.
 
+### 🔗 `mediaFiles` d'une publication Digital — validation serveur (02/09/2026)
+
+`SocialPost.mediaFiles` (`String[]`) porte **deux formes, et deux seulement** :
+- `/uploads/calendar/<uuid>.(jpg|png|webp|mp4|mov)` — un fichier déposé dans Gearbox.
+  Les 5 extensions sont **exactement** celles que produit `EXT_BY_MIME` pour le type
+  `calendar` (`routes/uploads.ts`) ; le nom est toujours un `randomUUID()` ;
+- `https://…` — un **lien externe** (WeTransfer, SharePoint, Drive…), ajouté depuis la
+  modale Médias.
+
+⚠️ **Avant le 02/09, `POST` et `PUT /api/social` passaient `req.body` BRUT à Prisma** :
+aucune liste blanche de champs, aucune validation d'url. N'importe quel compte des
+`EDIT_ROLES` pouvait donc y écrire `javascript:…`, `data:text/html;base64,…` ou
+`//tiers.example/pixel.gif`, rendus ensuite chez tous les collègues. Fermé par
+`validerMediaFiles`, appelée dans les **deux** handlers, avec plafonds (50 entrées,
+2048 caractères par url). Même patron que `AVATAR_UPLOAD_PATH` (`realtime/chat.ts`).
+
+⚠️ **NE PAS élargir le motif à `/^\/uploads\//`** : le dossier `chat/` n'a **aucun**
+filtre de format (`uploads.ts`), y pointer depuis une publication rouvrirait le trou par
+la bande.
+
+⚠️ **Les valeurs DÉJÀ en base sont tolérées, délibérément.** Le PUT relit `mediaFiles`
+dans le `findUnique` qu'il faisait déjà pour `archived` (zéro requête en plus) et
+n'applique la validation qu'aux entrées **nouvelles**. Sans cette tolérance, une seule
+ligne non conforme rendrait la publication **entièrement insauvegardable** : changer un
+statut partirait en 400, l'update optimiste se rollbackerait et l'écran afficherait une
+erreur incompréhensible. Le POST, lui, n'a rien à préserver et valide strictement.
+Audit du 02/09/2026 sur la production : **0 valeur non conforme**.
+
+ℹ️ Rappel de cycle de vie, contre-intuitif mais voulu : la purge 30 j
+(`jobs/purge.ts`) et la suppression de publication ne touchent QUE les urls préfixées
+`/uploads/calendar/`. **Un lien externe n'est jamais purgé** — il reste la source.
+
 ### 📎 Fichiers du mode EXPERT — `/api/project-files` (27/08/2026)
 
 Migration `20260826142519_add_expert_mode` : `Project.expertMode`, `Task.startDate`,

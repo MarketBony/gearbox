@@ -157,6 +157,15 @@ export type SocialStatus = 'À venir' | 'En attente' | 'Non Validé' | 'Programm
 export type SocialNetwork = string; 
 export type SocialTarget = 'Collaborateurs' | 'Internet';
 
+// ⚠️ `RH` n'existe QUE dans le Digital, et c'est volontaire.
+// `ServiceType` / `SERVICES` (VN, VO, APV, PR, Tous Services) pilotent le routage
+// budgétaire (`resolveBudgetLine`) et sont partagés par les Projets, le Budget, les
+// Dépenses fixes, l'Agenda, la To-do et l'Export : y ajouter `RH` ouvrirait une
+// cinquième colonne dans tout le Budget et une ligne d'enveloppe qui n'existe pas,
+// pour un besoin purement éditorial. On élargit donc ICI seulement.
+// `SocialPost.service` est un `String` libre en base (schema.prisma) → aucune migration.
+export type SocialServiceType = ServiceType | 'RH';
+
 export interface SocialPost {
   id: string;
   title: string;
@@ -164,7 +173,7 @@ export interface SocialPost {
   date: string;
   targets: SocialTarget[];
   brands: BrandType[];
-  service: ServiceType;
+  service: SocialServiceType; // ⚠️ au SINGULIER, contrairement à Project.service qui est un tableau
   networks: SocialNetwork[];
   concessions: string[]; // Sites, plaques ou 'GROUPE BONY' — périmètres, PAS des marques
   // Deux formes, disjointes : `/uploads/calendar/<uuid>.<ext>` pour un fichier déposé
