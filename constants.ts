@@ -1,6 +1,6 @@
 
 
-import { Site, ServiceType, Project, PlaqueName, BrandType, ProjectType, TaskChannel, Task, BudgetLine, SocialStatus, SocialNetwork } from './types';
+import { Site, ServiceType, Project, PlaqueName, BrandType, ProjectType, TaskChannel, Task, BudgetLine, SocialStatus, SocialNetwork, SocialServiceType } from './types';
 
 export const PLAQUES_STRUCTURE: Record<PlaqueName, Site[]> = {
   'PLAQUE CENTRE': ['Clermont', 'Ussel', 'Mozac', 'Massagettes'],
@@ -259,6 +259,19 @@ export const SOCIAL_STATUS_COLORS: Record<SocialStatus, string> = {
 };
 
 export const SOCIAL_NETWORKS: SocialNetwork[] = ['Instagram', 'Story Instagram', 'Facebook', 'Story Facebook', 'LinkedIn', 'GMB', 'TikTok', 'YouTube'];
+
+// Services proposés par le calendrier éditorial — `SERVICES` + `RH`.
+//
+// ⚠️ NE PAS fusionner avec `SERVICES` (ligne ~25) : celui-ci est la liste BUDGÉTAIRE,
+// partagée par les Projets, le Budget, les Dépenses fixes, l'Agenda et l'Export.
+// `RH` est une rubrique éditoriale (portraits de collaborateurs, offres d'emploi,
+// « la Minute de l'Auto ») qui ne correspond à aucune enveloppe. Voir `SocialServiceType`.
+//
+// ⚠️ Cette liste sert AUSSI à résoudre l'existant : un `<Select>` dont la valeur n'est
+// pas dans ses options retombe sur son placeholder (components/Select.tsx), et la
+// première personne qui « corrige » ce champ vide écraserait la vraie valeur en base.
+// Restreindre la liste de choix ne doit jamais restreindre la liste de résolution.
+export const SOCIAL_SERVICES: SocialServiceType[] = [...SERVICES, 'RH'];
 
 export const LOI_LOM_OPTIONS = [
     "Au quotidien, prenez les transports en commun #SeDéplacerMoinsPolluer",

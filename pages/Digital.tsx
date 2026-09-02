@@ -4,8 +4,8 @@ import { useSessionState } from '../hooks/useSessionState';
 import { useAuth } from '../contexts/AuthContext';
 import { db, ApiError } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
-import { SocialPost, SocialStatus, SocialNetwork, BrandType, ServiceType, SocialTarget, Site, PlaqueName, DigitalTags, ActivityLog } from '../types';
-import { SOCIAL_STATUS_COLORS, BRANDS, SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTIONS, SITES, BRAND_COLORS } from '../constants';
+import { SocialPost, SocialStatus, SocialNetwork, BrandType, SocialServiceType, SocialTarget, Site, PlaqueName, DigitalTags, ActivityLog } from '../types';
+import { SOCIAL_STATUS_COLORS, BRANDS, SOCIAL_SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTIONS, SITES, BRAND_COLORS } from '../constants';
 import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload, ExternalLink } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
@@ -648,8 +648,8 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                  <Select
                     value={post.service}
                     disabled={!canEdit}
-                    onChange={v => onUpdate({...post, service: v as ServiceType})}
-                    options={SERVICES.map(s => ({ value: s, label: s }))}
+                    onChange={v => onUpdate({...post, service: v as SocialServiceType})}
+                    options={SOCIAL_SERVICES.map(s => ({ value: s, label: s }))}
                     size="sm"
                 />
 
@@ -968,7 +968,7 @@ const Digital: React.FC = () => {
   // Filters & Sort
   const [searchTerm, setSearchTerm] = useSessionState<string>('digital_searchTerm', '');
   const [filterBrand, setFilterBrand] = useSessionState<BrandType | 'All'>('digital_filterBrand', 'All');
-  const [filterService, setFilterService] = useSessionState<ServiceType | 'All'>('digital_filterService', 'All');
+  const [filterService, setFilterService] = useSessionState<SocialServiceType | 'All'>('digital_filterService', 'All');
   const [filterConcession, setFilterConcession] = useSessionState<string>('digital_filterConcession', 'All');
   const [sortOrder, setSortOrder] = useSessionState<'asc' | 'desc'>('digital_sortOrder', 'asc');
 
@@ -1683,7 +1683,7 @@ const Digital: React.FC = () => {
                             <Select
                                 value={filterService}
                                 onChange={v => setFilterService(v as any)}
-                                options={[{ value: 'All', label: 'Tous Services' }, ...SERVICES.map(s => ({ value: s, label: s }))]}
+                                options={[{ value: 'All', label: 'Tous Services' }, ...SOCIAL_SERVICES.map(s => ({ value: s, label: s }))]}
                                 size="sm"
                             />
                         </div>

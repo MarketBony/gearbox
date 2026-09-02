@@ -10,7 +10,16 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 44** (reprise du mode
+- master = prod, synchronisés. Dernier lot déployé : **correctifs 45 et 46** (Digital —
+  liens externes dans les médias + validation de `mediaFiles` ; service `RH` et script
+  d'import du calendrier éditorial, 2 septembre) — **`api` ET `web`** (`social.ts` bouge
+  au 45), **aucune migration**.
+  ⚠️ **Le correctif 46 a livré le CODE, pas les DONNÉES** : au moment de ce déploiement
+  les 43 publications éditoriales ne sont pas encore en base. L'import
+  (`node scripts/import-edito.mjs --commit`) doit tourner **APRÈS** la mise en ligne du
+  `web`, sinon les 10 posts `RH` s'affichent avec un sélecteur de service vide et le
+  premier qui y touche écrase la valeur. Vérifier l'état réel avant de conclure.
+  Avant eux le **correctif 44** (reprise du mode
   Expert après recette : KPI refaits, Gantt lisible, fichiers de tâche visibles, retour
   dans la charte liquid glass, 27 août) — **`web` seul**, aucune migration.
   Avant lui le **correctif 43** (mode Expert :
@@ -2122,12 +2131,178 @@
     suppression de « Forum Pièces 2026 ». Annulée immédiatement, projet vérifié intact
     (20 tâches, 96 525 €, mode Expert actif).
 
+45. **DIGITAL — LIENS EXTERNES dans les médias, et validation de `mediaFiles`**
+    (`feat/digital-liens-medias`, 2 septembre). `api` **et** `web`, **aucune migration**.
+
+    **Besoin** : les visuels d'une publication vivent souvent dans un WeTransfer ou un
+    dossier SharePoint, pas dans un fichier qu'on dépose. La modale Médias n'acceptait
+    que des uploads.
+
+    **Choix de stockage — pas de migration.** Le lien est rangé tel quel dans
+    `SocialPost.mediaFiles` (`String[]`), discriminé par `^https?://` vs `^/uploads/`.
+    Les deux formes sont disjointes, et surtout les deux purges (30 j des archives dans
+    `jobs/purge.ts`, suppression de post dans `routes/social.ts`) ne touchaient DÉJÀ que
+    les urls préfixées `/uploads/calendar/` et conservent tout le reste. Vérifié dans le
+    code avant d'écrire une ligne.
+    ⚠️ Conséquence à connaître : **un lien survit à la purge 30 j** alors que les
+    fichiers du même post disparaissent. C'est voulu (le lien reste la source), d'où la
+    ventilation « 2 fichiers · 1 lien » dans les libellés — un total opaque se lirait
+    comme un bug.
+
+    **⚠️⚠️ LA RÈGLE DU LOT : un lien externe n'atteint JAMAIS un `<img src>`, un
+    `<video src>` ni la lightbox.** Ce serait une requête sortante émise par le
+    navigateur de CHAQUE collègue ouvrant la modale — fuite d'IP et accusé de
+    consultation offerts au tiers, c'est-à-dire exactement le trou `avatarUrl` de
+    `BUGS-CONNUS.md`, sauf créé volontairement. Un lien est rendu comme une CARTE :
+    icône, pastille du fournisseur, libellé. Zéro requête réseau tant qu'on n'a pas
+    cliqué — **mesuré dans l'onglet Réseau, filtre `toubkalpes` : 0**.
+    - `lib/linkProviders.ts` est **réutilisé, pas réécrit** (`fournisseurDe`,
+      `libelleCourt`) : il connaissait déjà SharePoint, WeTransfer, OneDrive, Dropbox,
+      Drive, Canva. `fournisseurDe` peut rendre `null` → pastille générique « Lien ».
+    - `components/LinkPreview.tsx` n'est **délibérément pas** réutilisé : sa branche
+      « aperçu riche » rend une vignette `<img>` servie par un tiers. Arbitrage acté
+      pour le Chat, non étendu au Digital.
+
+    **⚠️ Le garde `!estLienExterne` dans `isVideoUrl` est load-bearing.** Sans lui, un
+    lien de partage finissant par `/video.mp4` (WeTransfer en produit) partait dans un
+    `<video src>` — même fuite, en pire. Testé explicitement.
+
+    **`handleDownload` renommé `handleOuvrirOuTelecharger`.** L'attribut `download` est
+    **ignoré en cross-origin** : sur un lien externe, l'ancienne version faisait NAVIGUER
+    l'onglet Gearbox et perdait la saisie en cours. Un lien s'ouvre à part, avec
+    `noopener,noreferrer`.
+
+    **BACKEND — un trou préexistant fermé au passage.** `POST` et `PUT /api/social`
+    passaient `req.body` **brut** à Prisma : aucune liste blanche, aucune validation
+    d'url. `validerMediaFiles` (`routes/social.ts`) n'accepte plus qu'un chemin
+    `/uploads/calendar/<uuid>.(jpg|png|webp|mp4|mov)` — les 5 extensions exactes que
+    produit `EXT_BY_MIME` pour ce type — ou une url `http(s)` parsable, avec plafonds
+    (50 entrées, 2048 caractères).
+    ⚠️ **Ne PAS élargir à `/^\/uploads\//`** : le dossier `chat/` n'a aucun filtre de
+    format, on rouvrirait le trou par la bande.
+    ⚠️ **Tolérance de l'existant, et c'est délibéré** : les valeurs déjà en base sont
+    acceptées telles quelles (lues dans le `findUnique` que le PUT faisait déjà, zéro
+    requête en plus). Sinon une seule ligne non conforme rendait le post **entièrement
+    insauvegardable** — changer un statut serait parti en 400 avec rollback optimiste et
+    message incompréhensible. Audit fait sur la prod le 02/09 : **0 valeur non
+    conforme** sur l'ensemble des publications, la version stricte aurait donc été sûre
+    aussi ; la tolérante est un sur-ensemble.
+
+    **Vérifié dans l'interface**, sur un post jetable créé puis supprimé (204, aucun
+    résidu, dossier `uploads/calendar/` vide) : lien SharePoint réel → carte SHAREPOINT
+    sans image · **0 requête sortante** · faux `.mp4` → carte, pas de lecteur · domaine
+    inconnu → pastille générique · `ftp://` et doublon refusés avec message · **8
+    charges refusées en 400 côté serveur** (`javascript:`, `data:`,
+    `//tiers/pixel.gif`, dossier `chat/`, traversée `../`, `.svg`, non-tableau, 51
+    entrées) · suppression 3→2 · badge de ligne et infobulle « 3 liens » après F5 ·
+    thèmes clair et sombre · mobile 375 px. `tsc` 9 racine / 0 backend.
+    ℹ️ **Réserve honnête** : la non-régression de la branche FICHIER (miniature, lecteur,
+    lightbox, téléchargement) n'a pas été rejouée — aucune publication de la base ne
+    portait de fichier, et l'outil d'automatisation ne sait pas déposer de fichier. Le
+    code de cette branche est inchangé hormis le garde ajouté à `isVideoUrl`. À
+    reprendre par Théo. Les rôles `Site Manager` et `External` n'ont pas été parcourus
+    non plus, faute de comptes.
+
+46. **DIGITAL — service `RH` et script d'import du calendrier éditorial**
+    (`feat/import-calendrier-edito`, 2 septembre). Frontend seul → `web`, **aucune
+    migration**.
+
+    ⚠️⚠️ **CE LOT LIVRE LE CODE, PAS LES DONNÉES.** Les 43 publications de
+    `Copie de CALENDRIER EDITORIAL.xlsx` (01/09/2026 → 29/12/2026) **ne sont pas encore
+    en base** au moment de ce déploiement : l'import doit tourner APRÈS, voir l'ordre
+    plus bas. Ne pas lire ce paragraphe comme « c'est fait ».
+
+    **`RH` — un service qui n'existe QUE dans le Digital.** Le fichier source classe 10
+    publications sur 43 en `RH` (portraits de collaborateurs, offres d'emploi, « la
+    Minute de l'Auto »), une rubrique éditoriale qui ne correspond à aucune enveloppe.
+    Nouveau `SocialServiceType = ServiceType | 'RH'` (`types.ts`) et `SOCIAL_SERVICES`
+    (`constants.ts`), utilisés par les **deux** sélecteurs de `Digital.tsx`.
+    ⚠️ **`SERVICES` et `ServiceType` ne bougent PAS** : ils pilotent `resolveBudgetLine`
+    et sont partagés par Projets, Budget, Dépenses fixes, Agenda, To-do et Export — y
+    ajouter `RH` ouvrirait une cinquième colonne dans tout le Budget et une ligne
+    d'enveloppe qui n'existe pas. Vérifié : `SOCIAL_SERVICES` n'est importé que par
+    `Digital.tsx`, et `SocialPost.service` est un `String` libre en base → aucune
+    migration.
+    ⚠️ **Pourquoi ce n'était pas optionnel** : `components/Select.tsx` calcule son
+    libellé par `options.find(o => o.value === value)`. Une valeur absente des options
+    fait retomber le composant sur son **placeholder** — les 10 posts `RH` auraient
+    affiché un champ VIDE, et la première personne « corrigeant » ce vide aurait écrasé
+    la vraie valeur. Restreindre la liste de choix ne doit jamais restreindre la liste
+    qui sert à résoudre l'existant.
+
+    **`scripts/import-edito.mjs`** — à la racine, hors du champ de `nodemon` (un fichier
+    dans `backend/` redémarrerait l'API en pleine écriture), **commité** contrairement au
+    script ad hoc du correctif 22 qui a été perdu. Écrit par la **vraie API REST**, jamais
+    en Prisma direct. Dry-run par défaut, `--commit` explicite, `--limit N`,
+    `--rollback <jsonl>`. Jeton par `$GEARBOX_TOKEN` uniquement, jamais en argument.
+
+    **⚠️⚠️ LE PIÈGE DE DATE, mesuré et non supposé.** La cellule « 01/09/26 » est la
+    série Excel 46266. Lue avec `cellDates:true`, elle revient en
+    `2026-08-31T21:59:39.000Z`, et `.toISOString().slice(0,10)` donne donc
+    **`2026-08-31`** : les 43 posts auraient été datés de la veille, au bon format, sans
+    la moindre erreur visible. Le script lit la **série brute** et convertit par
+    `XLSX.SSF.parse_date_code` — aucun fuseau n'intervient. Le rapport de dry-run affiche
+    ce contrôle **en premier**, pour qu'il ne repose pas sur la mémoire de l'exécutant.
+
+    Trois autres faits vérifiés dans le fichier, chacun corrigeant une hypothèse fausse :
+    - `sheet_to_json` rend **45 lignes** (le `!ref` va jusqu'à `A1:N322`, deux lignes
+      résiduelles suivent le tableau) → filtre sur « Nom » non vide, **jamais** sur un
+      numéro de ligne en dur ;
+    - la colonne Canal contient des jetons **`D <SITE>` et `R <SITE>` séparés**
+      (`D MOZAC, R MOZAC, GROUPE`) → décodage **par jeton**, pas par chaîne entière ;
+    - **`DACIA CAMP AURILLAC` apparaît deux fois**, à deux dates → la clé d'anti-doublon
+      est la paire `titre+date`, jamais le titre seul.
+
+    **Correspondances décidées par Théo** : `Marque = Groupe` → **`['Holding']`** (c'est
+    littéralement l'ancien nom du tag ; sans effet budgétaire, le Digital n'entre dans
+    aucun budget) · `R&D` → `['Renault','Dacia']` · colonne **`Sites`** (Aucun / Internet
+    / Collaborateurs / Les deux) → **`targets`**, pas des sites malgré son nom ·
+    colonne **`Canal`** → `concessions`, « GROUPE » et tout « FULL … » → `GROUPE BONY`
+    (périmètre global reconnu par `siteScope.ts`), `R AURILLAC`/`DACIA AURILLAC` →
+    `Aurillac` — le préfixe de marque est redondant avec la colonne Marque ·
+    `Youtube` → **`YouTube`** · les 7 noms de fichiers sans fichier et les 2 remarques
+    **ne vont pas en base**, ils sont listés dans le rapport.
+    ⚠️ `OPO SEPTEMBRE NISSAN` n'a ni statut ni canal → `À venir` et `GROUPE BONY`.
+    Sans concession, `arrayScopeWhere` utilise `hasSome` : le post serait **invisible de
+    tous les chefs de site**.
+
+    **⚠️ ORDRE DE DÉPLOIEMENT NON NÉGOCIABLE** : le `web` de ce lot doit être **en ligne
+    AVANT** le `--commit` de l'import. Sinon les 10 posts `RH` s'affichent en production
+    avec un sélecteur de service vide, et le premier qui touche ce champ écrase la donnée.
+
+    **Vérifié** : dry-run complet sur les 43 lignes → **0 anomalie**, première ligne au
+    **1ᵉʳ septembre**, répartition recoupée à la main contre le fichier (Holding 24 ·
+    Dacia 12 · Renault 10 · Nissan 3 ; VN 22 · APV 11 · RH 10 ; GROUPE BONY 37 puis 12
+    concessions nommées). `RH` confirmé présent dans le sélecteur de filtre **dans le
+    navigateur**. `tsc` 9 racine / 0 backend.
+    ℹ️ **Restent à faire** : l'aller-retour `--limit 1` commit + rollback (à prouver
+    AVANT les 42 autres), puis l'import complet, puis le dépôt manuel des 7 fichiers.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
 > l'historique des correctifs ci-dessus et dans `BUGS-CONNUS.md`.
 
 ### Fonctionnel / produit
+- **⏳ IMPORT DU CALENDRIER ÉDITORIAL — le code est en ligne, les 43 posts NON.**
+  Suite immédiate du correctif 46, dans cet ordre strict :
+  1. `$env:GEARBOX_TOKEN` = le jeton de session (console du navigateur,
+     `localStorage.gearbox_token`, 24 h) — **remplacer le texte d'exemple**, piège
+     rencontré le 02/09 ;
+  2. dry-run contre la prod → recoupement anti-doublon (`titre+date`) ;
+  3. **aller-retour `--limit 1` commit + rollback, à prouver AVANT les 42 autres** ;
+  4. import complet, **hors heures de bureau** : 43 `POST` = 43 `social:updated`, donc
+     autant de rechargements chez chaque client connecté ;
+  5. dépôt **manuel** des 7 fichiers listés dans le rapport (`MINUTE DE L'AUTO` EP 5/7/8/9,
+     `Offre emploi…jpg`, `SEPTEMBRE 2026`, `Vidéos_Bony_Lamarck`) — le classeur ne les
+     contenait pas, rien n'a été inventé en base.
+  ℹ️ Aucune entrée d'`ActivityLog` ne sera créée (le journal est alimenté côté client) :
+  les 43 posts apparaîtront sans auteur ni trace dans le fil. Attendu, pas un bug.
+- **Non-régression de la branche FICHIER de la modale Médias, non rejouée** (correctif
+  45) : aucune publication de la base ne portait de fichier au moment de la recette.
+  Contrôle de 30 secondes à faire par Théo — déposer un JPG et un MP4, vérifier
+  miniature, lecteur, lightbox, **téléchargement** (et non ouverture d'onglet) et
+  suppression. Idem pour les rôles `Site Manager` et `External`, faute de comptes.
 - **CHAT — lot 2 LIVRÉ** au correctif 38 (vocaux, aperçus de liens, recherche de GIF).
   Reste à vérifier par Théo : le **vocal sur iPhone** (Safari produit du `m4a` là où
   Chrome fait du `webm` ; les deux sont prévus et servis correctement, mais seul un
