@@ -16,10 +16,17 @@ durant : la valeur à comparer aujourd'hui est **9**, mesurée en confrontant `m
 une branche de travail. Les entrées de correctifs qui citent 12 décrivent leur époque,
 ne pas les réécrire.
 
-> ⚠️ **Trois modules ont chacun leur « seule porte », à ne jamais contourner** :
+> ⚠️ **Cinq modules ont chacun leur « seule porte », à ne jamais contourner** :
 > `utils/publicUser.ts` (jamais l'objet Prisma brut, il porte `passwordHash`),
-> `utils/gameView.ts` (jamais une partie non redactée), et `auth/siteScope.ts`
-> (jamais un `where` de site recopié dans une route). Détail dans les sections dédiées.
+> `utils/gameView.ts` (jamais une partie non redactée), `auth/siteScope.ts`
+> (jamais un `where` de site recopié dans une route), `TASK_FIELDS` dans
+> `routes/projects.ts` (seule porte d'écriture des champs d'une tâche de projet), et
+> depuis le 07/09/2026 **`db.ts` (UNE seule instance de PrismaClient)**.
+> Détail dans les sections dédiées.
+>
+> Contrôle mécanique de la dernière, à rejouer après toute évolution — il doit ne RIEN
+> rendre :
+> `grep -rn "new PrismaClient" backend/src --include=*.ts | grep -v "src/db.ts"`
 
 ## ✅ Modules de données branchés (frontend → REST/Socket.IO, vérifiés en base)
 
@@ -764,6 +771,116 @@ lui refuse l'upload. Ne pas l'ajouter à une liste « pour faire propre ».
 ne pas modifier — un service worker qui met en cache fige les utilisateurs sur une
 vieille version qu'on ne peut plus corriger à distance. Sans `fetch`, les en-têtes
 `Cache-Control` de nginx pilotent seuls la fraîcheur.
+
+### 🗄️ UN SEUL client Prisma — `src/db.ts` (07/09/2026)
+
+Il y avait **27 `new PrismaClient()`** dans `backend/src`, un par module (`routes/*`,
+`realtime/*`, `auth/siteScope`, `jobs/purge`, `settings/appSettings`, `utils/pushSender`),
+chacun avec **son propre pool de connexions indépendant**.
+
+⚠️ **Pourquoi c'était un défaut structurel et pas une coquetterie.** Le `connection_limit`
+par défaut de Prisma vaut `vCPU × 2 + 1`, soit **17** sur les 8 vCPU du VPS : le plafond
+théorique atteignait donc ~440 connexions client depuis un seul processus Node, face à un
+pooler pgBouncer Supabase dont le `default_pool_size` se compte en dizaines. Prisma ouvre
+paresseusement et ces 440 n'ont jamais été observées — mais l'erreur
+`Unable to start a transaction in the given time`, relevée **20 fois en production** le
+07/09/2026, est exactement l'attente d'une connexion dans le pool d'UN client. Et 27 pools
+indépendants rendent ce plafond **impossible à régler** : `connection_limit=10` sur 27
+clients donne 270 connexions, pas 10.
+
+`DATABASE_URL` porte désormais `connection_limit=10&pool_timeout=20&connect_timeout=10`
+en plus du `pgbouncer=true` obligatoire. ⚠️ Ces paramètres vont **à l'intérieur des
+guillemets** de la valeur (voir `BUGS-CONNUS.md`), et `.env` étant hors git, ils doivent
+être posés **à la main** dans les deux fichiers réels : ce poste et `~/gearbox/.env` sur
+le VPS.
+
+`db.ts` porte aussi :
+- `log: process.env.PRISMA_LOG_QUERIES === '1' ? [...]` — journal des requêtes activable
+  sans recompiler. C'est **ce qui permet de COMPTER les aller-retours** d'un PUT, seule
+  façon honnête de vérifier qu'une transaction est passée de ~30 requêtes à 4 ;
+- un `$disconnect` sur SIGTERM/SIGINT : sans lui, les connexions du conteneur arrêté
+  restent côté pooler jusqu'à sa propre expiration, et un redéploiement enchaîné consomme
+  deux fois le quota au moment précis où le nouveau conteneur en a besoin.
+
+### 🔁 `PUT /api/projects/:id` — coût de la transaction et erreurs honnêtes (07/09/2026)
+
+**Ce que faisait la route avant.** Une transaction interactive émettant **un
+`task.update` PAR TÂCHE**, quel que soit le champ modifié : ~30 aller-retours séquentiels
+pour un projet de 24 tâches. Une transaction interactive **épingle une connexion serveur
+du pooler pendant toute sa durée** ; à 22 ms d'aller-retour mesurés VPS → pooler, cela
+faisait ~0,7 s d'épinglage par sauvegarde. L'écran, lui, en lançait une **par frappe**.
+
+**Ce qu'elle fait maintenant** : elle lit les tâches EN ENTIER et n'écrit que les lignes
+réellement modifiées, `createMany` pour les créations, `maxWait`/`timeout` explicites
+(8 s / 15 s au lieu des 2 s / 5 s tacites), relecture finale **sortie** de la transaction,
+et **une** reprise sur saturation (le PUT est idempotent : il applique un instantané
+complet). **Mesuré** : un PUT modifiant un champ sur un projet de 4 tâches émet
+**1 seul `UPDATE "Task"`** au lieu de 4.
+
+⚠️ **Trois invariants de la comparaison, à ne pas casser :**
+1. elle se fait **APRÈS `pickTaskData`**, jamais avant — c'est `pickTaskData` qui
+   normalise `''` → `null` ; comparer avant ferait paraître une chaîne vide différente
+   d'un `null` en base et la ligne serait réécrite à chaque PUT, le gain disparaissant
+   **en silence** ;
+2. un champ **absent** du corps est absent des données comparées, donc jamais une
+   différence — même sémantique qu'`undefined` = « non modifié » ;
+3. tous les `TASK_FIELDS` sont **scalaires**, donc `!==` suffit. **Le jour où on en
+   ajoute un qui ne l'est pas (tableau, Json), la comparaison devient FAUSSE en silence**
+   et la valeur cessera d'être enregistrée — exactement la classe de piège de la liste
+   blanche elle-même.
+
+**`statutPrisma()` remplace un `catch` qui rendait 404 pour DOUZE causes distinctes.**
+`P2025`→404 · `P2002`/`P2003`→409 · `P2028`/`P2024`/`P2034`→**503** + `Retry-After` ·
+`PrismaClientValidationError`→400 · reste→500.
+⚠️ Mappage **par code AVEC repli sur le message** : selon la version du moteur, « Unable
+to start a transaction in the given time » remonte tantôt avec `P2028`, tantôt **sans
+code du tout** (observé en production). Sans ce repli, une montée de version ferait
+retomber une saturation dans le 500 générique et on repartirait de zéro sur le même
+diagnostic.
+⚠️ La **trace** ne bouge pas : le `console.error` reste et gagne le code Prisma. C'est la
+seule source exploitable par `docker compose logs api | grep "PUT échoué"`, et c'est elle
+qui a permis le diagnostic du correctif 48. Le message rendu au client sort d'un
+**ensemble fixe** de chaînes françaises — jamais `e.message`, qui contient du SQL, des
+noms de colonnes et parfois des valeurs.
+
+**Métadonnées retirées du corps entrant.** `id`, `createdAt` et `updatedAt` ne sont pas
+des données d'entrée : le frontend renvoyait le projet tel qu'il l'avait lu au GET, et
+Prisma respecte une valeur explicite plutôt que son `@updatedAt`. Vérifié dans le SQL
+généré — `UPDATE "Project" SET "id" = $1, … "createdAt" = $21` a disparu.
+⚠️ Le **POST**, lui, garde `id` : le frontend génère les identifiants de projet.
+
+**Vérifications forcées, une par classe** : projet inexistant → 404 · `cost: "abc"` → 400
+(était 404) · corps de 5 Mo → **413** (était 500) · jeton invalide → **401** (était 403) ·
+sans jeton → 401 JSON.
+⚠️ **Le 503 n'a jamais été déclenché pour de vrai** — il faudrait saturer le pooler. Le
+mappage est relu, pas observé.
+
+### 🔑 Jeton expiré → 401, et non plus 403 (07/09/2026)
+
+`auth/middleware.ts` rendait `res.sendStatus(403)` sur un JWT invalide **ou expiré**.
+Deux défauts sur cette seule ligne :
+1. **403 signifie « authentifié mais pas autorisé »** — c'est ce que rend `requireRole`,
+   à juste titre. Un jeton expiré n'est pas un problème de droit, c'est une absence
+   d'authentification. Or le frontend ne déconnecte que sur **401** : la session
+   paraissait vivante à l'écran, chaque sauvegarde échouait avec l'alerte générique
+   « serveur injoignable ? », et rien ne proposait jamais de se reconnecter. Le jeton
+   durant 24 h, c'était **garanti quotidien** ;
+2. `sendStatus` envoie un corps **texte** (« Forbidden »), donc le `res.json()` du client
+   échouait et le message se dégradait en « Erreur 403 ».
+
+⚠️ **Portée du changement** : `requireRole` continue de rendre **403** pour un vrai refus
+de rôle. Rien de légitimement « interdit » ne change de statut — seule l'authentification
+manquante ou périmée bascule en 401.
+
+### 📦 Taille de corps et `err.status` (07/09/2026)
+
+`express.json()` était monté **sans `limit`**, donc plafonné à 100 ko par défaut. Et
+`middleware/errorHandler.ts` **ignorait `err.status`**, codant 500 en dur : l'erreur
+`entity.too.large` (qui porte `status: 413`) ressortait donc en « Erreur interne du
+serveur », ce qui envoie chercher la cause côté serveur alors que la requête de
+l'appelant est en cause. Corrigé : `limit: '2mb'`, et le gestionnaire respecte
+`err.status` avec un message tiré d'un ensemble fixe. `detail` reste réservé au
+hors-production.
 
 ## ⚠️ Route DORMANTE — `/api/expenses` (modèle `OneOffExpense`)
 

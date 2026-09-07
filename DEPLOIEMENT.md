@@ -138,6 +138,20 @@ première connexion.
 
 ## Maintenance
 
+- **⚠️ Modifier `~/gearbox/.env` : `up -d`, JAMAIS `restart`.**
+  `docker compose restart` **ne relit pas** le fichier `.env` — il redémarre le processus
+  dans le conteneur existant, avec l'environnement injecté à sa création. Seule une
+  **recréation** (`sudo docker compose up -d api`) réinjecte les variables. C'est la façon
+  la plus probable de croire qu'un changement d'environnement « n'a rien fait ».
+  Contrôle après coup, mot de passe masqué :
+  `sudo docker compose exec api printenv DATABASE_URL | sed 's/:[^:@]*@/:***@/'`
+  ⚠️ `.env` est **hors git** et existe en DEUX exemplaires (ce poste et le VPS) : tout
+  paramètre ajouté ici doit l'être **à la main** des deux côtés. Et les paramètres d'URL
+  vont **à l'intérieur des guillemets** de la valeur — ajoutés après le guillemet fermant,
+  Prisma refuse chaque requête (`the URL must start with the protocol postgresql://`)
+  alors que l'API démarre normalement. Le signe qui ne trompe pas dans les logs de
+  démarrage est `[settings] Jeux ALLUMES` (ou `ETEINTS`), qui prouve une lecture réussie
+  en base ; `[settings] lecture impossible` signale l'inverse.
 - **Mise à jour** : `cd ~/gearbox && git pull && sudo docker compose up -d --build`
   — cibler un seul service quand la modif ne touche qu'un côté :
   `sudo docker compose up -d --build api` (backend seul) ou `--build web`

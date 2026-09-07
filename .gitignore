@@ -37,3 +37,11 @@ screenshots/
 *.njsproj
 *.sln
 *.sw?
+
+# Exclusions VOLONTAIRES, documentees dans ETAT-PROJET.md — ce ne sont pas des oublis.
+# Inscrites ici le 07/09/2026 apres qu'un `git add -A` les a committees par accident
+# (branche reecrite avant tout push) : l'exclusion ne doit pas dependre de la vigilance.
+#  - le classeur source de la reprise de donnees, binaire qui evolue de son cote ;
+#  - la presentation de la stack faite pour l'equipe, livrable ponctuel hors application.
+budget market 2026.xlsx
+PRESENTATION-EQUIPE.html

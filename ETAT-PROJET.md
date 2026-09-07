@@ -10,7 +10,16 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 47** (Digital — refonte
+- master = prod, synchronisés. Dernier lot déployé : **correctif 48** (sauvegarde de
+  projet — fin du PUT par frappe, transaction allégée, erreurs honnêtes, client Prisma
+  unique, 7 septembre) — **`api` ET `web`**, **avec migration**
+  (`20260907120000_add_task_project_id_index`, purement additive).
+  ⚠️ **Ce lot exige une action MANUELLE sur le VPS** : `~/gearbox/.env` doit recevoir
+  `&connection_limit=10&pool_timeout=20&connect_timeout=10` **à l'intérieur des
+  guillemets** de `DATABASE_URL`, et il faut `up -d api` (recréation) — un
+  `docker compose restart` **ne relit pas** le `.env`. Oublié, le backend repart sur les
+  défauts de Prisma et l'effet mesurable disparaît, sans aucun symptôme visible.
+  Avant lui le **correctif 47** (Digital — refonte
   de la ligne d'édito et correction de DEUX bugs d'empilement, 2 septembre) — **`web`
   seul**, aucune migration.
   Avant lui les **correctifs 45 et 46** (Digital —
@@ -2362,6 +2371,120 @@
     bloc d'actions seul sur une deuxième rangée.
     `tsc` 9 racine / 0 backend, `check-plaques-sync` vert.
 
+48. **SAUVEGARDE DE PROJET — la fin de « serveur injoignable ? »**
+    (`fix/sauvegarde-projet-saturation`, 7 septembre). `api` **ET** `web`,
+    **avec migration** (`20260907120000_add_task_project_id_index`, purement additive).
+
+    ⚠️⚠️ **CAUSE MESURÉE EN PRODUCTION, PAS DÉDUITE DU CODE.** Théo et ses collègues
+    recevaient, en tapant le nom d'une tâche, l'alerte « Échec de la sauvegarde du projet
+    (serveur injoignable ?) ». Le message était **faux** : le serveur allait très bien.
+    Relevé le 07/09 sur le VPS (`docker compose logs api | grep "PUT échoué"`) :
+    - **48 échecs** sur les 4 jours de vie du conteneur, **tous sur le SEUL projet
+      `326tr3ltm`** (Forum Pièces 2026, 24 tâches) ;
+    - **28** en `Transaction already closed: timeout was 5000 ms, however 5009–10362 ms
+      passed` (dont 22 levés dès le PREMIER statement de la transaction) ;
+    - **20** en `Unable to start a transaction in the given time` (le `maxWait` de 2 s) ;
+    - `restarts=0`, `OOMKilled=false`, conteneur debout depuis 4 jours → **l'hypothèse
+      infra est écartée par la mesure**, pas par raisonnement ;
+    - latence VPS → pooler Supabase mesurée à **~22 ms**, et le VPS a **8 vCPU**
+      (et non 2, comme on aurait pu le supposer).
+
+    **Le mécanisme, chiffré.** Le champ « nom de tâche » était un input contrôlé qui
+    envoyait **le projet ENTIER avec toutes ses tâches à CHAQUE FRAPPE**. Côté serveur,
+    chaque PUT ouvrait une transaction interactive faisant **~30 aller-retours
+    séquentiels** (un `task.update` par tâche, quel que soit le champ modifié) et
+    **épinglant une connexion serveur du pooler pgBouncer** pour toute sa durée, soit
+    ~0,7 s. Taper 20 caractères lançait donc 20 transactions épinglées en 4 secondes,
+    multipliées par le nombre de collègues. Le pooler saturait. Cela explique au mot près
+    les deux observations de Théo : **« en tapant le nom »** (rafale) et **« surtout les
+    gros projets »** (connexion épinglée plus longtemps).
+    ⚠️ Le code l'admettait déjà : `pages/Projects.tsx` disait « un PUT, à CHAQUE FRAPPE »
+    et `components/expert/TaskDetailPanel.tsx` qualifiait cela de « ruineux ». Personne
+    n'avait fait le lien avec l'alerte, parce que **deux catch-all superposés** le
+    rendaient illisible : le backend transformait **douze causes distinctes** en
+    `404 Projet introuvable`, et le frontend affichait « serveur injoignable ? » **sans
+    jamais tester le statut** — alors que `services/dataService.ts` distinguait déjà
+    parfaitement réseau (`ApiError(0)`) et HTTP (`ApiError(status)`).
+
+    **Phase 1 — discipline d'écriture (frontend).**
+    - `components/ChampDiffere.tsx` (nouveau) : `ChampTexte` / `ChampNombre`, brouillon
+      local et écriture **au blur**. Généralise le motif déjà éprouvé dans
+      `expert/TaskDetailPanel`. Traite les **trois sorties sans blur** (démontage,
+      onglet caché, fermeture) et porte la règle **« vide n'est pas zéro »**.
+      ⚠️ Blur et NON debounce : un debounce envoie encore un PUT par *pause* de frappe,
+      et se déclenche pendant que le champ a **encore le focus** — ce qui rouvre les deux
+      défauts que le blur ferme (la ligne qui saute au tri, et la réponse serveur qui
+      réécrase le brouillon).
+    - **16 contrôles** basculés : 9 dans `Projects.tsx`, **7 dans `Campaigns.tsx`** —
+      cet écran écrit dans la MÊME route et personne ne l'avait vu.
+    - `services/fileSauvegardeProjet.ts` (nouveau) : **un seul PUT en vol par projet**,
+      coalescence du dernier instantané, reprise sur `0` et `503`.
+      ⚠️ **Invariant à ne pas casser** : la coalescence n'est sûre que parce que chaque
+      charge est un **instantané complet**. Si elle devient un delta partiel, elle perdra
+      des modifications **en silence**.
+    - `utils/projet.ts` (nouveau) : la formule avancement / budget réel en **UNE** copie,
+      au lieu de deux (`Projects.tsx` et `TodoList.tsx`, cette dernière **mutant** son
+      argument).
+    - Miroir `projetRef` comme unique source du « courant », `muterProjet(f)` à la place
+      de `handleUpdateProject(objet)` sur les **22 appelants** : plus aucune écriture ne
+      part d'une closure périmée.
+    - Temps réel scindé : `RT_EVENTS.users` déclenchait un rechargement COMPLET des
+      projets pour une simple photo de profil. Et le projet ouvert n'est plus réassis
+      pendant une saisie vive.
+    - Plus de `db.getProjects()` après **n'importe quel** échec : c'était un chemin de
+      **perte de données** (une saturation passagère détruisait le travail non
+      sauvegardé). Seuls 404 et 409 rechargent désormais.
+
+    **Phase 2 — coût du PUT et erreurs honnêtes (backend).**
+    - La transaction ne réécrit plus que les lignes **réellement modifiées** (comparaison
+      champ à champ APRÈS `pickTaskData`, `createMany` pour les créations), `maxWait` et
+      `timeout` explicites (8 s / 15 s), relecture finale **sortie** de la transaction,
+      et **une** reprise sur saturation (le PUT est idempotent).
+    - `statutPrisma()` : `P2025`→404, `P2002`/`P2003`→409, `P2028`/`P2024`/`P2034`→**503**
+      + `Retry-After`, validation→400, reste→500. La trace serveur reste, enrichie du code
+      Prisma. **Jamais `e.message` au client.**
+    - `express.json({ limit: '2mb' })` et `errorHandler` qui respecte enfin `err.status`
+      (un 413 sortait en 500).
+
+    **Phase 3 — un seul client Prisma.** `backend/src/db.ts` (nouveau) remplace les
+    **27** `new PrismaClient()`. Le `connection_limit` par défaut vaut `vCPU × 2 + 1` =
+    **17 par client** sur ce VPS : le plafond théorique était de ~440 connexions face à un
+    pooler qui s'en compte en dizaines. `DATABASE_URL` gagne
+    `connection_limit=10&pool_timeout=20&connect_timeout=10`.
+
+    **Deux correctifs collatéraux**, trouvés pendant l'audit :
+    - **désassigner une tâche ne s'enregistrait JAMAIS** (`v || undefined`, supprimé par
+      `JSON.stringify`, donc lu comme « non modifié » — 200 OK et rien ne bouge).
+      **Troisième occurrence** du mode d'échec de `deadline` (correctif 42) ;
+    - **un jeton expiré ne déconnectait pas** : le backend rendait `403` (corps texte) là
+      où le frontend ne traite que le `401`. La session paraissait vivante et chaque
+      sauvegarde échouait avec l'alerte générique — garanti quotidien, le jeton durant 24 h.
+
+    **VÉRIFICATIONS FAITES (mesurées dans le navigateur et dans les logs) :**
+    - **39 caractères tapés → 0 PUT pendant la frappe, 1 PUT au blur** (avant : 39) ;
+    - **4 clics rapides sur « + AJOUTER UNE TÂCHE » → 4 tâches** en base
+      (référence mesurée le 27/08 : **1**) — clôt la fiche correspondante ;
+    - **1 PUT, un champ modifié, projet de 4 tâches → UN SEUL `UPDATE "Task"`**
+      (avant : 4 ; sur un projet de 24 tâches : 1 au lieu de 24), vérifié dans le SQL
+      généré avec `PRISMA_LOG_QUERIES=1` ;
+    - le SQL ne contient plus `"id" = $1 … "createdAt" = $21` : `Project.updatedAt` est
+      de nouveau écrit par Prisma et non par le client ;
+    - **désassignation → `null` en base** (elle ne s'enregistrait jamais) ;
+    - **supprimer une ligne en pleine saisie ne la ressuscite pas** (4 tâches → 3, le
+      brouillon non validé n'existe nulle part) ;
+    - classes d'erreur forcées : projet inexistant → **404**, `cost:"abc"` → **400**
+      (était 404), corps de 5 Mo → **413** (était 500), jeton invalide → **401**
+      (était 403), sans jeton → **401** JSON ;
+    - **20 routes d'API sur 20 en 200** après la fusion des 27 clients Prisma.
+    - `tsc --noEmit` : **9 erreurs à la racine** (les 9 préexistantes, inchangées),
+      **0 au backend**.
+
+    ⚠️ **NON VÉRIFIÉ, à assumer** : le **503** n'a pas pu être déclenché pour de vrai
+    (il faudrait saturer le pooler) — seul le mappage est relu. Le test de charge
+    concurrent prévu au plan n'a pas été joué. Et le parcours d'interface des écrans
+    Budget / Digital / Chat / Agenda / Matériel après la fusion des clients Prisma a été
+    interrompu : seules les **routes** ont été vérifiées, une par module.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
@@ -2442,6 +2565,32 @@
   test dans l'interface — deux fois les contrôles d'API étaient bons et l'écran mentait.
   À faire avec Théo connecté, comme le recoupement du budget de Mozac.
 
+- **✅ SOLDÉ au correctif 48 (07/09/2026)** — l'alerte « Échec de la sauvegarde du projet
+  (serveur injoignable ?) », que Théo et ses collègues recevaient en tapant un nom de
+  tâche. Cause **mesurée** : saturation du pooler par un PUT du projet entier à chaque
+  frappe, masquée par deux catch-all. Détail complet dans le correctif 48.
+  **Reste à surveiller** : le critère d'acceptation est
+  `docker compose logs api --since 96h | grep -c "PUT échoué"` → **0**, à relever quatre
+  jours après le déploiement. La référence d'avant était **48**.
+- **Test de charge concurrent NON JOUÉ** (correctif 48). Le plan prévoyait un script sous
+  `scripts/`, jeton Master réel, N PUT concurrents sur un projet jetable, hors heures
+  ouvrées et depuis le hotspot — sur le modèle de la vérification du verrou consultatif du
+  matériel. Il n'a pas été écrit : la réduction de charge a été mesurée **unitairement**
+  (nombre de PUT, nombre d'`UPDATE` par PUT), pas **sous concurrence**. C'est le seul
+  chiffre qui manque pour affirmer que la saturation ne peut plus se produire, et non
+  seulement qu'elle est devenue improbable.
+- **Le `503` n'a jamais été déclenché pour de vrai** (correctif 48) : le mappage
+  `P2028`/`P2024`/`P2034` → 503 + `Retry-After` est relu dans le code et couvert par un
+  repli sur le message, mais il faudrait saturer le pooler pour l'observer. La reprise
+  côté file de sauvegarde comme celle côté route sont donc **non exercées** en conditions
+  réelles.
+- **Parcours d'interface incomplet après la fusion des 27 clients Prisma** (correctif 48) :
+  les **20 routes** d'API ont été vérifiées une par module (toutes en 200), mais le
+  parcours écran par écran (Budget, Digital, Chat, Agenda, Matériel, Jeux, Paramètres,
+  envoi d'avatar, fichier de projet) a été interrompu. ⚠️ La leçon qui revient dans ce
+  dépôt est qu'un contrôle exact des routes a **deux fois** manqué ce qu'un parcours de
+  cinq minutes a vu. À solder par Théo à la première utilisation.
+
 ### Dette technique
 - **Build local non représentatif du build déployé** : Docker construit le front en
   **node:18-alpine** avec `npm install`, le poste de Théo est en **Node 24**. Mesuré
@@ -2467,6 +2616,9 @@
      `prebuild`. Couvre aussi `ALPINE_SITES` et les sites hors plaque.
   2. `pages/Projects.tsx` garde sa barre de filtres inline et n'utilise pas
      `components/CollapsibleFilters.tsx`.
+  3. ✅ **RÉSOLU au correctif 48** : la formule d'avancement / budget réel était recopiée
+     dans `Projects.tsx` **et** `TodoList.tsx` (cette dernière **mutant** son argument).
+     Elle vit désormais en une seule copie dans `utils/projet.ts`.
 - **`PUT /api/auth/me` ne valide pas la forme de `avatarUrl`** : un utilisateur peut y
   écrire une URL **externe**, rendue dans un `<img>` chez tous ses collègues (fuite
   d'IP, pixel de traçage). Trou préexistant, découvert en fermant le même risque sur la
@@ -2507,6 +2659,27 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **⚠️ `git add -A` a committé les deux fichiers volontairement NON suivis.** Le 07/09/2026,
+  `budget market 2026.xlsx` (1,4 Mo) et `PRESENTATION-EQUIPE.html` sont entrés dans un
+  commit du correctif 48. Repéré avant tout push, branche réécrite (`git filter-branch`)
+  pour que le binaire n'atteigne jamais GitHub. ⚠️ `filter-branch` les **efface aussi du
+  disque** : il faut les restaurer depuis l'ancien HEAD (`git checkout <ancien> -- …`
+  puis `git reset HEAD -- …`). Depuis, ils sont dans `.gitignore` — l'exclusion ne
+  dépend plus de la vigilance, comme `check-plaques-sync.mjs` pour les plaques.
+- **⚠️ Les paramètres d'URL vont À L'INTÉRIEUR des guillemets du `.env`.** Ajoutés après
+  le guillemet fermant de `DATABASE_URL`, Prisma rend
+  « the URL must start with the protocol postgresql:// » sur **chaque requête** : l'API
+  démarre normalement et **toutes** les routes tombent. Le signe qui ne trompe pas au
+  démarrage est la ligne `[settings] Jeux ALLUMES` (ou `ETEINTS`), qui prouve une lecture
+  réussie en base ; `[settings] lecture impossible` signale l'inverse.
+- **Un `visibilitychange` peut valider un brouillon sans aucun blur.** Constaté en
+  recettant le correctif 48 : des PUT partaient alors que le champ gardait le focus et
+  qu'aucun événement `blur` n'était émis. Ce n'était pas un bug — c'est le filet
+  « onglet caché » de `ChampDiffere`, déclenché par l'outil d'automatisation qui masque
+  le panneau entre deux appels. ⚠️ Corollaire pour toute recette future : **une page
+  ouverte sur le projet testé est un ÉCRIVAIN CONCURRENT.** Deux `UPDATE` sont apparus
+  pour un seul champ modifié, et une valeur écrite par script a été réécrite par la
+  page. Sortir de l'écran avant de mesurer.
 - **Après un déploiement, recharger complètement la page** : un onglet resté ouvert
   continue de tourner sur l'ancien bundle. Symptôme trompeur du 29 juillet — le
   temps réel semblait ne marcher qu'après un aller-retour de rubrique (le remontage
