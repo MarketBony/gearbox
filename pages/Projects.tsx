@@ -2,7 +2,9 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Task, TaskStatus, ServiceType, PlaqueName, Site, BrandType, ProjectType, User, UserRole, ActivityLog } from '../types';
-import { db } from '../services/dataService';
+import { db, ApiError } from '../services/dataService';
+import { fileSauvegardeProjet } from '../services/fileSauvegardeProjet';
+import { recalculerProjet } from '../utils/projet';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { SITES, PLAQUES_STRUCTURE, SERVICES, SERVICE_COLORS, BRANDS, BRAND_COLORS, PROJECT_TYPES, TASK_CHANNELS, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, ALPINE_SITES, NISSAN_SITES, RDM_BRANDS, isMarketingRole } from '../constants';
@@ -17,6 +19,7 @@ import Select from '../components/Select';
 import FloatingPanel from '../components/FloatingPanel';
 import ExpertPanel, { useProjectFiles } from '../components/expert/ExpertPanel';
 import TaskDetailPanel from '../components/expert/TaskDetailPanel';
+import { ChampTexte, ChampNombre } from '../components/ChampDiffere';
 
 // Puces marque minimalistes (mêmes teintes que BRAND_COLORS, charte identique)
 const BRAND_DOT: Record<string, string> = {
@@ -371,11 +374,64 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProjectRaw] = useState<Project | null>(null);
   const SESSION_SELECTED_KEY = `gearbox_session_projects_${viewMode}_selectedId`;
+
+  /**
+   * ⚠️ MIROIR DU PROJET OUVERT — c'est LUI que lit la couche réseau, jamais la closure
+   * d'un rendu. Avant le correctif 48, `addTask` et `updateTask` construisaient leur
+   * corps depuis le `selectedProject` capturé au rendu où l'événement s'était produit :
+   * deux modifications parties avant le retour du premier PUT portaient donc chacune une
+   * liste de tâches incomplète, et le diff transactionnel du serveur SUPPRIMAIT la tâche
+   * créée par l'autre (mesuré le 27/08/2026 : 4 clics rapides sur « + AJOUTER UNE
+   * TÂCHE » ne donnaient qu'UNE ligne).
+   *
+   * ⚠️ Un `setState(prev => …)` seul ne suffit pas : la charge doit être ENVOYÉE, donc
+   * l'objet doit être lisible HORS de l'updater — un `fetch` dans un updater est un effet
+   * de bord dans un réducteur, rejoué deux fois en StrictMode. Le miroir n'est pas un
+   * raccourci pour éviter l'état fonctionnel, c'est le seul endroit où la couche réseau
+   * peut lire un « courant » cohérent.
+   */
+  const projetRef = useRef<Project | null>(null);
+
+  /**
+   * ⚠️ SEULE PORTE d'écriture du projet sélectionné — même doctrine que `TASK_FIELDS`
+   * côté serveur ou `constants.ts` pour le routage budgétaire. Le miroir doit être posé
+   * ICI et NULLE PART ailleurs, sinon il diverge de l'état React et la couche réseau
+   * envoie un instantané périmé.
+   */
   const setSelectedProject = useCallback((p: Project | null) => {
+    projetRef.current = p;
     setSelectedProjectRaw(p);
     if (p) sessionStorage.setItem(SESSION_SELECTED_KEY, p.id);
     else sessionStorage.removeItem(SESSION_SELECTED_KEY);
   }, [SESSION_SELECTED_KEY]);
+
+  /**
+   * Nombre de champs de saisie ayant actuellement le focus (alimenté par
+   * `ChampDiffere`). ⚠️ Sert à interdire au temps réel de réasseoir le projet ouvert
+   * pendant une frappe : la réponse serveur est par construction PLUS ANCIENNE que le
+   * brouillon en cours.
+   */
+  const champsFocalisesRef = useRef(0);
+  /** Rattrapage différé : id du projet dont la réinstallation a été refusée. */
+  const reseatEnAttenteRef = useRef<string | null>(null);
+
+  /**
+   * Passé à chaque `ChampDiffere` comme `onFocusChange`. Plomberie explicite plutôt
+   * qu'un `document.activeElement.closest(...)` : ce dernier marcherait sans câblage mais
+   * coupleraient l'écran à la structure du DOM, en douce.
+   */
+  const suivreFocusChamp = useCallback((focus: boolean) => {
+    champsFocalisesRef.current = Math.max(0, champsFocalisesRef.current + (focus ? 1 : -1));
+    // Le dernier champ quitté libère le rattrapage mis de côté pendant la saisie.
+    if (champsFocalisesRef.current === 0 && reseatEnAttenteRef.current) {
+      const id = reseatEnAttenteRef.current;
+      reseatEnAttenteRef.current = null;
+      if (!fileSauvegardeProjet.aDesEcrituresEnCours(id)) rechargerProjetsRef.current?.();
+    }
+  }, []);
+
+  /** Miroir de `loadProjects` : `suivreFocusChamp` est stable et ne doit pas se recréer. */
+  const rechargerProjetsRef = useRef<(() => void) | null>(null);
   const [saving, setSaving] = useState(false);
   const [showSiteDropdown, setShowSiteDropdown] = useState(false);
   const [showTeamDropdown, setShowTeamDropdown] = useState(false);
@@ -469,12 +525,15 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
   const marketingUsers = useMemo(() => users.filter(u => isMarketingRole(u.role)), [users]);
 
   // --- ORDRE D'AFFICHAGE DES TÂCHES ------------------------------------------------
-  // ⚠️ GEL PENDANT LA SAISIE, sans quoi le tri rend le tableau inutilisable :
-  // `updateTask` appelle `handleUpdateProject`, donc un PUT, à CHAQUE FRAPPE. Avec un
-  // tri par nom, taper « Flyer » ferait sauter la ligne cinq fois et le champ perdrait
-  // le focus à la première lettre. On fige donc l'ordre tant qu'un champ texte est en
-  // cours d'édition (onFocus), et on le libère en sortant (onBlur) : la ligne se
-  // replace une fois la saisie finie.
+  // ⚠️ GEL PENDANT LA SAISIE — À CONSERVER, MAIS SA RAISON A CHANGÉ AU CORRECTIF 48.
+  // Avant : `updateTask` déclenchait un PUT à CHAQUE FRAPPE, donc avec un tri par nom,
+  // taper « Flyer » faisait sauter la ligne cinq fois et le champ perdait le focus dès la
+  // première lettre. Depuis le correctif 48 la saisie est différée (`ChampDiffere`) : la
+  // clé de tri ne bouge plus pendant la frappe, et c'est précisément ce qui rend tentant
+  // de SUPPRIMER ce gel. Ne pas le faire — il reste le seul garde-fou contre le retri
+  // déclenché par la modification d'un COLLÈGUE pendant qu'on tape, qui sortirait la
+  // ligne de sous le curseur. On fige donc l'ordre tant qu'un champ texte est en cours
+  // d'édition (onFocus), et on le libère en sortant (onBlur).
   // Les Select et le DatePicker ne gèlent rien — ils changent leur valeur en une seule
   // action, le réordonnancement immédiat y est le comportement attendu.
   const [ordreGele, setOrdreGele] = useState<string[] | null>(null);
@@ -580,13 +639,16 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
     return () => window.removeEventListener('gearbox-navigate' as any, handleNavigation);
   }, []);
 
-  // Temps réel : projets (+ liste des utilisateurs, utilisée pour l'affectation
-  // des tâches). loadProjects re-synchronise aussi le projet ouvert par son id,
-  // donc la sélection n'est pas perdue quand un collègue modifie ce projet.
-  useRealtimeSync([...RT_EVENTS.projects, ...RT_EVENTS.users], () => {
-    loadProjects();
-    db.getUsers().then(setUsers).catch(() => {});
-  });
+  // Temps réel : projets. `loadProjects` re-synchronise aussi le projet ouvert par son
+  // id, donc la sélection n'est pas perdue quand un collègue modifie ce projet.
+  useRealtimeSync(RT_EVENTS.projects, () => { loadProjects(); });
+
+  // ⚠️ ABONNEMENT SÉPARÉ, et c'est le point. `RT_EVENTS.users` était branché sur le MÊME
+  // rappel que les projets : une simple modification de profil ou de photo d'un collègue
+  // déclenchait donc un rechargement COMPLET des projets, et pouvait réasseoir le projet
+  // ouvert en pleine saisie. Or cet écran ne lit `users` que pour résoudre les noms des
+  // personnes assignées — il n'a aucune raison de recharger les projets pour ça.
+  useRealtimeSync(RT_EVENTS.users, () => { db.getUsers().then(setUsers).catch(() => {}); });
 
   useEffect(() => {
       setSelectedProject(null);
@@ -617,44 +679,124 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
         if (found) {
             const isArchived = found.status === 'Archived';
             if ((viewMode === 'archived' && isArchived) || (viewMode === 'current' && !isArchived)) {
-                setSelectedProjectRaw(found);
+                // ⚠️ ON NE RÉASSOIT PAS le projet ouvert si une écriture est en vol ou si un
+                // champ a le focus : la réponse serveur est par construction PLUS ANCIENNE
+                // que le brouillon en cours de saisie, et la réassoir écraserait la frappe.
+                // Même règle que l'exclusion de l'auteur côté socket
+                // (backend/src/realtime/index.ts), pour la même raison : ce qui vient du
+                // serveur ne gagne jamais contre une saisie vive. Le rattrapage n'est pas
+                // perdu — `suivreFocusChamp` le rejoue dès que le focus est relâché.
+                if (fileSauvegardeProjet.aDesEcrituresEnCours(found.id) || champsFocalisesRef.current > 0) {
+                    reseatEnAttenteRef.current = found.id;
+                } else {
+                    // Passe par la porte unique, qui pose AUSSI le miroir : `setSelectedProjectRaw`
+                    // seul le laissait diverger de l'état React, et la couche réseau envoyait
+                    // alors un instantané périmé.
+                    setSelectedProject(found);
+                }
             }
         }
         if (pendingId) window.sessionStorage.removeItem('pendingProjectId');
     }
   };
+  // Rattachement du miroir, pour que `suivreFocusChamp` (stable) puisse rejouer le
+  // rechargement mis de côté pendant une saisie sans se recréer à chaque rendu.
+  rechargerProjetsRef.current = loadProjects;
 
-  const handleUpdateProject = useCallback(async (updated: Project) => {
+  /**
+   * Message d'échec de sauvegarde, choisi d'après le STATUT.
+   *
+   * ⚠️ `apiFetch` (services/dataService.ts) DISTINGUE DÉJÀ les cas : `ApiError(0)` pour un
+   * réseau injoignable, `ApiError(status)` pour une réponse HTTP. C'est l'appelant qui
+   * jetait la distinction, et qui affichait « serveur injoignable ? » pour un 403, un
+   * 404, un 500 et une coupure réseau indifféremment — donc le message le plus important
+   * de l'application était aussi le moins fiable, et un problème de CONCURRENCE a passé
+   * pour une panne réseau pendant des mois. Même branchement que `pages/Material.tsx` et
+   * `pages/Digital.tsx`, qui lisent bien `ApiError.status`.
+   */
+  const onEchecSauvegarde = useCallback((erreur: unknown) => {
+    console.error('Project update failed:', erreur);
+    if (!(erreur instanceof ApiError)) { alert('Échec inattendu de la sauvegarde.'); return; }
+    switch (erreur.status) {
+      case 0:
+        alert('Serveur injoignable. Vos modifications ne sont PAS perdues : elles repartiront à la prochaine sauvegarde — ne fermez pas l\'onglet.');
+        return;
+      case 503:
+        alert('La base est momentanément saturée. Plusieurs tentatives ont échoué : réessayez dans une minute.');
+        return;
+      // `apiFetch` a déjà purgé le jeton et émis 'gearbox-auth-expired' : AuthContext
+      // déconnecte proprement, une alerte de plus n'apporterait rien.
+      case 401: return;
+      case 403:
+        alert('Droits insuffisants pour modifier ce projet.');
+        return;
+      // ⚠️ SEULS le 404 et le 409 justifient un rechargement : là, l'état local est
+      // réellement faux. Recharger après N'IMPORTE QUEL échec — ce que faisait cet écran
+      // — détruisait le travail non sauvegardé sur une simple saturation passagère, alors
+      // qu'il suffisait de réessayer.
+      case 404:
+        alert('Ce projet n\'existe plus (supprimé depuis un autre poste ?).');
+        setSelectedProject(null);
+        loadProjects();
+        return;
+      case 409:
+        alert(erreur.message || 'Conflit de sauvegarde. Les données ont été rechargées.');
+        loadProjects();
+        return;
+      default:
+        // 400 / 413 / 500 : le serveur rend déjà un message français précis.
+        alert(erreur.message || 'Échec de la sauvegarde du projet.');
+    }
+  }, [setSelectedProject]);
+
+  /**
+   * Applique `f` à l'état COURANT (le miroir), recalcule les agrégats dérivés, pose
+   * l'état optimiste et met la sauvegarde EN FILE.
+   *
+   * ⚠️ Remplace l'ancien `handleUpdateProject(objet)`, qui recevait un objet construit
+   * depuis la closure du rendu — donc périmé dès qu'une deuxième modification partait
+   * avant le retour du premier PUT. Ici `f` reçoit toujours le projet réellement à jour.
+   *
+   * ⚠️ La sauvegarde passe par `fileSauvegardeProjet` : UN SEUL PUT en vol par projet.
+   * Ne jamais rappeler `db.updateProject` directement depuis cet écran, ce serait
+   * rouvrir la course que la file existe pour fermer.
+   */
+  const muterProjet = useCallback((f: (p: Project) => Project) => {
     if (!canEdit) return;
+    const courant = projetRef.current;
+    if (!courant) return;
+
+    const suivant = recalculerProjet(f(courant));
+    setSelectedProject(suivant);
+    setProjects(prev => prev.map(p => (p.id === suivant.id ? suivant : p)));
     setSaving(true);
-    
-    let totalWeight = 0;
-    if (updated.tasks.length > 0) {
-        updated.tasks.forEach(t => {
-            if (t.status === 'Done' || t.status === 'Programmed') totalWeight += 1;
-            else if (t.status === 'InProgress') totalWeight += 0.5;
-        });
-        updated.progress = Math.round((totalWeight / updated.tasks.length) * 100);
-    } else {
-        updated.progress = 0;
-    }
-    updated.budgetActual = updated.tasks.reduce((sum, t) => sum + (t.cost || 0), 0);
 
-    // Update optimiste local, puis PUT unitaire vers l'API (le backend gère
-    // le diff des tâches). En cas d'échec : resynchronisation depuis la base.
-    setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
-    setSelectedProject(updated);
+    fileSauvegardeProjet.pousser(suivant, {
+      onSucces: (projetServeur) => {
+        // ⚠️ La réponse n'est appliquée que si RIEN n'attend derrière et qu'aucun champ
+        // n'a le focus : sinon elle est plus ancienne que ce que l'utilisateur est en
+        // train de taper, et l'appliquer écraserait sa saisie.
+        if (fileSauvegardeProjet.aDesEcrituresEnCours(projetServeur.id)) return;
+        if (champsFocalisesRef.current > 0) return;
+        if (projetRef.current?.id !== projetServeur.id) return;
+        setSelectedProject(projetServeur);
+        setProjects(prev => prev.map(p => (p.id === projetServeur.id ? projetServeur : p)));
+      },
+      onEchec: onEchecSauvegarde,
+      onRepos: () => setSaving(false),
+    });
+  }, [canEdit, setSelectedProject, onEchecSauvegarde]);
 
-    try {
-      await db.updateProject(updated);
-    } catch (error) {
-      console.error('Project update failed:', error);
-      alert('Échec de la sauvegarde du projet (serveur injoignable ?). Rechargement des données.');
-      const fresh = await db.getProjects().catch(() => null);
-      if (fresh) setProjects(fresh);
-    }
-    setTimeout(() => setSaving(false), 500);
-  }, [canEdit]);
+  /**
+   * Écriture d'un champ de TÂCHE venue d'un champ à sauvegarde différée.
+   * ⚠️ Refuse l'écriture si la tâche n'existe PLUS dans l'état courant : c'est ce qui
+   * empêche le flush au démontage de `ChampDiffere` de faire RESSUSCITER une ligne qu'on
+   * vient de supprimer en pleine saisie.
+   */
+  const validerChampTache = useCallback((taskId: string, champ: keyof Task, valeur: any) => {
+    if (!projetRef.current?.tasks.some(t => t.id === taskId)) return;
+    muterProjet(p => ({ ...p, tasks: p.tasks.map(t => (t.id === taskId ? { ...t, [champ]: valeur } : t)) }));
+  }, [muterProjet]);
 
   const handleStatusChange = async (newStatus: string) => {
       if (!selectedProject || !canEdit) return;
@@ -666,18 +808,21 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
       }
 
       if (selectedProject.status === 'Archived' && newStatus !== 'Archived') {
-          const restored = { ...selectedProject, status: newStatus as any };
-          await handleUpdateProject(restored);
+          // ⚠️ Plus d'`await` : la file de sauvegarde detient deja son instantane, donc
+          // deselectionner juste apres ne l'affecte pas.
+          muterProjet(p => ({ ...p, status: newStatus as any }));
           setSelectedProject(null);
           return;
       }
 
-      handleUpdateProject({ ...selectedProject, status: newStatus as any });
+      muterProjet(p => ({ ...p, status: newStatus as any }));
   };
 
   const confirmArchive = async () => {
       if (projectToArchive && canEdit) {
-          await handleUpdateProject(projectToArchive);
+          // ⚠️ On archive l'etat COURANT et non `projectToArchive`, capture au clic :
+          // entre le clic et la confirmation, l'utilisateur a pu modifier le projet.
+          muterProjet(p => ({ ...p, status: 'Archived' }));
           if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a archivé le projet', entity: 'project', entityName: projectToArchive.name, entityId: projectToArchive.id, timestamp: new Date().toISOString() });
           setShowArchiveConfirm(false);
           setProjectToArchive(null);
@@ -742,15 +887,19 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
 
   const updateSiteSelection = (newSite: string) => {
       if (!selectedProject || !canEdit) return;
-      
-      let newSites = [...(selectedProject.sites || [])];
+
+      // ⚠️ Tout le calcul se fait DANS le mutateur, donc sur le projet reellement a jour.
+      // Le derouler avant l'appel le ferait repartir de la closure du rendu — c'est
+      // exactement le defaut que le correctif 48 ferme.
+      muterProjet(projetCourant => {
+      let newSites = [...(projetCourant.sites || [])];
       // If sites was undefined (legacy), init with current site
-      if (!selectedProject.sites && selectedProject.site) {
-          newSites = [selectedProject.site];
+      if (!projetCourant.sites && projetCourant.site) {
+          newSites = [projetCourant.site];
       }
 
-      let newDistribution = { ...(selectedProject.budgetDistribution || {}) };
-      let mainSite = selectedProject.site;
+      let newDistribution = { ...(projetCourant.budgetDistribution || {}) };
+      let mainSite = projetCourant.site;
 
       const isGroupMode = (s: string) => s === 'GROUPE BONY' || s === 'GROUPE BONY (R/N)';
 
@@ -793,72 +942,68 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
           }
       }
 
-      handleUpdateProject({ 
-          ...selectedProject, 
-          site: mainSite, 
-          sites: newSites, 
-          budgetDistribution: newDistribution 
+      return { ...projetCourant, site: mainSite, sites: newSites, budgetDistribution: newDistribution };
       });
   };
 
   const updateBudgetDistribution = (site: string, value: number) => {
       if (!selectedProject || !canEdit) return;
-      const newDistribution = { ...(selectedProject.budgetDistribution || {}) };
-      newDistribution[site] = value;
-      handleUpdateProject({ ...selectedProject, budgetDistribution: newDistribution });
+      muterProjet(p => ({ ...p, budgetDistribution: { ...(p.budgetDistribution || {}), [site]: value } }));
   };
 
   const toggleService = (s: ServiceType) => {
       if (!selectedProject || !canEdit) return;
-      const currentServices = selectedProject.service || [];
-      let newServices: ServiceType[] = [];
-
-      if (s === 'Tous Services') {
-          newServices = currentServices.includes('Tous Services') ? [] : ['Tous Services'];
-      } else {
-          let temp = currentServices.filter(svc => svc !== 'Tous Services');
-          newServices = temp.includes(s) ? temp.filter(svc => svc !== s) : [...temp, s];
-      }
-      handleUpdateProject({ ...selectedProject, service: newServices });
+      muterProjet(p => {
+          const currentServices = p.service || [];
+          let newServices: ServiceType[] = [];
+          if (s === 'Tous Services') {
+              newServices = currentServices.includes('Tous Services') ? [] : ['Tous Services'];
+          } else {
+              const temp = currentServices.filter(svc => svc !== 'Tous Services');
+              newServices = temp.includes(s) ? temp.filter(svc => svc !== s) : [...temp, s];
+          }
+          return { ...p, service: newServices };
+      });
   };
 
   const toggleBrand = (b: BrandType) => {
       if (!selectedProject || !canEdit) return;
-      const currentBrands = selectedProject.brands || [];
-      let newBrands: BrandType[] = [];
-
-      if (b === 'Holding') {
-          newBrands = currentBrands.includes('Holding') ? [] : ['Holding'];
-      } else {
-          let temp = currentBrands.filter(br => br !== 'Holding');
-          newBrands = temp.includes(b) ? temp.filter(br => br !== b) : [...temp, b];
-      }
-      handleUpdateProject({ ...selectedProject, brands: newBrands });
+      muterProjet(p => {
+          const currentBrands = p.brands || [];
+          let newBrands: BrandType[] = [];
+          // ⚠️ Holding est un TAG EXCLUSIF (regle metier, CLAUDE.md) : le poser retire
+          // toute autre marque, et poser une autre marque le retire. Ne pas y toucher.
+          if (b === 'Holding') {
+              newBrands = currentBrands.includes('Holding') ? [] : ['Holding'];
+          } else {
+              const temp = currentBrands.filter(br => br !== 'Holding');
+              newBrands = temp.includes(b) ? temp.filter(br => br !== b) : [...temp, b];
+          }
+          return { ...p, brands: newBrands };
+      });
   };
 
   const addTask = () => {
       if (!selectedProject || !canEdit) return;
       const newTask: Task = { id: Math.random().toString(36).substr(2, 9), name: '', channel: '', cost: 0, status: 'Todo' };
-      handleUpdateProject({ ...selectedProject, tasks: [...selectedProject.tasks, newTask] });
+      muterProjet(p => ({ ...p, tasks: [...p.tasks, newTask] }));
   };
 
   const updateTask = (taskId: string, field: keyof Task, value: any) => {
       if (!selectedProject || !canEdit) return;
-      const newTasks = selectedProject.tasks.map(t => t.id === taskId ? { ...t, [field]: value } : t);
-      handleUpdateProject({ ...selectedProject, tasks: newTasks });
+      muterProjet(p => ({ ...p, tasks: p.tasks.map(t => (t.id === taskId ? { ...t, [field]: value } : t)) }));
   };
 
   const removeTask = (taskId: string) => {
       if (!selectedProject || !canEdit) return;
-      const newTasks = selectedProject.tasks.filter(t => t.id !== taskId);
-      handleUpdateProject({ ...selectedProject, tasks: newTasks });
+      muterProjet(p => ({ ...p, tasks: p.tasks.filter(t => t.id !== taskId) }));
   };
 
   const addAssignedUser = (userId: string) => {
       if (!selectedProject || !canEdit) return;
       const current = selectedProject.assignedUsers || [];
       if (current.includes(userId)) return;
-      handleUpdateProject({ ...selectedProject, assignedUsers: [...current, userId] });
+      muterProjet(p => ({ ...p, assignedUsers: [...(p.assignedUsers || []), userId] }));
       setShowTeamDropdown(false);
   };
 
@@ -868,7 +1013,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
       if (current.length <= 1) {
           if (!confirm('Cet utilisateur est le seul membre du projet. Le retirer quand même ?')) return;
       }
-      handleUpdateProject({ ...selectedProject, assignedUsers: current.filter(id => id !== userId) });
+      muterProjet(p => ({ ...p, assignedUsers: (p.assignedUsers || []).filter(id => id !== userId) }));
   };
 
   const filteredProjects = useMemo(() => {
@@ -1308,11 +1453,12 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                     
                     <div className="space-y-2">
                         <label className="block text-xs font-bold text-bony-violet tracking-widest uppercase">Titre du projet</label>
-                        <input 
-                            type="text" 
+                        <ChampTexte
+                            cle={`${selectedProject.id}:name`}
                             disabled={!canEdit}
-                            value={selectedProject.name}
-                            onChange={(e) => handleUpdateProject({...selectedProject, name: e.target.value})}
+                            valeur={selectedProject.name}
+                            onValider={(v) => muterProjet(p => ({ ...p, name: v }))}
+                            onFocusChange={suivreFocusChamp}
                             className={`w-full bg-transparent text-4xl font-title text-bony-text border-b-2 border-bony-border outline-none pb-2 transition-colors placeholder-slate-400 ${canEdit ? 'focus:border-bony-orange' : 'opacity-80'}`}
                             placeholder="NOM DU PROJET"
                         />
@@ -1369,7 +1515,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                         bien les modules une fois le mode allumé par quelqu'un. */}
                                     {canEdit && (
                                         <button
-                                            onClick={() => handleUpdateProject({ ...selectedProject, expertMode: !selectedProject.expertMode })}
+                                            onClick={() => muterProjet(p => ({ ...p, expertMode: !p.expertMode }))}
                                             title={selectedProject.expertMode
                                                 ? "Revenir à la vue simple. Aucune donnée n'est supprimée."
                                                 : 'Débloquer les indicateurs, le planning et les fichiers'}
@@ -1393,9 +1539,9 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                      <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2">Période</label>
                                      {canEdit ? (
                                          <div className="flex items-center gap-1.5">
-                                             <DatePicker size="sm" value={selectedProject.startDate} onChange={(v) => handleUpdateProject({...selectedProject, startDate: v, ...(v && selectedProject.endDate && v > selectedProject.endDate ? { endDate: v } : {})})} placeholder="Début" />
+                                             <DatePicker size="sm" value={selectedProject.startDate} onChange={(v) => muterProjet(p => ({ ...p, startDate: v, ...(v && p.endDate && v > p.endDate ? { endDate: v } : {}) }))} placeholder="Début" />
                                              <ArrowRight size={12} className="text-slate-400 shrink-0"/>
-                                             <DatePicker size="sm" value={selectedProject.endDate} minDate={selectedProject.startDate} onChange={(v) => handleUpdateProject({...selectedProject, endDate: v})} placeholder="Fin" />
+                                             <DatePicker size="sm" value={selectedProject.endDate} minDate={selectedProject.startDate} onChange={(v) => muterProjet(p => ({ ...p, endDate: v }))} placeholder="Fin" />
                                          </div>
                                      ) : (
                                          <div className="flex items-center gap-2 bg-[var(--bg-input)] border border-bony-border rounded-2xl px-3 h-[38px] text-xs font-bold text-bony-text">
@@ -1410,7 +1556,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                     <button
                                         type="button"
                                         disabled={!canEdit}
-                                        onClick={() => handleUpdateProject({ ...selectedProject, proPlus: !selectedProject.proPlus })}
+                                        onClick={() => muterProjet(p => ({ ...p, proPlus: !p.proPlus }))}
                                         className={`flex items-center gap-2 h-[38px] px-3 rounded-lg border text-xs font-bold uppercase tracking-wide transition-all ${
                                             selectedProject.proPlus
                                                 ? 'bg-bony-gradient text-white border-transparent shadow'
@@ -1503,7 +1649,7 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                      <Select
                                         value={selectedProject.projectType || 'OP Clients'}
                                         disabled={!canEdit}
-                                        onChange={(v) => handleUpdateProject({...selectedProject, projectType: v as any})}
+                                        onChange={(v) => muterProjet(p => ({ ...p, projectType: v as any }))}
                                         options={PROJECT_TYPES.map(t => ({ value: t, label: t }))}
                                      />
                                 </div>
@@ -1620,19 +1766,23 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                     <span className="text-xs font-bold text-slate-600 dark:text-slate-400 w-24 truncate" title={site}>{site}</span>
                                                     <div className="flex-1 flex items-center gap-2 bg-slate-100 dark:bg-black/30 rounded px-2 py-1 border border-bony-border">
                                                         {euroMode ? (
-                                                            <input
-                                                                type="number"
-                                                                value={amount}
+                                                            <ChampNombre
+                                                                cle={`${selectedProject.id}:dist-eur:${site}`}
+                                                                valeur={amount}
+                                                                videVaut="zero"
                                                                 disabled={euroDisabled}
-                                                                onChange={(e) => updateBudgetDistribution(site, selectedProject.budgetActual > 0 ? (Number(e.target.value) / selectedProject.budgetActual) * 100 : 0)}
+                                                                onValider={(v) => updateBudgetDistribution(site, selectedProject.budgetActual > 0 ? ((v ?? 0) / selectedProject.budgetActual) * 100 : 0)}
+                                                                onFocusChange={suivreFocusChamp}
                                                                 className="w-full bg-transparent text-xs font-bold text-right outline-none disabled:opacity-50"
                                                             />
                                                         ) : (
-                                                            <input
-                                                                type="number"
-                                                                value={Number(pct.toFixed(2))}
+                                                            <ChampNombre
+                                                                cle={`${selectedProject.id}:dist-pct:${site}`}
+                                                                valeur={Number(pct.toFixed(2))}
+                                                                videVaut="zero"
                                                                 disabled={isFixed || !canEdit}
-                                                                onChange={(e) => updateBudgetDistribution(site, Number(e.target.value))}
+                                                                onValider={(v) => updateBudgetDistribution(site, v ?? 0)}
+                                                                onFocusChange={suivreFocusChamp}
                                                                 className="w-full bg-transparent text-xs font-bold text-right outline-none disabled:opacity-50"
                                                             />
                                                         )}
@@ -1675,11 +1825,15 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                  <div className="space-y-1">
                                      <label className="text-[10px] font-bold text-slate-500 uppercase">Budget Prévu</label>
                                      <div className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded-lg flex items-center px-3 py-2">
-                                         <input 
-                                             type="number" 
+                                         {/* ⚠️ `videVaut="zero"` : `Project.budgetPlanned` est un `Float` NON
+                                             nullable en base — un champ vide y vaut 0, pas null. */}
+                                         <ChampNombre
+                                             cle={`${selectedProject.id}:budgetPlanned`}
                                              disabled={!canEdit}
-                                             value={selectedProject.budgetPlanned}
-                                             onChange={(e) => handleUpdateProject({...selectedProject, budgetPlanned: Number(e.target.value)})}
+                                             valeur={selectedProject.budgetPlanned}
+                                             videVaut="zero"
+                                             onValider={(v) => muterProjet(p => ({ ...p, budgetPlanned: v ?? 0 }))}
+                                             onFocusChange={suivreFocusChamp}
                                              className="bg-transparent text-xl font-sans font-bold text-bony-text outline-none w-full placeholder-slate-400 disabled:opacity-50"
                                              placeholder="0"
                                          />
@@ -1717,13 +1871,21 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                          <div key={champ} className="space-y-1 pt-4 border-t border-bony-border animate-in fade-in">
                                              <label className="text-[10px] font-bold text-slate-500 uppercase">Part {marque} (%)</label>
                                              <div className="bg-slate-100 dark:bg-black/30 border border-bony-border rounded-lg flex items-center px-3 py-2 gap-2">
-                                                 <input
-                                                     type="number"
-                                                     min="0"
-                                                     max="100"
+                                                 {/* ⚠️ `videVaut="null"` et NON "zero" : la regle metier est
+                                                     « curseur vide = 100 % sur la marque » (CLAUDE.md). Ecrire 0
+                                                     deplacerait TOUT le montant sur le compte RDM — l'inverse de
+                                                     ce que l'utilisateur demande en vidant le champ.
+                                                     Le bornage 0-100 est applique AU COMMIT : l'appliquer a chaque
+                                                     frappe empechait de taper « 100 » (bloque a 1 au premier
+                                                     caractere). */}
+                                                 <ChampNombre
+                                                     cle={`${selectedProject.id}:${champ}`}
                                                      disabled={!canEdit}
-                                                     value={share}
-                                                     onChange={(e) => handleUpdateProject({...selectedProject, [champ]: Math.min(100, Math.max(0, Number(e.target.value)))})}
+                                                     valeur={share}
+                                                     videVaut="null"
+                                                     borne={[0, 100]}
+                                                     onValider={(v) => muterProjet(p => ({ ...p, [champ]: v }))}
+                                                     onFocusChange={suivreFocusChamp}
                                                      className="bg-transparent text-xl font-sans font-bold text-bony-text outline-none w-16 placeholder-slate-400 disabled:opacity-50 text-center"
                                                      placeholder="100"
                                                  />
@@ -1823,25 +1985,27 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                             {/* Numéro de ligne : suit l'ordre AFFICHÉ, ce n'est pas un identifiant. */}
                                             <td className="p-3 text-center text-slate-400 text-xs font-sans">{index + 1}</td>
                                             <td className="p-3">
-                                                <input
-                                                    type="text"
+                                                <ChampTexte
+                                                    cle={`${task.id}:name`}
                                                     disabled={!canEdit}
-                                                    value={task.name}
-                                                    onChange={(e) => updateTask(task.id, 'name', e.target.value)}
-                                                    onFocus={gelerOrdre}
-                                                    onBlur={() => setOrdreGele(null)}
+                                                    valeur={task.name}
+                                                    onValider={(v) => validerChampTache(task.id, 'name', v)}
+                                                    onFocusChange={suivreFocusChamp}
+                                                    onFocusPlus={gelerOrdre}
+                                                    onBlurPlus={() => setOrdreGele(null)}
                                                     placeholder="Description de la tâche..."
                                                     className="w-full bg-transparent outline-none text-bony-text text-sm placeholder-slate-400 disabled:opacity-50"
                                                 />
                                             </td>
                                             <td className="p-3">
-                                                <input
-                                                    type="text"
+                                                <ChampTexte
+                                                    cle={`${task.id}:provider`}
                                                     disabled={!canEdit}
-                                                    value={task.provider || ''}
-                                                    onChange={(e) => updateTask(task.id, 'provider', e.target.value)}
-                                                    onFocus={gelerOrdre}
-                                                    onBlur={() => setOrdreGele(null)}
+                                                    valeur={task.provider || ''}
+                                                    onValider={(v) => validerChampTache(task.id, 'provider', v)}
+                                                    onFocusChange={suivreFocusChamp}
+                                                    onFocusPlus={gelerOrdre}
+                                                    onBlurPlus={() => setOrdreGele(null)}
                                                     placeholder="Prestataire..."
                                                     className="w-full bg-transparent outline-none text-bony-text text-sm placeholder-slate-400 disabled:opacity-50"
                                                 />
@@ -1889,7 +2053,13 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                             size="sm"
                                                             value={task.assignedUserId || ''}
                                                             disabled={!canEdit}
-                                                            onChange={(v) => updateTask(task.id, 'assignedUserId', v || undefined)}
+                                                            /* ⚠️ `v || null` et NON `|| undefined` : `undefined` est SUPPRIME par
+                                                               JSON.stringify, donc `pickTaskData` le lit comme « champ absent du body,
+                                                               donc non modifie » — la DESASSIGNATION ne partait jamais, et le serveur
+                                                               repondait 200. Troisieme occurrence du mode d'echec de `deadline`
+                                                               (correctif 42) ; la regle est ecrite en commentaire deux colonnes plus
+                                                               loin, sur l'echeance. */
+                                                            onChange={(v) => updateTask(task.id, 'assignedUserId', v || null)}
                                                             placeholder="— Non assigné —"
                                                             // ⚠️ L'assigné COURANT est réinjecté même si son rôle n'est plus
                                                             // dans l'équipe marketing. Sans ça, `Select` ne trouve pas la
@@ -1910,13 +2080,16 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
                                                 </div>
                                             </td>
                                             <td className="px-1.5 py-3">
-                                                <input
-                                                    type="number"
+                                                {/* ⚠️ `videVaut="zero"` : `Task.cost` est un `Float` NON nullable. */}
+                                                <ChampNombre
+                                                    cle={`${task.id}:cost`}
                                                     disabled={!canEdit}
-                                                    value={task.cost}
-                                                    onChange={(e) => updateTask(task.id, 'cost', Number(e.target.value))}
-                                                    onFocus={gelerOrdre}
-                                                    onBlur={() => setOrdreGele(null)}
+                                                    valeur={task.cost}
+                                                    videVaut="zero"
+                                                    onValider={(v) => validerChampTache(task.id, 'cost', v ?? 0)}
+                                                    onFocusChange={suivreFocusChamp}
+                                                    onFocusPlus={gelerOrdre}
+                                                    onBlurPlus={() => setOrdreGele(null)}
                                                     // Centré (et non plus à droite) pour se caler sous son en-tête : ce sont
                                                     // des champs de saisie courts, pas une colonne de totaux à aligner.
                                                     className="w-full bg-transparent outline-none text-bony-text text-sm text-center font-sans focus:text-bony-orange disabled:opacity-50"
@@ -2011,10 +2184,13 @@ const Projects: React.FC<ProjectsProps> = ({ viewMode = 'current' }) => {
 
                     <div className="space-y-2 pt-4">
                         <label className="block text-xs font-bold text-slate-500 tracking-widest uppercase">Description Globale</label>
-                        <textarea 
-                            value={selectedProject.description}
+                        <ChampTexte
+                            multiligne
+                            cle={`${selectedProject.id}:description`}
+                            valeur={selectedProject.description || ''}
                             disabled={!canEdit}
-                            onChange={(e) => handleUpdateProject({...selectedProject, description: e.target.value})}
+                            onValider={(v) => muterProjet(p => ({ ...p, description: v }))}
+                            onFocusChange={suivreFocusChamp}
                             className="w-full h-32 gx-glass-panel rounded-lg p-4 text-bony-text outline-none focus:border-bony-blue resize-none leading-relaxed text-sm disabled:opacity-50"
                             placeholder="Contexte général du projet..."
                         />
