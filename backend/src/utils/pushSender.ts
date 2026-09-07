@@ -1,5 +1,5 @@
 import webpush from 'web-push';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../db';
 
 // =====================================================================
 // ENVOI DE NOTIFICATIONS WEB PUSH
@@ -15,7 +15,6 @@ import { PrismaClient } from '@prisma/client';
 // déclaration, elles n'atteignent pas le conteneur.
 // =====================================================================
 
-const prisma = new PrismaClient();
 
 const PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? '';
 const PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? '';

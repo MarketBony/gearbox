@@ -1,9 +1,8 @@
-import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import { UPLOADS_ROOT } from '../routes/uploads';
+import { prisma } from '../db';
 
-const prisma = new PrismaClient();
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Rétention des pièces jointes de chat, arbitrée par Théo le 05/08/2026.

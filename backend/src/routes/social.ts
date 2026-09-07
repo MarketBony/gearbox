@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
@@ -7,9 +6,9 @@ import { emitEvent } from '../realtime';
 import { scopeOf, arrayScopeWhere, redactSiteFields } from '../auth/siteScope';
 import { withDates } from '../utils/dates';
 import { UPLOADS_ROOT } from './uploads';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 // Aligné sur le gating de Digital.tsx (canEdit + External sur le calendrier
 // éditorial — pas de granularité par onglet côté API). Corrige au passage
 // l'ancien 'DigitalManager' sans espace qui ne matchait jamais le vrai rôle.

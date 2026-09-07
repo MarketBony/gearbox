@@ -1,9 +1,8 @@
 import { Server, Socket } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
 import { sendPushToUsers, resolvePushRecipients } from '../utils/pushSender';
 import { getUserIdsOnSection } from './presence';
+import { prisma } from '../db';
 
-const prisma = new PrismaClient();
 
 // Rooms : une par conversation (diffusion ciblée aux participants, jamais de
 // broadcast global) + une par utilisateur (notification de nouvelle conversation

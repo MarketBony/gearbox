@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { PrismaClient, EquipmentBooking } from '@prisma/client';
+import { EquipmentBooking } from '@prisma/client';
 import { authenticateToken } from '../auth/middleware';
 import { emitEvent } from '../realtime';
 import { checkAvailability, overCapacityMessage, AvailabilityCheck } from '../utils/availability';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Réservations : accessibles à TOUT utilisateur authentifié (Material.tsx ne
 // restreint la réservation à aucun rôle côté UI — on reste cohérent avec ça,

@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../db';
 
 // =============================================================================
 // RÉGLAGES D'APPLICATION — modifiables EN LIGNE, sans redéploiement.

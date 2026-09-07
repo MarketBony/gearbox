@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireRole } from '../auth/middleware';
 import { emitEvent } from '../realtime';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Allow all authenticated users to view expenses
 router.get('/', authenticateToken, async (req, res) => {
