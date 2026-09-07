@@ -1,14 +1,13 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
 import { scopeOf, arrayScopeWhere } from '../auth/siteScope';
 import { UPLOADS_ROOT } from './uploads';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Même liste que `projects.ts` : déposer un fichier sur un projet, c'est le modifier.
 // ⚠️ 'Digital Manager' AVEC l'espace — c'est la valeur réelle en base.

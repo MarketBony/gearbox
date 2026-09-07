@@ -1,11 +1,10 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
 import { budgetScopeOf, stringScopeWhere } from '../auth/siteScope';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 // Director inclus : aligné sur canEditProvisions du frontend (Budget.tsx).
 const EDIT_ROLES = ['Master', 'Administrator', 'Director'];
 

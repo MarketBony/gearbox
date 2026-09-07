@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { VALID_ROLES, isValidRole, canAssignRole, forbiddenRoleMessage, USER_DELETE_ROLES, hasSocialFeatures } from '../auth/roles';
@@ -8,9 +7,9 @@ import { emitEvent, notifyUserChanged } from '../realtime';
 // Projection publique partagée avec routes/auth.ts — voir utils/publicUser.ts pour
 // la règle (ne jamais faire sortir l'objet Prisma brut, il porte `passwordHash`).
 import { publicUser } from '../utils/publicUser';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Gestion des comptes = action sensible : mutations réservées Master/Administrator/Director
 // (Director = parité Administrator, décision du 8 juillet 2026).

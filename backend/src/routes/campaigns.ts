@@ -1,11 +1,10 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireRole } from '../auth/middleware';
 import { emitEvent } from '../realtime';
 import { withDates } from '../utils/dates';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator'];
 
 router.get('/', authenticateToken, async (req, res) => {

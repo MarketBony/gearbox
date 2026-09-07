@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // ============================================================================
 // TÂCHES AUTONOMES — tâches de la To-do qui n'appartiennent à AUCUN projet.

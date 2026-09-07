@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireRole } from '../auth/middleware';
 import { emitEvent } from '../realtime';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 // 'Digital Manager' avec espace (rôle réel en base) — 'DigitalManager' ne matchait jamais.
 // ⚠️ 'External' ajouté le 25/08/2026 : Théo lui a donné l'accès TOTAL au Digital,
 // tags compris. Sans cette ligne, l'écran lui afficherait des contrôles de tags que

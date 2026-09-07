@@ -1,11 +1,10 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
 import { hasSocialFeatures } from '../auth/roles';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Journal d'activité : immuable (pas de PUT/DELETE, le modèle n'a pas d'updatedAt).
 // Règles répliquées de dataService.logActivity (côté écriture, comme au frontend) :

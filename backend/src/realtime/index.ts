@@ -15,11 +15,10 @@ import { registerGameHandlers, emitSessionToPlayers } from './games';
 import { hasSocialFeatures } from '../auth/roles';
 import { invalidateUserScope } from '../auth/siteScope';
 import { sendPushToUsers } from '../utils/pushSender';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../db';
 
 let io: Server;
 // Sert uniquement à résoudre le nom de l'auteur d'un défi pour la notification.
-const prisma = new PrismaClient();
 
 // Extrait le JWT du handshake : socket.handshake.auth.token (convention socket.io-client)
 // avec repli sur le header Authorization: Bearer <token>.

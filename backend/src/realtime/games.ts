@@ -1,11 +1,10 @@
 import { Server, Socket } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
 import { GAMES_ROLES } from '../auth/roles';
 import { jeuxActives } from '../settings/appSettings';
 import { applyMove, validateFleet, IllegalMoveError, BattleshipBoard } from '../utils/gameRules';
 import { projectSessionFor, SessionRow } from '../utils/gameView';
+import { prisma } from '../db';
 
-const prisma = new PrismaClient();
 
 // Même convention de room que le chat : une room par utilisateur. Une partie ne
 // concerne que deux personnes, on ne diffuse donc JAMAIS en global — chaque

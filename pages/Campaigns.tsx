@@ -1,8 +1,10 @@
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
 import { Project, Task, Site, ServiceType, BrandType, PlaqueName, TaskChannel, ActivityLog } from '../types';
-import { db } from '../services/dataService';
+import { db, ApiError } from '../services/dataService';
+import { fileSauvegardeProjet } from '../services/fileSauvegardeProjet';
+import { recalculerProjet } from '../utils/projet';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { useAuth } from '../contexts/AuthContext';
 import { PLAQUES_STRUCTURE, BRANDS, BRAND_COLORS, SERVICE_COLORS } from '../constants';
@@ -14,6 +16,7 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
 import DateRangePicker from '../components/DateRangePicker';
+import { ChampTexte, ChampNombre } from '../components/ChampDiffere';
 
 // --- TYPES ---
 interface CampaignTask extends Task {
@@ -63,6 +66,28 @@ const Campaigns: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  /**
+   * ⚠️ MIROIR DE LA LISTE DE PROJETS — c'est LUI que lit la couche réseau. Même défaut et
+   * même parade que dans `pages/Projects.tsx` (correctif 48) : `updateTaskField` lisait
+   * `projects` dans la closure de son rendu, donc deux saisies rapprochées repartaient du
+   * même état et la seconde écrasait la première. Cet écran écrit dans la MÊME route
+   * (`PUT /api/projects/:id`, projet entier + toutes ses tâches), avec le même diff
+   * transactionnel côté serveur : la course y est identique.
+   */
+  const projetsRef = useRef<Project[]>([]);
+
+  /** SEULE porte d'écriture de la liste : elle pose aussi le miroir. */
+  const poserProjets = useCallback((data: Project[]) => {
+    projetsRef.current = data;
+    setProjects(data);
+  }, []);
+
+  /** Nombre de champs ayant le focus — interdit d'écraser une saisie vive. */
+  const champsFocalisesRef = useRef(0);
+  const suivreFocusChamp = useCallback((focus: boolean) => {
+    champsFocalisesRef.current = Math.max(0, champsFocalisesRef.current + (focus ? 1 : -1));
+  }, []);
+
   const canEdit = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Coordinator';
 
   // --- FILTRES UNIFIÉS (refonte du 30/07/2026) ---
@@ -99,7 +124,7 @@ const Campaigns: React.FC = () => {
 
   const loadData = async () => {
     const data = await db.getProjects();
-    setProjects(data);
+    poserProjets(data);
   };
 
   // --- DATA PREPARATION ---
@@ -130,37 +155,61 @@ const Campaigns: React.FC = () => {
 
   // --- ACTIONS ---
 
-  const updateTaskField = useCallback(async (projectId: string, taskId: string, field: keyof Task, value: any) => {
+  /**
+   * Écriture d'un champ de tâche depuis l'écran Campagnes.
+   *
+   * ⚠️ Part du MIROIR (`projetsRef`) et non de `projects` capturé au rendu, et passe par
+   * `fileSauvegardeProjet` pour qu'un seul PUT soit en vol par projet. Ne jamais rappeler
+   * `db.updateProject` directement ici : ce serait rouvrir la course que la file ferme.
+   *
+   * ⚠️ Refuse d'écrire sur une tâche qui n'existe PLUS dans l'état courant — c'est ce qui
+   * empêche le flush au démontage de `ChampDiffere` de faire ressusciter une ligne
+   * disparue (filtre modifié, tâche supprimée depuis un autre poste).
+   */
+  const updateTaskField = useCallback((projectId: string, taskId: string, field: keyof Task, value: any) => {
     if (!canEdit) return;
-    setSaving(true);
-    const updatedProjects = projects.map(p => {
-        if (p.id !== projectId) return p;
-        const updatedTasks = p.tasks.map(t => {
-            if (t.id !== taskId) return t;
-            return { ...t, [field]: value };
-        });
-        return { ...p, tasks: updatedTasks };
+
+    const courant = projetsRef.current;
+    const projetCourant = courant.find(p => p.id === projectId);
+    const tacheCourante = projetCourant?.tasks.find(t => t.id === taskId);
+    if (!projetCourant || !tacheCourante) return;
+
+    const suivant = recalculerProjet({
+        ...projetCourant,
+        tasks: projetCourant.tasks.map(t => (t.id === taskId ? { ...t, [field]: value } : t)),
     });
-    setProjects(updatedProjects);
-    // PUT unitaire du seul projet modifié (API réelle — le diff des tâches est géré côté serveur).
-    const changed = updatedProjects.find(p => p.id === projectId);
-    if (changed) {
-        try {
-            await db.updateProject(changed);
-        } catch (error) {
-            console.error('Task field update failed:', error);
-            alert('Échec de la sauvegarde (serveur injoignable ?).');
-            const fresh = await db.getProjects().catch(() => null);
-            if (fresh) setProjects(fresh);
-        }
-    }
+
+    poserProjets(courant.map(p => (p.id === projectId ? suivant : p)));
+    setSaving(true);
+
+    fileSauvegardeProjet.pousser(suivant, {
+        onSucces: (projetServeur) => {
+            // Réponse appliquée seulement si rien n'attend derrière et qu'aucun champ n'a
+            // le focus : sinon elle est plus ancienne que la saisie en cours.
+            if (fileSauvegardeProjet.aDesEcrituresEnCours(projetServeur.id)) return;
+            if (champsFocalisesRef.current > 0) return;
+            poserProjets(projetsRef.current.map(p => (p.id === projetServeur.id ? projetServeur : p)));
+        },
+        // ⚠️ Message choisi d'après le STATUT, et plus de rechargement destructif après
+        // n'importe quel échec : sur une saturation passagère il suffit de réessayer, et
+        // recharger effaçait le travail non sauvegardé.
+        onEchec: (erreur) => {
+            console.error('Task field update failed:', erreur);
+            if (!(erreur instanceof ApiError)) { alert('Échec inattendu de la sauvegarde.'); return; }
+            if (erreur.status === 0) { alert('Serveur injoignable. Vos modifications ne sont PAS perdues — ne fermez pas cet onglet.'); return; }
+            if (erreur.status === 503) { alert('La base est momentanément saturée. Réessayez dans une minute.'); return; }
+            if (erreur.status === 401) return; // apiFetch a déjà déclenché la déconnexion
+            if (erreur.status === 403) { alert('Droits insuffisants pour modifier cette campagne.'); return; }
+            if (erreur.status === 404 || erreur.status === 409) { alert(erreur.message || 'Données périmées : rechargement.'); loadData(); return; }
+            alert(erreur.message || 'Échec de la sauvegarde.');
+        },
+        onRepos: () => setSaving(false),
+    });
+
     if (field === 'status' && user) {
-        const project = projects.find(p => p.id === projectId);
-        const task = project?.tasks.find(t => t.id === taskId);
-        if (task) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: `a changé le statut de la tâche`, entity: 'task', entityName: task.name || taskId, timestamp: new Date().toISOString() });
+        db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: `a changé le statut de la tâche`, entity: 'task', entityName: tacheCourante.name || taskId, timestamp: new Date().toISOString() });
     }
-    setTimeout(() => setSaving(false), 500);
-  }, [projects, canEdit, user]);
+  }, [canEdit, user, poserProjets]);
 
   // --- CHART HELPERS --- (Simplified for brevity, logic unchanged)
   // ... (Chart logic remains identical to previous file, reused here)
@@ -723,85 +772,104 @@ const Campaigns: React.FC = () => {
                                 </div>
 
                                 {/* 2. Volumétrie (Number) */}
-                                <input 
-                                    type="number"
+                                {/* ⚠️ `videVaut="null"` sur les SIX indicateurs et sur la facturation : ce sont
+                                    des `Float?` en base. Avant le correctif 48, `Number(e.target.value)` rendait
+                                    0 pour une chaîne vide — effacer un taux écrivait donc « zéro pour cent » au
+                                    lieu de « non renseigné », et l'indicateur était écrasé en silence.
+                                    Le bornage 0-100 des quatre taux est appliqué AU COMMIT et non à chaque
+                                    frappe : sinon taper « 100 » restait bloqué à 1 dès le premier caractère. */}
+                                <ChampNombre
+                                    cle={`${task.id}:volumetry`}
                                     disabled={!canEdit}
                                     placeholder="0"
-                                    value={task.volumetry || ''}
-                                    onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'volumetry', Number(e.target.value))}
+                                    valeur={task.volumetry}
+                                    videVaut="null"
+                                    onValider={(v) => updateTaskField(task.parentProjectId, task.id, 'volumetry', v)}
+                                    onFocusChange={suivreFocusChamp}
                                     className="bg-slate-100 dark:bg-black/20 gx-num-tight border border-bony-border rounded px-1.5 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
                                 />
 
                                 {/* 3. % Ouverture (0-100) */}
                                 <div className="relative">
-                                    <input 
-                                        type="number"
+                                    <ChampNombre
+                                        cle={`${task.id}:openRate`}
                                         disabled={!canEdit}
                                         placeholder="-"
-                                        min="0" max="100"
-                                        value={task.openRate || ''}
-                                        onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'openRate', Number(e.target.value))}
+                                        valeur={task.openRate}
+                                        videVaut="null"
+                                        borne={[0, 100]}
+                                        onValider={(v) => updateTaskField(task.parentProjectId, task.id, 'openRate', v)}
+                                        onFocusChange={suivreFocusChamp}
                                         className="w-full bg-slate-100 dark:bg-black/20 gx-num-tight border border-bony-border rounded px-1.5 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
                                     />
                                 </div>
 
                                 {/* 4. % NPAI */}
                                 <div className="relative">
-                                    <input 
-                                        type="number"
+                                    <ChampNombre
+                                        cle={`${task.id}:npaiRate`}
                                         disabled={!canEdit}
                                         placeholder="-"
-                                        min="0" max="100"
-                                        value={task.npaiRate || ''}
-                                        onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'npaiRate', Number(e.target.value))}
+                                        valeur={task.npaiRate}
+                                        videVaut="null"
+                                        borne={[0, 100]}
+                                        onValider={(v) => updateTaskField(task.parentProjectId, task.id, 'npaiRate', v)}
+                                        onFocusChange={suivreFocusChamp}
                                         className="w-full bg-slate-100 dark:bg-black/20 gx-num-tight border border-bony-border rounded px-1.5 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
                                     />
                                 </div>
 
                                 {/* 5. % STOP */}
                                 <div className="relative">
-                                    <input 
-                                        type="number"
+                                    <ChampNombre
+                                        cle={`${task.id}:stopRate`}
                                         disabled={!canEdit}
                                         placeholder="-"
-                                        min="0" max="100"
-                                        value={task.stopRate || ''}
-                                        onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'stopRate', Number(e.target.value))}
+                                        valeur={task.stopRate}
+                                        videVaut="null"
+                                        borne={[0, 100]}
+                                        onValider={(v) => updateTaskField(task.parentProjectId, task.id, 'stopRate', v)}
+                                        onFocusChange={suivreFocusChamp}
                                         className="w-full bg-slate-100 dark:bg-black/20 gx-num-tight border border-bony-border rounded px-1.5 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
                                     />
                                 </div>
 
                                 {/* 6. % Clics */}
                                 <div className="relative">
-                                    <input 
-                                        type="number"
+                                    <ChampNombre
+                                        cle={`${task.id}:clickRate`}
                                         disabled={!canEdit}
                                         placeholder="-"
-                                        min="0" max="100"
-                                        value={task.clickRate || ''}
-                                        onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'clickRate', Number(e.target.value))}
+                                        valeur={task.clickRate}
+                                        videVaut="null"
+                                        borne={[0, 100]}
+                                        onValider={(v) => updateTaskField(task.parentProjectId, task.id, 'clickRate', v)}
+                                        onFocusChange={suivreFocusChamp}
                                         className="w-full bg-slate-100 dark:bg-black/20 gx-num-tight border border-bony-border rounded px-1.5 py-1.5 text-right text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
                                     />
                                 </div>
 
                                 {/* 7. COD TXT (Text) */}
-                                <input 
-                                    type="text"
+                                <ChampTexte
+                                    cle={`${task.id}:codTxt`}
                                     disabled={!canEdit}
                                     placeholder="Code..."
-                                    value={task.codTxt || ''}
-                                    onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'codTxt', e.target.value)}
+                                    valeur={task.codTxt || ''}
+                                    onValider={(v) => updateTaskField(task.parentProjectId, task.id, 'codTxt', v)}
+                                    onFocusChange={suivreFocusChamp}
                                     className="bg-slate-100 dark:bg-black/20 border border-bony-border rounded px-1.5 py-1.5 text-center text-xs text-slate-900 dark:text-white outline-none focus:border-bony-violet focus:bg-white dark:focus:bg-black/40 transition-colors font-sans disabled:opacity-50"
                                 />
 
                                 {/* 8. Facturation (Number) */}
                                 <div className="relative">
-                                    <input 
-                                        type="number"
+                                    <ChampNombre
+                                        cle={`${task.id}:billedAmount`}
                                         disabled={!canEdit}
                                         placeholder="0"
-                                        value={task.billedAmount || ''}
-                                        onChange={(e) => updateTaskField(task.parentProjectId, task.id, 'billedAmount', Number(e.target.value))}
+                                        valeur={task.billedAmount}
+                                        videVaut="null"
+                                        onValider={(v) => updateTaskField(task.parentProjectId, task.id, 'billedAmount', v)}
+                                        onFocusChange={suivreFocusChamp}
                                         className="w-full bg-slate-100 dark:bg-black/20 gx-num-tight border border-bony-border rounded px-1.5 py-1.5 text-right text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-bony-orange focus:bg-white dark:focus:bg-black/40 transition-colors disabled:opacity-50"
                                     />
                                     <span className="absolute right-6 top-1.5 text-[8px] text-slate-500 pointer-events-none">€</span>

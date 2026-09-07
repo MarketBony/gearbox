@@ -1,5 +1,5 @@
 import { Server, Socket } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../db';
 
 // =====================================================================
 // PRÉSENCE EN TEMPS RÉEL — qui est sur quelle rubrique de l'ERP
@@ -15,7 +15,6 @@ import { PrismaClient } from '@prisma/client';
 // raisonner qu'une synchronisation incrémentale.
 // =====================================================================
 
-const prisma = new PrismaClient();
 
 interface Entry {
   userId: string;

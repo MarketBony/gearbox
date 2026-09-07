@@ -1,14 +1,13 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { GAMES_ROLES } from '../auth/roles';
 import { jeuxActives } from '../settings/appSettings';
 import { isGameType, initBoard, initStatus } from '../utils/gameRules';
 import { projectSessionFor, projectSessionSummary } from '../utils/gameView';
 import { notifyChallenge, notifySessionToPlayers } from '../realtime';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Toutes les routes de jeu sont réservées aux rôles autorisés (règle métier :
 // Director en est exclu, contrairement à ses autres droits d'Administrator).

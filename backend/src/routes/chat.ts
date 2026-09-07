@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { authenticateToken, AuthRequest } from '../auth/middleware';
 import { hasSocialFeatures } from '../auth/roles';
 import { joinConversationRooms, notifyConversationCreated } from '../realtime';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // REST = chargement initial et historique uniquement.
 // La création/édition/suppression/réaction de MESSAGE passe par Socket.IO

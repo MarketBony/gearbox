@@ -141,6 +141,14 @@ model Task {
   billedAmount   Float?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  // ⚠️ Index ajoute le 07/09/2026 (correctif 48). Postgres n'indexe PAS automatiquement
+  // une colonne de cle etrangere : `task.findMany({ where: { projectId } })` — appele a
+  // chaque PUT de projet — balayait donc la table.
+  // ⚠️ HONNETEMENT : ce n'est PAS ce qui a produit les timeouts mesures. La table fait
+  // quelques centaines de lignes, un balayage y coute moins d'une milliseconde ; la cause
+  // etait la saturation du pooler. On l'ajoute parce que c'est gratuit, correct, et que
+  // ca evite le probleme a 10 000 lignes — pas pour revendiquer un gain aujourd'hui.
+  @@index([projectId])
 }
 
 // ============================================================================

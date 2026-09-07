@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { authenticateToken, requireRole } from '../auth/middleware';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Relance du seed = action sensible (reset des mots de passe démo) :
 // authentification + rôles Master/Administrator exigés.

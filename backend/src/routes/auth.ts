@@ -1,13 +1,12 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET as SECRET } from '../auth/secret';
 import { publicUser } from '../utils/publicUser';
 import { emitEvent, notifyUserChanged } from '../realtime';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.post('/login', async (req, res) => {
   const { loginId, password } = req.body;

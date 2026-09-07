@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../auth/middleware';
 import { getPublicKey, pushConfigured } from '../utils/pushSender';
+import { prisma } from '../db';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // =====================================================================
 // ABONNEMENTS WEB PUSH

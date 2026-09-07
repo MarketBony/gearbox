@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import DatePicker from '../components/DatePicker';
 import Select from '../components/Select';
 import { db } from '../services/dataService';
+import { recalculerProjet } from '../utils/projet';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { Project, Task, TaskStatus, TaskChannel, BrandType, ServiceType, PlaqueName } from '../types';
 import { BRAND_COLORS, SERVICE_COLORS, PLAQUES_STRUCTURE, BRANDS, SERVICES, TASK_CHANNELS } from '../constants';
@@ -87,20 +88,11 @@ function matchesSiteFilter(p: Project, selected: string[]): boolean {
   return false;
 }
 
-function recalcProject(project: Project): Project {
-  let totalWeight = 0;
-  if (project.tasks.length > 0) {
-    project.tasks.forEach(t => {
-      if (t.status === 'Done' || t.status === 'Programmed') totalWeight += 1;
-      else if (t.status === 'InProgress') totalWeight += 0.5;
-    });
-    project.progress = Math.round((totalWeight / project.tasks.length) * 100);
-  } else {
-    project.progress = 0;
-  }
-  project.budgetActual = project.tasks.reduce((sum, t) => sum + (t.cost || 0), 0);
-  return project;
-}
+// ⚠️ La formule d'avancement / budget réel vit désormais dans `utils/projet.ts`, en UNE
+// seule copie. Elle était dupliquée ici et dans `pages/Projects.tsx` — et cette version
+// MUTAIT son argument (`project.progress = …`), donc écrivait dans l'objet d'état React
+// dont il provenait. Voir l'en-tête de `utils/projet.ts` pour le pourquoi.
+const recalcProject = recalculerProjet;
 
 // ---- Site filter dropdown ----
 // Réutilisé à DEUX endroits : la barre de filtres de la To-do, et le choix des sites

@@ -48,7 +48,12 @@ const io = new Server(server, {
 });
 
 app.use(cors());
-app.use(express.json());
+// ⚠️ `limit` EXPLICITE. Sans elle, body-parser plafonne a 100 ko par defaut : un PUT de
+// projet portant toutes ses taches (et, en mode Expert, des notes libres sans longueur
+// maximale) pouvait le depasser. Le symptome etait trompeur — `errorHandler` ignorait
+// `err.status`, donc l'erreur 413 << entity.too.large >> ressortait en 500
+// << Erreur interne du serveur >>, et l'ecran affichait << serveur injoignable ? >>.
+app.use(express.json({ limit: '2mb' }));
 
 // Contexte d'émission : mémorise le `x-socket-id` de l'appelant pour la durée de
 // la requête, afin que emitEvent ne renvoie pas l'événement à son propre auteur
