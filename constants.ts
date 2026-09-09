@@ -247,6 +247,85 @@ export const BRAND_COLORS: Record<BrandType, string> = {
 
 // --- DIGITAL CONSTANTS ---
 
+/**
+ * Libellés d'affichage des MARQUES, propres au Digital.
+ *
+ * ⚠️ LA VALEUR STOCKÉE NE CHANGE PAS. L'équipe digitale parle de « GROUPE BONY » là où le
+ * tag marque vaut `Holding` : on traduit donc à l'AFFICHAGE, et rien d'autre.
+ * Renommer la valeur aurait été une migration de données (25 publications), aurait cassé
+ * `BRAND_COLORS` (indexé par `BrandType`) et surtout aurait fait porter LE MÊME NOM à deux
+ * notions opposées : le tag marque `Holding`, exclu de TOUS les budgets, et le périmètre
+ * de site `GROUPE BONY`, qui déclenche au contraire une ventilation pondérée sur 19
+ * concessions. C'est exactement la confusion que le renommage du 30/07/2026 avait
+ * supprimée, et que `CLAUDE.md` interdit de recréer.
+ *
+ * ⚠️ Appliqué au SEUL module Digital, à la demande de Théo (07/09/2026). Les autres écrans
+ * continuent d'afficher « Holding ». Même doctrine que le service `RH` (voir types.ts) :
+ * on élargit ICI seulement. Si l'harmonisation est un jour souhaitée, c'est un lot dédié
+ * — il touche aussi l'export Excel, donc des fichiers déjà livrés.
+ */
+export const DIGITAL_BRAND_LABELS: Partial<Record<BrandType, string>> = {
+  Holding: 'GROUPE BONY',
+};
+
+/** Libellé Digital d'une marque, avec repli sur la valeur pour toutes les autres. */
+export const libelleMarqueDigital = (marque: string): string =>
+  DIGITAL_BRAND_LABELS[marque as BrandType] ?? marque;
+
+/**
+ * Libellés d'affichage des STATUTS de publication.
+ *
+ * ⚠️ `SocialStatus` mélange sept valeurs françaises et UN anglicisme, `Programmed`, hérité
+ * de l'origine du modèle. Il était rendu tel quel dans le sélecteur et dans les vues
+ * calendrier : l'équipe lisait littéralement « Programmed » entre « Non Validé » et
+ * « Rédigé ». On traduit à l'affichage.
+ * ⚠️ LA VALEUR STOCKÉE RESTE `Programmed` : elle indexe `SOCIAL_STATUS_COLORS` et sert de
+ * comparaison ailleurs dans l'application (le calcul d'avancement d'un projet compte
+ * `Done` ET `Programmed`). La renommer imposerait une migration ET la mise à jour de tous
+ * les tests, sans aucun garde-fou côté serveur pour signaler un oubli.
+ */
+export const SOCIAL_STATUS_LABELS: Partial<Record<SocialStatus, string>> = {
+  'Programmed': 'Programmé',
+};
+
+/** Libellé d'un statut de publication, avec repli sur la valeur. */
+export const libelleStatutSocial = (statut: string): string =>
+  SOCIAL_STATUS_LABELS[statut as SocialStatus] ?? statut;
+
+/**
+ * Périmètres proposés par le sélecteur « Sites » du module DIGITAL.
+ *
+ * ⚠️ LISTE PROPRE AU DIGITAL, et surtout PAS `SITES`. Une publication n'a pas de budget :
+ * ce champ (`SocialPost.concessions`) sert au ciblage éditorial, pas au routage
+ * budgétaire. Y ajouter les regroupements « FULL … » demandés par l'équipe est donc sans
+ * conséquence — alors que les ajouter à `SITES` les ferait apparaître dans les Projets,
+ * les Dépenses fixes et le Budget, où ils ne correspondraient à AUCUNE ligne d'enveloppe.
+ * C'est précisément le défaut du pseudo-site « Alpine », retiré pour cette raison.
+ *
+ * ⚠️ `Ricoux` est VOLONTAIREMENT absent de cette liste, et VOLONTAIREMENT conservé partout
+ * ailleurs : c'est une enseigne qui porte une vraie ligne de budget, la part de Thiers et
+ * d'Ambert (`SITE_ALIASES`), une part dans les deux tables de ventilation GROUPE BONY, et
+ * elle est référencée par 12 projets et ~200 lignes de dépenses fixes. On ne la retire QUE
+ * du sélecteur Digital, où aucune publication ne l'utilisait (vérifié en base le
+ * 07/09/2026 : 0 sur 57).
+ *
+ * ⚠️ `Yssingeaux` est une concession réelle, rattachée à la PLAQUE SUD, dont le budget est
+ * porté par Le Puy-en-Velay. Elle n'a jamais été saisie dans Gearbox pour cette raison.
+ * Elle est ajoutée ICI pour le seul ciblage éditorial. **Si elle devait un jour porter du
+ * budget, il faudrait l'ajouter à `PLAQUES_STRUCTURE` ET lui donner son alias
+ * (`'Yssingeaux': 'Le Puy-en-Velay'`) dans `SITE_ALIASES`** — sans quoi son montant ne
+ * serait rattaché à aucune ligne.
+ */
+export const DIGITAL_FULL_TAGS = ['FULL RENAULT', 'FULL DACIA', 'FULL NISSAN', 'FULL ALPINE'];
+
+export const DIGITAL_CONCESSIONS: string[] = [
+  'GROUPE BONY',
+  ...DIGITAL_FULL_TAGS,
+  ...Object.keys(PLAQUES_STRUCTURE),
+  ...SITES.filter(s => s !== 'Ricoux'),
+  'Yssingeaux',
+];
+
 export const SOCIAL_STATUS_COLORS: Record<SocialStatus, string> = {
     'À venir': 'bg-slate-700 text-slate-300 border-slate-600',
     'En attente': 'bg-orange-500/20 text-orange-400 border-orange-500/50',

@@ -882,6 +882,62 @@ l'appelant est en cause. Corrigé : `limit: '2mb'`, et le gestionnaire respecte
 `err.status` avec un message tiré d'un ensemble fixe. `detail` reste réservé au
 hors-production.
 
+### 🏷️ Tags Digital — `/api/tags` enfin BRANCHÉ (09/09/2026)
+
+⚠️⚠️ **Jusqu'au correctif 49, cette route n'était appelée par PERSONNE.**
+`services/dataService.ts` (`getDigitalTags` / `saveDigitalTags`) lisait et écrivait dans le
+**`localStorage` du navigateur**, alors que la route et le modèle `DigitalTags` existaient
+depuis l'origine. Conséquences vécues par l'équipe digitale pendant des mois : les tags
+créés par une personne étaient **invisibles de ses collègues**, perdus au vidage du
+navigateur, et l'abonnement `RT_EVENTS.tags` de `pages/Digital.tsx` écoutait un événement
+que plus rien n'émettait.
+
+**Récupération de l'existant — et ce n'est pas « si le serveur est vide ».** Mesuré au
+branchement : la table contenait les valeurs du **seed** (`routes/seed.ts` : 3 réseaux,
+classes A à G), tandis que le `localStorage` des postes portait le vrai travail (34 modèles
+avec leur classe CO², 8 réseaux). Une garde sur le seul « vide » n'aurait jamais joué et
+l'écran serait retombé sur le seed. Le client reconnaît donc une table **non curée** (vide
+**ou** strictement égale au seed) et remonte alors **l'union** du serveur et du poste, une
+seule fois, sous drapeau `gearbox_digital_tags_migres`.
+
+**Trois catégories éditables, et pas une de plus.** `networks`, `co2` et `lom` — ce sont
+les seuls champs de `SocialPost` typés `String` **libre**.
+⚠️ **Ce qu'il ne faut PAS ouvrir** : marques, services, statuts et sites sont adossés à des
+types de `types.ts`, indexent `BRAND_COLORS` / `SOCIAL_STATUS_COLORS` et pilotent des tests
+métier. Les rendre éditables supprimerait la garantie de compilation **sans rien mettre à
+la place** : `schema.prisma` n'a aucun enum et aucune route ne valide ces valeurs. Si le
+besoin se confirme, c'est un lot dédié qui **commence** par écrire cette validation.
+
+`POST /api/tags` passait `req.body` **brut** à Prisma (un `id` envoyé aurait tenté de
+réécrire la clé primaire). Il a désormais une liste blanche `CATEGORIES`, un nettoyage
+(trim, dédoublonnage, bornes 200 entrées / 80 caractères) et refuse un corps sans catégorie
+reconnue. La liste blanche est le **miroir** de `CategorieTag` dans `pages/Digital.tsx` :
+les deux doivent rester alignées.
+
+### 🖼️ `SocialPost.mediaNames` — le nom d'origine des visuels (09/09/2026)
+
+Le fichier garde son **uuid** sur le disque : `routes/uploads.ts` pose la règle absolue
+(« le nom d'origine ne doit JAMAIS entrer dans un chemin de fichier », traversée `../`) et
+`routes/social.ts` impose cette forme par expression régulière (`CALENDAR_UPLOAD_PATH`). Le
+nom d'origine est donc stocké **à côté**, comme le font déjà `ProjectFile.fileName` et
+`ChatMessage.fileName`.
+
+`mediaNames` est un tableau **PARALLÈLE** à `mediaFiles` : même longueur, même ordre,
+l'index fait le lien. L'ordre du tableau **est** l'ordre de diffusion attendu par l'équipe.
+
+⚠️ **LE RISQUE DE CETTE FORME EST LA DÉRIVE entre les deux tableaux, et la parade est
+UNIQUE** : `normaliserMediaNames` dans le `PUT /api/social/:id` recale systématiquement
+`mediaNames` à la longueur de `mediaFiles` (complète par des chaînes vides, tronque le
+surplus) et neutralise tout séparateur de chemin, toute séquence `..` et tout caractère de
+contrôle dans les noms. **Ne jamais écrire ces deux colonnes ailleurs sans repasser par
+là.** Le recalage se déclenche dès que l'un OU l'autre des champs est présent dans le corps :
+un client qui enverrait `mediaFiles` sans `mediaNames` ne doit pas laisser en base des noms
+pointant sur les mauvais fichiers.
+
+Un tableau vide est **légitime** : c'est l'état des 25 publications antérieures au
+correctif, et l'écran retombe alors sur le nom de fichier uuid (vérifié : leurs images
+s'affichent, numérotées, sans régression).
+
 ## ⚠️ Route DORMANTE — `/api/expenses` (modèle `OneOffExpense`)
 
 Route CRUD complète et fonctionnelle (émissions `expense:*` incluses), mais

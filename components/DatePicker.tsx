@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { startOfMonth, startOfWeek, addDays, addMonths, isSameMonth, isSameDay, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -65,8 +65,22 @@ const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, placeholder = 
     if (selected) setViewMonth(startOfMonth(selected));
   }, [value]);
 
-  const gridStart = startOfWeek(startOfMonth(viewMonth), { weekStartsOn: 1 });
-  const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
+  // ⚠️ GRILLE CALCULÉE SEULEMENT QUAND LE PANNEAU EST OUVERT, et mémoïsée sur le mois
+  // affiché. Avant le correctif 49, ces 42 objets `Date` étaient reconstruits dans le
+  // corps de rendu À CHAQUE RENDU, panneau FERMÉ compris. Ce composant est monté une fois
+  // par ligne de liste : mesuré sur le Calendrier éditorial du Digital (57 lignes), cela
+  // faisait environ 2 400 `Date` recréés à chaque caractère tapé dans un autre champ de
+  // la page — pour une grille que personne ne regardait.
+  // ⚠️ Composant PARTAGÉ (Projets, Agenda, Matériel, To-do, Digital) : toute évolution ici
+  // se vérifie sur ces cinq écrans, pas seulement sur celui qui a motivé le changement.
+  const days = useMemo(
+    () => {
+      if (!open) return [];
+      const gridStart = startOfWeek(startOfMonth(viewMonth), { weekStartsOn: 1 });
+      return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
+    },
+    [open, viewMonth]
+  );
   const today = new Date();
 
   const isDisabled = (d: Date) => !!minDate && toISO(d) < minDate;

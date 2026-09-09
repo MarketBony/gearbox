@@ -217,6 +217,23 @@ model SocialPost {
   networks    String[]
   concessions String[]
   mediaFiles  String[]
+  // ⚠️ NOMS D'ORIGINE des médias, ajoutés au correctif 49 (09/09/2026), en TABLEAU
+  // PARALLÈLE à `mediaFiles` : même longueur, même ordre, l'index fait le lien.
+  //
+  // Pourquoi pas dans le nom du fichier : `routes/uploads.ts` génère un uuid
+  // VOLONTAIREMENT — « le nom d'origine ne doit JAMAIS entrer dans un chemin de fichier »
+  // (traversée `../`) — et `routes/social.ts` impose cette forme uuid par expression
+  // régulière. On stocke donc le nom À CÔTÉ, comme le font déjà `ProjectFile.fileName` et
+  // `ChatMessage.fileName`.
+  //
+  // ⚠️ LE RISQUE DE CETTE FORME EST LA DÉRIVE entre les deux tableaux. La parade est
+  // UNIQUE et vit dans le PUT de `routes/social.ts`, qui normalise systématiquement
+  // `mediaNames` à la longueur de `mediaFiles`. Ne jamais écrire ces deux colonnes
+  // ailleurs sans repasser par là.
+  //
+  // Un tableau vide est LÉGITIME : c'est l'état des publications antérieures au
+  // correctif, et l'écran retombe alors sur le nom de fichier uuid.
+  mediaNames  String[]  @default([])
   link        String
   wording     String
   lom         String
@@ -231,6 +248,15 @@ model DigitalTags {
   id       String   @id @default(uuid())
   networks String[]
   co2      String[]
+  // ⚠️ Mentions Loi LOM, rendues éditables au correctif 49 (09/09/2026). Troisième et
+  // DERNIÈRE catégorie ouverte à l'édition, et ce n'est pas arbitraire : `networks`,
+  // `co2` et `lom` sont les seuls champs de `SocialPost` typés `String` LIBRE. Les
+  // marques, services, statuts et sites sont adossés à des types de `types.ts`, indexent
+  // des dictionnaires de couleurs et pilotent des tests métier — les rendre éditables en
+  // base supprimerait la garantie de compilation sans rien mettre à la place, puisque
+  // aucune validation de valeur n'existe côté serveur.
+  // `@default([])` : les lignes existantes restent valides, la migration est additive.
+  lom      String[] @default([])
 }
 
 model Contact {
