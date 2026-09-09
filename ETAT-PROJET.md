@@ -10,10 +10,19 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 48** (sauvegarde de
+- master = prod, synchronisés. Dernier lot déployé : **correctif 49** (Digital — retours
+  de l'équipe : lenteur du wording, libellés, tags partagés, nom et ordre des visuels,
+  9 septembre) — **`api` ET `web`**, **avec migration**
+  (`20260909120000_digital_media_names_et_tags_lom`, purement additive).
+  ℹ️ La migration a été appliquée depuis ce poste **avant** le déploiement : le backend
+  local pointant sur la base de production, `prisma migrate deploy` l'y a posée
+  directement. Le conteneur `api` n'a donc rien trouvé à appliquer au démarrage.
+  Avant lui le **correctif 48** (sauvegarde de
   projet — fin du PUT par frappe, transaction allégée, erreurs honnêtes, client Prisma
   unique, 7 septembre) — **`api` ET `web`**, **avec migration**
   (`20260907120000_add_task_project_id_index`, purement additive).
+  **Critère d'acceptation du 48 relevé le 08/09 : `0` PUT échoué sur 26 h**, contre 48
+  avant le correctif. Zéro erreur API, zéro saturation.
   ⚠️ **Ce lot exige une action MANUELLE sur le VPS** : `~/gearbox/.env` doit recevoir
   `&connection_limit=10&pool_timeout=20&connect_timeout=10` **à l'intérieur des
   guillemets** de `DATABASE_URL`, et il faut `up -d api` (recréation) — un
@@ -2485,6 +2494,114 @@
     Budget / Digital / Chat / Agenda / Matériel après la fusion des clients Prisma a été
     interrompu : seules les **routes** ont été vérifiées, une par module.
 
+49. **DIGITAL — RETOURS DE L'ÉQUIPE DIGITALE : lenteur du wording, libellés, tags
+    partagés, nom et ordre des visuels** (`feat/digital-retours-equipe`, 9 septembre).
+    `api` **ET** `web`, **avec migration**
+    (`20260909120000_digital_media_names_et_tags_lom`, purement additive).
+
+    Huit demandes remontées après une semaine d'usage intensif. **Tout est cantonné au
+    module Digital** : aucune donnée budgétaire, aucun projet, aucune dépense fixe n'a
+    été touché. Vérifié au diff : `SITES`, `PLAQUES_STRUCTURE`, `SITE_ALIASES` et les deux
+    tables `DISTRIBUTION_GROUPE_BONY` sont intacts, `types.ts` n'a gagné qu'un champ
+    `DigitalTags.lom`.
+
+    **⚠️ TROIS DÉCOUVERTES qui ont changé le périmètre, toutes mesurées avant de coder :**
+
+    1. **L'écran « Gestion des TAGS » n'écrivait PAS en base.** `getDigitalTags` /
+       `saveDigitalTags` lisaient et écrivaient dans le **`localStorage` du navigateur**,
+       alors que la route `/api/tags` et le modèle Prisma `DigitalTags` existaient depuis
+       l'origine — **jamais appelés par le client** (vérifié : aucun `apiFetch('/tags')`
+       nulle part). Les tags saisis étaient donc invisibles des collègues et perdus au
+       vidage du navigateur, et `RT_EVENTS.tags` écoutait un événement que plus rien
+       n'émettait.
+    2. **La lenteur du wording pénalisait TOUTE l'équipe, pas seulement celui qui tape.**
+       Chaque frappe envoyait la publication entière, et le serveur répondait par un
+       `emitEvent('social:updated')` qui faisait **recharger les 57 publications chez
+       chaque collègue connecté** (debounce 300 ms). Une personne qui rédigeait faisait
+       donc recharger toute la liste à l'équipe ~3 fois par seconde.
+    3. **Le renommage des images ne se corrige pas là où l'équipe le croyait.** L'uuid est
+       VOLONTAIRE (`routes/uploads.ts` : « le nom d'origine ne doit JAMAIS entrer dans un
+       chemin de fichier ») et `routes/social.ts` impose cette forme par expression
+       régulière. Le nom d'origine est donc stocké **à côté**, pas dans le fichier.
+
+    **Les huit demandes et leur traitement :**
+
+    | Demande | Traitement |
+    |---|---|
+    | Le wording rame (gros problème) | Six causes cumulées, toutes corrigées — voir ci-dessous |
+    | Sites : + tags FULL, − Ricoux, + Yssingeaux | Nouvelle constante `DIGITAL_CONCESSIONS`, **propre au Digital** |
+    | Marques : Holding → GROUPE BONY | `DIGITAL_BRAND_LABELS`, **affichage seul**, valeur stockée inchangée |
+    | Statut : Programmed → Programmé | `SOCIAL_STATUS_LABELS`, **affichage seul** |
+    | Calendrier : un seul logo | `LogosReseaux` — 3 icônes max + « +N », avec dédoublonnage |
+    | Images renommées à l'import | `SocialPost.mediaNames`, tableau parallèle |
+    | Ordre des visuels | Numéro sur chaque vignette + glisser-déposer |
+    | Accès aux autres tags | Tags branchés sur le serveur + 3ᵉ catégorie (Loi LOM) |
+
+    **Les six causes de la lenteur, et leur correctif :**
+    1. un `PUT /api/social/:id` **par frappe** sur le wording, le titre et le lien →
+       `components/ChampDiffere.tsx` (créé au correctif 48) réutilisé, avec un nouveau
+       rappel `onBrouillonChange` pour que l'aperçu et le compteur de caractères suivent
+       la frappe sans rien envoyer ;
+    2. la diffusion socket qui faisait refetcher toute la liste chez les collègues →
+       supprimée par voie de conséquence, puisqu'il n'y a plus de PUT par frappe ;
+    3. **aucun `React.memo` ni `useCallback`** dans les 1827 lignes du fichier → `EditoRow`
+       mémoïsé, gestionnaires stabilisés ;
+    4. `filteredPosts` triait avec **deux `new Date()` par comparaison** → clé de tri
+       pré-calculée une fois par publication ;
+    5. `components/DatePicker.tsx` reconstruisait ses **42 objets `Date` à chaque rendu,
+       panneau FERMÉ compris** — soit ~2 400 par frappe sur l'ensemble des lignes → grille
+       calculée seulement à l'ouverture. ⚠️ **Composant PARTAGÉ** (Projets, Agenda,
+       Matériel, To-do) ;
+    6. la recherche n'était pas temporisée et `useSessionState` fait un `JSON.stringify`
+       **synchrone** à chaque écriture → brouillon local + temporisation 250 ms.
+
+    **Généralisation de la file de sauvegarde.** `services/fileSauvegardeProjet.ts` (correctif
+    48) devient une fabrique, `services/fileSauvegarde.ts` : `fileSauvegardeProjet` et
+    `fileSauvegardePublication` en sont deux instanciations. ⚠️ `Projects.tsx` et
+    `Campaigns.tsx` **n'ont pas été touchés** — l'interface publique est identique — mais la
+    non-régression a été rejouée (voir plus bas). Écrire une deuxième file aurait divergé,
+    comme les formules de budget quatre fois.
+
+    **⚠️ La récupération des tags n'est PAS « si le serveur est vide ».** Mesuré le
+    09/09/2026 en branchant la route : la table contenait les valeurs du **seed**
+    (3 réseaux, classes A à G) tandis que le `localStorage` portait le vrai travail de
+    l'équipe (34 modèles avec leur classe CO², 8 réseaux). Une garde sur le seul « vide »
+    n'aurait jamais joué et l'équipe aurait vu son travail disparaître. On reconnaît donc
+    la table **non curée** (vide OU strictement égale au seed) et on remonte **l'UNION** du
+    serveur et du poste. Résultat sur le poste de Théo : 8 réseaux, 41 entrées CO².
+    ℹ️ Les 7 classes A–G du seed sont donc désormais mêlées aux 34 modèles : elles se
+    suppriment en dix secondes depuis l'écran, aucune donnée n'est en jeu.
+
+    **VÉRIFICATIONS (mesurées dans l'interface, sur la base réelle) :**
+    - **39 caractères tapés dans un wording → 0 PUT et 0 GET pendant la frappe, 1 PUT à la
+      fermeture** (avant : 39 PUT + la rafale de rechargements chez chaque collègue) ;
+    - **non-régression Projets** (file généralisée) : 4 clics rapides sur « + AJOUTER UNE
+      TÂCHE » → **4 tâches** ;
+    - calendrier, à 1400 px : 5 réseaux → **3 icônes + « +2 »**, 2 réseaux → 2 icônes,
+      jamais plus de 3, **hauteur de cellule uniforme à 231 px**, aucun débordement ;
+    - dédoublonnage : « FERMETURE CONCESSION VDR » (Facebook + Story Instagram + Story
+      Facebook) → **2 icônes distinctes**, pas de Facebook en double ;
+    - sélecteur Sites : les 4 tags FULL et Yssingeaux présents, **Ricoux absent** ;
+    - « Holding » et « Programmed » ont disparu de l'écran, **et la base contient toujours
+      `Holding`** ;
+    - médias : dépôt de `1-avant.png` / `2-pendant.png` / `3-apres.png` → noms d'origine en
+      base, urls **toujours en uuid** sur le disque ; glisser la 3ᵉ vignette en 1ʳᵉ position
+      → ordre persisté en base **et** à l'écran ; PUT sans `mediaNames` → noms conservés ;
+      PUT tronquant `mediaFiles` à 2 → `mediaNames` recalé à 2 ;
+    - **compatibilité ascendante** : une publication antérieure au correctif (`mediaNames`
+      vide) affiche ses 2 images, numérotées, avec le nom uuid en repli — aucune régression ;
+    - tags : un tag ajouté dans l'écran est **immédiatement présent dans `GET /api/tags`** ;
+    - `tsc --noEmit` : **9 erreurs à la racine** (les préexistantes), **0 au backend** ;
+      `check-plaques-sync` vert.
+    - Données de test créées puis supprimées : **57 publications et 123 projets avant comme
+      après, zéro résidu.**
+
+    ⚠️ **NON VÉRIFIÉ, à assumer** : le parcours à DEUX POSTES simultanés (la preuve la plus
+    parlante que l'équipe entière est soulagée, et que les tags sont bien partagés) n'a pas
+    pu être joué — il demande deux sessions. C'est le contrôle de 2 minutes à faire par
+    Théo avec un collègue. Le rôle `External`, qui édite le Digital depuis le 25/08, n'a pas
+    non plus été parcouru faute de compte.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
@@ -2659,6 +2776,24 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **⚠️ `strictNullChecks` est DÉSACTIVÉ dans `tsconfig.json` : un prop requis manquant
+  n'est PAS une erreur de compilation.** Découvert le 09/09/2026 : un `React.memo` typé via
+  `React.FC<Props>` **sur la const** perd en plus la vérification des props à l'appel, et un
+  `onUpdate={...}` resté en place après renommage du prop n'a produit AUCUNE erreur — le
+  gestionnaire serait arrivé `undefined` à l'exécution. Parade appliquée : annoter les props
+  **sur la fonction** (`React.memo(function X({…}: Props) {…})`). Et surtout : sur ce dépôt,
+  **`tsc` ne rattrape pas un appelant oublié** — il faut relire les sites d'appel à la main.
+- **Le libellé d'un bouton peut être DYNAMIQUE, et casser un test qui le cherche par son
+  titre.** Le bouton « Gérer les médias » d'une ligne d'édito s'intitule « 2 fichiers »
+  dès qu'elle porte des médias. Une recherche sur le titre fixe ne trouvait donc que les
+  lignes SANS média — et remonter dans le DOM depuis le champ titre attrapait le bouton
+  d'une ligne voisine, donc ouvrait la modale d'une AUTRE publication. Symptôme trompeur :
+  « aucun média » sur une publication qui en a deux. Repérer la racine de ligne par
+  « premier ancêtre ne contenant qu'un seul champ titre » avant de chercher un bouton.
+- **Un filtre de recherche persiste en `sessionStorage` entre deux essais.** Une
+  vérification qui ne trouve « aucune publication » alors que la donnée existe doit
+  d'abord vérifier `gearbox_session_digital_searchTerm` — et se rappeler que les
+  publications **archivées** sont exclues de l'onglet Calendrier Editorial.
 - **⚠️ `git add -A` a committé les deux fichiers volontairement NON suivis.** Le 07/09/2026,
   `budget market 2026.xlsx` (1,4 Mo) et `PRESENTATION-EQUIPE.html` sont entrés dans un
   commit du correctif 48. Repéré avant tout push, branche réécrite (`git filter-branch`)
