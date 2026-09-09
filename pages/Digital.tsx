@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSessionState } from '../hooks/useSessionState';
 import { useAuth } from '../contexts/AuthContext';
 import { db, ApiError } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
+import { fileSauvegardePublication } from '../services/fileSauvegardePublication';
+import { ChampTexte } from '../components/ChampDiffere';
 import { SocialPost, SocialStatus, SocialNetwork, BrandType, SocialServiceType, SocialTarget, Site, PlaqueName, DigitalTags, ActivityLog } from '../types';
 import { SOCIAL_STATUS_COLORS, BRANDS, SOCIAL_SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTIONS, SITES, BRAND_COLORS } from '../constants';
 import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload, ExternalLink } from 'lucide-react';
@@ -542,7 +544,17 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
 // --- COMPONENT: EDITO ROW ---
 interface EditoRowProps {
     post: SocialPost;
-    onUpdate: (updatedPost: SocialPost) => void;
+    /**
+     * Écrit UN champ de la publication.
+     *
+     * ⚠️ Remplace l'ancien `onUpdate(publicationEntiere)` au correctif 49. Les douze
+     * contrôles de cette ligne ne modifient chacun QU'UN champ : passer l'objet entier
+     * obligeait à le reconstruire depuis `post`, c'est-à-dire depuis la closure du rendu.
+     * Avec une saisie différée, cette closure est périmée au moment du flush — un menu
+     * déroulant modifié entre-temps serait réécrit avec son ancienne valeur. L'écran
+     * relit donc la publication COURANTE par son id (voir `changerChampPublication`).
+     */
+    onChangerChamp: (postId: string, champ: keyof SocialPost, valeur: any) => void;
     onDelete: (post: SocialPost) => void;
     canEdit: boolean;
     canDelete: boolean;
@@ -551,12 +563,34 @@ interface EditoRowProps {
     co2Options: string[];
     mediaCount: number;
     onOpenMedia: (postId: string) => void;
+    /** Signale qu'un champ texte prend/perd le focus (voir `champsFocalisesRef`). */
+    onFocusChange: (focus: boolean) => void;
 }
 
-const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, canDelete, isArchivedView, networkOptions, co2Options, mediaCount, onOpenMedia }) => {
+/**
+ * ⚠️ `React.memo` — indispensable, et inopérant sans les `useCallback` de l'écran.
+ * Avant le correctif 49, une frappe dans n'importe quel champ re-rendait les 57 lignes,
+ * chacune remontant 1 DatePicker + 4 Select + 3 VisualMultiSelect. C'est la moitié de la
+ * lenteur ressentie. Si quelqu'un repasse un jour `onChangerChamp`/`onDelete`/`onOpenMedia`
+ * en fonctions recréées à chaque rendu, ce `memo` redeviendra silencieusement inutile.
+ */
+// ⚠️ Props annotées SUR LA FONCTION, pas via `React.FC<...>` sur la const : combiné à
+// `React.memo`, l'annotation externe fait PERDRE la vérification des props à l'appel.
+// Constaté le 09/09/2026 — un `onUpdate={...}` resté en place ne produisait aucune erreur
+// TypeScript, et `onChangerChamp` serait arrivé `undefined` à l'exécution. Défaut
+// silencieux, donc à ne pas réintroduire.
+const EditoRow = React.memo(function EditoRow({ post, onChangerChamp, onDelete, canEdit, canDelete, isArchivedView, networkOptions, co2Options, mediaCount, onOpenMedia, onFocusChange }: EditoRowProps) {
     const [wordingOuvert, setWordingOuvert] = useState(false);
     const wordingRef = useRef<HTMLDivElement>(null);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    /**
+     * Brouillon du wording, remonté par `ChampTexte` à chaque frappe.
+     * ⚠️ Sert UNIQUEMENT à l'aperçu et au compteur de caractères, qui lisaient
+     * `post.wording` et figeaient donc pendant la frappe une fois l'écriture différée.
+     * `null` = pas de saisie en cours, on lit la valeur enregistrée.
+     */
+    const [brouillonWording, setBrouillonWording] = useState<string | null>(null);
+    const wordingAffiche = brouillonWording ?? post.wording;
     
     // Status Color Strip
     const statusColorClass = SOCIAL_STATUS_COLORS[post.status] || 'bg-slate-500';
@@ -571,7 +605,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
         e.stopPropagation(); // Important to prevent row conflicts
         if (!canEdit) return;
         // Direct toggle without blocking confirm for speed
-        onUpdate({ ...post, archived: !post.archived });
+        onChangerChamp(post.id, 'archived', !post.archived);
     };
 
     // Ligne d'edito : `flex-wrap` + bases explicites, PAS un enchainement de largeurs
@@ -589,23 +623,24 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                 puis le wording. Cliquer le wording ouvre un vrai panneau d'ecriture. */}
             <div className="flex-[1_1_340px] min-w-0 sm:min-w-[260px] flex flex-col gap-1.5 self-stretch">
                 <div className="flex items-center gap-2 min-w-0">
-                    <input
-                        type="text"
-                        value={post.title}
+                    <ChampTexte
+                        cle={`${post.id}:title`}
+                        valeur={post.title}
                         disabled={!canEdit}
-                        onChange={e => onUpdate({...post, title: e.target.value})}
+                        onValider={v => onChangerChamp(post.id, 'title', v)}
+                        onFocusChange={onFocusChange}
                         className="flex-1 min-w-0 bg-transparent border-none p-0 text-sm font-bold text-slate-900 dark:text-white outline-none placeholder-slate-400 dark:placeholder-slate-600 focus:text-bony-orange transition-colors"
                         placeholder="Titre de la publication..."
                     />
                     <div className="flex items-center gap-1 shrink-0 w-[34%] max-w-[230px]">
                         <LinkIcon size={11} className={post.link ? "text-blue-500 dark:text-blue-400 shrink-0" : "text-slate-400 dark:text-slate-600 shrink-0"}/>
-                        <input
-                            type="text"
-                            value={post.link}
+                        <ChampTexte
+                            cle={`${post.id}:link`}
+                            valeur={post.link}
                             disabled={!canEdit}
-                            onChange={e => onUpdate({...post, link: e.target.value})}
+                            onValider={v => onChangerChamp(post.id, 'link', v)}
+                            onFocusChange={onFocusChange}
                             placeholder="Lien…"
-                            title={post.link || undefined}
                             className="bg-transparent text-[11px] text-blue-500 dark:text-blue-300 w-full min-w-0 truncate outline-none placeholder-slate-400 dark:placeholder-slate-700 hover:text-blue-600 dark:hover:text-blue-200 transition-colors"
                         />
                     </div>
@@ -624,8 +659,8 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                     onClick={() => canEdit && setWordingOuvert(true)}
                     className={`h-[78px] shrink-0 w-full bg-slate-50 dark:bg-black/30 border rounded-lg px-2.5 py-1.5 text-[11px] leading-[1.45] text-slate-700 dark:text-slate-300 overflow-hidden whitespace-pre-wrap transition-colors ${wordingOuvert ? 'border-bony-violet' : 'border-bony-border'} ${canEdit ? 'cursor-text hover:border-bony-violet/60' : ''}`}
                 >
-                    {post.wording
-                        ? post.wording
+                    {wordingAffiche
+                        ? wordingAffiche
                         : <span className="text-slate-400 dark:text-slate-600 italic">Rédiger le post ici…</span>}
                 </div>
                 {/* ⚠️ Hauteur FIXE et non `flex-1` : laissee libre, la zone suivait la
@@ -641,16 +676,25 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                     maxHeight={340}
                     className="rounded-2xl p-2"
                 >
-                    <textarea
-                        autoFocus
-                        value={post.wording}
-                        onChange={e => onUpdate({...post, wording: e.target.value})}
-                        onKeyDown={e => { if (e.key === 'Escape') setWordingOuvert(false); }}
+                    {/* ⚠️ SAISIE DIFFÉRÉE — c'est LE correctif de la lenteur signalée par l'équipe.
+                        Avant, chaque caractère envoyait la publication ENTIÈRE au serveur, qui
+                        diffusait un événement faisant recharger toute la liste chez TOUS les
+                        collègues connectés. Une personne qui rédigeait ralentissait l'équipe.
+                        Le texte n'est désormais envoyé qu'à la fermeture du panneau (blur ou
+                        démontage). `onBrouillonChange` ne sert qu'à l'aperçu et au compteur. */}
+                    <ChampTexte
+                        multiligne
+                        cle={`${post.id}:wording`}
+                        valeur={post.wording}
+                        disabled={!canEdit}
+                        onValider={v => onChangerChamp(post.id, 'wording', v)}
+                        onFocusChange={onFocusChange}
+                        onBrouillonChange={setBrouillonWording}
                         className="w-full h-56 bg-transparent border-none outline-none resize-none text-xs leading-relaxed text-bony-text custom-scrollbar"
                         placeholder="Rédiger le post ici..."
                     />
                     <div className="flex items-center justify-between px-1 pt-1 border-t border-bony-border">
-                        <span className="text-[10px] text-bony-muted">{post.wording.length} caractères</span>
+                        <span className="text-[10px] text-bony-muted">{wordingAffiche.length} caractères</span>
                         <button
                             type="button"
                             onClick={() => setWordingOuvert(false)}
@@ -673,7 +717,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                     {canEdit ? (
                         <DatePicker
                             value={post.date}
-                            onChange={v => onUpdate({...post, date: v})}
+                            onChange={v => onChangerChamp(post.id, 'date', v)}
                             size="sm"
                             compact
                         />
@@ -689,7 +733,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                     <Select
                         value={post.status}
                         disabled={!canEdit}
-                        onChange={v => onUpdate({...post, status: v as SocialStatus})}
+                        onChange={v => onChangerChamp(post.id, 'status', v as SocialStatus)}
                         options={Object.keys(SOCIAL_STATUS_COLORS).map(s => ({ value: s, label: s }))}
                         size="sm"
                     />
@@ -700,7 +744,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                     <Select
                         value={post.service}
                         disabled={!canEdit}
-                        onChange={v => onUpdate({...post, service: v as SocialServiceType})}
+                        onChange={v => onChangerChamp(post.id, 'service', v as SocialServiceType)}
                         options={SOCIAL_SERVICES.map(s => ({ value: s, label: s }))}
                         size="sm"
                     />
@@ -712,7 +756,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                         label="Marques…"
                         options={BRANDS}
                         selected={post.brands}
-                        onChange={v => onUpdate({...post, brands: v as BrandType[]})}
+                        onChange={v => onChangerChamp(post.id, 'brands', v as BrandType[])}
                         disabled={!canEdit}
                         type="brand"
                         maxVisible={1}
@@ -725,7 +769,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                         label="Sites…"
                         options={['GROUPE BONY', ...Object.keys(PLAQUES_STRUCTURE), ...SITES]}
                         selected={post.concessions}
-                        onChange={v => onUpdate({...post, concessions: v})}
+                        onChange={v => onChangerChamp(post.id, 'concessions', v)}
                         disabled={!canEdit}
                         maxVisible={1}
                     />
@@ -737,7 +781,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                         label="Réseaux…"
                         options={networkOptions}
                         selected={post.networks}
-                        onChange={v => onUpdate({...post, networks: v as SocialNetwork[]})}
+                        onChange={v => onChangerChamp(post.id, 'networks', v as SocialNetwork[])}
                         disabled={!canEdit}
                         maxVisible={1}
                     />
@@ -755,7 +799,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                                     const newTargets = post.targets.includes(t)
                                         ? post.targets.filter(x => x !== t)
                                         : [...post.targets, t];
-                                    onUpdate({...post, targets: newTargets});
+                                    onChangerChamp(post.id, 'targets', newTargets);
                                 }}
                                 className={`flex-1 min-w-0 rounded-lg text-[9px] font-bold uppercase border flex items-center justify-center transition-colors ${post.targets.includes(t) ? 'bg-bony-orange/15 text-bony-orange border-bony-orange/50' : 'text-slate-500 dark:text-slate-600 border-bony-border hover:border-slate-400 dark:hover:border-slate-500 bg-[var(--bg-input)]'}`}
                                 title={t === 'Internet' ? 'Site internet' : 'Collaborateurs'}
@@ -771,7 +815,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                     <Select
                         value={post.lom}
                         disabled={!canEdit}
-                        onChange={v => onUpdate({...post, lom: v})}
+                        onChange={v => onChangerChamp(post.id, 'lom', v)}
                         options={[{ value: '', label: 'Aucune' }, ...LOI_LOM_OPTIONS.map(l => ({ value: l, label: l }))]}
                         size="sm"
                     />
@@ -782,7 +826,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
                     <Select
                         value={post.co2}
                         disabled={!canEdit}
-                        onChange={v => onUpdate({...post, co2: v})}
+                        onChange={v => onChangerChamp(post.id, 'co2', v)}
                         options={[{ value: '', label: 'Aucune' }, ...co2Options.map(c => ({ value: c, label: c }))]}
                         size="sm"
                     />
@@ -838,7 +882,7 @@ const EditoRow: React.FC<EditoRowProps> = ({ post, onUpdate, onDelete, canEdit, 
             </div>
         </div>
     );
-};
+});
 
 // --- COMPONENT: TAGS MANAGER ---
 const TagsManager: React.FC<{ 
@@ -1056,7 +1100,39 @@ const Digital: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useSessionState<Tab>('digital_activeTab', 'Calendrier Editorial');
-  const [posts, setPosts] = useState<SocialPost[]>([]);
+  const [posts, setPostsRaw] = useState<SocialPost[]>([]);
+
+  /**
+   * ⚠️ MIROIR de la liste — c'est LUI que lit la couche réseau, jamais la closure d'un
+   * rendu. Même parade qu'au correctif 48 sur les Projets : avec une saisie différée, la
+   * publication capturée au rendu est périmée au moment du flush (un menu déroulant
+   * modifié entre-temps serait réécrit avec son ancienne valeur).
+   */
+  const postsRef = useRef<SocialPost[]>([]);
+
+  /**
+   * SEULE porte d'écriture de la liste : elle pose AUSSI le miroir.
+   *
+   * ⚠️ Le calcul se fait DEPUIS LE MIROIR et hors de l'updater React. Muter une ref
+   * à l'intérieur d'un updater est un effet de bord dans un réducteur, rejoué deux fois
+   * en StrictMode — c'est précisément ce que le correctif 48 s'interdisait côté Projets.
+   * Le miroir étant mis à jour de façon synchrone, deux appels successifs dans le même
+   * gestionnaire lisent bien l'état le plus récent.
+   */
+  const setPosts = useCallback((maj: SocialPost[] | ((prev: SocialPost[]) => SocialPost[])) => {
+    const suivant = typeof maj === 'function'
+      ? (maj as (p: SocialPost[]) => SocialPost[])(postsRef.current)
+      : maj;
+    postsRef.current = suivant;
+    setPostsRaw(suivant);
+  }, []);
+
+  /** Nombre de champs de saisie ayant le focus — interdit d'écraser une saisie vive. */
+  const champsFocalisesRef = useRef(0);
+  /** ⚠️ Stable (`useCallback` sans dépendance) : passée à `EditoRow`, qui est mémoïsé. */
+  const suivreFocusChamp = useCallback((focus: boolean) => {
+      champsFocalisesRef.current = Math.max(0, champsFocalisesRef.current + (focus ? 1 : -1));
+  }, []);
   const [tags, setTags] = useState<DigitalTags>({ networks: [], co2: [] });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1067,6 +1143,14 @@ const Digital: React.FC = () => {
 
   // Filters & Sort
   const [searchTerm, setSearchTerm] = useSessionState<string>('digital_searchTerm', '');
+  /**
+   * Brouillon de la recherche.
+   * ⚠️ `useSessionState` fait un `JSON.stringify` + `sessionStorage.setItem` SYNCHRONES à
+   * chaque écriture, et changer `searchTerm` re-filtre et re-trie toute la liste. Sans ce
+   * brouillon, chaque caractère tapé payait les deux. On saisit donc en local et on ne
+   * propage qu'après une pause de frappe — même motif que `components/GifPicker.tsx`.
+   */
+  const [rechercheBrouillon, setRechercheBrouillon] = useState(searchTerm);
   const [filterBrand, setFilterBrand] = useSessionState<BrandType | 'All'>('digital_filterBrand', 'All');
   const [filterService, setFilterService] = useSessionState<SocialServiceType | 'All'>('digital_filterService', 'All');
   const [filterConcession, setFilterConcession] = useSessionState<string>('digital_filterConcession', 'All');
@@ -1106,6 +1190,14 @@ const Digital: React.FC = () => {
       loadData();
   }, []);
 
+  // Anti-rafale de la recherche : on ne propage qu'après une pause de frappe. Voir le
+  // commentaire sur `rechercheBrouillon`.
+  useEffect(() => {
+      if (rechercheBrouillon === searchTerm) return;
+      const t = window.setTimeout(() => setSearchTerm(rechercheBrouillon), 250);
+      return () => window.clearTimeout(t);
+  }, [rechercheBrouillon]);
+
   useEffect(() => {
       const checkMobile = () => setIsMobile(window.innerWidth < 768);
       window.addEventListener('resize', checkMobile);
@@ -1134,28 +1226,66 @@ const Digital: React.FC = () => {
       if (!silent) setLoading(false);
   };
 
-  const handleUpdatePost = async (updatedPost: SocialPost) => {
-      if (!canEditCalendar) return;
-      // Les médias ne sont PLUS supprimés à l'archivage : le backend renseigne
-      // archivedAt et la purge serveur supprime les fichiers 30 jours plus tard.
-      const oldPost = posts.find(p => p.id === updatedPost.id);
-      const isArchiving = oldPost && !oldPost.archived && updatedPost.archived;
-      setSaving(true);
-      // Optimistic update : l'UI reflète le changement immédiatement, rollback si l'API refuse.
-      const previousPosts = posts;
-      setPosts(posts.map(p => p.id === updatedPost.id ? updatedPost : p));
-      try {
-          const saved = await db.updateSocialPost(updatedPost);
-          setPosts(prev => prev.map(p => p.id === saved.id ? saved : p));
-          if (isArchiving && user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a archivé la publication', entity: 'post', entityName: updatedPost.title || '(sans titre)', timestamp: new Date().toISOString() });
-      } catch (e) {
-          setPosts(previousPosts);
-          alert(e instanceof ApiError ? e.message : "Échec de l'enregistrement (serveur injoignable ?).");
-      }
-      setTimeout(() => setSaving(false), 500);
-  };
+  /**
+   * Message d'échec choisi d'après le STATUT — même branchement qu'aux Projets depuis le
+   * correctif 48. `apiFetch` distingue déjà réseau (`ApiError(0)`) et réponse HTTP ; ne
+   * pas jeter cette information, sinon toute panne redevient « serveur injoignable ? ».
+   */
+  const onEchecSauvegarde = useCallback((erreur: unknown) => {
+    console.error('Digital : enregistrement échoué', erreur);
+    if (!(erreur instanceof ApiError)) { alert("Échec inattendu de l'enregistrement."); return; }
+    switch (erreur.status) {
+      case 0:   alert('Serveur injoignable. Vos modifications ne sont PAS perdues — ne fermez pas cet onglet.'); return;
+      case 503: alert('La base est momentanément saturée. Réessayez dans une minute.'); return;
+      case 401: return; // apiFetch a déjà déclenché la déconnexion
+      case 403: alert('Droits insuffisants pour modifier cette publication.'); return;
+      case 404: alert("Cette publication n'existe plus (supprimée depuis un autre poste ?)."); loadData(true); return;
+      default:  alert(erreur.message || "Échec de l'enregistrement.");
+    }
+  }, []);
 
-  const handleDeletePost = async (post: SocialPost) => {
+  /**
+   * ÉCRIT UN CHAMP d'une publication — seule porte d'écriture de l'écran.
+   *
+   * ⚠️ Part du MIROIR (`postsRef`) et non de `posts` capturé au rendu, et **refuse
+   * d'écrire si la publication n'existe plus** : c'est ce qui empêche le flush au
+   * démontage de `ChampDiffere` de faire RESSUSCITER une publication supprimée en pleine
+   * saisie. Même garde que `validerChampTache` dans `pages/Projects.tsx`.
+   *
+   * ⚠️ La sauvegarde passe par `fileSauvegardePublication` : UN SEUL PUT en vol par
+   * publication. Ne jamais rappeler `db.updateSocialPost` directement depuis cet écran.
+   */
+  const changerChampPublication = useCallback((postId: string, champ: keyof SocialPost, valeur: any) => {
+      if (!canEditCalendar) return;
+      const courant = postsRef.current.find(p => p.id === postId);
+      if (!courant) return;
+      if ((courant as any)[champ] === valeur) return; // rien n'a changé : pas de PUT inutile
+
+      const suivant = { ...courant, [champ]: valeur } as SocialPost;
+      setPosts(prev => prev.map(p => (p.id === postId ? suivant : p)));
+      setSaving(true);
+
+      // Les médias ne sont PLUS supprimés à l'archivage : le backend renseigne archivedAt
+      // et la purge serveur supprime les fichiers 30 jours plus tard.
+      if (champ === 'archived' && valeur === true && user) {
+          db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a archivé la publication', entity: 'post', entityName: courant.title || '(sans titre)', timestamp: new Date().toISOString() });
+      }
+
+      fileSauvegardePublication.pousser(suivant, {
+          onSucces: (serveur) => {
+              // ⚠️ Réponse appliquée SEULEMENT si rien n'attend derrière et qu'aucun champ
+              // n'a le focus : sinon elle est plus ancienne que la saisie en cours et
+              // l'écraserait.
+              if (fileSauvegardePublication.aDesEcrituresEnCours(serveur.id)) return;
+              if (champsFocalisesRef.current > 0) return;
+              setPosts(prev => prev.map(p => (p.id === serveur.id ? serveur : p)));
+          },
+          onEchec: onEchecSauvegarde,
+          onRepos: () => setSaving(false),
+      });
+  }, [canEditCalendar, user, setPosts, onEchecSauvegarde]);
+
+  const handleDeletePost = useCallback(async (post: SocialPost) => {
       try {
           await db.deleteSocialPost(post.id);
       } catch (e) {
@@ -1164,13 +1294,13 @@ const Digital: React.FC = () => {
       }
       // Les fichiers calendar du post sont nettoyés côté backend (route DELETE /api/social).
       setMediaCounts(prev => { const next = { ...prev }; delete next[post.id]; return next; });
-      setPosts(posts.filter(p => p.id !== post.id));
+      setPosts(prev => prev.filter(p => p.id !== post.id));
       if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé la publication', entity: 'post', entityName: post.title || '(sans titre)', entityId: post.id, timestamp: new Date().toISOString() });
-  };
+  }, [user, setPosts]);
 
   // Persiste la nouvelle liste de médias (URLs) d'un post via db.updateSocialPost.
   const handleSaveMedia = async (postId: string, mediaFiles: string[]) => {
-      const target = posts.find(p => p.id === postId);
+      const target = postsRef.current.find(p => p.id === postId);
       if (!target) return;
       const updated = { ...target, mediaFiles };
       setPosts(prev => prev.map(p => p.id === postId ? updated : p)); // optimistic
@@ -1257,11 +1387,13 @@ const Digital: React.FC = () => {
           return true;
       });
 
-      return filtered.sort((a,b) => {
-          const dateA = parseLocalDate(a.date).getTime();
-          const dateB = parseLocalDate(b.date).getTime();
-          return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-      });
+      // ⚠️ Clé de tri calculée UNE FOIS par publication, et non deux `new Date()` par
+      // COMPARAISON. Sur 57 publications, un tri fait ~330 comparaisons : l'ancienne
+      // version construisait donc ~660 objets `Date` à chaque frappe, filtre ou
+      // changement d'onglet.
+      const parDate = filtered.map(p => ({ p, t: parseLocalDate(p.date).getTime() }));
+      parDate.sort((a, b) => (sortOrder === 'asc' ? a.t - b.t : b.t - a.t));
+      return parDate.map(x => x.p);
   }, [posts, activeTab, searchTerm, filterBrand, filterService, filterConcession, sortOrder]);
 
   const handlePostHover = (e: React.MouseEvent, postId: string | null) => {
@@ -1625,7 +1757,7 @@ const Digital: React.FC = () => {
                           <EditoRow
                             key={post.id}
                             post={post}
-                            onUpdate={handleUpdatePost}
+                            onChangerChamp={changerChampPublication}
                             onDelete={handleDeletePost}
                             canEdit={canEditCalendar}
                             canDelete={canDelete}
@@ -1634,6 +1766,7 @@ const Digital: React.FC = () => {
                             co2Options={tags.co2}
                             mediaCount={mediaCounts[post.id] ?? 0}
                             onOpenMedia={setMediaModalPostId}
+                            onFocusChange={suivreFocusChamp}
                           />
                       ))
                   ) : (
@@ -1758,8 +1891,8 @@ const Digital: React.FC = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                         <input
                             type="text"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
+                            value={rechercheBrouillon}
+                            onChange={e => setRechercheBrouillon(e.target.value)}
                             placeholder="Rechercher..."
                             className="w-full bg-slate-100 dark:bg-black/20 border border-bony-border rounded-lg pl-10 pr-3 py-2 text-xs text-slate-900 dark:text-bony-text outline-none focus:border-bony-violet transition-colors"
                         />

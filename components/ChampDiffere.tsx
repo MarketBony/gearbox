@@ -53,13 +53,27 @@ type ProprietesCommunes = {
   /** Conservés pour le gel de l'ordre des tâches (`gelerOrdre` / libération). */
   onFocusPlus?: () => void;
   onBlurPlus?: () => void;
+  /**
+   * Notifie le brouillon À CHAQUE FRAPPE, sans rien envoyer au serveur.
+   *
+   * ⚠️ À n'utiliser que pour un affichage QUI ACCOMPAGNE le champ — un compteur de
+   * caractères, un aperçu du texte. Ajouté au correctif 49 pour le wording du Digital,
+   * dont l'aperçu et le compteur lisaient la valeur enregistrée et FIGEAIENT donc pendant
+   * la frappe.
+   *
+   * ⚠️ NE JAMAIS s'en servir pour écrire (état remonté, appel réseau) : ce serait
+   * réintroduire exactement le défaut que ce composant existe pour supprimer, avec un
+   * rendu — voire un PUT — par caractère. La seule écriture est `onValider`, au blur.
+   */
+  onBrouillonChange?: (brouillon: string) => void;
 };
 
 /** Câblage commun : brouillon, réabsorption conditionnelle, et les trois sorties sans blur. */
 const useBrouillon = <T,>(
   valeur: T,
   cle: string,
-  commettre: (brouillonActuel: T) => void
+  commettre: (brouillonActuel: T) => void,
+  surBrouillon?: (brouillon: T) => void
 ) => {
   const [brouillon, setBrouillon] = useState<T>(valeur);
   const focusRef = useRef(false);
@@ -76,6 +90,12 @@ const useBrouillon = <T,>(
 
   // Changement de VALEUR : réabsorbé seulement hors focus (voir l'avertissement en tête).
   useEffect(() => { if (!focusRef.current) setBrouillon(valeur); }, [valeur]);
+
+  // Remontée du brouillon à l'appelant (compteur, aperçu). Purement consultatif : voir
+  // l'avertissement sur `onBrouillonChange`.
+  const surBrouillonRef = useRef(surBrouillon);
+  surBrouillonRef.current = surBrouillon;
+  useEffect(() => { surBrouillonRef.current?.(brouillon); }, [brouillon]);
 
   const valider = useCallback(() => { commettreRef.current(brouillonRef.current); }, []);
 
@@ -114,13 +134,14 @@ export const ChampTexte: React.FC<ProprietesCommunes & {
   multiligne?: boolean;
   rows?: number;
 }> = ({ valeur, onValider, cle, disabled, className, placeholder, multiligne, rows,
-        onFocusChange, onFocusPlus, onBlurPlus }) => {
+        onFocusChange, onFocusPlus, onBlurPlus, onBrouillonChange }) => {
   const valeurRef = useRef(valeur);
   valeurRef.current = valeur;
 
   const { brouillon, setBrouillon, focusRef, valider } = useBrouillon<string>(
     valeur, cle,
-    (b) => { if (b !== valeurRef.current) onValider(b); } // garde de non-changement : pas de PUT inutile
+    (b) => { if (b !== valeurRef.current) onValider(b); }, // garde de non-changement : pas de PUT inutile
+    onBrouillonChange
   );
 
   const communes = {
