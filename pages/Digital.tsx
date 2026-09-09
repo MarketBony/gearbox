@@ -7,7 +7,8 @@ import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { fileSauvegardePublication } from '../services/fileSauvegardePublication';
 import { ChampTexte } from '../components/ChampDiffere';
 import { SocialPost, SocialStatus, SocialNetwork, BrandType, SocialServiceType, SocialTarget, Site, PlaqueName, DigitalTags, ActivityLog } from '../types';
-import { SOCIAL_STATUS_COLORS, BRANDS, SOCIAL_SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTIONS, SITES, BRAND_COLORS } from '../constants';
+import { SOCIAL_STATUS_COLORS, BRANDS, SOCIAL_SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTIONS, SITES, BRAND_COLORS,
+         DIGITAL_CONCESSIONS, libelleMarqueDigital, libelleStatutSocial } from '../constants';
 import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload, ExternalLink } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
@@ -56,6 +57,68 @@ const getStartOfWeek = (d: Date) => {
 };
 
 // --- HELPER: NETWORK ICONS ---
+/**
+ * Icônes des réseaux d'une publication, DÉDOUBLONNÉES et bornées.
+ *
+ * ⚠️ POURQUOI CETTE FONCTION. Les vues Mois et Semaine n'affichaient que
+ * `post.networks[0]` alors que le champ est un tableau : mesuré en base le 07/09/2026,
+ * **48 publications sur 57 portent plusieurs réseaux** (jusqu'à 5). L'équipe ne pouvait
+ * donc pas identifier les autres réseaux concernés depuis le calendrier.
+ *
+ * ⚠️ DÉDOUBLONNAGE OBLIGATOIRE. `getSocialIcon` matche par SOUS-CHAÎNE : « Instagram » et
+ * « Story Instagram » sont deux valeurs distinctes qui rendent LA MÊME icône. Sans ce
+ * `Set`, une publication Insta + Story Insta afficherait deux fois le même logo — ce qui
+ * se lit comme un bug.
+ *
+ * ⚠️ BORNE À 3. Les cellules du mois sont volontairement compactes (`min-h-[80px]`,
+ * titre en `line-clamp-1`) : au-delà, la grille se déforme. Le surplus est annoncé par
+ * un « +N », comme le fait déjà `VisualMultiSelect` avec `maxVisible`.
+ */
+const MAX_LOGOS_CALENDRIER = 3;
+
+/**
+ * Clé d'ICÔNE d'un réseau — doit rester alignée sur les tests de `getSocialIcon`.
+ * ⚠️ Si on ajoute un réseau reconnu là-bas, il faut l'ajouter ICI, sinon deux réseaux
+ * distincts afficheront la même icône sans être dédoublonnés (le défaut d'origine).
+ */
+const cleIcone = (network: string): string => {
+    const n = network.toLowerCase().trim();
+    for (const marqueur of ['instagram', 'facebook', 'linkedin', 'youtube', 'gmb', 'tiktok']) {
+        if (n.includes(marqueur)) return marqueur;
+    }
+    return 'autre:' + n; // non reconnu : icône Globe, mais on garde chaque réseau distinct
+};
+
+const reseauxDistincts = (networks: string[]): string[] => {
+    const vus = new Set<string>();
+    const sortie: string[] = [];
+    for (const n of networks) {
+        // La clé est le NOM D'ICÔNE, pas le nom du réseau : c'est lui qui doit être unique.
+        const cle = cleIcone(n);
+        if (vus.has(cle)) continue;
+        vus.add(cle);
+        sortie.push(n);
+    }
+    return sortie;
+};
+
+const LogosReseaux: React.FC<{ networks: string[]; size?: number }> = ({ networks, size = 12 }) => {
+    const distincts = reseauxDistincts(networks || []);
+    if (distincts.length === 0) return <Globe size={size} className="text-slate-400" />;
+    const visibles = distincts.slice(0, MAX_LOGOS_CALENDRIER);
+    const reste = distincts.length - visibles.length;
+    return (
+        <div className="flex items-center gap-0.5 shrink-0">
+            {visibles.map(n => <div key={n} title={n}>{getSocialIcon(n, size)}</div>)}
+            {reste > 0 && (
+                <span className="text-[8px] font-bold text-slate-400 leading-none" title={distincts.slice(MAX_LOGOS_CALENDRIER).join(', ')}>
+                    +{reste}
+                </span>
+            )}
+        </div>
+    );
+};
+
 const getSocialIcon = (network: string, size: number = 14) => {
     const n = network.toLowerCase().trim();
     if (n.includes('instagram')) return <Instagram size={size} className="text-[#E1306C]" />;
@@ -124,7 +187,7 @@ const VisualMultiSelect: React.FC<VisualMultiSelectProps> = ({ label, options, s
                                 || 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600';
                             return (
                                 <span key={item} className={`shrink-0 max-w-[92px] truncate px-1.5 py-0.5 rounded text-[10px] font-bold border ${badgeStyle}`}>
-                                    {item}
+                                    {type === 'brand' ? libelleMarqueDigital(item) : item}
                                 </span>
                             );
                         })}
@@ -734,7 +797,7 @@ const EditoRow = React.memo(function EditoRow({ post, onChangerChamp, onDelete, 
                         value={post.status}
                         disabled={!canEdit}
                         onChange={v => onChangerChamp(post.id, 'status', v as SocialStatus)}
-                        options={Object.keys(SOCIAL_STATUS_COLORS).map(s => ({ value: s, label: s }))}
+                        options={Object.keys(SOCIAL_STATUS_COLORS).map(s => ({ value: s, label: libelleStatutSocial(s) }))}
                         size="sm"
                     />
                 </div>
@@ -767,7 +830,7 @@ const EditoRow = React.memo(function EditoRow({ post, onChangerChamp, onDelete, 
                     <Etiquette>Sites</Etiquette>
                     <VisualMultiSelect
                         label="Sites…"
-                        options={['GROUPE BONY', ...Object.keys(PLAQUES_STRUCTURE), ...SITES]}
+                        options={DIGITAL_CONCESSIONS}
                         selected={post.concessions}
                         onChange={v => onChangerChamp(post.id, 'concessions', v)}
                         disabled={!canEdit}
@@ -1425,11 +1488,11 @@ const Digital: React.FC = () => {
               <div className="flex justify-between items-start mb-2">
                   <div className="flex flex-wrap gap-1">
                       {hoveredPostData.brands.map(b => (
-                          <span key={b} className={`text-[8px] px-1.5 py-0.5 rounded border uppercase font-bold ${BRAND_COLORS[b]}`}>{b}</span>
+                          <span key={b} className={`text-[8px] px-1.5 py-0.5 rounded border uppercase font-bold ${BRAND_COLORS[b]}`}>{libelleMarqueDigital(b)}</span>
                       ))}
                   </div>
                   <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${SOCIAL_STATUS_COLORS[hoveredPostData.status]}`}>
-                      {hoveredPostData.status}
+                      {libelleStatutSocial(hoveredPostData.status)}
                   </span>
               </div>
 
@@ -1529,7 +1592,7 @@ const Digital: React.FC = () => {
                                               className="group relative p-1 rounded border border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/20 hover:border-bony-violet transition cursor-pointer flex items-start gap-1 overflow-hidden"
                                           >
                                               <div className={`absolute left-0 top-0 bottom-0 w-0.5 bg-${borderColor}`}></div>
-                                              <div className="hidden lg:block mt-0.5 shrink-0">{post.networks.length > 0 ? getSocialIcon(post.networks[0], 12) : <Globe size={12} className="text-slate-400"/>}</div>
+                                              <div className="hidden lg:block mt-0.5 shrink-0"><LogosReseaux networks={post.networks} size={12} /></div>
                                               <div className="min-w-0">
                                                   <div className="text-[8px] lg:text-[10px] font-bold text-slate-800 dark:text-slate-200 truncate leading-tight line-clamp-1">{post.title || "Sans titre"}</div>
                                               </div>
@@ -1579,8 +1642,15 @@ const Digital: React.FC = () => {
                                               <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l bg-${borderColor}`}></div>
                                               <div className="pl-2">
                                                   <div className="flex justify-between items-start mb-1">
-                                                      {post.networks.length > 0 ? getSocialIcon(post.networks[0], 14) : <Globe size={14} className="text-slate-400"/>}
-                                                      {post.brands.length > 0 && <div className={`w-2 h-2 rounded-full ${BRAND_COLORS[post.brands[0]]?.split(' ')[0]}`}></div>}
+                                                      <LogosReseaux networks={post.networks} size={14} />
+                                                      {/* Pastilles de TOUTES les marques, dédoublonnées — une seule était rendue.
+                                                          ⚠️ Regroupées dans un conteneur : en frères directs, elles cassaient le
+                                                          `justify-between` de la ligne. */}
+                                                      <div className="flex items-center gap-0.5 shrink-0">
+                                                          {post.brands.filter((b, i, t) => t.indexOf(b) === i).slice(0, 3).map(b => (
+                                                              <div key={b} title={libelleMarqueDigital(b)} className={`w-2 h-2 rounded-full ${BRAND_COLORS[b]?.split(' ')[0]}`}></div>
+                                                          ))}
+                                                      </div>
                                                   </div>
                                                   <div className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight mb-1">{post.title || "Sans titre"}</div>
                                                   <div className="text-[9px] px-1.5 py-0.5 rounded bg-white dark:bg-black/40 border border-bony-border w-fit">
@@ -1664,7 +1734,7 @@ const Digital: React.FC = () => {
                                           <span className="text-xs font-bold text-bony-orange">
                                               {parseLocalDate(post.date).toLocaleDateString('fr-FR')}
                                           </span>
-                                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${sc}`}>{post.status}</span>
+                                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${sc}`}>{libelleStatutSocial(post.status)}</span>
                                       </div>
                                       <p className="text-sm font-bold text-bony-text leading-tight line-clamp-2">{post.title || 'Sans titre'}</p>
                                       <div className="flex items-center justify-between">
@@ -1673,7 +1743,7 @@ const Digital: React.FC = () => {
                                           </div>
                                           <div className="flex flex-wrap gap-1 justify-end">
                                               {post.brands.slice(0, 3).map(b => (
-                                                  <span key={b} className={`text-[8px] px-1.5 py-0.5 rounded border uppercase font-bold ${BRAND_COLORS[b]}`}>{b}</span>
+                                                  <span key={b} className={`text-[8px] px-1.5 py-0.5 rounded border uppercase font-bold ${BRAND_COLORS[b]}`}>{libelleMarqueDigital(b)}</span>
                                               ))}
                                           </div>
                                       </div>
@@ -1906,7 +1976,7 @@ const Digital: React.FC = () => {
                             <Select
                                 value={filterBrand}
                                 onChange={v => setFilterBrand(v as any)}
-                                options={[{ value: 'All', label: 'Toutes Marques' }, ...BRANDS.map(b => ({ value: b, label: b }))]}
+                                options={[{ value: 'All', label: 'Toutes Marques' }, ...BRANDS.map(b => ({ value: b, label: libelleMarqueDigital(b) }))]}
                                 size="sm"
                             />
                         </div>
