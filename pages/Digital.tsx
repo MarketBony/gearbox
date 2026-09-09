@@ -7,7 +7,7 @@ import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { fileSauvegardePublication } from '../services/fileSauvegardePublication';
 import { ChampTexte } from '../components/ChampDiffere';
 import { SocialPost, SocialStatus, SocialNetwork, BrandType, SocialServiceType, SocialTarget, Site, PlaqueName, DigitalTags, ActivityLog } from '../types';
-import { SOCIAL_STATUS_COLORS, BRANDS, SOCIAL_SERVICES, PLAQUES_STRUCTURE, LOI_LOM_OPTIONS, SITES, BRAND_COLORS,
+import { SOCIAL_STATUS_COLORS, BRANDS, SOCIAL_SERVICES, PLAQUES_STRUCTURE, SITES, BRAND_COLORS,
          DIGITAL_CONCESSIONS, libelleMarqueDigital, libelleStatutSocial } from '../constants';
 import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload, ExternalLink } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
@@ -279,17 +279,45 @@ const libelleMedias = (urls: string[]): string => {
     return `${pluriel(fichiers, 'fichier')} · ${pluriel(liens, 'lien')}`;
 };
 
+/**
+ * Numéro d'ordre d'un visuel.
+ * ⚠️ C'est la moitié de la demande de l'équipe : l'ordre du tableau EST l'ordre de
+ * diffusion à respecter, mais rien ne l'affichait — il fallait le deviner. Il se lit
+ * maintenant, et se change au glisser-déposer.
+ */
+const NumeroMedia: React.FC<{ index: number }> = ({ index }) => (
+    <span className="absolute top-1 left-1 z-10 w-5 h-5 rounded-full bg-black/70 text-white text-[10px] font-bold flex items-center justify-center pointer-events-none">
+        {index + 1}
+    </span>
+);
+
 // --- COMPONENT: MEDIA MANAGER MODAL ---
 interface MediaManagerModalProps {
     post: SocialPost;
     canEdit: boolean;
     onClose: () => void;
-    // Persiste la nouvelle liste d'URLs (post.mediaFiles) via db.updateSocialPost.
-    onSaveMedia: (postId: string, mediaFiles: string[]) => Promise<void>;
+    /**
+     * Persiste la nouvelle liste d'URLs ET les noms d'origine correspondants.
+     * ⚠️ Les deux tableaux sont PARALLÈLES : même longueur, même ordre, l'index fait le
+     * lien. Ne jamais en modifier un sans l'autre — le serveur recale de toute façon
+     * (`normaliserMediaNames` dans routes/social.ts), mais laisser diverger ici ferait
+     * afficher le nom d'un autre visuel entre-temps.
+     */
+    onSaveMedia: (postId: string, mediaFiles: string[], mediaNames: string[]) => Promise<void>;
 }
 
 const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, onClose, onSaveMedia }) => {
     const [medias, setMedias] = useState<string[]>(post.mediaFiles ?? []);
+    /**
+     * Noms d'ORIGINE, alignés sur `medias` par l'index.
+     * ⚠️ Recalés à la longueur de `medias` dès l'ouverture : une publication antérieure au
+     * correctif 49 n'a pas de noms, et l'écran doit alors retomber sur le nom de fichier.
+     */
+    const [noms, setNoms] = useState<string[]>(() =>
+        (post.mediaFiles ?? []).map((_, i) => (post.mediaNames ?? [])[i] ?? '')
+    );
+    /** Index en cours de glissement, pour le réordonnancement. */
+    const [glisse, setGlisse] = useState<number | null>(null);
     const [dragging, setDragging] = useState(false);
     const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -297,11 +325,25 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
     const [lienSaisi, setLienSaisi] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    /**
+     * Nom À AFFICHER pour le média d'index `i` : le nom d'origine s'il existe, sinon le
+     * nom du fichier (l'uuid) comme avant le correctif 49.
+     */
+    const nomAffiche = (i: number) => (noms[i] || '').trim() || mediaFilename(medias[i]);
+
+    /** Enregistre les deux tableaux ENSEMBLE, et ne met l'écran à jour qu'en cas de succès. */
+    const enregistrer = async (nouveauxMedias: string[], nouveauxNoms: string[]) => {
+        await onSaveMedia(post.id, nouveauxMedias, nouveauxNoms);
+        setMedias(nouveauxMedias);
+        setNoms(nouveauxNoms);
+    };
+
     // Upload séquentiel : chaque fichier -> POST /api/uploads/calendar -> URL
     // ajoutée à post.mediaFiles (persisté à chaque ajout).
     const processFiles = async (files: FileList | File[]) => {
         setError(null);
         let current = [...medias];
+        let currentNoms = [...noms];
         for (const file of Array.from(files)) {
             if (!MEDIA_ACCEPTED.includes(file.type)) {
                 setError(`Format non supporté : "${file.name}". Accepté : JPG, PNG, WebP, MP4, MOV.`);
@@ -315,8 +357,12 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                 setUploading(true);
                 const url = await db.uploadFile('calendar', file);
                 current = [...current, url];
-                await onSaveMedia(post.id, current);
-                setMedias(current);
+                // ⚠️ Le nom d'origine est disponible ICI, et nulle part ailleurs : le
+                // serveur ne le voit jamais (multer le remplace par un uuid AVANT
+                // d'écrire sur disque, règle de sécurité de routes/uploads.ts). Si on ne
+                // le capture pas à cet instant, il est définitivement perdu.
+                currentNoms = [...currentNoms, file.name];
+                await enregistrer(current, currentNoms);
             } catch (e) {
                 setError(e instanceof ApiError ? e.message : `Échec de l'upload de "${file.name}".`);
             } finally {
@@ -325,14 +371,35 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
         }
     };
 
-    const handleDelete = async (url: string) => {
-        if (!confirm('Retirer ce média du post ?')) return;
-        const updated = medias.filter(m => m !== url);
+    /**
+     * ⚠️ Suppression PAR INDEX, et non par valeur d'URL comme avant le correctif 49 :
+     * `medias.filter(m => m !== url)` retirait TOUTES les occurrences, donc deux fois le
+     * même lien externe disparaissaient ensemble. Et avec des noms parallèles, filtrer par
+     * valeur désalignerait les deux tableaux.
+     */
+    const handleDelete = async (index: number) => {
+        if (!confirm(`Retirer « ${nomAffiche(index)} » du post ?`)) return;
         try {
-            await onSaveMedia(post.id, updated);
-            setMedias(updated);
+            await enregistrer(medias.filter((_, i) => i !== index), noms.filter((_, i) => i !== index));
         } catch (e) {
             setError(e instanceof ApiError ? e.message : 'Échec de la suppression.');
+        }
+    };
+
+    /**
+     * Réordonnancement par glisser-déposer. L'ordre du tableau EST l'ordre de diffusion
+     * attendu par l'équipe — c'est la demande d'origine : « les images se renomment à
+     * l'import, cela complique la transmission de l'ordre des visuels à respecter ».
+     * ⚠️ Les deux tableaux se déplacent ENSEMBLE, sinon les noms suivent les mauvais
+     * visuels.
+     */
+    const deplacer = async (de: number, vers: number) => {
+        if (de === vers || de < 0 || vers < 0) return;
+        const bouge = <T,>(t: T[]) => { const c = [...t]; const [x] = c.splice(de, 1); c.splice(vers, 0, x); return c; };
+        try {
+            await enregistrer(bouge(medias), bouge(noms));
+        } catch (e) {
+            setError(e instanceof ApiError ? e.message : 'Échec du réordonnancement.');
         }
     };
 
@@ -348,7 +415,8 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
         }
         const a = document.createElement('a');
         a.href = url;
-        a.download = mediaFilename(url);
+        // Le fichier téléchargé porte son NOM D'ORIGINE, plus l'uuid.
+        a.download = nomAffiche(medias.indexOf(url));
         a.click();
     };
 
@@ -373,9 +441,11 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
             return;
         }
         const updated = [...medias, brut];
+        // Un lien n'a pas de « nom d'origine » : on lui donne son libellé court, ce que
+        // l'utilisateur reconnaîtra, plutôt qu'une chaîne vide qui afficherait l'url brute.
+        const updatedNoms = [...noms, libelleCourt(brut)];
         try {
-            await onSaveMedia(post.id, updated);
-            setMedias(updated);
+            await enregistrer(updated, updatedNoms);
             setLienSaisi('');
         } catch (e) {
             setError(e instanceof ApiError ? e.message : "Échec de l'ajout du lien.");
@@ -474,7 +544,7 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {medias.map(url => estLienExterne(url) ? (
+                                {medias.map((url, index) => estLienExterne(url) ? (
                                     // ⚠️⚠️ TUILE LIEN — un lien externe ne doit JAMAIS atteindre
                                     // un <img src>, un <video src> ni la lightbox : ce serait une
                                     // requête sortante émise par le navigateur de CHAQUE collègue
@@ -491,13 +561,21 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                                     // — et `aUnApercuRiche()` est faux sur SharePoint/WeTransfer,
                                     // la branche ne servirait à rien.
                                     <a
-                                        key={url}
+                                        // ⚠️ La clé porte l'INDEX en plus de l'url : deux fois le même
+                                        // lien externe est légitime, et `key={url}` les confondait.
+                                        key={`${index}:${url}`}
                                         href={url}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         title={url}
-                                        className="group relative rounded-xl overflow-hidden border border-bony-border bg-white/45 dark:bg-white/[0.04] aspect-square flex flex-col items-center justify-center gap-2 p-3 text-center hover:border-bony-orange/50 transition-colors"
+                                        draggable={canEdit}
+                                        onDragStart={() => setGlisse(index)}
+                                        onDragOver={e => { if (glisse !== null) e.preventDefault(); }}
+                                        onDrop={e => { e.preventDefault(); if (glisse !== null) { deplacer(glisse, index); setGlisse(null); } }}
+                                        onDragEnd={() => setGlisse(null)}
+                                        className={`group relative rounded-xl overflow-hidden border bg-white/45 dark:bg-white/[0.04] aspect-square flex flex-col items-center justify-center gap-2 p-3 text-center transition-colors ${glisse === index ? 'border-bony-orange opacity-50' : 'border-bony-border hover:border-bony-orange/50'}`}
                                     >
+                                        <NumeroMedia index={index} />
                                         <LinkIcon size={20} className="text-slate-400 dark:text-slate-500 shrink-0" />
                                         {(() => {
                                             const f = fournisseurDe(url);
@@ -518,7 +596,7 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                                             </span>
                                             {canEdit && (
                                                 <button
-                                                    onClick={e => { e.preventDefault(); e.stopPropagation(); handleDelete(url); }}
+                                                    onClick={e => { e.preventDefault(); e.stopPropagation(); handleDelete(index); }}
                                                     className="p-2 bg-bony-panel/90 rounded-lg text-red-400 hover:bg-red-500/20 transition pointer-events-auto"
                                                     title="Retirer"
                                                 >
@@ -528,7 +606,16 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                                         </div>
                                     </a>
                                 ) : (
-                                    <div key={url} className="group relative rounded-xl overflow-hidden border border-bony-border bg-bony-dark aspect-square">
+                                    <div
+                                        key={`${index}:${url}`}
+                                        draggable={canEdit}
+                                        onDragStart={() => setGlisse(index)}
+                                        onDragOver={e => { if (glisse !== null) e.preventDefault(); }}
+                                        onDrop={e => { e.preventDefault(); if (glisse !== null) { deplacer(glisse, index); setGlisse(null); } }}
+                                        onDragEnd={() => setGlisse(null)}
+                                        className={`group relative rounded-xl overflow-hidden border bg-bony-dark aspect-square ${glisse === index ? 'border-bony-orange opacity-50' : 'border-bony-border'}`}
+                                    >
+                                        <NumeroMedia index={index} />
                                         {isVideoUrl(url) ? (
                                             <video
                                                 src={url}
@@ -539,7 +626,7 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                                         ) : (
                                             <img
                                                 src={url}
-                                                alt={mediaFilename(url)}
+                                                alt={nomAffiche(index)}
                                                 className="w-full h-full object-cover cursor-zoom-in hover:opacity-90 transition"
                                                 onClick={() => setLightboxSrc(url)}
                                             />
@@ -555,7 +642,7 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                                             </button>
                                             {canEdit && (
                                                 <button
-                                                    onClick={e => { e.stopPropagation(); handleDelete(url); }}
+                                                    onClick={e => { e.stopPropagation(); handleDelete(index); }}
                                                     className="p-2 bg-bony-panel/90 rounded-lg text-red-400 hover:bg-red-500/20 transition pointer-events-auto"
                                                     title="Retirer"
                                                 >
@@ -563,9 +650,11 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                                                 </button>
                                             )}
                                         </div>
-                                        {/* Filename bar */}
-                                        <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-gradient-to-t from-black/80 to-transparent text-[9px] text-white truncate pointer-events-none">
-                                            {mediaFilename(url)}
+                                        {/* ⚠️ Le NOM D'ORIGINE, et non plus l'uuid : c'est la demande de
+                                            l'équipe (« les images se renomment à l'import »). Repli sur le
+                                            nom de fichier pour les publications antérieures au correctif 49. */}
+                                        <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-gradient-to-t from-black/80 to-transparent text-[9px] text-white truncate pointer-events-none" title={nomAffiche(index)}>
+                                            {nomAffiche(index)}
                                         </div>
                                     </div>
                                 ))}
@@ -577,6 +666,9 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
                     <div className="px-5 py-3 border-t border-bony-border shrink-0 flex items-center justify-between">
                         <span className="text-[10px] text-bony-muted uppercase tracking-widest">
                             {medias.length === 0 ? '0 média' : libelleMedias(medias)}
+                            {canEdit && medias.length > 1 && (
+                                <span className="normal-case tracking-normal text-bony-muted/80"> · glissez les vignettes pour changer l'ordre</span>
+                            )}
                         </span>
                         <button onClick={onClose} className="px-4 py-1.5 rounded-lg text-sm font-bold text-slate-500 hover:text-bony-text transition">
                             Fermer
@@ -624,6 +716,8 @@ interface EditoRowProps {
     isArchivedView?: boolean;
     networkOptions: string[];
     co2Options: string[];
+    /** Mentions Loi LOM, éditables depuis « Gestion des TAGS » depuis le correctif 49. */
+    lomOptions: string[];
     mediaCount: number;
     onOpenMedia: (postId: string) => void;
     /** Signale qu'un champ texte prend/perd le focus (voir `champsFocalisesRef`). */
@@ -642,7 +736,7 @@ interface EditoRowProps {
 // Constaté le 09/09/2026 — un `onUpdate={...}` resté en place ne produisait aucune erreur
 // TypeScript, et `onChangerChamp` serait arrivé `undefined` à l'exécution. Défaut
 // silencieux, donc à ne pas réintroduire.
-const EditoRow = React.memo(function EditoRow({ post, onChangerChamp, onDelete, canEdit, canDelete, isArchivedView, networkOptions, co2Options, mediaCount, onOpenMedia, onFocusChange }: EditoRowProps) {
+const EditoRow = React.memo(function EditoRow({ post, onChangerChamp, onDelete, canEdit, canDelete, isArchivedView, networkOptions, co2Options, lomOptions, mediaCount, onOpenMedia, onFocusChange }: EditoRowProps) {
     const [wordingOuvert, setWordingOuvert] = useState(false);
     const wordingRef = useRef<HTMLDivElement>(null);
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -879,7 +973,7 @@ const EditoRow = React.memo(function EditoRow({ post, onChangerChamp, onDelete, 
                         value={post.lom}
                         disabled={!canEdit}
                         onChange={v => onChangerChamp(post.id, 'lom', v)}
-                        options={[{ value: '', label: 'Aucune' }, ...LOI_LOM_OPTIONS.map(l => ({ value: l, label: l }))]}
+                        options={[{ value: '', label: 'Aucune' }, ...lomOptions.map(l => ({ value: l, label: l }))]}
                         size="sm"
                     />
                 </div>
@@ -947,6 +1041,29 @@ const EditoRow = React.memo(function EditoRow({ post, onChangerChamp, onDelete, 
     );
 });
 
+/**
+ * Catégories de tags éditables depuis l'écran.
+ *
+ * ⚠️ FRONTIÈRE VOLONTAIRE, et c'est la réponse à « donner accès aux autres tags ».
+ * Ces trois-là sont ouvertes parce que les champs correspondants de `SocialPost` sont des
+ * chaînes LIBRES (`networks`, `co2`, `lom`). Marques, services, statuts et sites ne le
+ * sont pas : ils sont adossés à des types de `types.ts`, indexent `BRAND_COLORS` /
+ * `SOCIAL_STATUS_COLORS` et pilotent des tests métier. Les rendre éditables en base
+ * supprimerait la garantie de compilation sans rien mettre à la place — le schéma Prisma
+ * n'a aucun enum et aucune route ne valide ces valeurs. Si le besoin se confirme, c'est
+ * un lot dédié qui commence par écrire cette validation côté serveur.
+ * Miroir de `CATEGORIES` dans `backend/src/routes/tags.ts` : les deux doivent rester
+ * alignées.
+ */
+type CategorieTag = 'networks' | 'co2' | 'lom';
+
+/** Libellé du champ d'ajout, par catégorie — à compléter en même temps que `CategorieTag`. */
+const LIBELLE_AJOUT: Record<CategorieTag, string> = {
+    networks: 'un réseau',
+    co2: 'une classe CO²',
+    lom: 'une mention Loi LOM',
+};
+
 // --- COMPONENT: TAGS MANAGER ---
 const TagsManager: React.FC<{ 
     tags: DigitalTags, 
@@ -956,28 +1073,30 @@ const TagsManager: React.FC<{
     // --- STATE FOR NEW ITEM ---
     const [newNetwork, setNewNetwork] = useState('');
     const [newCo2, setNewCo2] = useState('');
+    const [newLom, setNewLom] = useState('');
 
     // --- STATE FOR EDITING ---
-    const [editingItem, setEditingItem] = useState<{ type: 'networks'|'co2', originalValue: string, currentValue: string } | null>(null);
+    const [editingItem, setEditingItem] = useState<{ type: CategorieTag, originalValue: string, currentValue: string } | null>(null);
     
     // --- STATE FOR DELETING CONFIRMATION ---
-    const [confirmDelete, setConfirmDelete] = useState<{ type: 'networks'|'co2', value: string } | null>(null);
+    const [confirmDelete, setConfirmDelete] = useState<{ type: CategorieTag, value: string } | null>(null);
 
     // ADD
-    const addTag = (type: 'networks' | 'co2', value: string) => {
+    const addTag = (type: CategorieTag, value: string) => {
         if (!value.trim()) return;
         const current = tags[type];
         if (current.includes(value.trim())) return;
-        
+
         const updated = { ...tags, [type]: [...current, value.trim()] };
         onUpdate(updated);
-        
+
         if (type === 'networks') setNewNetwork('');
-        else setNewCo2('');
+        else if (type === 'co2') setNewCo2('');
+        else setNewLom('');
     };
 
     // START EDIT
-    const startEdit = (e: React.MouseEvent, type: 'networks'|'co2', value: string) => {
+    const startEdit = (e: React.MouseEvent, type: CategorieTag, value: string) => {
         e.preventDefault();
         e.stopPropagation();
         setEditingItem({ type, originalValue: value, currentValue: value });
@@ -1006,7 +1125,7 @@ const TagsManager: React.FC<{
     };
 
     // HANDLE DELETE (2-Step)
-    const handleDeleteClick = (e: React.MouseEvent, type: 'networks'|'co2', value: string) => {
+    const handleDeleteClick = (e: React.MouseEvent, type: CategorieTag, value: string) => {
         e.preventDefault();
         e.stopPropagation();
 
@@ -1025,11 +1144,15 @@ const TagsManager: React.FC<{
         }
     };
 
-    const renderList = (title: string, items: string[], type: 'networks' | 'co2', inputValue: string, setInput: (v: string) => void) => (
+    const renderList = (title: string, items: string[], type: CategorieTag, inputValue: string, setInput: (v: string) => void) => (
         <div className="flex-1 gx-glass-panel border border-bony-border rounded-xl flex flex-col min-h-0 shadow-lg h-full overflow-hidden">
             <div className="p-4 border-b border-bony-border bg-slate-100 dark:bg-black/20 shrink-0">
                 <h3 className="text-sm font-bold text-bony-text uppercase tracking-widest flex items-center gap-2">
-                    {type === 'networks' ? <Globe size={16} className="text-bony-violet"/> : <Settings size={16} className="text-bony-orange"/>}
+                    {type === 'networks'
+                        ? <Globe size={16} className="text-bony-violet"/>
+                        : type === 'lom'
+                            ? <AlignLeft size={16} className="text-bony-blue"/>
+                            : <Settings size={16} className="text-bony-orange"/>}
                     {title}
                 </h3>
             </div>
@@ -1133,7 +1256,7 @@ const TagsManager: React.FC<{
                             value={inputValue}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addTag(type, inputValue)}
-                            placeholder={`Ajouter ${type === 'networks' ? 'un réseau' : 'une classe CO²'}...`}
+                            placeholder={`Ajouter ${LIBELLE_AJOUT[type]}...`}
                             className="flex-1 bg-white dark:bg-black/40 border border-bony-border rounded-lg px-3 py-2 text-xs text-bony-text outline-none focus:border-bony-violet"
                         />
                         <button 
@@ -1153,6 +1276,7 @@ const TagsManager: React.FC<{
         <div className="flex gap-6 flex-1 min-h-0 p-6 overflow-hidden h-full">
             {renderList("Réseaux Sociaux", tags.networks, 'networks', newNetwork, setNewNetwork)}
             {renderList("Classes CO² & Mentions", tags.co2, 'co2', newCo2, setNewCo2)}
+            {renderList("Mentions Loi LOM", tags.lom, 'lom', newLom, setNewLom)}
         </div>
     );
 };
@@ -1196,7 +1320,7 @@ const Digital: React.FC = () => {
   const suivreFocusChamp = useCallback((focus: boolean) => {
       champsFocalisesRef.current = Math.max(0, champsFocalisesRef.current + (focus ? 1 : -1));
   }, []);
-  const [tags, setTags] = useState<DigitalTags>({ networks: [], co2: [] });
+  const [tags, setTags] = useState<DigitalTags>({ networks: [], co2: [], lom: [] });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mediaModalPostId, setMediaModalPostId] = useState<string | null>(null);
@@ -1361,14 +1485,42 @@ const Digital: React.FC = () => {
       if (user) db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action: 'a supprimé la publication', entity: 'post', entityName: post.title || '(sans titre)', entityId: post.id, timestamp: new Date().toISOString() });
   }, [user, setPosts]);
 
-  // Persiste la nouvelle liste de médias (URLs) d'un post via db.updateSocialPost.
-  const handleSaveMedia = async (postId: string, mediaFiles: string[]) => {
+  // Persiste la nouvelle liste de médias d'un post, via la FILE (voir enregistrerPublication).
+  /**
+   * Passe une publication par la FILE et attend son sort.
+   *
+   * ⚠️ Les médias doivent emprunter la même file que les champs, sinon un PUT de wording
+   * parti AVANT un dépôt de visuel — donc porteur de l'ancienne liste de médias — écrase
+   * le dépôt en arrivant après lui. Ils partagent le miroir, donc chaque instantané est
+   * complet ; c'est l'ORDRE qui doit être garanti, et c'est ce que fait la file.
+   *
+   * ⚠️ `onRepos` sert de filet : la coalescence peut remplacer l'instantané en attente
+   * (et donc ses rappels) avant que `onSucces` ne se déclenche. Sans ce repli, la modale
+   * resterait bloquée sur une promesse qui ne se résout jamais.
+   */
+  const enregistrerPublication = useCallback((post: SocialPost) => new Promise<SocialPost>((resoudre, rejeter) => {
+      let regle = false;
+      setSaving(true);
+      fileSauvegardePublication.pousser(post, {
+          onSucces: (serveur) => { if (!regle) { regle = true; resoudre(serveur); } },
+          onEchec: (e) => { if (!regle) { regle = true; rejeter(e); } },
+          onRepos: () => { setSaving(false); if (!regle) { regle = true; resoudre(post); } },
+      });
+  }), []);
+
+  /**
+   * ⚠️ Les deux tableaux voyagent ENSEMBLE. `mediaNames` est parallèle à `mediaFiles` :
+   * même longueur, même ordre, l'index fait le lien. Le serveur recale de toute façon
+   * (`normaliserMediaNames`, routes/social.ts), mais envoyer l'un sans l'autre ferait
+   * afficher, le temps d'un aller-retour, le nom d'un autre visuel.
+   */
+  const handleSaveMedia = async (postId: string, mediaFiles: string[], mediaNames: string[]) => {
       const target = postsRef.current.find(p => p.id === postId);
       if (!target) return;
-      const updated = { ...target, mediaFiles };
+      const updated = { ...target, mediaFiles, mediaNames };
       setPosts(prev => prev.map(p => p.id === postId ? updated : p)); // optimistic
       try {
-          const saved = await db.updateSocialPost(updated);
+          const saved = await enregistrerPublication(updated);
           setPosts(prev => prev.map(p => p.id === saved.id ? saved : p));
           setMediaCounts(prev => ({ ...prev, [postId]: mediaFiles.length }));
       } catch (e) {
@@ -1834,6 +1986,7 @@ const Digital: React.FC = () => {
                             isArchivedView={isArchivedView}
                             networkOptions={tags.networks}
                             co2Options={tags.co2}
+                            lomOptions={tags.lom}
                             mediaCount={mediaCounts[post.id] ?? 0}
                             onOpenMedia={setMediaModalPostId}
                             onFocusChange={suivreFocusChamp}

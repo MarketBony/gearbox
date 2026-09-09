@@ -203,6 +203,12 @@ export interface FeedInfo {
 export interface DigitalTags {
     networks: string[];
     co2: string[];
+    // ⚠️ Mentions Loi LOM, éditables depuis « Gestion des TAGS » au correctif 49.
+    // Troisième et DERNIÈRE catégorie ouverte : `networks`, `co2` et `lom` sont les seuls
+    // champs de `SocialPost` typés `String` LIBRE. Marques, services, statuts et sites
+    // sont adossés à des types de ce fichier et pilotent des tests métier — les ouvrir
+    // supprimerait la garantie de compilation sans validation serveur pour la remplacer.
+    lom: string[];
 }
 
 export interface Equipment {

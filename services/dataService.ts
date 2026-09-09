@@ -1,7 +1,7 @@
 
 import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile } from '../types';
 import type { LobbyData, GameSession, GameChallenge, GameType } from '../components/games/gameTypes';
-import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS } from '../constants';
+import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS, LOI_LOM_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
 import { getCurrentSocketId } from './socketId';
 
@@ -130,6 +130,43 @@ const normalizeSocialPost = (p: any): SocialPost => ({
 // brut à Prisma).
 const stripMeta = ({ id, createdAt, updatedAt, ...data }: any) => data;
 
+/**
+ * Forme sûre d'un `DigitalTags`, quelle que soit la source.
+ * ⚠️ `lom` n'existe que depuis le correctif 49 : une ligne écrite avant, ou un
+ * `localStorage` d'un poste pas encore mis à jour, ne le porte pas. Sans ce repli,
+ * l'écran planterait sur un `.map` d'`undefined`.
+ */
+/**
+ * Valeurs semées par `backend/src/routes/seed.ts` à la création de la base. Leur présence
+ * signifie que personne n'a jamais curé la table depuis l'écran — ce qui a été le cas
+ * jusqu'au correctif 49, l'écran n'écrivant que dans le `localStorage`.
+ */
+const TAGS_DU_SEED = {
+  networks: ['Facebook', 'Instagram', 'LinkedIn'],
+  co2: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+};
+
+const memeListe = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+/** La table est-elle encore « d'usine » : vide, ou strictement égale au seed ? */
+const estNonCuree = (t: DigitalTags): boolean => {
+  const vide = t.networks.length === 0 && t.co2.length === 0 && t.lom.length === 0;
+  const seed = memeListe(t.networks, TAGS_DU_SEED.networks) && memeListe(t.co2, TAGS_DU_SEED.co2) && t.lom.length === 0;
+  return vide || seed;
+};
+
+/** Union ordonnée, sans doublon : le serveur d'abord, puis ce que le poste ajoute. */
+const fusionner = (a: string[], b: string[]): string[] => {
+  const vus = new Set(a);
+  return [...a, ...b.filter(v => !vus.has(v))];
+};
+
+const normalizeDigitalTags = (t: any): DigitalTags => ({
+  networks: Array.isArray(t?.networks) ? t.networks : [],
+  co2: Array.isArray(t?.co2) ? t.co2 : [],
+  lom: Array.isArray(t?.lom) ? t.lom : [],
+});
+
 // Helpers de migration one-shot localStorage -> Supabase (étape 7.2) :
 // ne s'exécute que si l'API est vide, qu'aucune migration n'a déjà eu lieu
 // (flag), que le compte connecté peut écrire (Master/Admin) et que des
@@ -166,14 +203,11 @@ class DataService {
     if (!localStorage.getItem('gearbox_budgets')) {
         localStorage.setItem('gearbox_budgets', JSON.stringify(INITIAL_BUDGET_SCENARIO));
     }
-    // Ensure Digital Tags exist
-    if (!localStorage.getItem('gearbox_digital_tags')) {
-        const defaultTags: DigitalTags = {
-            networks: SOCIAL_NETWORKS,
-            co2: CO2_OPTIONS
-        };
-        localStorage.setItem('gearbox_digital_tags', JSON.stringify(defaultTags));
-    }
+    // ⚠️ L'amorçage des tags Digital dans le `localStorage` a été RETIRÉ au correctif 49 :
+    // la source de vérité est désormais la table `DigitalTags` via `/api/tags`. Semer les
+    // valeurs canoniques ici ferait croire à la récupération unique de `getDigitalTags`
+    // qu'un travail local existe, et publierait des valeurs par défaut que personne n'a
+    // saisies. Les défauts sont désormais rendus à l'affichage, sans être enregistrés.
   }
 
   // --- Generic Helpers ---
@@ -534,24 +568,80 @@ class DataService {
   }
 
   // --- DIGITAL TAGS ---
+  //
+  // ⚠️⚠️ CES DEUX MÉTHODES N'ATTEIGNAIENT PAS LE SERVEUR. Jusqu'au correctif 49
+  // (09/09/2026), elles lisaient et écrivaient dans le `localStorage` du navigateur,
+  // alors que la route `/api/tags` ET le modèle Prisma `DigitalTags` existaient depuis
+  // l'origine — simplement jamais appelés par le client (vérifié : aucun `apiFetch('/tags')`
+  // nulle part). Conséquences vécues par l'équipe digitale : les tags créés par une
+  // personne étaient INVISIBLES de ses collègues, perdus au vidage du navigateur, et
+  // l'abonnement temps réel `RT_EVENTS.tags` de `pages/Digital.tsx` écoutait un événement
+  // que plus rien n'émettait.
+
+  /** Clé du drapeau de migration, posée une fois pour toutes par poste. */
+  private static readonly TAGS_MIGRES = 'gearbox_digital_tags_migres';
+
   async getDigitalTags(): Promise<DigitalTags> {
       if (this.isElectron && window.electron) {
           const rows = await window.electron.loadData('digital_tags');
-          if (rows && rows.length > 0) return rows[0];
-          return { networks: SOCIAL_NETWORKS, co2: CO2_OPTIONS };
+          if (rows && rows.length > 0) return normalizeDigitalTags(rows[0]);
+          return { networks: SOCIAL_NETWORKS, co2: CO2_OPTIONS, lom: LOI_LOM_OPTIONS };
       }
-      const data = localStorage.getItem('gearbox_digital_tags');
-      return data ? JSON.parse(data) : { networks: SOCIAL_NETWORKS, co2: CO2_OPTIONS };
+
+      const serveur = normalizeDigitalTags(await apiFetch('/tags'));
+
+      // ⚠️ RÉCUPÉRATION UNIQUE DES TAGS LOCAUX — et ce n'est PAS un simple « si le serveur
+      // est vide ». Constaté le 09/09/2026 en branchant la route : la table n'était pas
+      // vide, elle contenait les valeurs du SEED d'origine (3 réseaux, classes A à G,
+      // cf. backend/src/routes/seed.ts), tandis que le `localStorage` des postes portait le
+      // vrai travail de l'équipe — 34 modèles avec leur classe CO², les 8 réseaux réels.
+      // Une garde sur le seul « vide » n'aurait donc jamais joué, et l'écran serait retombé
+      // sur les valeurs du seed : l'équipe aurait vu son travail disparaître.
+      //
+      // On considère donc comme NON CURÉE une table vide OU strictement égale au seed, et
+      // on remonte alors l'UNION du serveur et du local. L'union plutôt qu'un remplacement :
+      // aucune valeur n'est perdue, ni celle du serveur ni celle du poste, et le tri est
+      // ensuite trivial à faire à la main dans l'écran.
+      if (!localStorage.getItem(DataService.TAGS_MIGRES)) {
+          const brut = localStorage.getItem('gearbox_digital_tags');
+          if (brut && estNonCuree(serveur)) {
+              try {
+                  const locaux = normalizeDigitalTags(JSON.parse(brut));
+                  if (locaux.networks.length || locaux.co2.length || locaux.lom.length) {
+                      const union: DigitalTags = {
+                          networks: fusionner(serveur.networks, locaux.networks),
+                          co2: fusionner(serveur.co2, locaux.co2),
+                          lom: fusionner(serveur.lom, locaux.lom),
+                      };
+                      const remontes = normalizeDigitalTags(await apiFetch('/tags', { method: 'POST', body: JSON.stringify(union) }));
+                      localStorage.setItem(DataService.TAGS_MIGRES, new Date().toISOString());
+                      return remontes;
+                  }
+              } catch (e) {
+                  // Un `localStorage` illisible ne doit pas empêcher l'écran de s'ouvrir.
+                  console.error('[tags] récupération des tags locaux impossible :', e);
+              }
+          }
+          localStorage.setItem(DataService.TAGS_MIGRES, new Date().toISOString());
+      }
+
+      // Base encore vierge : on propose les valeurs canoniques, SANS les enregistrer.
+      // Elles ne partiront au serveur qu'à la première modification volontaire.
+      if (serveur.networks.length === 0 && serveur.co2.length === 0 && serveur.lom.length === 0) {
+          return { networks: SOCIAL_NETWORKS, co2: CO2_OPTIONS, lom: LOI_LOM_OPTIONS };
+      }
+      return serveur;
   }
 
-  async saveDigitalTags(tags: DigitalTags) {
+  async saveDigitalTags(tags: DigitalTags): Promise<DigitalTags> {
       if (this.isElectron && window.electron) {
           // Use 'save-data' with array [tags] since it expects array for generic insert
-          await window.electron.saveData('digital_tags', [tags]); 
-          return;
+          await window.electron.saveData('digital_tags', [tags]);
+          return tags;
       }
-      localStorage.setItem('gearbox_digital_tags', JSON.stringify(tags));
-      await new Promise(r => setTimeout(r, 200));
+      // Le serveur nettoie et dédoublonne (routes/tags.ts) : on rend SA réponse, pas
+      // l'objet envoyé, pour que l'écran reflète ce qui est réellement enregistré.
+      return normalizeDigitalTags(await apiFetch('/tags', { method: 'POST', body: JSON.stringify(tags) }));
   }
 
   // --- CHAT (BRANCHÉ BACKEND — étape 7) ---

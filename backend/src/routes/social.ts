@@ -41,6 +41,38 @@ const entreeMediaValide = (u: unknown): boolean => {
   try { new URL(u); return true; } catch { return false; }
 };
 
+const NOM_MEDIA_MAX_LONGUEUR = 160;
+
+/**
+ * Normalise `mediaNames` pour qu'il ait EXACTEMENT la longueur de `mediaFiles`.
+ *
+ * ⚠️ SEULE PORTE de cohérence entre les deux tableaux. `mediaNames` est un tableau
+ * PARALLÈLE : c'est l'index qui associe un nom d'origine à une url. Rien, côté base, ne
+ * garantit que les deux restent alignés — un client ancien, un script, ou un simple oubli
+ * d'un appelant les ferait diverger, et les visuels afficheraient alors le nom d'un
+ * autre. On recale donc ici, et nulle part ailleurs : on complète par une chaîne vide
+ * (l'écran retombe sur le nom uuid) et on tronque le surplus.
+ *
+ * ⚠️ Le nom d'origine est une donnée d'AFFICHAGE, jamais un chemin. On retire donc tout
+ * séparateur de chemin et toute séquence `..` avant de stocker : même si la seule
+ * consommation prévue est un `alt` et un nom de téléchargement, la règle absolue de
+ * `routes/uploads.ts` veut qu'un nom fourni par l'utilisateur ne puisse jamais servir à
+ * construire un chemin. On borne aussi la longueur.
+ */
+const normaliserMediaNames = (noms: unknown, urls: string[]): string[] => {
+  const bruts = Array.isArray(noms) ? noms : [];
+  return urls.map((_, i) => {
+    const n = bruts[i];
+    if (typeof n !== 'string') return '';
+    return n
+      .replace(/[\\/]/g, '_')       // aucun séparateur de chemin
+      .replace(/\.\./g, '_')         // aucune remontée de répertoire
+      .replace(/[\x00-\x1f]/g, '')   // aucun caractère de contrôle
+      .trim()
+      .slice(0, NOM_MEDIA_MAX_LONGUEUR);
+  });
+};
+
 /**
  * Rend un message d'erreur, ou `null` si c'est bon.
  *
@@ -98,11 +130,27 @@ router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) 
   // sert de liste de tolérance pour les valeurs héritées, cf. validerMediaFiles.
   const existing = await prisma.socialPost.findUnique({
     where: { id },
-    select: { archived: true, mediaFiles: true },
+    select: { archived: true, mediaFiles: true, mediaNames: true },
   });
 
   const refus = validerMediaFiles(data.mediaFiles, existing?.mediaFiles ?? []);
   if (refus) return res.status(400).json({ error: refus });
+
+  // ⚠️ Recalage des noms de médias — voir `normaliserMediaNames`. On le fait dès que
+  // l'un OU l'autre des deux tableaux est présent dans le corps : envoyer `mediaFiles`
+  // sans `mediaNames` (un client qui ne connaît pas encore le champ) ne doit pas laisser
+  // en base des noms qui pointent sur les mauvais fichiers.
+  const envoieMedias = Object.prototype.hasOwnProperty.call(data, 'mediaFiles')
+    || Object.prototype.hasOwnProperty.call(data, 'mediaNames');
+  if (envoieMedias) {
+    const urls: string[] = Array.isArray(data.mediaFiles) ? data.mediaFiles : (existing?.mediaFiles ?? []);
+    const noms = Object.prototype.hasOwnProperty.call(data, 'mediaNames')
+      ? data.mediaNames
+      : (existing?.mediaNames ?? []);
+    data.mediaNames = normaliserMediaNames(noms, urls);
+  } else {
+    delete data.mediaNames;
+  }
 
   if (Object.prototype.hasOwnProperty.call(data, 'archived')) {
     if (data.archived === true && existing && !existing.archived) {
