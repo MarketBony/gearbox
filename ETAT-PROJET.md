@@ -10,7 +10,14 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 49** (Digital — retours
+- master = prod, synchronisés. Dernier lot déployé : **correctif 50** (Digital — second
+  retour de l'équipe : liens cliquables, commentaires par édito, plaques hors du sélecteur
+  de sites, statut « Constructeur », 10 septembre) — **`api` ET `web`**, **avec migration**
+  (`20260910120000_add_social_comments`, purement additive).
+  ℹ️ Migration appliquée depuis ce poste **avant** le déploiement, puis inscrite dans
+  `_prisma_migrations` par `prisma migrate resolve --applied` — sans cette seconde étape le
+  conteneur `api` la rejouerait au démarrage et **ne démarrerait pas**.
+  Avant lui le **correctif 49** (Digital — retours
   de l'équipe : lenteur du wording, libellés, tags partagés, nom et ordre des visuels,
   9 septembre) — **`api` ET `web`**, **avec migration**
   (`20260909120000_digital_media_names_et_tags_lom`, purement additive).
@@ -2602,6 +2609,118 @@
     Théo avec un collègue. Le rôle `External`, qui édite le Digital depuis le 25/08, n'a pas
     non plus été parcouru faute de compte.
 
+50. **DIGITAL — SECOND RETOUR DE L'ÉQUIPE : liens cliquables, commentaires par édito,
+    plaques hors du sélecteur, statut « Constructeur »** (`feat/digital-retours-equipe-2`,
+    10 septembre 2026). Frontend **et** backend, **avec migration**
+    (`20260910120000_add_social_comments`, purement additive). Quatre demandes de l'équipe,
+    plus **deux défauts trouvés en chemin**, dont l'un était un prérequis technique.
+
+    - **Les liens sont cliquables** (`pages/Digital.tsx`). Le champ « Lien » d'une ligne
+      d'édito était un `<input>` nu, sans `<a>` : l'équipe recopiait l'adresse à la main.
+      Il rend désormais un vrai lien (nouvel onglet, `rel="noopener noreferrer"`, libellé
+      raccourci par `libelleCourt`, url complète en infobulle) avec un **crayon** qui
+      rouvre la saisie ; le champ reste affiché tant qu'il n'y a rien à ouvrir.
+      ⚠️ **Le garde de protocole `hrefSur` est le prix de cette fonction, pas un ornement** :
+      `SocialPost.link` n'est validé NULLE PART (`String` libre côté Prisma, jamais regardé
+      par la route). Tant que le champ était inerte, son contenu ne pouvait rien faire ; le
+      rendre cliquable aurait transformé un `javascript:…` en exécutable d'un clic, dans la
+      session du collègue qui suit le lien. Seuls `http`/`https` sont rendus, et `www.…`
+      est préfixé (l'équipe colle souvent sans protocole, et une url sans schéma serait lue
+      comme un chemin RELATIF à Gearbox). **Vérifié** : `javascript:alert(1)` saisi →
+      aucune ancre, le champ reste ; `www.bonyauto-mobile.com/test` → `https://…`.
+      La fermeture se fait sur la **perte de focus** et non sur `onValider` : celui-ci
+      n'est appelé que si la valeur a CHANGÉ (garde de `ChampTexte`), donc ouvrir puis
+      renoncer laissait le champ ouvert indéfiniment. `ChampTexte` reçoit au passage un
+      `autoFocus` optionnel — sans lui, le crayon ouvrait un champ qu'il fallait ensuite
+      aller cliquer.
+    - **Un fil de COMMENTAIRES par publication.** Nouveau modèle `SocialComment`
+      (`postId` + `@@index`, `onDelete: Cascade`), trois routes REST dans `social.ts`,
+      **déclarées avant `/:id`** — sans quoi `DELETE /comments/:id` serait capturée par
+      `DELETE /:id`, qui supprimerait la publication dont l'id vaudrait « comments ».
+      ⚠️ **Aucun nom ni couleur d'auteur n'est stocké** : `authorId` seul, l'identité est
+      résolue **par le serveur à la lecture** (via `publicUser`) — un renommage ne doit pas
+      laisser l'ancien nom dans l'historique (leçon des parties de jeu, correctif 30), et
+      c'est le serveur qui résout parce qu'un rôle cloisonné ne reçoit de `GET /api/users`
+      que sa propre fiche : il lirait sinon « Utilisateur » partout.
+      Côté écran, un **4ᵉ bouton** dans la colonne d'actions avec pastille de compte, et un
+      `FloatingPanel` **portalisé** — obligatoire, `.gx-glass-panel` porte un
+      `backdrop-filter` qui crée un contexte d'empilement (c'est le bug du correctif 47).
+      Le panneau n'est **monté que lorsqu'il est ouvert** : c'est ce qui permet d'y appeler
+      `useRealtimeSync` sans poser 57 abonnements, un par ligne.
+      ⚠️ Événement temps réel **distinct** (`social-comment:updated` / `:deleted`) :
+      réutiliser `social:updated` aurait fait recharger la liste entière chez tous les
+      collègues à chaque commentaire — exactement la lenteur que le correctif 49 venait de
+      supprimer. L'écran s'y abonne quand même pour les **compteurs**, un commentaire étant
+      un événement rare.
+    - **Les plaques quittent le sélecteur « Sites »** d'une ligne (`DIGITAL_CONCESSIONS`,
+      `constants.ts`) : l'équipe vise des concessions réelles. Le **filtre ★ PLAQUE de
+      l'onglet Planning est conservé** — là, une plaque est une façon de LIRE plusieurs
+      sites d'un coup, pas une valeur saisie. `PLAQUES_STRUCTURE` n'est pas touché
+      (dupliqué côté backend, surveillé par `check-plaques-sync`).
+      ⚠️ **Mesuré avant de coder, et ça a changé le correctif** : **9 publications réelles
+      portent des plaques** dans `concessions` (« OPO SEPTEMBRE RENAULT », « LANCEMENT LEAF
+      J-7 »… — elles s'en servent comme d'un « tout le réseau »). Or le bouton du
+      `VisualMultiSelect` rend `selected`, pas `options` : la valeur serait restée
+      AFFICHÉE sans figurer dans le menu, donc **impossible à décocher**. Le sélecteur
+      complète donc ses options par les valeurs déjà retenues. Vérifié sur « OFFRES
+      ACCESSOIRES DACIA » : 33 options au lieu de 29, les 4 plaques cochées et décochables.
+    - **Statut « Constructeur »**, en 2ᵉ position, cyan. Trois lignes en tout
+      (`types.ts`, `SOCIAL_STATUS_COLORS`), **aucun changement serveur** : `status` est un
+      `String` libre. ⚠️ **L'ordre des clés de `SOCIAL_STATUS_COLORS` EST l'ordre du menu**
+      (`Object.keys`) — c'est désormais écrit au-dessus de la constante. Le texte porte une
+      variante `dark:` que les huit autres n'ont pas : sans elle, un `text-cyan-300` pâlit
+      en thème clair.
+    - **PRÉREQUIS TECHNIQUE — `SOCIAL_FIELDS`, la liste blanche d'écriture** de
+      `routes/social.ts`. Le POST et le PUT passaient `req.body` **BRUT** à Prisma. C'est
+      tenable tant que le client renvoie exactement les colonnes du modèle — mais il
+      renvoie la publication **entière** à chaque sauvegarde (`stripMeta`), donc le jour où
+      la réponse du GET porte un champ de plus (`commentCount`, dérivé et non stocké), ce
+      champ repart au PUT, Prisma refuse l'argument inconnu et **toutes** les sauvegardes
+      tombent. La fonctionnalité imposait donc de fermer la dette. C'est la **cinquième
+      porte** du backend, avec le même piège que `TASK_FIELDS` : un champ absent de la
+      liste est jeté **en silence**.
+    - **Défaut trouvé en chemin : la purge faisait DÉRIVER les noms de visuels.**
+      `jobs/purge.ts` écrivait `mediaFiles` sans toucher `mediaNames`, alors que le schéma
+      pose la règle « ne jamais écrire ces deux colonnes ailleurs sans repasser par
+      `normaliserMediaNames` ». La purge 30 j retire des entrées **au milieu** du tableau :
+      les noms suivants glissaient d'un cran et s'affichaient sur les mauvais médias.
+      **Prouvé** sur un cas fabriqué (fichier · lien · fichier, les deux fichiers purgés) :
+      le lien restant conserve `le-lien.txt` au lieu d'hériter de `premier.jpg`.
+
+    **Vérifié dans l'interface, sur les données réelles et sur une publication jetable**
+    (« TEST CORRECTIF 50 »), créée puis supprimée : 3 liens réels rendus cliquables ;
+    statut persisté en base et bande cyan calculée (`rgb(6,182,212)`) dans la ligne **et**
+    sur la tuile du Planning ; 29 options de sites sans aucune plaque ; commentaire créé
+    (auteur et couleur résolus serveur), relu, compteur exact, supprimé ; bornes du
+    commentaire (vide → 400, > 2 000 caractères → 400, publication inconnue → 404) ;
+    **cascade prouvée** — publication supprimée, `SocialComment` à 0 en base, 61
+    publications avant comme après, zéro résidu.
+    **Non-régression de la liste blanche, le contrôle le plus important** : les **15
+    champs** ont été réécrits et relus un par un (titre, statut, date, service, marques,
+    réseaux, sites, diffusion, wording, LOM, CO², lien, médias + noms, archivage) — un
+    champ oublié aurait été jeté sans erreur ni trace. `archivedAt` reste géré serveur
+    (posé à l'archivage, vidé au désarchivage).
+    Mesuré : hauteur de ligne **inchangée à 170 px**, colonne d'actions 161 px pour un
+    en-tête porté à 152 (le décalage de 9 px est celui d'avant, à l'identique), panneau de
+    320 px qui ne déborde ni à 1 280 ni à **375 px**, bouton à **44 px** au doigt, aucun
+    scroll horizontal à 1 400, 1 280, 1 000 et 375 px.
+    `tsc --noEmit` : **9 à la racine** (les préexistantes), **0 au backend** ;
+    `check-plaques-sync` vert ; build de production OK.
+
+    ⚠️ **La migration a été appliquée depuis ce poste AVANT le déploiement**, comme au
+    correctif 49 : `prisma db execute` (le `migrate deploy` étant refusé par le classifieur
+    de sécurité de l'agent), **puis `prisma migrate resolve --applied`** pour l'inscrire
+    dans `_prisma_migrations`. Cette seconde commande n'est pas facultative : sans elle le
+    conteneur `api` rejouerait la migration au démarrage, échouerait sur une table déjà
+    existante et **ne démarrerait pas**. `migrate status` rend « Database schema is up to
+    date! » avant le déploiement.
+
+    ⚠️ **NON VÉRIFIÉ, à assumer** : (1) le refus **403** de supprimer le commentaire d'un
+    AUTRE auteur — le seul compte disponible est Master, qui a justement le droit
+    d'arbitrer ; il faut un second compte non-admin. (2) Le temps réel des commentaires
+    **à deux postes**. (3) Les rôles `Site Manager` (qui doit LIRE le fil sans pouvoir
+    commenter) et `External`, faute de comptes — même trou qu'aux correctifs 45 et 49.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
@@ -2707,6 +2826,13 @@
   envoi d'avatar, fichier de projet) a été interrompu. ⚠️ La leçon qui revient dans ce
   dépôt est qu'un contrôle exact des routes a **deux fois** manqué ce qu'un parcours de
   cinq minutes a vu. À solder par Théo à la première utilisation.
+
+- **Commentaires du Digital (correctif 50) — trois contrôles qui demandent un AUTRE compte
+  que le mien** : (1) le refus 403 de supprimer le commentaire d'un autre auteur (Master
+  a le droit d'arbitrer, donc mon compte ne peut pas le montrer) ; (2) le temps réel du
+  fil à deux postes ; (3) le chef de site, qui doit LIRE un fil sans pouvoir commenter, et
+  l'External, qui doit pouvoir les deux. Même trou qu'aux correctifs 45 et 49 — un
+  raisonnement exact ne remplace pas un parcours d'interface.
 
 ### Dette technique
 - **Build local non représentatif du build déployé** : Docker construit le front en

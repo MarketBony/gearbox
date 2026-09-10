@@ -6,16 +6,17 @@ import { db, ApiError } from '../services/dataService';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { fileSauvegardePublication } from '../services/fileSauvegardePublication';
 import { ChampTexte } from '../components/ChampDiffere';
-import { SocialPost, SocialStatus, SocialNetwork, BrandType, SocialServiceType, SocialTarget, Site, PlaqueName, DigitalTags, ActivityLog } from '../types';
+import { SocialPost, SocialStatus, SocialNetwork, BrandType, SocialServiceType, SocialTarget, Site, PlaqueName, DigitalTags, ActivityLog, SocialComment } from '../types';
 import { SOCIAL_STATUS_COLORS, BRANDS, SOCIAL_SERVICES, PLAQUES_STRUCTURE, SITES, BRAND_COLORS,
          DIGITAL_CONCESSIONS, libelleMarqueDigital, libelleStatutSocial } from '../constants';
-import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload, ExternalLink } from 'lucide-react';
+import { Globe, Lock, Plus, Save, Archive, Search, Filter, Image, Trash2, Check, ChevronDown, Link as LinkIcon, Calendar, ArrowUp, ArrowDown, Square, CheckSquare, LayoutList, X, ChevronLeft, ChevronRight, Instagram, Facebook, Linkedin, Youtube, MapPin, Video, Eye, AlignLeft, Clock, Settings, Edit2, AlertCircle, Download, Upload, ExternalLink, MessageSquare, Send } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import Select from '../components/Select';
 import CollapsibleFilters from '../components/CollapsibleFilters';
 import { isSiteManager, canEditDigital } from '../constants';
 import DatePicker from '../components/DatePicker';
 import FloatingPanel from '../components/FloatingPanel';
+import Avatar from '../components/Avatar';
 import { fournisseurDe, libelleCourt } from '../lib/linkProviders';
 
 type Tab = 'Calendrier Editorial' | 'Planning Digital' | 'Archives' | 'Gestion des TAGS';
@@ -259,6 +260,33 @@ const MEDIA_MAX_SIZE = 2 * 1024 * 1024 * 1024; // 2 Go
 const MEDIA_ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime'];
 
 const estLienExterne = (url: string) => /^https?:\/\//i.test(url);
+
+/**
+ * Adresse OUVRABLE d'un `post.link`, ou `null` si on refuse de la rendre cliquable.
+ *
+ * ⚠️ CE GARDE EST LE PRIX DU LIEN CLIQUABLE (correctif 50). Tant que le lien n'était
+ * qu'un champ de saisie, son contenu était inerte. `SocialPost.link` n'est validé NULLE
+ * PART — `String` libre côté Prisma, et la route ne le regarde pas — donc un
+ * `javascript:…` ou un `data:text/html;…` saisi par n'importe quel compte des
+ * `EDIT_ROLES` deviendrait, sans ce filtre, un exécutable d'un clic dans la session du
+ * collègue qui le suit. Même doctrine que `entreeMediaValide` côté serveur
+ * (`backend/src/routes/social.ts`) : on n'accepte QUE `http`/`https`.
+ *
+ * `www.…` est préfixé parce que c'est ce que l'équipe colle réellement, et qu'une url
+ * sans protocole serait sinon interprétée comme un chemin RELATIF à Gearbox.
+ */
+const hrefSur = (lien?: string): string | null => {
+    const brut = (lien ?? '').trim();
+    if (!brut) return null;
+    const candidat = /^www\./i.test(brut) ? `https://${brut}` : brut;
+    if (!estLienExterne(candidat)) return null;
+    try {
+        const u = new URL(candidat);
+        return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : null;
+    } catch {
+        return null;
+    }
+};
 
 // ⚠️ Le garde `!estLienExterne` est LOAD-BEARING : sans lui, un lien de partage se
 // terminant par `/video.mp4` (WeTransfer en produit) partirait dans un `<video src>`,
@@ -696,6 +724,177 @@ const MediaManagerModal: React.FC<MediaManagerModalProps> = ({ post, canEdit, on
     );
 };
 
+// --- COMPONENT: FIL DE COMMENTAIRES D'UNE PUBLICATION (correctif 50) ---
+//
+// Demande de l'équipe : laisser une consigne sur un édito sans passer par le chat, où
+// elle se perd. La contrainte d'intégration était l'ESPACE — la ligne d'édito a été
+// resserrée au correctif 47 et n'a plus de marge — d'où un panneau ouvert à la demande
+// depuis la colonne d'actions, et non un bloc affiché en permanence.
+//
+// ⚠️ MONTÉ SEULEMENT QUAND IL EST OUVERT (rendu conditionnel côté ligne). C'est ce qui
+// permet d'y appeler `useRealtimeSync` sans poser 57 abonnements — un par ligne — et de
+// ne charger le fil qu'à l'ouverture.
+//
+// ⚠️ Panneau PORTALISÉ (`FloatingPanel`) et non `absolute` : `.gx-glass-panel` porte un
+// `backdrop-filter`, qui crée un contexte d'empilement — c'est ce qui faisait passer
+// l'ancien wording SOUS les lignes suivantes (correctif 47).
+const PanneauCommentaires: React.FC<{
+    postId: string;
+    triggerRef: React.RefObject<HTMLElement | null>;
+    canEdit: boolean;
+    onClose: () => void;
+    /** Remonte le nombre réel à la ligne, qui n'a sinon que le compteur du dernier GET. */
+    onNombre: (n: number) => void;
+}> = ({ postId, triggerRef, canEdit, onClose, onNombre }) => {
+    const { user } = useAuth();
+    const [commentaires, setCommentaires] = useState<SocialComment[] | null>(null);
+    const [saisie, setSaisie] = useState('');
+    const [envoiEnCours, setEnvoiEnCours] = useState(false);
+    const [erreur, setErreur] = useState<string | null>(null);
+
+    // `onNombre` vient du parent et n'est pas mémoïsé : passer par une ref évite de
+    // recréer `charger` (et donc de recharger le fil) à chaque rendu de la ligne.
+    const onNombreRef = useRef(onNombre);
+    onNombreRef.current = onNombre;
+
+    const charger = useCallback(async () => {
+        try {
+            const liste = await db.getSocialComments(postId);
+            setCommentaires(liste);
+            onNombreRef.current(liste.length);
+            setErreur(null);
+        } catch (e) {
+            setErreur(e instanceof ApiError ? e.message : 'Commentaires indisponibles.');
+        }
+    }, [postId]);
+
+    useEffect(() => { charger(); }, [charger]);
+    // Un collègue qui commente pendant que le fil est ouvert. Le compteur des AUTRES
+    // lignes, lui, se met à jour par le rechargement de l'écran (voir `Digital`).
+    useRealtimeSync([...RT_EVENTS.socialComments], charger);
+
+    const envoyer = async () => {
+        const texte = saisie.trim();
+        if (!texte || envoiEnCours) return;
+        setEnvoiEnCours(true);
+        try {
+            await db.addSocialComment(postId, texte);
+            setSaisie('');
+            await charger();
+        } catch (e) {
+            setErreur(e instanceof ApiError ? e.message : 'Envoi impossible.');
+        } finally {
+            setEnvoiEnCours(false);
+        }
+    };
+
+    const supprimer = async (id: string) => {
+        try {
+            await db.deleteSocialComment(id);
+            await charger();
+        } catch (e) {
+            setErreur(e instanceof ApiError ? e.message : 'Suppression impossible.');
+        }
+    };
+
+    const estAdmin = user?.role === 'Master' || user?.role === 'Administrator';
+    const quand = (iso: string) => {
+        const d = new Date(iso);
+        return Number.isNaN(d.getTime())
+            ? ''
+            : `${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+    };
+
+    return (
+        <FloatingPanel
+            open
+            onClose={onClose}
+            triggerRef={triggerRef}
+            width={320}
+            minWidth={280}
+            maxHeight={360}
+            align="end"
+            className="rounded-2xl p-2"
+        >
+            <div className="flex flex-col min-h-0 gap-2">
+                <div className="flex items-center justify-between px-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-bony-muted">Commentaires</span>
+                    <button type="button" onClick={onClose} className="p-1 -m-1 text-bony-muted hover:text-bony-orange transition-colors" title="Fermer">
+                        <X size={12} />
+                    </button>
+                </div>
+
+                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar flex flex-col gap-2 px-1">
+                    {commentaires === null ? (
+                        <p className="text-[11px] text-bony-muted italic py-2">Chargement…</p>
+                    ) : commentaires.length === 0 ? (
+                        <p className="text-[11px] text-bony-muted italic py-2">
+                            Aucun commentaire. {canEdit ? 'Laissez une consigne à l’équipe.' : ''}
+                        </p>
+                    ) : commentaires.map(c => (
+                        <div key={c.id} className="flex items-start gap-2 group/com">
+                            <Avatar userId={c.authorId} name={c.author?.name ?? '?'} color={c.author?.avatarColor} size={22} />
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-baseline gap-1.5 min-w-0">
+                                    <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate">
+                                        {/* Compte supprimé depuis : on ne fabrique pas un nom, on le dit. */}
+                                        {c.author?.name ?? 'Compte supprimé'}
+                                    </span>
+                                    <span className="text-[9px] text-bony-muted shrink-0">{quand(c.createdAt)}</span>
+                                </div>
+                                <p className="text-[11px] leading-snug text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">
+                                    {c.content}
+                                </p>
+                            </div>
+                            {canEdit && (c.authorId === user?.id || estAdmin) && (
+                                <button
+                                    type="button"
+                                    onClick={() => supprimer(c.id)}
+                                    title="Supprimer ce commentaire"
+                                    // Visible au doigt sur mobile, discret au survol sur ordinateur :
+                                    // c'est la parade du correctif 31 sur la sourdine du chat.
+                                    className="shrink-0 p-1 rounded text-slate-400 dark:text-slate-600 hover:text-red-500 transition-colors opacity-100 md:opacity-0 md:group-hover/com:opacity-100"
+                                >
+                                    <X size={11} />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                {erreur && <p className="text-[10px] text-red-500 px-1">{erreur}</p>}
+
+                {canEdit && (
+                    <div className="border-t border-bony-border pt-2 flex items-end gap-1.5">
+                        <textarea
+                            value={saisie}
+                            onChange={e => setSaisie(e.target.value)}
+                            // ⚠️ Entrée envoie, Maj+Entrée passe à la ligne : même convention que le
+                            // Chat. Aucun appel réseau à la frappe — l'état est purement local.
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); envoyer(); }
+                            }}
+                            rows={2}
+                            maxLength={2000}
+                            placeholder="Écrire un commentaire…"
+                            className="flex-1 min-w-0 bg-[var(--bg-input)] border border-bony-border rounded-lg px-2 py-1.5 text-[11px] text-bony-text outline-none focus:border-bony-violet resize-none custom-scrollbar"
+                        />
+                        <button
+                            type="button"
+                            onClick={envoyer}
+                            disabled={!saisie.trim() || envoiEnCours}
+                            title="Envoyer (Entrée)"
+                            className="shrink-0 w-9 h-9 rounded-lg bg-bony-orange/15 border border-bony-orange/50 text-bony-orange flex items-center justify-center transition-opacity disabled:opacity-40"
+                        >
+                            <Send size={14} />
+                        </button>
+                    </div>
+                )}
+            </div>
+        </FloatingPanel>
+    );
+};
+
 // --- COMPONENT: EDITO ROW ---
 interface EditoRowProps {
     post: SocialPost;
@@ -740,6 +939,39 @@ const EditoRow = React.memo(function EditoRow({ post, onChangerChamp, onDelete, 
     const [wordingOuvert, setWordingOuvert] = useState(false);
     const wordingRef = useRef<HTMLDivElement>(null);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    /** Bascule lien cliquable ↔ saisie (correctif 50). Voir le bloc LIEN plus bas. */
+    const [editionLien, setEditionLien] = useState(false);
+    const [commentairesOuverts, setCommentairesOuverts] = useState(false);
+    const boutonCommentairesRef = useRef<HTMLButtonElement>(null);
+    /**
+     * Nombre de commentaires.
+     *
+     * ⚠️ Deux sources, et l'ordre compte : `post.commentCount` vient du dernier
+     * `GET /api/social` et peut donc être périmé de quelques secondes ; dès que le
+     * panneau a lu le fil, c'est LUI qui fait autorité — sinon la pastille afficherait
+     * encore « 2 » juste après qu'on a supprimé le troisième commentaire.
+     */
+    const [nbCommentairesLus, setNbCommentairesLus] = useState<number | null>(null);
+    const nbCommentaires = nbCommentairesLus ?? post.commentCount ?? 0;
+    // Toute valeur FRAÎCHE du serveur reprend la main : sans cette remise à zéro, une
+    // ligne dont le fil a été ouvert une fois resterait figée sur ce qu'elle avait lu,
+    // même après qu'un collègue a commenté et que l'écran s'est rechargé.
+    useEffect(() => { setNbCommentairesLus(null); }, [post.commentCount]);
+    const hrefLien = hrefSur(post.link);
+    /**
+     * Options du sélecteur « Sites ».
+     *
+     * ⚠️ `DIGITAL_CONCESSIONS` ne contient plus les PLAQUES depuis le correctif 50, mais
+     * une publication écrite avant peut en porter une. Le bouton du `VisualMultiSelect`
+     * rend `selected` et non `options` : la plaque resterait donc AFFICHÉE sans figurer
+     * dans le menu, c'est-à-dire impossible à décocher. On complète les options par les
+     * valeurs déjà retenues — ce qui retire la plaque des nouveaux choix sans piéger
+     * l'existant.
+     */
+    const optionsSites = useMemo(
+        () => [...DIGITAL_CONCESSIONS, ...post.concessions.filter(c => !DIGITAL_CONCESSIONS.includes(c))],
+        [post.concessions]
+    );
     /**
      * Brouillon du wording, remonté par `ChampTexte` à chaque frappe.
      * ⚠️ Sert UNIQUEMENT à l'aperçu et au compteur de caractères, qui lisaient
@@ -789,17 +1021,52 @@ const EditoRow = React.memo(function EditoRow({ post, onChangerChamp, onDelete, 
                         className="flex-1 min-w-0 bg-transparent border-none p-0 text-sm font-bold text-slate-900 dark:text-white outline-none placeholder-slate-400 dark:placeholder-slate-600 focus:text-bony-orange transition-colors"
                         placeholder="Titre de la publication..."
                     />
+                    {/* LIEN — cliquable au repos, editable au crayon (correctif 50).
+                        L'equipe recopiait l'adresse a la main : le champ etait un input nu,
+                        sans <a>. On garde la saisie differee pour l'edition, et on rend un
+                        vrai lien le reste du temps. Le champ reste affiche tant qu'il n'y a
+                        rien a ouvrir (vide, ou protocole refuse par `hrefSur`) : sans quoi
+                        une saisie non conforme deviendrait invisible ET ineditable. */}
                     <div className="flex items-center gap-1 shrink-0 w-[34%] max-w-[230px]">
                         <LinkIcon size={11} className={post.link ? "text-blue-500 dark:text-blue-400 shrink-0" : "text-slate-400 dark:text-slate-600 shrink-0"}/>
-                        <ChampTexte
-                            cle={`${post.id}:link`}
-                            valeur={post.link}
-                            disabled={!canEdit}
-                            onValider={v => onChangerChamp(post.id, 'link', v)}
-                            onFocusChange={onFocusChange}
-                            placeholder="Lien…"
-                            className="bg-transparent text-[11px] text-blue-500 dark:text-blue-300 w-full min-w-0 truncate outline-none placeholder-slate-400 dark:placeholder-slate-700 hover:text-blue-600 dark:hover:text-blue-200 transition-colors"
-                        />
+                        {hrefLien && !editionLien ? (
+                            <>
+                                <a
+                                    href={hrefLien}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title={post.link}
+                                    className="flex-1 min-w-0 truncate text-[11px] text-blue-500 dark:text-blue-300 underline decoration-dotted underline-offset-2 hover:text-blue-600 dark:hover:text-blue-200 transition-colors"
+                                >
+                                    {libelleCourt(hrefLien)}
+                                </a>
+                                {canEdit && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditionLien(true)}
+                                        title="Modifier le lien"
+                                        className="shrink-0 p-1 -my-1 rounded text-slate-400 dark:text-slate-600 hover:text-bony-orange transition-colors"
+                                    >
+                                        <Edit2 size={11} />
+                                    </button>
+                                )}
+                            </>
+                        ) : (
+                            <ChampTexte
+                                cle={`${post.id}:link`}
+                                valeur={post.link}
+                                disabled={!canEdit}
+                                autoFocus={editionLien}
+                                onValider={v => onChangerChamp(post.id, 'link', v)}
+                                // ⚠️ On referme sur la PERTE DE FOCUS, pas sur `onValider` :
+                                // celui-ci n'est appele que si la valeur a CHANGE (garde de
+                                // `ChampTexte`), donc ouvrir puis renoncer laisserait le
+                                // champ ouvert indefiniment.
+                                onFocusChange={f => { onFocusChange?.(f); if (!f) setEditionLien(false); }}
+                                placeholder="Lien…"
+                                className="bg-transparent text-[11px] text-blue-500 dark:text-blue-300 w-full min-w-0 truncate outline-none placeholder-slate-400 dark:placeholder-slate-700 hover:text-blue-600 dark:hover:text-blue-200 transition-colors"
+                            />
+                        )}
                     </div>
                 </div>
 
@@ -924,7 +1191,7 @@ const EditoRow = React.memo(function EditoRow({ post, onChangerChamp, onDelete, 
                     <Etiquette>Sites</Etiquette>
                     <VisualMultiSelect
                         label="Sites…"
-                        options={DIGITAL_CONCESSIONS}
+                        options={optionsSites}
                         selected={post.concessions}
                         onChange={v => onChangerChamp(post.id, 'concessions', v)}
                         disabled={!canEdit}
@@ -1005,6 +1272,32 @@ const EditoRow = React.memo(function EditoRow({ post, onChangerChamp, onDelete, 
                         </span>
                     )}
                 </button>
+
+                {/* COMMENTAIRES — 4e bouton (correctif 50). Le fil n'est chargé qu'à
+                    l'ouverture ; la pastille se contente du compteur renvoyé par
+                    `GET /api/social`, jusqu'à ce que le panneau donne le nombre réel. */}
+                <button
+                    ref={boutonCommentairesRef}
+                    onClick={() => setCommentairesOuverts(o => !o)}
+                    className={`relative w-11 h-11 md:w-9 md:h-9 rounded-lg border flex items-center justify-center transition-all shrink-0 ${nbCommentaires > 0 ? 'bg-bony-violet/10 border-bony-violet text-bony-violet' : 'bg-slate-100 dark:bg-black/40 border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-600 hover:text-slate-900 dark:hover:text-white hover:border-bony-violet/50'}`}
+                    title={nbCommentaires > 0 ? `${nbCommentaires} commentaire${nbCommentaires > 1 ? 's' : ''}` : 'Commenter'}
+                >
+                    <MessageSquare size={18}/>
+                    {nbCommentaires > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-bony-violet text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none shadow">
+                            {nbCommentaires > 9 ? '9+' : nbCommentaires}
+                        </span>
+                    )}
+                </button>
+                {commentairesOuverts && (
+                    <PanneauCommentaires
+                        postId={post.id}
+                        triggerRef={boutonCommentairesRef}
+                        canEdit={canEdit}
+                        onClose={() => setCommentairesOuverts(false)}
+                        onNombre={setNbCommentairesLus}
+                    />
+                )}
 
                 <button
                     disabled={!canEdit}
@@ -1393,8 +1686,14 @@ const Digital: React.FC = () => {
 
   // Temps réel : posts du calendrier + tags (réseaux/CO2). `silent` = pas de
   // squelette de chargement pendant le refetch.
+  //
+  // ⚠️ Les commentaires en font partie, mais SEULEMENT pour le compteur : un commentaire
+  // posté par un collègue doit faire bouger la pastille des lignes, ce que seul un
+  // `GET /api/social` sait faire (le fil, lui, se recharge dans le panneau ouvert). Un
+  // commentaire est un événement RARE — rien à voir avec la frappe au kilomètre que le
+  // correctif 49 a sortie du réseau.
   useRealtimeSync(
-      [...RT_EVENTS.social, ...RT_EVENTS.tags],
+      [...RT_EVENTS.social, ...RT_EVENTS.tags, ...RT_EVENTS.socialComments],
       () => loadData(true)
   );
 
@@ -1969,7 +2268,7 @@ const Digital: React.FC = () => {
                       RÉGLAGES · TRI PAR DATE
                       {sortOrder === 'asc' ? <ArrowUp size={12}/> : <ArrowDown size={12}/>}
                   </div>
-                  <div className="shrink-0 w-[116px] text-right">MÉDIA / ACTIONS</div>
+                  <div className="shrink-0 w-[152px] text-right">MÉDIA / ACTIONS</div>
               </div>
 
               {/* LIST */}

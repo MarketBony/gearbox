@@ -197,6 +197,18 @@ helpers de clause associés. **Ne jamais recopier un `where` de site dans une ro
 c'est le même principe que `constants.ts` pour le routage budgétaire et `publicUser`
 pour `passwordHash`.
 
+**Les autres portes uniques du backend, à connaître avant d'écrire une route :**
+`utils/publicUser.ts` (jamais l'objet Prisma brut d'un `User`), `utils/gameView.ts`
+(jamais une partie non redactée), `db.ts` (une seule instance de `PrismaClient`), et les
+deux listes blanches d'écriture — `TASK_FIELDS` dans `routes/projects.ts` et, depuis le
+10/09/2026, **`SOCIAL_FIELDS` dans `routes/social.ts`**. ⚠️ Ces listes jettent **en
+silence** tout champ qui n'y figure pas : la valeur part, le serveur répond 200, elle a
+disparu au rechargement, et il n'y a d'erreur ni côté client ni dans les logs. Une colonne
+ajoutée au schéma s'ajoute à la liste **dans le même lot**. Corollaire découvert au
+correctif 50 : **enrichir la réponse d'une route dont l'écriture n'a pas de liste blanche
+est un piège à retardement** — le client renvoie l'objet entier, champ dérivé compris, et
+Prisma refuse l'argument inconnu.
+
 ⚠️ **Filtrer les lignes ne suffit pas : il faut aussi redacter leur CONTENU.** Un
 projet multi-sites qui inclut sa concession passe légitimement le filtre, mais son
 `sites[]` et son `budgetDistribution` nommeraient toutes les autres avec leurs

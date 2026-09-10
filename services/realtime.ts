@@ -55,6 +55,12 @@ export const RT_EVENTS = {
   expenses: ['expense:created', 'expense:updated', 'expense:deleted'],
   fixedExpenses: ['fixed-expense:created', 'fixed-expense:updated', 'fixed-expense:deleted'],
   social: ['social:updated', 'social:deleted'],
+  // Commentaires d'une publication (correctif 50). Événement DISTINCT de `social` — et
+  // c'est le cœur de l'affaire : réutiliser `social:updated` ferait recharger la liste
+  // entière des publications chez tous les collègues à chaque commentaire, c'est-à-dire
+  // exactement la lenteur que le correctif 49 venait de supprimer. Même raison que pour
+  // `projectFiles`.
+  socialComments: ['social-comment:updated', 'social-comment:deleted'],
   tags: ['tags:updated'],
   activity: ['activity:created'],
   // Émis par le backend mais aucun écran ne lit /contacts aujourd'hui —

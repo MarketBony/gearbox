@@ -16,12 +16,14 @@ durant : la valeur à comparer aujourd'hui est **9**, mesurée en confrontant `m
 une branche de travail. Les entrées de correctifs qui citent 12 décrivent leur époque,
 ne pas les réécrire.
 
-> ⚠️ **Cinq modules ont chacun leur « seule porte », à ne jamais contourner** :
+> ⚠️ **Six modules ont chacun leur « seule porte », à ne jamais contourner** :
 > `utils/publicUser.ts` (jamais l'objet Prisma brut, il porte `passwordHash`),
 > `utils/gameView.ts` (jamais une partie non redactée), `auth/siteScope.ts`
 > (jamais un `where` de site recopié dans une route), `TASK_FIELDS` dans
-> `routes/projects.ts` (seule porte d'écriture des champs d'une tâche de projet), et
-> depuis le 07/09/2026 **`db.ts` (UNE seule instance de PrismaClient)**.
+> `routes/projects.ts` (seule porte d'écriture des champs d'une tâche de projet),
+> depuis le 07/09/2026 **`db.ts` (UNE seule instance de PrismaClient)**, et depuis le
+> 10/09/2026 **`SOCIAL_FIELDS` dans `routes/social.ts`** (seule porte d'écriture des
+> champs d'une publication Digital).
 > Détail dans les sections dédiées.
 >
 > Contrôle mécanique de la dernière, à rejouer après toute évolution — il doit ne RIEN
@@ -938,6 +940,75 @@ Un tableau vide est **légitime** : c'est l'état des 25 publications antérieur
 correctif, et l'écran retombe alors sur le nom de fichier uuid (vérifié : leurs images
 s'affichent, numérotées, sans régression).
 
+⚠️ **CET AVERTISSEMENT A ÉTÉ ENFREINT DÈS LE LOT SUIVANT, par le code de ce dépôt** :
+`jobs/purge.ts` écrivait `mediaFiles` sans toucher `mediaNames`. Comme la purge 30 j retire
+des entrées **au milieu** du tableau, les noms suivants glissaient d'un cran et
+s'affichaient sur les mauvais visuels — jusqu'au prochain PUT, qui tronquait le surplus par
+la FIN. Corrigé le 10/09/2026 (correctif 50) : la purge filtre les deux colonnes **par les
+mêmes index** et les écrit ensemble, en ne fabriquant pas de `mediaNames` là où il était
+vide. Prouvé sur un cas fichier · lien · fichier : le lien restant garde son propre nom.
+Le `DELETE` de `routes/social.ts` n'a jamais eu le problème (la ligne entière disparaît).
+
+### 🔐 `SOCIAL_FIELDS` — la SEULE porte d'écriture d'une publication (10/09/2026)
+
+Jusqu'au correctif 50, `POST /api/social` et `PUT /api/social/:id` passaient `req.body`
+**BRUT** à Prisma. Ça a tenu des mois parce que le client renvoyait exactement les colonnes
+du modèle — mais il renvoie la publication **entière** à chaque sauvegarde
+(`services/dataService.ts`, `stripMeta` ne retire que `id`/`createdAt`/`updatedAt`).
+
+⚠️ **Conséquence concrète, et c'est ce qui a rendu la liste blanche obligatoire** : dès que
+la réponse du `GET` porte un champ de plus — ici `commentCount`, **dérivé** d'un `_count`
+Prisma et absent du modèle — ce champ repart au PUT, Prisma refuse l'argument inconnu, et
+**toutes** les sauvegardes de publication tombent. Enrichir la réponse d'une route sans
+liste blanche d'écriture est donc un piège à retardement.
+
+⚠️ **Même comportement que `TASK_FIELDS` : un champ absent de la liste est jeté EN
+SILENCE.** La valeur part, le serveur répond 200, elle a disparu au rechargement, et il n'y
+a d'erreur ni côté client ni dans les logs. **Toute colonne ajoutée à `SocialPost` doit être
+ajoutée à `SOCIAL_FIELDS` dans le même lot.** Les 15 champs actuels : `title`, `status`,
+`date`, `targets`, `brands`, `service`, `networks`, `concessions`, `mediaFiles`,
+`mediaNames`, `link`, `wording`, `lom`, `co2`, `archived`.
+
+Exclus volontairement : `archivedAt` (posé par le serveur seul, ancre de la purge 30 j),
+`createdAt`/`updatedAt` (Prisma), et `id` — **toléré au POST uniquement**, la migration
+one-shot des publications venues du `localStorage` conservant les ids d'origine.
+
+Les validations existantes (`validerMediaFiles`, `normaliserMediaNames`, gestion serveur
+d'`archivedAt`) s'appliquent **après** le tri, inchangées.
+
+### 💬 Commentaires d'une publication — `SocialComment` (10/09/2026)
+
+Demande de l'équipe digitale : laisser une consigne sur un édito sans passer par le chat,
+où elle se perd. Trois routes dans `routes/social.ts` :
+`GET /:id/comments` (authentifié), `POST /:id/comments` et `DELETE /comments/:commentId`
+(`requireRole(EDIT_ROLES)`).
+
+⚠️ **Elles sont déclarées AVANT `/:id`**, et ce n'est pas cosmétique : Express résout dans
+l'ordre, `DELETE /comments/:id` serait sinon capturée par `DELETE /:id` — qui **supprimerait
+la publication** dont l'id vaudrait « comments ».
+
+⚠️ **Aucun nom ni couleur d'auteur n'est stocké** : `authorId` seul, et l'identité est
+résolue **à la lecture**, via `publicUser`. Deux raisons : un renommage ne doit pas laisser
+l'ancien nom dans tout l'historique (leçon de `player1Name`, correctif 30), et c'est le
+SERVEUR qui doit résoudre parce qu'un rôle cloisonné ne reçoit de `GET /api/users` que sa
+propre fiche — l'écran afficherait sinon « Utilisateur » à la place de chaque nom.
+
+Autres règles : l'auteur vient du **jeton**, jamais du corps (sinon on signe au nom d'un
+collègue) ; contenu trimé, non vide, ≤ 2 000 caractères ; suppression réservée à l'auteur
+ou à Master/Administrator (un Director n'arbitre pas, cf. `USER_DELETE_ROLES`) ; périmètre
+de lecture contrôlé par `scopeOf` + `arrayScopeWhere` sur la publication parente — **jamais
+un `where` de site recopié**. `onDelete: Cascade` : supprimer une publication emporte son
+fil (vérifié en base, 0 orphelin).
+
+Temps réel : `social-comment:updated` / `social-comment:deleted`, **distincts de
+`social:*`**. Réutiliser `social:updated` aurait fait recharger la liste entière des
+publications chez tous les collègues à chaque commentaire — la lenteur que le correctif 49
+venait de supprimer. Le payload est `{ postId }`, sans contenu.
+
+`GET /api/social` renvoie `commentCount` (aplati depuis `_count`), et **le POST comme le PUT
+le renvoient aussi** : le client remplace sa copie locale par la réponse du PUT, la pastille
+de la ligne tomberait sinon à zéro dès qu'on y change un statut.
+
 ## ⚠️ Route DORMANTE — `/api/expenses` (modèle `OneOffExpense`)
 
 Route CRUD complète et fonctionnelle (émissions `expense:*` incluses), mais
@@ -1032,6 +1103,7 @@ Chaque route métier émet un événement Socket.IO via `emitEvent` (`src/realti
 | Ressource | Événements |
 |---|---|
 | projects · campaigns · budget · contacts · social | `<res>:updated`, `<res>:deleted` |
+| social-comment (10/09/2026) | `social-comment:updated`, `social-comment:deleted` — payload `{ postId }` |
 | users | `users:updated`, `users:deleted` |
 | equipment · equipment-booking · expense · fixed-expense | `<res>:created`, `:updated`, `:deleted` |
 | tags | `tags:updated` |

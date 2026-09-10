@@ -152,7 +152,7 @@ export interface Campaign {
 }
 
 // --- DIGITAL MODULE TYPES ---
-export type SocialStatus = 'À venir' | 'En attente' | 'Non Validé' | 'Programmed' | 'Rédigé' | 'Abandonné' | 'Validé' | 'Publié';
+export type SocialStatus = 'À venir' | 'Constructeur' | 'En attente' | 'Non Validé' | 'Programmed' | 'Rédigé' | 'Abandonné' | 'Validé' | 'Publié';
 // Changed to string to allow dynamic tags management
 export type SocialNetwork = string; 
 export type SocialTarget = 'Collaborateurs' | 'Internet';
@@ -181,12 +181,44 @@ export interface SocialPost {
   // Validé côté serveur par `validerMediaFiles` (backend/src/routes/social.ts) ; les
   // purges ne touchent QUE les urls `/uploads/calendar/`, un lien n'est jamais purgé.
   mediaFiles: string[];
+  // Noms d'origine des visuels, tableau PARALLÈLE à `mediaFiles` (même longueur, même
+  // ordre — l'index fait le lien). Vide sur les publications antérieures au correctif 49 :
+  // l'écran retombe alors sur le nom uuid du fichier. Recalé par le serveur, seule porte.
+  mediaNames?: string[];
+  /**
+   * Nombre de commentaires — DÉRIVÉ, renvoyé par `GET /api/social`, jamais stocké.
+   * ⚠️ Il repart au serveur à chaque sauvegarde (le client renvoie la publication
+   * entière) : c'est la liste blanche `SOCIAL_FIELDS` de `routes/social.ts` qui l'écarte.
+   */
+  commentCount?: number;
   link: string;
   wording: string;
   lom: string;
   co2: string;
   archived: boolean;
   archivedAt?: string; // Renseigné par le backend à l'archivage ; ancre la purge des médias
+}
+
+/**
+ * Un commentaire d'une publication du calendrier éditorial (correctif 50).
+ *
+ * ⚠️ Ni nom ni couleur d'auteur : `authorId` seul, l'identité se résout à l'affichage
+ * depuis la liste des utilisateurs. Recopier le nom laisserait une valeur périmée dans
+ * tout l'historique après un renommage — c'est la leçon des parties de jeu (correctif 30).
+ */
+export interface SocialComment {
+  id: string;
+  postId: string;
+  authorId: string;
+  content: string;
+  createdAt: string;
+  /**
+   * Identité résolue par le SERVEUR à la lecture (jamais stockée sur le commentaire).
+   * ⚠️ C'est le serveur qui la résout, et non l'écran : un rôle cloisonné ne reçoit de
+   * `GET /api/users` que sa propre fiche, il lirait sinon « Utilisateur » partout.
+   * `null` si le compte a été supprimé depuis.
+   */
+  author?: { id: string; name: string; avatarColor?: string } | null;
 }
 
 // Flux RSS de Hello Marketing. Les URL vivent UNIQUEMENT côté serveur

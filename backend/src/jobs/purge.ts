@@ -20,25 +20,42 @@ export const purgeArchivedCalendarMedia = async () => {
   const cutoff = new Date(Date.now() - THIRTY_DAYS_MS);
   const posts = await prisma.socialPost.findMany({
     where: { archived: true, archivedAt: { not: null, lt: cutoff } },
-    select: { id: true, mediaFiles: true }
+    select: { id: true, mediaFiles: true, mediaNames: true }
   });
 
   let filesDeleted = 0;
   for (const post of posts) {
     const remaining: string[] = [];
-    for (const url of post.mediaFiles) {
+    const remainingNames: string[] = [];
+    // ⚠️ `mediaNames` est un tableau PARALLÈLE à `mediaFiles` : c'est l'INDEX qui fait le
+    // lien (voir la garde de `schema.prisma` et `normaliserMediaNames` dans
+    // routes/social.ts). Cette purge retire des entrées AU MILIEU du tableau : n'écrire
+    // que `mediaFiles` faisait glisser tous les noms suivants d'un cran, et les visuels
+    // restants s'affichaient sous le nom de leur voisin — jusqu'au prochain PUT, qui
+    // tronquait le surplus par la FIN. Corrigé le 10/09/2026 : on filtre les deux
+    // colonnes par les mêmes index, et on les écrit ensemble.
+    post.mediaFiles.forEach((url, index) => {
+      const conserver = () => {
+        remaining.push(url);
+        if (post.mediaNames.length) remainingNames.push(post.mediaNames[index] ?? '');
+      };
       // On ne purge QUE les fichiers du dossier calendar/.
-      if (!url.startsWith('/uploads/calendar/')) { remaining.push(url); continue; }
+      if (!url.startsWith('/uploads/calendar/')) { conserver(); return; }
       const filePath = path.join(UPLOADS_ROOT, 'calendar', path.basename(url));
       try {
         if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); filesDeleted++; }
       } catch (e) {
         console.error('[purge] échec suppression', filePath, (e as Error).message);
-        remaining.push(url); // on conserve la référence si la suppression a échoué
+        conserver(); // on conserve la référence si la suppression a échoué
       }
-    }
+    });
     if (remaining.length !== post.mediaFiles.length) {
-      await prisma.socialPost.update({ where: { id: post.id }, data: { mediaFiles: remaining } });
+      // Un `mediaNames` vide est légitime (publications antérieures au correctif 49) :
+      // on ne le fabrique pas, on ne le recale que s'il existait.
+      const data = post.mediaNames.length
+        ? { mediaFiles: remaining, mediaNames: remainingNames }
+        : { mediaFiles: remaining };
+      await prisma.socialPost.update({ where: { id: post.id }, data });
     }
   }
 

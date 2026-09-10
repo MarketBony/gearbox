@@ -242,6 +242,35 @@ model SocialPost {
   archivedAt  DateTime? // Renseigné à la bascule archived->true ; ancre la purge des médias (30j)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  comments    SocialComment[]
+}
+
+/// Commentaires d'une publication du calendrier éditorial (correctif 50, 10/09/2026).
+///
+/// Demande de l'équipe digitale : pouvoir laisser une consigne sur un post sans passer
+/// par le chat, où elle se perd. Le fil est porté par la publication, pas par une
+/// conversation.
+///
+/// ⚠️ AUCUN NOM NI COULEUR D'AUTEUR N'EST STOCKÉ ICI, volontairement. `authorId` seul, et
+/// l'identité se résout à l'affichage depuis la liste des utilisateurs — même règle que
+/// les parties de jeu depuis le correctif 30, où recopier `player1Name` laissait un nom
+/// périmé dans tout l'historique après un simple renommage.
+///
+/// `onDelete: Cascade` : supprimer une publication emporte ses commentaires (la ligne
+/// n'existe plus, le fil n'a plus d'objet). C'est la même relation que
+/// `ChatMessage → ChatConversation`.
+///
+/// ⚠️ L'index sur `postId` n'est PAS décoratif : Postgres n'indexe pas les clés
+/// étrangères, et c'est exactement l'oubli qu'a coûté le correctif 48 sur `Task`.
+model SocialComment {
+  id        String     @id @default(uuid())
+  postId    String
+  post      SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String     // référence libre vers User (pas de FK, style du schéma)
+  content   String
+  createdAt DateTime   @default(now())
+
+  @@index([postId])
 }
 
 model DigitalTags {
