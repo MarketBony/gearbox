@@ -6,6 +6,7 @@ import { emitEvent } from '../realtime';
 import { scopeOf, arrayScopeWhere, redactSiteFields } from '../auth/siteScope';
 import { withDates } from '../utils/dates';
 import { UPLOADS_ROOT } from './uploads';
+import { publicUser } from '../utils/publicUser';
 import { prisma } from '../db';
 
 const router = Router();
@@ -100,28 +101,178 @@ const validerMediaFiles = (valeur: unknown, existantes: string[] = []): string |
   return null;
 };
 
+/**
+ * ⚠️⚠️ SEULE PORTE D'ÉCRITURE des champs d'une publication (10/09/2026).
+ *
+ * Avant, le POST et le PUT passaient `req.body` **brut** à Prisma. Ça a tenu tant que le
+ * client renvoyait exactement les colonnes du modèle — mais le client renvoie la
+ * publication ENTIÈRE à chaque sauvegarde (`services/dataService.ts`, `stripMeta`), donc
+ * le jour où la réponse du GET porte un champ de plus (ici `commentCount`, dérivé et non
+ * stocké), ce champ repart au PUT et Prisma refuse l'argument inconnu : **toutes** les
+ * sauvegardes tombent. Le tri se fait donc ici, une fois, comme `TASK_FIELDS` le fait
+ * pour les tâches de projet (`routes/projects.ts`).
+ *
+ * ⚠️ MÊME PIÈGE QUE `TASK_FIELDS` : un champ absent de cette liste est jeté **en
+ * silence** — la valeur part, le serveur répond 200, elle a disparu au rechargement, et
+ * il n'y a d'erreur ni côté client ni dans les logs. Toute colonne ajoutée à
+ * `SocialPost` doit être ajoutée ICI dans le même lot.
+ *
+ * Exclus volontairement : `archivedAt` (posé par le serveur seul, ancre de la purge
+ * 30 j), `createdAt` / `updatedAt` (gérés par Prisma), et `id` — sauf au POST, voir
+ * ci-dessous.
+ */
+const SOCIAL_FIELDS = [
+  'title', 'status', 'date', 'targets', 'brands', 'service', 'networks',
+  'concessions', 'mediaFiles', 'mediaNames', 'link', 'wording', 'lom', 'co2', 'archived',
+] as const;
+
+/**
+ * Aplatit le `_count` de Prisma en `commentCount`.
+ *
+ * ⚠️ Appliqué au GET **et** aux deux écritures, à dessein : le client remplace sa copie
+ * locale par la réponse du PUT (`fileSauvegardePublication`, `pages/Digital.tsx`). Sans
+ * le compteur dans cette réponse, la pastille de commentaires d'une ligne tomberait à
+ * zéro dès qu'on y change un statut, jusqu'au prochain rechargement complet.
+ */
+const avecCompteur = <T extends { _count?: { comments: number } }>(p: T) => {
+  const { _count, ...reste } = p;
+  return { ...reste, commentCount: _count?.comments ?? 0 };
+};
+
+const COMMENT_COUNT_INCLUDE = { _count: { select: { comments: true } } } as const;
+
+const pickSocialData = (corps: any): Record<string, any> => {
+  const data: Record<string, any> = {};
+  if (!corps || typeof corps !== 'object') return data;
+  for (const champ of SOCIAL_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(corps, champ)) data[champ] = corps[champ];
+  }
+  return data;
+};
+
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   // Cloisonnement par concession. ⚠️ Le champ s'appelle `concessions` ici (et non
   // `sites`) : c'est le même rôle, un nom différent selon le modèle.
   const scope = await scopeOf(req);
+  // `commentCount` est DÉRIVÉ (aucune colonne) : il alimente la pastille du bouton
+  // Commentaires de chaque ligne, sans charger les fils eux-mêmes.
+  // ⚠️ Ce champ en trop dans la réponse est précisément ce qui a rendu `SOCIAL_FIELDS`
+  // obligatoire : le client renvoie la publication entière au PUT.
   const posts = await prisma.socialPost.findMany({
     where: arrayScopeWhere('concessions', scope),
+    include: COMMENT_COUNT_INCLUDE,
   });
-  res.json(posts.map(p => redactSiteFields(p, scope, 'concessions')));
+  res.json(posts.map(p => redactSiteFields(avecCompteur(p), scope, 'concessions')));
+});
+
+// ---------------------------------------------------------------------------------
+// COMMENTAIRES D'UNE PUBLICATION (correctif 50)
+//
+// ⚠️ CES TROIS ROUTES SONT DÉCLARÉES AVANT `/:id` — et ce n'est pas cosmétique :
+// `DELETE /comments/:commentId` serait sinon capturée par `DELETE /:id`, qui
+// SUPPRIMERAIT LA PUBLICATION dont l'id vaudrait « comments ». Express résout dans
+// l'ordre de déclaration.
+//
+// Lecture pour quiconque voit la publication (le chef de site lit son périmètre),
+// écriture réservée aux EDIT_ROLES : un rôle en lecture seule l'est par ABSENCE de
+// cette liste, on ne l'y ajoute pas « pour faire propre ».
+// ---------------------------------------------------------------------------------
+
+const COMMENT_MAX_LONGUEUR = 2000;
+
+/**
+ * Rend `true` si le demandeur a le droit de VOIR cette publication.
+ * ⚠️ Le périmètre passe par `scopeOf` / `arrayScopeWhere` — jamais un `where` de site
+ * recopié dans une route (`auth/siteScope.ts` est la seule porte).
+ */
+const publicationVisible = async (req: AuthRequest, postId: string): Promise<boolean> => {
+  const scope = await scopeOf(req);
+  const post = await prisma.socialPost.findFirst({
+    where: { id: postId, ...arrayScopeWhere('concessions', scope) },
+    select: { id: true },
+  });
+  return !!post;
+};
+
+router.get('/:id/comments', authenticateToken, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  if (!(await publicationVisible(req, id))) return res.status(404).json({ error: 'Publication introuvable.' });
+  const comments = await prisma.socialComment.findMany({
+    where: { postId: id },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  // ⚠️ L'IDENTITÉ DE L'AUTEUR EST RÉSOLUE ICI, à la lecture, et non stockée sur le
+  // commentaire : un renommage ne doit pas laisser l'ancien nom dans tout l'historique
+  // (leçon du correctif 30 sur les parties de jeu). C'est le serveur qui la résout et
+  // non l'écran, parce qu'un rôle cloisonné ne reçoit de `GET /api/users` que sa propre
+  // fiche — il lirait sinon « Utilisateur » à la place de chaque nom.
+  //
+  // ⚠️ On passe par `publicUser`, seule forme d'un User qui sort du backend
+  // (`passwordHash`), avant de ne garder que les trois champs d'affichage.
+  const auteurs = await prisma.user.findMany({
+    where: { id: { in: [...new Set(comments.map(c => c.authorId))] } },
+  });
+  const parId = new Map(auteurs.map(publicUser).map(u => [u.id, { id: u.id, name: u.name, avatarColor: u.avatarColor }]));
+
+  res.json(comments.map(c => ({ ...c, author: parId.get(c.authorId) ?? null })));
+});
+
+router.post('/:id/comments', authenticateToken, requireRole(EDIT_ROLES), async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  if (!(await publicationVisible(req, id))) return res.status(404).json({ error: 'Publication introuvable.' });
+
+  const contenu = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+  if (!contenu) return res.status(400).json({ error: 'Le commentaire est vide.' });
+  if (contenu.length > COMMENT_MAX_LONGUEUR) {
+    return res.status(400).json({ error: `Le commentaire est limité à ${COMMENT_MAX_LONGUEUR} caractères.` });
+  }
+
+  const comment = await prisma.socialComment.create({
+    // ⚠️ L'auteur vient du JETON, jamais du corps : un `authorId` envoyé par le client
+    // permettrait de signer au nom d'un collègue.
+    data: { postId: id, authorId: req.user!.id, content: contenu },
+  });
+  emitEvent('social-comment:updated', { postId: id });
+  res.json(comment);
+});
+
+router.delete('/comments/:commentId', authenticateToken, requireRole(EDIT_ROLES), async (req: AuthRequest, res) => {
+  const { commentId } = req.params;
+  const comment = await prisma.socialComment.findUnique({ where: { id: commentId } });
+  if (!comment) return res.status(404).json({ error: 'Commentaire introuvable.' });
+
+  // Son propre commentaire, ou l'arbitrage d'un administrateur. Un Director ne supprime
+  // pas celui d'un autre : il n'arbitre pas les comptes (cf. `USER_DELETE_ROLES`).
+  const estAdmin = req.user?.role === 'Master' || req.user?.role === 'Administrator';
+  if (comment.authorId !== req.user?.id && !estAdmin) {
+    return res.status(403).json({ error: 'Seul l\'auteur peut supprimer ce commentaire.' });
+  }
+
+  await prisma.socialComment.delete({ where: { id: commentId } });
+  emitEvent('social-comment:deleted', { postId: comment.postId });
+  res.sendStatus(204);
 });
 
 router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) => {
   // Création : rien à préserver, validation stricte.
   const refus = validerMediaFiles(req.body?.mediaFiles);
   if (refus) return res.status(400).json({ error: refus });
-  const post = await prisma.socialPost.create({ data: withDates(req.body, ['date']) });
+  const data = withDates(pickSocialData(req.body), ['date']);
+  // ⚠️ `id` toléré À LA CRÉATION SEULEMENT : la migration one-shot des publications
+  // venues du localStorage conserve les ids d'origine (`migrateSocialPostsIfNeeded`,
+  // services/dataService.ts) parce que les médias y étaient rangés sous une clé dérivée
+  // de l'id. Elle ne joue plus que sur une base vide, mais la retirer changerait un
+  // contrat sans nécessité.
+  if (typeof req.body?.id === 'string') data.id = req.body.id;
+  const post = avecCompteur(await prisma.socialPost.create({ data: data as any, include: COMMENT_COUNT_INCLUDE }));
   emitEvent('social:updated', post);
   res.json(post);
 });
 
 router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) => {
   const { id } = req.params;
-  const data = withDates(req.body, ['date']);
+  const data = withDates(pickSocialData(req.body), ['date']);
 
   // archivedAt = ancre de la purge des médias : géré SERVEUR uniquement (jamais le
   // client). On le renseigne quand archived bascule false -> true, on le vide au
@@ -164,7 +315,7 @@ router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) 
     delete data.archivedAt;
   }
 
-  const post = await prisma.socialPost.update({ where: { id }, data });
+  const post = avecCompteur(await prisma.socialPost.update({ where: { id }, data, include: COMMENT_COUNT_INCLUDE }));
   emitEvent('social:updated', post);
   res.json(post);
 });

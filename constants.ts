@@ -318,16 +318,42 @@ export const libelleStatutSocial = (statut: string): string =>
  */
 export const DIGITAL_FULL_TAGS = ['FULL RENAULT', 'FULL DACIA', 'FULL NISSAN', 'FULL ALPINE'];
 
+/**
+ * Périmètres RÉELLEMENT proposés à la saisie (voir le bloc ci-dessus pour le reste).
+ *
+ * ⚠️ LES PLAQUES ONT ÉTÉ RETIRÉES de cette liste le 10/09/2026 (correctif 50), à la
+ * demande de l'équipe : elles ne servent pas au ciblage éditorial, où l'on vise des
+ * concessions réelles. Elles restent le raccourci ★ du FILTRE de l'onglet Planning
+ * (`pages/Digital.tsx`), qui les construit directement depuis `PLAQUES_STRUCTURE` — là,
+ * une plaque est une façon de LIRE plusieurs sites d'un coup, pas une valeur saisie.
+ * `PLAQUES_STRUCTURE` lui-même n'est pas touché : il est dupliqué dans
+ * `backend/src/auth/siteScope.ts` et surveillé par `scripts/check-plaques-sync.mjs`.
+ * ⚠️ Une publication écrite AVANT ce correctif peut porter une plaque dans ses
+ * `concessions` : le sélecteur de la ligne d'édito complète donc ses options avec les
+ * valeurs déjà sélectionnées, sans quoi la plaque resterait affichée sans pouvoir être
+ * décochée. Voir `optionsSitesAvecExistant` dans `pages/Digital.tsx`.
+ */
 export const DIGITAL_CONCESSIONS: string[] = [
   'GROUPE BONY',
   ...DIGITAL_FULL_TAGS,
-  ...Object.keys(PLAQUES_STRUCTURE),
   ...SITES.filter(s => s !== 'Ricoux'),
   'Yssingeaux',
 ];
 
+/**
+ * Couleurs des statuts de publication.
+ *
+ * ⚠️ L'ORDRE DES CLÉS EST L'ORDRE DU MENU : le sélecteur de statut d'une ligne d'édito
+ * dérive ses options d'`Object.keys(SOCIAL_STATUS_COLORS)` (`pages/Digital.tsx`). Insérer
+ * une valeur ailleurs qu'à sa place logique la déplacerait dans l'interface.
+ */
 export const SOCIAL_STATUS_COLORS: Record<SocialStatus, string> = {
     'À venir': 'bg-slate-700 text-slate-300 border-slate-600',
+    // Contenu fourni par le constructeur — demande de l'équipe digitale (correctif 50).
+    // Placé en 2ᵉ position : c'est une ORIGINE de contenu, elle se lit en début de flux.
+    // Cyan, la seule teinte encore libre parmi les huit statuts existants ; le texte a une
+    // variante `dark:` (les autres entrées n'en ont pas et pâlissent en thème clair).
+    'Constructeur': 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 border-cyan-500/50',
     'En attente': 'bg-orange-500/20 text-orange-400 border-orange-500/50',
     'Non Validé': 'bg-red-500/20 text-red-400 border-red-500/50',
     'Rédigé': 'bg-blue-500/20 text-blue-300 border-blue-500/50',

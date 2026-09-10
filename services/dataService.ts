@@ -1,5 +1,5 @@
 
-import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile } from '../types';
+import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment } from '../types';
 import type { LobbyData, GameSession, GameChallenge, GameType } from '../components/games/gameTypes';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS, LOI_LOM_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
@@ -547,6 +547,28 @@ class DataService {
   }
   async deleteSocialPost(id: string): Promise<void> {
     await apiFetch(`/social/${id}`, { method: 'DELETE' });
+  }
+
+  // --- COMMENTAIRES D'UNE PUBLICATION (correctif 50) ---
+  //
+  // ⚠️ Les fils ne sont PAS chargés avec les publications : `GET /api/social` n'en
+  // renvoie que le NOMBRE (`commentCount`, dérivé côté serveur), et le fil lui-même
+  // n'est lu qu'à l'ouverture du panneau. Charger 57 fils pour en afficher un seul
+  // ferait payer à chaque rechargement — y compris ceux du temps réel — ce dont on se
+  // sert une fois.
+  async getSocialComments(postId: string): Promise<SocialComment[]> {
+    return apiFetch<SocialComment[]>(`/social/${postId}/comments`);
+  }
+  async addSocialComment(postId: string, content: string): Promise<SocialComment> {
+    // ⚠️ Aucun auteur envoyé : le serveur le lit dans le jeton. Un `authorId` client
+    // permettrait de signer au nom d'un collègue.
+    return apiFetch<SocialComment>(`/social/${postId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+  async deleteSocialComment(commentId: string): Promise<void> {
+    await apiFetch(`/social/comments/${commentId}`, { method: 'DELETE' });
   }
   // Migration one-shot : on CONSERVE les ids d'origine (le backend accepte
   // l'id fourni) car les médias sont stockés en localStorage sous une clé

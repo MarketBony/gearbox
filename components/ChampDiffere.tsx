@@ -133,7 +133,14 @@ export const ChampTexte: React.FC<ProprietesCommunes & {
   onValider: (v: string) => void;
   multiligne?: boolean;
   rows?: number;
-}> = ({ valeur, onValider, cle, disabled, className, placeholder, multiligne, rows,
+  /**
+   * Prend le focus au montage. Ajouté au correctif 50 pour le lien d'une ligne d'édito,
+   * qui n'affiche son champ que le temps de l'édition : sans focus automatique, le clic
+   * sur le crayon ouvrirait un champ qu'il faudrait ensuite aller cliquer.
+   * ⚠️ Ne rien changer d'autre au comportement : l'écriture reste au blur.
+   */
+  autoFocus?: boolean;
+}> = ({ valeur, onValider, cle, disabled, className, placeholder, multiligne, rows, autoFocus,
         onFocusChange, onFocusPlus, onBlurPlus, onBrouillonChange }) => {
   const valeurRef = useRef(valeur);
   valeurRef.current = valeur;
@@ -145,7 +152,7 @@ export const ChampTexte: React.FC<ProprietesCommunes & {
   );
 
   const communes = {
-    disabled, className, placeholder,
+    disabled, className, placeholder, autoFocus,
     value: brouillon,
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setBrouillon(e.target.value),
     onFocus: () => { focusRef.current = true; onFocusChange?.(true); onFocusPlus?.(); },
