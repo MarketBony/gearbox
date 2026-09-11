@@ -2876,6 +2876,55 @@
     ⚠️ **NON VÉRIFIÉ** : le rendu sur un VRAI téléphone (l'émulation ne dit rien du
     clavier virtuel, qui réduit la hauteur utile).
 
+53. **CHAT — l'import d'image ne faisait RIEN, et la personnalisation devient PAR
+    DISCUSSION** (`fix/chat-perso-par-conversation`, 11 septembre 2026). Frontend **et**
+    backend, **avec migration** (`20260911160000_add_chat_customization`, purement
+    additive). Deux reproches de Théo sur le correctif 52, tous les deux fondés.
+
+    - ⚠️⚠️ **« L'upload d'image ne fonctionne pas, ça fait littéralement rien. »** Exact,
+      et la cause est structurelle : l'`<input type="file">` était placé **à l'intérieur
+      de l'overlay** de la modale, qui porte `onClick={fermer}`. Cliquer « Importer »
+      appelait `input.click()`, dont l'événement **remonte** jusqu'à cet overlay : la
+      modale se fermait, le sous-arbre était démonté, et l'input porteur du `onChange`
+      n'existait plus quand l'utilisateur validait son fichier. Aucune erreur, aucune
+      requête — rien. **Corrigé** : l'input vit désormais à la racine du composant,
+      toujours monté, comme `imageInputRef` et `fileInputRef` du chat.
+      ⚠️ **POURQUOI MON TEST NE L'A PAS VU, et c'est la vraie leçon** : j'avais injecté le
+      fichier dans l'input par script (`DataTransfer` + `dispatchEvent`) au lieu de
+      **cliquer sur le bouton**. Le chemin réel — le clic, sa propagation, le démontage —
+      n'était donc jamais exercé. C'est mot pour mot la leçon déjà écrite deux fois dans
+      ce dépôt (escalade de rôle, navigation du chef de site) : **un test fabriqué ne
+      remplace pas le parcours réel**. Vérification refaite en cliquant pour de bon, avec
+      le dialogue natif neutralisé mais la propagation intacte : la modale reste ouverte
+      et l'input est **le même élément** avant et après.
+    - **La personnalisation est désormais PROPRE À CHAQUE DISCUSSION**, ce qui était la
+      demande initiale mal comprise. Nouveau modèle `ChatCustomization` (une ligne par
+      couple utilisateur × conversation, `@@unique` pour l'upsert), deux routes dans
+      `routes/chat.ts`, et un chargement en **une seule requête** à l'ouverture du Chat —
+      l'écran change de fil sans aller-retour réseau.
+      `User.chatBackground` / `chatBubble` sont conservés et deviennent le **défaut** des
+      discussions sans réglage propre, posé par un bouton « Toutes mes discussions ».
+      ⚠️ `??` et non `||` dans le repli : une valeur vide enregistrée signifie « pas de
+      fond ICI », et `||` la remplacerait par le défaut global — on ne pourrait alors plus
+      retirer un fond sur une seule discussion.
+      ⚠️ **Aucun `emitEvent`** sur ces routes : ce réglage ne regarde que son auteur, le
+      diffuser ferait recharger l'écran de collègues que ça ne concerne pas.
+    - **Validation extraite** dans `backend/src/utils/personnalisationChat.ts` : deux
+      routes écrivent maintenant ces valeurs (`PUT /api/auth/me` pour le défaut,
+      `PUT /api/chat/conversations/:id/customization` pour une discussion). Deux copies
+      des mêmes expressions régulières auraient divergé — c'est le reproche que ce dépôt
+      fait aux `where` de site recopiés.
+
+    **Vérifié dans l'interface** : deux conversations côte à côte, l'une avec son fond et
+    ses bulles, l'autre **sans aucun fond** ; image importée par le vrai chemin, appliquée
+    à la seule discussion courante ; réglages relus après rechargement.
+    **Sécurité de la nouvelle route** : conversation dont on n'est pas membre → **403**,
+    conversation inconnue → **404**, url externe → **400**, `/uploads/chat/…` → **400**,
+    `linear-gradient(...)` en guise de couleur de bulle → **400**, corps vide → **400**.
+    `tsc` 9 racine / 0 backend, build OK. **Résidus supprimés** : ligne de
+    personnalisation de test effacée, fichier importé retiré du disque, compte remis à
+    `null` — `ChatCustomization` est vide en base pour tous les comptes.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans

@@ -565,7 +565,28 @@ const Chat: React.FC = () => {
   const [showFonds, setShowFonds] = useState(false);
   const [fondEnCours, setFondEnCours] = useState(false);
   const fondBgInputRef = useRef<HTMLInputElement>(null);
-  const fondActuel = me?.chatBackground ?? null;
+  /**
+   * Personnalisation PAR CONVERSATION.
+   *
+   * ⚠️ Le premier jet était GLOBAL, et c'est ce que Théo a refusé : « je veux que la
+   * personnalisation soit propre à chaque discussion ». Les valeurs du compte
+   * (`me.chatBackground` / `me.chatBubble`) restent le DÉFAUT des discussions sans
+   * réglage propre — c'est ce qu'applique le bouton « toutes mes discussions » — et une
+   * ligne par conversation le remplace dès qu'elle existe.
+   */
+  const [persos, setPersos] = useState<Record<string, { background: string | null; bubble: string | null }>>({});
+  useEffect(() => {
+    if (!me) return;
+    db.getChatCustomizations()
+      .then(rows => setPersos(Object.fromEntries(rows.map(r => [r.conversationId, { background: r.background, bubble: r.bubble }]))))
+      .catch(e => console.error('Chat : personnalisations non chargées', e));
+  }, [me?.id]);
+
+  const persoCourante = activeConvId ? persos[activeConvId] : undefined;
+  // ⚠️ `??` et non `||` : une chaîne vide enregistrée signifierait « pas de fond », et
+  // `||` la remplacerait par le défaut global — donc on ne pourrait plus RETIRER un fond
+  // sur une seule discussion.
+  const fondActuel = persoCourante?.background ?? me?.chatBackground ?? null;
   /**
    * Style résolu, et surtout : A-T-ON VRAIMENT un fond à afficher ?
    *
@@ -579,7 +600,7 @@ const Chat: React.FC = () => {
   const styleFond = styleFondChat(fondActuel, sombre);
   const aUnFond = Object.keys(styleFond).length > 0;
   /** Couleur de MES bulles. Un id inconnu retombe sur le dégradé Bony (`bulleDe`). */
-  const maBulle = bulleDe(me?.chatBubble);
+  const maBulle = bulleDe(persoCourante?.bubble ?? me?.chatBubble);
   /** Ancre des menus GIF et « citer un projet » : la BARRE, pas leur picto — celui-ci
    *  n'existe plus sur mobile, où l'action est déclenchée depuis le menu « + ». */
   const barreSaisieRef = useRef<HTMLDivElement>(null);
@@ -648,7 +669,7 @@ const Chat: React.FC = () => {
     setFondEnCours(true);
     try {
       const url = await db.uploadFile('chatbg', fichier);
-      await setChatBackground(url);
+      await enregistrerPerso({ background: url });
       setShowFonds(false);
     } catch (e) {
       console.error('Fond de chat : import échoué', e);
@@ -658,26 +679,50 @@ const Chat: React.FC = () => {
     }
   };
 
-  const choisirBulle = async (id: string) => {
+  /**
+   * Enregistre un réglage SUR LA CONVERSATION COURANTE.
+   *
+   * ⚠️ `''` et non `null` dans le corps : convention du serveur « champ absent =
+   * inchangé, valeur vide = retour au défaut ». C'est ce qui permet de retirer un fond
+   * sur une seule discussion sans toucher aux autres.
+   */
+  const enregistrerPerso = async (patch: { background?: string; bubble?: string }) => {
+    if (!activeConvId) return;
     setFondEnCours(true);
     try {
-      await setChatBubble(id);
+      const row = await db.setChatCustomization(activeConvId, patch);
+      setPersos(prev => ({ ...prev, [activeConvId]: { background: row.background, bubble: row.bubble } }));
     } catch (e) {
-      console.error('Couleur de bulle : enregistrement échoué', e);
-      alert(e instanceof ApiError ? e.message : "Enregistrement de la couleur impossible.");
+      console.error('Personnalisation : enregistrement échoué', e);
+      alert(e instanceof ApiError ? e.message : "Enregistrement impossible.");
     } finally {
       setFondEnCours(false);
     }
   };
 
+  const choisirBulle = (id: string) => enregistrerPerso({ bubble: id });
+
   const choisirFond = async (valeur: string | null) => {
+    await enregistrerPerso({ background: valeur ?? '' });
+    // « Aucun fond » laisse la modale ouverte : on vient de retirer quelque chose, on
+    // veut voir le résultat et pouvoir choisir autre chose dans la foulée.
+    if (valeur) setShowFonds(false);
+  };
+
+  /**
+   * Applique le réglage de CETTE discussion à toutes les autres, en l'écrivant comme
+   * défaut du compte. Les discussions ayant leur propre réglage le gardent — c'est le
+   * principe d'un défaut, et c'est aussi ce que fait WhatsApp.
+   */
+  const appliquerPartout = async () => {
     setFondEnCours(true);
     try {
-      await setChatBackground(valeur);
+      await setChatBackground(fondActuel);
+      await setChatBubble(persoCourante?.bubble ?? me?.chatBubble ?? null);
       setShowFonds(false);
     } catch (e) {
-      console.error('Fond de chat : enregistrement échoué', e);
-      alert(e instanceof ApiError ? e.message : "Enregistrement du fond impossible.");
+      console.error('Personnalisation globale : enregistrement échoué', e);
+      alert(e instanceof ApiError ? e.message : "Enregistrement impossible.");
     } finally {
       setFondEnCours(false);
     }
@@ -1917,7 +1962,7 @@ const Chat: React.FC = () => {
                 <h3 className="font-title text-sm text-bony-text">Personnaliser la discussion</h3>
                 {/* Dire explicitement que le choix est personnel : sans ça, on hésite à
                     en mettre un, de peur de l'imposer à toute l'équipe. */}
-                <p className="text-[10px] text-bony-muted mt-0.5">Visible par vous seul, sur tous vos appareils.</p>
+                <p className="text-[10px] text-bony-muted mt-0.5">« {getConvName(activeConv)} » — visible par vous seul, sur tous vos appareils.</p>
               </div>
               <button onClick={() => setShowFonds(false)} className="text-slate-400 hover:text-bony-text"><X size={18} /></button>
             </div>
@@ -1961,7 +2006,7 @@ const Chat: React.FC = () => {
                 <p className="text-[10px] font-bold uppercase tracking-wider text-bony-muted mb-2">Couleur de vos bulles</p>
                 <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                   {BULLES_CHAT.map(b => {
-                    const choisi = (me?.chatBubble ?? 'bony') === b.id;
+                    const choisi = (persoCourante?.bubble ?? me?.chatBubble ?? 'bony') === b.id;
                     return (
                       <button
                         key={b.id}
@@ -2019,18 +2064,36 @@ const Chat: React.FC = () => {
               >
                 Aucun fond
               </button>
-              <span className="text-[10px] text-bony-muted">{fondEnCours ? 'Enregistrement…' : ''}</span>
+              <button
+                onClick={appliquerPartout}
+                disabled={fondEnCours}
+                className="px-3 py-2 rounded-xl text-xs font-bold text-bony-orange border border-bony-orange/50 hover:bg-bony-orange/10 disabled:opacity-40 transition"
+                title="Utiliser ce réglage comme défaut pour les discussions non personnalisées"
+              >
+                {fondEnCours ? 'Enregistrement…' : 'Toutes mes discussions'}
+              </button>
             </div>
           </div>
-          <input
-            ref={fondBgInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) importerFond(f); e.target.value = ''; }}
-          />
         </div>
       )}
+
+      {/* ⚠️⚠️ CET INPUT EST HORS DE LA MODALE, ET C'EST TOUT LE CORRECTIF DU 11/09/2026.
+          Placé à l'intérieur, il était dans le sous-arbre de l'overlay qui porte
+          `onClick={fermer}` : `fondBgInputRef.current.click()` déclenchait un clic qui
+          REMONTE jusqu'à cet overlay, fermait la modale, et démontait donc l'input avant
+          que l'utilisateur ait choisi son fichier. Le sélecteur s'ouvrait et « ça ne
+          faisait littéralement rien » — aucune erreur, aucun réseau, rien.
+          Toujours monté ici, comme `imageInputRef` et `fileInputRef` du chat.
+          ⚠️ Mon test initial n'avait rien vu parce qu'il INJECTAIT le fichier dans
+          l'input par script au lieu de cliquer sur le bouton : il n'exerçait pas le
+          chemin réel. C'est la leçon déjà écrite deux fois dans ce dépôt. */}
+      <input
+        ref={fondBgInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) importerFond(f); e.target.value = ''; }}
+      />
 
       {/* ===== GROUP AVATAR MODAL ===== */}
       {showGroupAvatarModal && activeConv?.type === 'group' && (

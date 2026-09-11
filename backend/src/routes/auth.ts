@@ -4,48 +4,17 @@ import jwt from 'jsonwebtoken';
 import { JWT_SECRET as SECRET } from '../auth/secret';
 import { publicUser } from '../utils/publicUser';
 import { emitEvent, notifyUserChanged } from '../realtime';
+import { FOND_PROCEDURAL, CHATBG_UPLOAD_PATH, BULLE_ID } from '../utils/personnalisationChat';
 import { prisma } from '../db';
 
 const router = Router();
 
 /**
- * Formes acceptées pour `User.chatBackground` (fond du Chat), et ELLES SEULES.
- *
- * ⚠️ Même doctrine que `CALENDAR_UPLOAD_PATH` (routes/social.ts) et que
- * `AVATAR_UPLOAD_PATH` (realtime/chat.ts) : on ne fait confiance ni au client ni au type
- * MIME qu'il déclare, on reconnaît un chemin que NOUS avons produit. Le nom de fichier
- * est toujours un `randomUUID()` et l'extension vient d'`EXT_BY_MIME` pour le type
- * `chatbg` (jpg|png|webp) — voir `routes/uploads.ts`.
- *
- * ⚠️ NE PAS élargir à `/^\/uploads\//` : les dossiers `chat/` et `project/` n'ont AUCUN
- * filtre de format, y pointer depuis un fond rouvrirait ce trou par la bande. C'est le
- * même piège que celui documenté pour les médias du Digital.
+ * ⚠️ Les regex de validation ont été EXTRAITES dans `utils/personnalisationChat.ts` le
+ * 11/09/2026 : la personnalisation est devenue par conversation, donc deux routes les
+ * utilisent (ici pour le DÉFAUT global, `routes/chat.ts` pour une discussion précise).
+ * Deux copies auraient divergé.
  */
-const CHATBG_UPLOAD_PATH =
-  /^\/uploads\/chatbg\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/i;
-
-/**
- * Fond du catalogue procédural : `proc:<id>`.
- *
- * ⚠️ Le serveur ne connaît PAS la liste des ids — elle vit dans `lib/personnalisationChat.ts`, côté
- * frontend, et le backend ne peut pas importer ce fichier (il n'est compilé que dans le
- * bundle web, même raison que `PLAQUES_STRUCTURE`). On valide donc la FORME, pas la
- * valeur : un id inconnu est sans danger, le client retombe proprement sur le fond par
- * défaut (`styleFondChat` rend `{}`). Valider la liste ici imposerait une troisième
- * duplication à garder synchronisée pour un gain nul.
- */
-const FOND_PROCEDURAL = /^proc:[a-z0-9-]{1,40}$/;
-
-/**
- * Couleur des bulles : un IDENTIFIANT du catalogue, jamais une couleur CSS.
- *
- * ⚠️ La distinction est le tout : la valeur est injectée dans un `style` côté client.
- * Accepter `#f00` ou `linear-gradient(...)` reviendrait à laisser un compte écrire une
- * déclaration de style dans la page de l'application — on ne laisse donc passer qu'un
- * mot-clé, que le client résout lui-même. Même raison que pour les fonds : le serveur
- * valide la FORME, la liste vit côté frontend et un id inconnu retombe sur le défaut.
- */
-const BULLE_ID = /^[a-z0-9-]{1,30}$/;
 
 router.post('/login', async (req, res) => {
   const { loginId, password } = req.body;
