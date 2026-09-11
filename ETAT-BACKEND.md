@@ -1027,6 +1027,41 @@ venait de supprimer. Le payload est `{ postId }`, sans contenu.
 le renvoient aussi** : le client remplace sa copie locale par la réponse du PUT, la pastille
 de la ligne tomberait sinon à zéro dès qu'on y change un statut.
 
+### 🎨 Personnalisation du Chat — `User.chatBackground` et `User.chatBubble` (11/09/2026)
+
+Préférence personnelle, écrite par `PUT /api/auth/me` et renvoyée par `publicUser`.
+
+⚠️ **VALIDÉE À L'ÉCRITURE, deux formes et deux seulement** : `proc:<id>` (catalogue
+`lib/fondsChat.ts`) ou `/uploads/chatbg/<uuid>.(jpg|png|webp)`. Sans cette garde, le champ
+serait une **seconde version du trou connu d'`avatarUrl`** — encore ouvert deux lignes plus
+haut dans le même handler — où un appel direct écrit une URL **externe** ensuite chargée
+par le navigateur de l'utilisateur (fuite d'IP, pixel de traçage). En pire, même : un fond
+s'affiche en grand et en permanence.
+
+⚠️ **NE PAS élargir le motif à `/^\/uploads\//`** : `chat/` et `project/` n'ont AUCUN
+filtre de format. Même piège, mêmes mots, que pour les médias du Digital.
+
+⚠️ Le serveur valide la **FORME et non la liste des ids** : celle-ci vit dans
+`lib/fondsChat.ts`, que le backend ne peut pas importer (compilé dans le seul bundle web,
+même raison que `PLAQUES_STRUCTURE`). Valider la liste imposerait une troisième duplication
+à maintenir pour un gain nul — un id inconnu est inoffensif, le client retombe sur « aucun
+fond ». C'est un choix, pas un oubli.
+
+Nouveau type d'upload **`chatbg`** (`routes/uploads.ts`) : JPEG/PNG/WebP, **8 Mo**. Liste
+blanche assumée, contrairement à `chat` et `project` — ce fichier n'est jamais ouvert ni
+téléchargé, il est rendu dans un `background-image`. `image/gif` en est volontairement
+absent (un fond animé en permanence fatigue la lecture et coûte en rendu).
+
+**`chatBubble`** suit la même doctrine, avec une nuance qui compte : la valeur est un
+**identifiant** du catalogue (`^[a-z0-9-]{1,30}$`), **jamais une couleur CSS**. Elle est
+injectée dans un attribut `style` côté client — accepter `#f00` ou `linear-gradient(...)`
+laisserait un compte écrire une déclaration de style dans la page de l'application. Le
+client résout l'id lui-même et retombe sur le dégradé Bony s'il est inconnu.
+
+ℹ️ Aucune purge des fonds importés : remplacer son fond laisse l'ancien fichier sur le
+disque, comme pour les avatars. Même fiche que les uploads orphelins au backlog, poids
+comparable (une image par personne qui en pose une).
+
 ## ⚠️ Route DORMANTE — `/api/expenses` (modèle `OneOffExpense`)
 
 Route CRUD complète et fonctionnelle (émissions `expense:*` incluses), mais

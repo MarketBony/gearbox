@@ -21,7 +21,7 @@ export const UPLOADS_ROOT = fs.existsSync(path.join(cwd, 'backend', 'src'))
   ? path.join(cwd, 'backend', 'uploads') // cwd = racine du repo
   : path.join(cwd, 'uploads');           // cwd = backend/
 
-export const UPLOAD_TYPES = ['chat', 'avatar', 'calendar', 'project'] as const;
+export const UPLOAD_TYPES = ['chat', 'avatar', 'calendar', 'project', 'chatbg'] as const;
 export type UploadType = typeof UPLOAD_TYPES[number];
 
 // RÈGLES FIGÉES — formats acceptés + tailles max par type.
@@ -65,6 +65,21 @@ const RULES: Record<UploadType, { mimes: string[] | null; maxBytes: number; labe
     mimes: null,
     maxBytes: 100 * 1024 * 1024, // 100 MB, comme le chat
     label: 'tous formats'
+  },
+  // Fond de discussion importé par un utilisateur (11/09/2026).
+  //
+  // ⚠️ Liste BLANCHE assumée, contrairement à `chat` et `project` : ce fichier n'est
+  // jamais ouvert ni téléchargé, il est rendu dans un `background-image` — donc toujours
+  // comme une IMAGE. Y autoriser tous les formats n'apporterait rien et rouvrirait une
+  // surface pour rien. `image/gif` en est volontairement absent : un fond animé derrière
+  // chaque message, en permanence, fatigue la lecture et coûte en rendu.
+  //
+  // 8 Mo : une photo de téléphone recadrée passe largement, et ce fichier est chargé à
+  // chaque ouverture du chat par la personne qui l'a choisi.
+  chatbg: {
+    mimes: ['image/jpeg', 'image/png', 'image/webp'],
+    maxBytes: 8 * 1024 * 1024, // 8 MB
+    label: 'JPEG, PNG, WebP'
   }
 };
 

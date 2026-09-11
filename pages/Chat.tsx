@@ -16,12 +16,14 @@ import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { getSocket, connectSocket, emitWithAck } from '../services/socket';
 import { chatStore } from '../services/chatStore';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { FONDS_CHAT, BULLES_CHAT, PREFIXE_PROC, styleFondChat, voileFondChat, estFondImporte, bulleDe } from '../lib/personnalisationChat';
 import {
   MessageSquare, Plus, Send, Star, StarOff, ArrowLeft,
   MoreHorizontal, Pencil, Trash2, X, Image, Reply, Check,
   Users, UserPlus, UserMinus, ChevronRight, Hash, Camera, Upload, ZoomIn,
   Bell, BellOff, Paperclip, FileText, FileX, Download, SmilePlus,
-  FolderKanban, Search, ExternalLink, Mic
+  FolderKanban, Search, ExternalLink, Mic, Palette
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import Cropper from 'react-easy-crop';
@@ -429,7 +431,7 @@ const GroupAvatarCropModal: React.FC<GroupAvatarModalProps> = ({ convId, convNam
 // --- MAIN COMPONENT ---
 // ========================
 const Chat: React.FC = () => {
-  const { user: me } = useAuth();
+  const { user: me, setChatBackground, setChatBubble } = useAuth();
   const isExternal = me?.role === 'External';
 
   const [users, setUsers] = useState<User[]>([]);
@@ -526,9 +528,63 @@ const Chat: React.FC = () => {
   // refuse ou tombe.
   const [projets, setProjets] = useState<Project[]>([]);
   const [showVoice, setShowVoice] = useState(false);
+  /**
+   * Menu « + » de la barre de saisie, sur MOBILE uniquement.
+   *
+   * ⚠️ Mesuré le 11/09/2026 à 375 px : les cinq pictos d'action occupaient 220 px de la
+   * barre (44 px chacun, zone tactile obligatoire) et il restait **19 px** au champ de
+   * texte — on écrivait dans une fente. Ils sont donc repliés ici sous un seul bouton,
+   * comme le font WhatsApp et Messenger. Sur ordinateur, où la place ne manque pas, la
+   * barre est inchangée.
+   */
+  const [showActions, setShowActions] = useState(false);
+  const actionsBtnRef = useRef<HTMLDivElement>(null);
+  /**
+   * Fond de discussion — préférence personnelle, stockée en base sur le compte.
+   *
+   * ⚠️ Le fond est celui de CELUI QUI REGARDE, pas de la conversation : chacun voit le
+   * sien, comme sur WhatsApp. Rien n'est partagé, donc aucun risque d'imposer aux
+   * collègues une image illisible.
+   */
+  const { theme } = useTheme();
+  const sombre = theme === 'dark';
+  /**
+   * Largeur mobile — pour ce qu'aucune classe Tailwind ne peut faire : changer un
+   * ATTRIBUT. Le placeholder « Écrire un message… (Entrée pour envoyer) » passait sur
+   * deux lignes et se faisait couper à 375 px, et sa parenthèse n'a de toute façon aucun
+   * sens au doigt, où Entrée retourne à la ligne. Seuil aligné sur le `md:` de Tailwind.
+   */
+  const [estMobile, setEstMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const maj = () => setEstMobile(mq.matches);
+    maj();
+    mq.addEventListener('change', maj);
+    return () => mq.removeEventListener('change', maj);
+  }, []);
+  const [showFonds, setShowFonds] = useState(false);
+  const [fondEnCours, setFondEnCours] = useState(false);
+  const fondBgInputRef = useRef<HTMLInputElement>(null);
+  const fondActuel = me?.chatBackground ?? null;
+  /**
+   * Style résolu, et surtout : A-T-ON VRAIMENT un fond à afficher ?
+   *
+   * ⚠️ `fondActuel` non vide ne suffit pas. Une valeur inconnue — un fond retiré du
+   * catalogue, une valeur venue d'ailleurs — est volontairement tolérée par le serveur
+   * (il ne valide que la FORME) et retombe sur `{}` côté client. Se fier à `fondActuel`
+   * pour afficher le VOILE posait alors un filtre blanc ou sombre sur la conversation
+   * sans aucun fond derrière : on assombrissait l'écran pour rien. Mesuré en écrivant
+   * `proc:inexistant` en base.
+   */
+  const styleFond = styleFondChat(fondActuel, sombre);
+  const aUnFond = Object.keys(styleFond).length > 0;
+  /** Couleur de MES bulles. Un id inconnu retombe sur le dégradé Bony (`bulleDe`). */
+  const maBulle = bulleDe(me?.chatBubble);
+  /** Ancre des menus GIF et « citer un projet » : la BARRE, pas leur picto — celui-ci
+   *  n'existe plus sur mobile, où l'action est déclenchée depuis le menu « + ». */
+  const barreSaisieRef = useRef<HTMLDivElement>(null);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [gifDispo, setGifDispo] = useState(false);
-  const gifBtnRef = useRef<HTMLDivElement>(null);
   // Le bouton GIF n'apparaît que si le serveur a une clé Tenor : sans elle, la
   // recherche renverrait 503 à chaque ouverture.
   useEffect(() => {
@@ -536,7 +592,6 @@ const Chat: React.FC = () => {
   }, []);
   const [showProjetPicker, setShowProjetPicker] = useState(false);
   const [rechercheProjet, setRechercheProjet] = useState('');
-  const projetBtnRef = useRef<HTMLDivElement>(null);
   const chargerProjets = useCallback(() => {
     db.getProjects().then(setProjets).catch(() => setProjets([]));
   }, []);
@@ -555,6 +610,78 @@ const Chat: React.FC = () => {
       .sort((a, b) => a.endDate.localeCompare(b.endDate))
       .slice(0, 50); // la liste est déroulante et filtrable : au-delà, on affine par la recherche
   }, [projets, rechercheProjet]);
+
+  /**
+   * Actions de la barre de saisie — SOURCE UNIQUE des deux rendus.
+   *
+   * ⚠️ Une seule liste, rendue à deux endroits : en pictos sur ordinateur, en lignes dans
+   * le menu « + » sur mobile. Écrire deux fois les mêmes boutons, c'est exactement ce qui
+   * a fait diverger la navigation du chef de site (une troisième liste en dur qui
+   * ignorait le filtrage) — on ne recommence pas.
+   *
+   * `dansLeMenu: false` pour le vocal : sur mobile il a sa place à DROITE, là où se
+   * trouve le bouton d'envoi tant que le champ est vide (convention WhatsApp), donc
+   * l'afficher aussi dans le menu ferait doublon.
+   */
+  const actionsSaisie = useMemo(() => [
+    { cle: 'image',   titre: 'Envoyer une image',  libelle: 'Image',        icone: <Image size={18} />,        onClick: () => imageInputRef.current?.click(), dansLeMenu: true,  actif: false },
+    { cle: 'fichier', titre: 'Joindre un fichier (tous formats, max 100 Mo)', libelle: 'Fichier', icone: <Paperclip size={18} />, onClick: () => fileInputRef.current?.click(), dansLeMenu: true, actif: false },
+    // Le GIF n'apparaît que si le serveur a une clé : mieux vaut pas de bouton qu'un
+    // bouton qui échoue.
+    ...(gifDispo ? [{ cle: 'gif', titre: 'Envoyer un GIF', libelle: 'GIF animé', icone: <span className="text-[11px] font-bold leading-none">GIF</span>, onClick: () => setShowGifPicker(v => !v), dansLeMenu: true, actif: showGifPicker }] : []),
+    { cle: 'vocal',   titre: 'Message vocal',      libelle: 'Message vocal', icone: <Mic size={18} />,         onClick: () => setShowVoice(v => !v), dansLeMenu: false, actif: showVoice },
+    // Masqué pour un External : il n'a pas accès aux Projets, lui proposer d'en citer un
+    // n'aurait aucun sens.
+    ...(me?.role !== 'External' ? [{ cle: 'projet', titre: 'Citer un projet', libelle: 'Citer un projet', icone: <FolderKanban size={18} />, onClick: () => setShowProjetPicker(v => !v), dansLeMenu: true, actif: showProjetPicker }] : []),
+  ], [gifDispo, showGifPicker, showVoice, showProjetPicker, me?.role]);
+
+  /**
+   * Import d'une image de fond.
+   *
+   * ⚠️ Les limites affichées ici sont un CONFORT : le seul garde-fou réel est la règle
+   * `chatbg` de `backend/src/routes/uploads.ts` (JPEG/PNG/WebP, 8 Mo). Les deux doivent
+   * rester alignées — c'est déjà la règle pour les pièces jointes du chat.
+   */
+  const importerFond = async (fichier: File) => {
+    if (!fichier.type.startsWith('image/')) { alert('Choisissez une image (JPEG, PNG ou WebP).'); return; }
+    if (fichier.size > 8 * 1024 * 1024) { alert('Image trop lourde : 8 Mo maximum.'); return; }
+    setFondEnCours(true);
+    try {
+      const url = await db.uploadFile('chatbg', fichier);
+      await setChatBackground(url);
+      setShowFonds(false);
+    } catch (e) {
+      console.error('Fond de chat : import échoué', e);
+      alert(e instanceof ApiError ? e.message : "Import du fond impossible.");
+    } finally {
+      setFondEnCours(false);
+    }
+  };
+
+  const choisirBulle = async (id: string) => {
+    setFondEnCours(true);
+    try {
+      await setChatBubble(id);
+    } catch (e) {
+      console.error('Couleur de bulle : enregistrement échoué', e);
+      alert(e instanceof ApiError ? e.message : "Enregistrement de la couleur impossible.");
+    } finally {
+      setFondEnCours(false);
+    }
+  };
+
+  const choisirFond = async (valeur: string | null) => {
+    setFondEnCours(true);
+    try {
+      await setChatBackground(valeur);
+      setShowFonds(false);
+    } catch (e) {
+      console.error('Fond de chat : enregistrement échoué', e);
+      alert(e instanceof ApiError ? e.message : "Enregistrement du fond impossible.");
+    } finally {
+      setFondEnCours(false);
+    }
+  };
 
   // Auto-ouverture de la 1re conversation visible une fois la liste chargée.
   useEffect(() => {
@@ -1131,6 +1258,16 @@ const Chat: React.FC = () => {
                 )}
               </div>
 
+              {/* Fond de discussion — préférence personnelle, donc disponible sur TOUTE
+                  conversation (privée, groupe, général), contrairement au bouton Membres. */}
+              <button
+                onClick={() => setShowFonds(true)}
+                className="shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[34px] md:min-w-[34px] rounded-lg border border-bony-border text-slate-500 hover:border-bony-orange hover:text-bony-orange transition"
+                title="Personnaliser la discussion"
+              >
+                <Palette size={15} />
+              </button>
+
               {/* Membres button (group only) */}
               {activeConv.type === 'group' && (
                 <button
@@ -1146,9 +1283,17 @@ const Chat: React.FC = () => {
             {/* Content row: messages + members panel */}
             <div className="flex flex-1 overflow-hidden relative">
 
-              {/* Messages */}
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-4 space-y-1">
+              {/* Messages.
+                  ⚠️ Le FOND est posé ici, sur le conteneur, et non sur la zone qui
+                  défile : une image doit rester fixe pendant qu'on remonte le fil, comme
+                  dans toutes les messageries. Le voile par-dessus n'est pas décoratif —
+                  sur une photo importée, dont on ne maîtrise ni la luminosité ni le
+                  contraste, c'est lui qui garde le texte lisible. */}
+              <div className="flex-1 flex flex-col overflow-hidden relative" style={styleFond}>
+                {aUnFond && (
+                  <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: voileFondChat(fondActuel, sombre) }} />
+                )}
+                <div className="relative flex-1 overflow-y-auto custom-scrollbar px-4 py-4 space-y-1">
                   {groupedMessages.map(({ day, msgs }) => (
                     <div key={day}>
                       <div className="flex items-center gap-3 my-4">
@@ -1270,7 +1415,10 @@ const Chat: React.FC = () => {
                                     <div>
                                       <div
                                         className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${isMe ? 'text-white rounded-br-sm' : 'bg-bony-panel border border-bony-border text-bony-text rounded-bl-sm'}`}
-                                        style={isMe ? { background: 'linear-gradient(135deg, #f75632, #8f12ab)' } : {}}
+                                        // ⚠️ Seules MES bulles changent de couleur : celles des
+                                        // autres gardent le panneau neutre, sinon on ne
+                                        // distingue plus qui parle.
+                                        style={isMe ? { background: maBulle.css, color: maBulle.texteSombre ? '#0f172a' : undefined } : {}}
                                       >
                                         {renduTexteRiche(msg.content)}
                                         {msg.edited && <span className="text-[9px] opacity-60 ml-1">(modifié)</span>}
@@ -1372,7 +1520,7 @@ const Chat: React.FC = () => {
                     ⚠️ Paddings en longhand uniquement : un raccourci `p-*` préfixé
                     `md:` écrase un `pt-*`/`pb-*` écrit après lui (l'ordre des règles
                     générées par la CDN Play ne suit pas l'ordre des classes). */}
-                <div className="px-3 md:px-4 pt-2 pb-2 md:pb-2.5 border-t border-bony-border glass-strong shrink-0">
+                <div className="relative px-3 md:px-4 pt-2 pb-2 md:pb-2.5 border-t border-bony-border glass-strong shrink-0">
                   {showVoice && (
                     <VoiceRecorder
                       onClose={() => setShowVoice(false)}
@@ -1407,53 +1555,45 @@ const Chat: React.FC = () => {
                       messagerie). L'alignement sur une seule ligne ne vient donc PAS
                       d'`items-center` mais du fait que les quatre enfants ont la même
                       hauteur — voir le commentaire du textarea. */}
-                  <div className="flex items-end gap-2 bg-[var(--bg-input)] border border-bony-border rounded-2xl px-2 py-1 focus-within:border-bony-orange/60 transition-colors">
-                    {/* Deux déclencheurs pour un seul champ : l'un filtre sur les
-                        images (usage le plus courant, la galerie s'ouvre directement
-                        sur mobile), l'autre accepte tout. Le contrôle réel est côté
-                        serveur, `accept` n'est qu'un confort de sélection. */}
-                    <button onClick={() => imageInputRef.current?.click()} className="shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl text-slate-400 hover:text-bony-orange hover:bg-white/5 transition" title="Envoyer une image">
-                      <Image size={18} />
-                    </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl text-slate-400 hover:text-bony-orange hover:bg-white/5 transition" title="Joindre un fichier (tous formats, max 100 Mo)">
-                      <Paperclip size={18} />
-                    </button>
-                    {/* Bouton GIF — masqué tant que GIPHY_API_KEY n'est pas configurée
-                        sur le serveur : mieux vaut pas de bouton qu'un bouton qui
-                        échoue. */}
+                  <div ref={barreSaisieRef} className="flex items-end gap-2 bg-[var(--bg-input)] border border-bony-border rounded-2xl px-2 py-1 focus-within:border-bony-orange/60 transition-colors">
+                    {/* MOBILE — un seul bouton pour toutes les actions.
+                        ⚠️ Mesuré à 375 px avant ce correctif : 5 pictos × 44 px + les
+                        écarts laissaient **19 px** au champ de texte. Les 44 px de zone
+                        tactile ne sont pas négociables (règle du projet), donc c'est le
+                        NOMBRE de boutons qui devait baisser, pas leur taille. */}
+                    <div ref={actionsBtnRef} className="shrink-0 md:hidden">
+                      <button
+                        onClick={() => setShowActions(v => !v)}
+                        className={`flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl transition ${showActions ? 'text-bony-orange bg-bony-orange/10' : 'text-slate-400 hover:text-bony-orange hover:bg-white/5'}`}
+                        title="Joindre, GIF, citer un projet…"
+                        aria-label="Plus d'actions"
+                      >
+                        <Plus size={20} />
+                      </button>
+                    </div>
+
+                    {/* ORDINATEUR — les mêmes actions, dépliées. Même source que le menu
+                        ci-dessus : jamais deux listes de boutons à maintenir. */}
+                    {actionsSaisie.map(a => (
+                      <button
+                        key={a.cle}
+                        onClick={a.onClick}
+                        className={`shrink-0 hidden md:flex items-center justify-center md:min-h-[36px] md:min-w-[36px] rounded-xl transition ${a.actif ? 'text-bony-orange bg-bony-orange/10' : 'text-slate-400 hover:text-bony-orange hover:bg-white/5'}`}
+                        title={a.titre}
+                      >
+                        {a.icone}
+                      </button>
+                    ))}
+                    {/* Les deux menus sont ancrés sur la BARRE et non sur leur picto :
+                        celui-ci n'existe pas sur mobile, où l'action part du « + ». */}
                     {gifDispo && (
-                      <div ref={gifBtnRef} className="shrink-0 relative">
-                        <button
-                          onClick={() => setShowGifPicker(v => !v)}
-                          className={`flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl text-[11px] font-bold transition ${showGifPicker ? 'text-bony-orange bg-bony-orange/10' : 'text-slate-400 hover:text-bony-orange hover:bg-white/5'}`}
-                          title="Envoyer un GIF"
-                        >
-                          GIF
-                        </button>
-                        <FloatingPanel open={showGifPicker} onClose={() => setShowGifPicker(false)} triggerRef={gifBtnRef} width={300} maxHeight={360} className="rounded-xl">
-                          <GifPicker onPick={url => sendMessage(url)} onClose={() => setShowGifPicker(false)} />
-                        </FloatingPanel>
-                      </div>
+                      <FloatingPanel open={showGifPicker} onClose={() => setShowGifPicker(false)} triggerRef={barreSaisieRef} width={300} maxHeight={360} className="rounded-xl">
+                        <GifPicker onPick={url => sendMessage(url)} onClose={() => setShowGifPicker(false)} />
+                      </FloatingPanel>
                     )}
-                    <button
-                      onClick={() => setShowVoice(v => !v)}
-                      className={`shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl transition ${showVoice ? 'text-bony-orange bg-bony-orange/10' : 'text-slate-400 hover:text-bony-orange hover:bg-white/5'}`}
-                      title="Message vocal"
-                    >
-                      <Mic size={18} />
-                    </button>
-                    {/* Citer un projet. Masqué pour un External : il n'a pas accès aux
-                        Projets, lui proposer d'en citer un n'aurait aucun sens. */}
                     {me?.role !== 'External' && (
-                      <div ref={projetBtnRef} className="shrink-0 relative">
-                        <button
-                          onClick={() => setShowProjetPicker(v => !v)}
-                          className="flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl text-slate-400 hover:text-bony-orange hover:bg-white/5 transition"
-                          title="Citer un projet"
-                        >
-                          <FolderKanban size={18} />
-                        </button>
-                        <FloatingPanel open={showProjetPicker} onClose={() => setShowProjetPicker(false)} triggerRef={projetBtnRef} width={280} maxHeight={340} className="rounded-xl">
+                      <div className="contents">
+                        <FloatingPanel open={showProjetPicker} onClose={() => setShowProjetPicker(false)} triggerRef={barreSaisieRef} width={280} maxHeight={340} className="rounded-xl">
                           <div className="p-2 border-b border-bony-border shrink-0">
                             <div className="flex items-center gap-2 bg-bony-dark border border-bony-border rounded-lg px-2 py-1.5">
                               <Search size={13} className="text-slate-500 shrink-0" />
@@ -1502,14 +1642,57 @@ const Chat: React.FC = () => {
                       onChange={e => setInput(e.target.value)}
                       onKeyDown={handleKeyDown}
                       onPaste={handlePaste}
-                      placeholder="Écrire un message… (Entrée pour envoyer)"
+                      placeholder={estMobile ? 'Écrire un message…' : 'Écrire un message… (Entrée pour envoyer)'}
                       className="flex-1 min-w-0 bg-transparent text-sm text-bony-text outline-none resize-none overflow-y-auto max-h-32 py-[10px] md:py-1.5 leading-6 placeholder-bony-muted"
                       rows={1}
                     />
-                    <button onClick={() => sendMessage(input)} disabled={!input.trim()} className="shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl bg-bony-gradient text-white disabled:opacity-30 transition-opacity hover:opacity-90" title="Envoyer">
+                    {/* MOBILE — micro tant que le champ est vide, envoi dès qu'on tape :
+                        la convention de WhatsApp. Elle rend le vocal accessible d'un
+                        doigt sans coûter un seul pixel de largeur au champ de texte,
+                        c'est pour ça qu'il n'est pas dans le menu « + ». */}
+                    {!input.trim() && (
+                      <button
+                        onClick={() => setShowVoice(v => !v)}
+                        className={`shrink-0 md:hidden flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl transition ${showVoice ? 'text-bony-orange bg-bony-orange/10' : 'text-slate-400 hover:text-bony-orange hover:bg-white/5'}`}
+                        title="Message vocal"
+                      >
+                        <Mic size={18} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => sendMessage(input)}
+                      disabled={!input.trim()}
+                      className={`shrink-0 ${input.trim() ? 'flex' : 'hidden md:flex'} items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[36px] md:min-w-[36px] rounded-xl bg-bony-gradient text-white disabled:opacity-30 transition-opacity hover:opacity-90`}
+                      title="Envoyer"
+                    >
                       <Send size={16} />
                     </button>
                   </div>
+
+                  {/* Menu des actions, MOBILE. Portalisé (`FloatingPanel`) : la barre est
+                      dans un `glass-strong`, donc dans un contexte d'empilement — un
+                      `absolute` passerait sous les messages, comme au correctif 47. */}
+                  <FloatingPanel
+                    open={showActions}
+                    onClose={() => setShowActions(false)}
+                    triggerRef={actionsBtnRef}
+                    width={230}
+                    maxHeight={320}
+                    className="rounded-2xl p-1.5"
+                  >
+                    <div className="flex flex-col gap-0.5">
+                      {actionsSaisie.filter(a => a.dansLeMenu).map(a => (
+                        <button
+                          key={a.cle}
+                          onClick={() => { setShowActions(false); a.onClick(); }}
+                          className="flex items-center gap-3 px-3 min-h-[44px] rounded-xl text-left text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5 hover:text-bony-orange transition"
+                        >
+                          <span className="w-5 flex items-center justify-center shrink-0">{a.icone}</span>
+                          <span className="text-xs font-medium">{a.libelle}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </FloatingPanel>
                   <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleAttachment(f); e.target.value = ''; }} />
                   <input ref={fileInputRef} type="file" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleAttachment(f); e.target.value = ''; }} />
                 </div>
@@ -1722,6 +1905,130 @@ const Chat: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-zoom-out" onClick={() => setLightboxSrc(null)}>
           <img src={lightboxSrc} alt="Agrandissement" className="max-w-full max-h-full rounded-xl object-contain shadow-2xl" />
           <button className="absolute top-4 right-4 text-white/70 hover:text-white" onClick={() => setLightboxSrc(null)}><X size={28} /></button>
+        </div>
+      )}
+
+      {/* ===== FOND DE DISCUSSION ===== */}
+      {showFonds && (
+        <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { if (!fondEnCours) setShowFonds(false); }}>
+          <div className="gx-glass-panel border border-bony-border rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-bony-border shrink-0">
+              <div>
+                <h3 className="font-title text-sm text-bony-text">Personnaliser la discussion</h3>
+                {/* Dire explicitement que le choix est personnel : sans ça, on hésite à
+                    en mettre un, de peur de l'imposer à toute l'équipe. */}
+                <p className="text-[10px] text-bony-muted mt-0.5">Visible par vous seul, sur tous vos appareils.</p>
+              </div>
+              <button onClick={() => setShowFonds(false)} className="text-slate-400 hover:text-bony-text"><X size={18} /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+              {/* ⚠️ Liste dérivée du catalogue et non écrite à la main : une famille
+                  renommée dans `personnalisationChat.ts` faisait disparaître toute sa
+                  section sans la moindre erreur (constaté avec « Couleurs »). */}
+              {[...new Set(FONDS_CHAT.map(f => f.famille))].map(famille => (
+                <div key={famille}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-bony-muted mb-2">{famille}</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {FONDS_CHAT.filter(f => f.famille === famille).map(f => {
+                      const valeur = `${PREFIXE_PROC}${f.id}`;
+                      const choisi = fondActuel === valeur;
+                      return (
+                        <button
+                          key={f.id}
+                          onClick={() => choisirFond(valeur)}
+                          disabled={fondEnCours}
+                          // L'aperçu utilise EXACTEMENT le style du rendu réel : une
+                          // vignette dessinée à part finirait par mentir.
+                          style={sombre ? f.sombre : f.clair}
+                          className={`relative h-20 rounded-xl border-2 overflow-hidden transition disabled:opacity-50 ${choisi ? 'border-bony-orange' : 'border-bony-border hover:border-bony-orange/50'}`}
+                          title={f.nom}
+                        >
+                          <span className="absolute inset-x-0 bottom-0 px-1.5 py-1 text-[9px] font-bold text-white bg-black/45 truncate text-left">{f.nom}</span>
+                          {choisi && (
+                            <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-bony-orange flex items-center justify-center">
+                              <Check size={10} className="text-white" />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-bony-muted mb-2">Couleur de vos bulles</p>
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                  {BULLES_CHAT.map(b => {
+                    const choisi = (me?.chatBubble ?? 'bony') === b.id;
+                    return (
+                      <button
+                        key={b.id}
+                        onClick={() => choisirBulle(b.id)}
+                        disabled={fondEnCours}
+                        title={b.nom}
+                        className={`relative h-12 rounded-xl border-2 transition disabled:opacity-50 ${choisi ? 'border-bony-orange' : 'border-transparent hover:border-bony-orange/50'}`}
+                        style={{ background: b.css }}
+                      >
+                        {choisi && (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <Check size={14} className={b.texteSombre ? 'text-slate-900' : 'text-white'} />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-bony-muted mt-1.5">Ne change que vos messages — vos collègues gardent la couleur qu'ils ont choisie.</p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-bony-muted mb-2">Votre image</p>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  <button
+                    onClick={() => fondBgInputRef.current?.click()}
+                    disabled={fondEnCours}
+                    className="h-20 rounded-xl border-2 border-dashed border-bony-border hover:border-bony-orange text-slate-400 hover:text-bony-orange flex flex-col items-center justify-center gap-1 transition disabled:opacity-50"
+                    title="Importer une image (JPEG, PNG ou WebP, 8 Mo max)"
+                  >
+                    <Upload size={16} />
+                    <span className="text-[9px] font-bold">Importer</span>
+                  </button>
+                  {estFondImporte(fondActuel) && (
+                    <div
+                      className="relative h-20 rounded-xl border-2 border-bony-orange overflow-hidden"
+                      style={{ backgroundImage: `url("${fondActuel}")`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                      title="Votre image actuelle"
+                    >
+                      <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-bony-orange flex items-center justify-center">
+                        <Check size={10} className="text-white" />
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[10px] text-bony-muted mt-1.5">JPEG, PNG ou WebP — 8 Mo maximum.</p>
+              </div>
+            </div>
+
+            <div className="p-3 border-t border-bony-border shrink-0 flex items-center justify-between gap-2">
+              <button
+                onClick={() => choisirFond(null)}
+                disabled={fondEnCours || !fondActuel}
+                className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-bony-text border border-bony-border disabled:opacity-40 transition"
+              >
+                Aucun fond
+              </button>
+              <span className="text-[10px] text-bony-muted">{fondEnCours ? 'Enregistrement…' : ''}</span>
+            </div>
+          </div>
+          <input
+            ref={fondBgInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) importerFond(f); e.target.value = ''; }}
+          />
         </div>
       )}
 

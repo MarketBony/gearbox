@@ -8,6 +8,45 @@ import { prisma } from '../db';
 
 const router = Router();
 
+/**
+ * Formes acceptées pour `User.chatBackground` (fond du Chat), et ELLES SEULES.
+ *
+ * ⚠️ Même doctrine que `CALENDAR_UPLOAD_PATH` (routes/social.ts) et que
+ * `AVATAR_UPLOAD_PATH` (realtime/chat.ts) : on ne fait confiance ni au client ni au type
+ * MIME qu'il déclare, on reconnaît un chemin que NOUS avons produit. Le nom de fichier
+ * est toujours un `randomUUID()` et l'extension vient d'`EXT_BY_MIME` pour le type
+ * `chatbg` (jpg|png|webp) — voir `routes/uploads.ts`.
+ *
+ * ⚠️ NE PAS élargir à `/^\/uploads\//` : les dossiers `chat/` et `project/` n'ont AUCUN
+ * filtre de format, y pointer depuis un fond rouvrirait ce trou par la bande. C'est le
+ * même piège que celui documenté pour les médias du Digital.
+ */
+const CHATBG_UPLOAD_PATH =
+  /^\/uploads\/chatbg\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/i;
+
+/**
+ * Fond du catalogue procédural : `proc:<id>`.
+ *
+ * ⚠️ Le serveur ne connaît PAS la liste des ids — elle vit dans `lib/personnalisationChat.ts`, côté
+ * frontend, et le backend ne peut pas importer ce fichier (il n'est compilé que dans le
+ * bundle web, même raison que `PLAQUES_STRUCTURE`). On valide donc la FORME, pas la
+ * valeur : un id inconnu est sans danger, le client retombe proprement sur le fond par
+ * défaut (`styleFondChat` rend `{}`). Valider la liste ici imposerait une troisième
+ * duplication à garder synchronisée pour un gain nul.
+ */
+const FOND_PROCEDURAL = /^proc:[a-z0-9-]{1,40}$/;
+
+/**
+ * Couleur des bulles : un IDENTIFIANT du catalogue, jamais une couleur CSS.
+ *
+ * ⚠️ La distinction est le tout : la valeur est injectée dans un `style` côté client.
+ * Accepter `#f00` ou `linear-gradient(...)` reviendrait à laisser un compte écrire une
+ * déclaration de style dans la page de l'application — on ne laisse donc passer qu'un
+ * mot-clé, que le client résout lui-même. Même raison que pour les fonds : le serveur
+ * valide la FORME, la liste vit côté frontend et un id inconnu retombe sur le défaut.
+ */
+const BULLE_ID = /^[a-z0-9-]{1,30}$/;
+
 router.post('/login', async (req, res) => {
   const { loginId, password } = req.body;
 
@@ -68,13 +107,41 @@ router.put('/me', async (req, res) => {
   const decoded = decodeToken(req);
   if (!decoded) return res.sendStatus(403);
 
-  const { name, password, avatarColor, avatarUrl, birthdate } = req.body;
+  const { name, password, avatarColor, avatarUrl, birthdate, chatBackground, chatBubble } = req.body;
 
   // avatarUrl : undefined = champ absent (non modifié) ; null = suppression de la photo.
   const updateData: any = { name, avatarColor };
   if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
   // Même convention : undefined = non modifié ; vide = anniversaire effacé.
   if (birthdate !== undefined) updateData.birthdate = birthdate || null;
+  // Fond du Chat : undefined = non modifié ; vide = retour au fond par défaut.
+  //
+  // ⚠️ VALIDÉ ICI, et c'est obligatoire. `avatarUrl`, juste au-dessus, accepte encore
+  // n'importe quelle chaîne — trou connu et documenté : un appel direct y écrit une URL
+  // EXTERNE, ensuite rendue dans un `<img>` chez tous les collègues (fuite d'IP, pixel de
+  // traçage). Un fond de chat pose exactement le même risque, en pire : il est rendu en
+  // grand et en permanence. On n'ouvre donc que deux formes, et rien d'autre.
+  if (chatBackground !== undefined) {
+    const v = typeof chatBackground === 'string' ? chatBackground.trim() : '';
+    if (!v) {
+      updateData.chatBackground = null;
+    } else if (FOND_PROCEDURAL.test(v) || CHATBG_UPLOAD_PATH.test(v)) {
+      updateData.chatBackground = v;
+    } else {
+      return res.status(400).json({ error: 'Fond de discussion refusé : seuls un fond du catalogue ou une image déposée dans Gearbox sont acceptés.' });
+    }
+  }
+  // Couleur des bulles : même convention (vide = retour au dégradé Bony).
+  if (chatBubble !== undefined) {
+    const v = typeof chatBubble === 'string' ? chatBubble.trim() : '';
+    if (!v) {
+      updateData.chatBubble = null;
+    } else if (BULLE_ID.test(v)) {
+      updateData.chatBubble = v;
+    } else {
+      return res.status(400).json({ error: 'Couleur de bulle refusée.' });
+    }
+  }
   if (password) {
     updateData.passwordHash = await bcrypt.hash(password, 10);
   }
