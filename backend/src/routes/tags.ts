@@ -40,6 +40,15 @@ const nettoyerListe = (valeur: unknown): string[] => {
   for (const v of valeur) {
     if (typeof v !== 'string') continue;
     const t = v.replace(/[\x00-\x1f]/g, '').trim().slice(0, MAX_LONGUEUR);
+    // ⚠️ Une valeur TRONQUÉE ne correspond plus à ce que portent les publications qui
+    // l'utilisent : leur `<Select>` retomberait sur son placeholder et la première
+    // personne qui « corrige » le champ vide écraserait la vraie valeur en base. La plus
+    // longue mention Loi LOM fait EXACTEMENT 80 caractères, soit la limite au caractère
+    // près — d'où cette trace, pour qu'un dépassement futur se voie au lieu de se
+    // découvrir six mois plus tard sur un champ devenu vide.
+    if (t.length < v.trim().length) {
+      console.warn(`[tags] valeur tronquée à ${MAX_LONGUEUR} caractères : "${v.trim().slice(0, 40)}…"`);
+    }
     if (!t || vus.has(t)) continue;
     vus.add(t);
     sortie.push(t);
@@ -69,6 +78,23 @@ router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) =>
   // ⚠️ UNE SEULE LIGNE dans cette table, par construction. `upsert` n'est pas utilisable
   // ici : il lui faudrait un identifiant stable, or l'id est un uuid généré.
   const premier = await prisma.digitalTags.findFirst();
+
+  // ⚠️ TRACE D'EFFACEMENT MASSIF. Le 10/09/2026, les 34 modèles CO² et les 4 mentions
+  // Loi LOM ont disparu de cette table, et il a été IMPOSSIBLE de savoir quand ni par
+  // qui : rien n'est journalisé ici, `DigitalTags` n'a pas d'`updatedAt`, l'ActivityLog
+  // ne couvre pas les tags et les logs du conteneur repartent de zéro à chaque
+  // déploiement. Vider une catégorie non vide reste AUTORISÉ (c'est une action légitime
+  // de l'écran), mais ça laisse désormais une ligne dans les logs de l'api.
+  if (premier) {
+    for (const c of CATEGORIES) {
+      const avant = (premier as any)[c]?.length ?? 0;
+      const apres = data[c]?.length;
+      if (apres !== undefined && avant > 0 && apres === 0) {
+        console.warn(`[tags] ⚠️ catégorie "${c}" VIDÉE : ${avant} entrée(s) supprimées d'un coup par ${(req as any).user?.id ?? 'inconnu'}`);
+      }
+    }
+  }
+
   const tags = premier
     ? await prisma.digitalTags.update({ where: { id: premier.id }, data })
     : await prisma.digitalTags.create({ data: { ...VIDE, ...data } });
