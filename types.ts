@@ -396,3 +396,21 @@ declare global {
     electron?: IpcApi;
   }
 }
+
+// --- CONGÉS (12/09/2026) ---
+//
+// ⚠️ `CPAM` = CP matin, `CPAPM` = CP après-midi : ce sont les DEMI-JOURNÉES, qui comptent
+// 0,5 jour. RTT et HR n'en ont pas — la maquette d'origine n'en prévoyait que pour les CP.
+export type CongeType = 'CP' | 'RTT' | 'HR' | 'CPAM' | 'CPAPM';
+
+/** Une cellule du planning : une personne, un jour. */
+export interface CongeJour {
+  id: string;
+  userId: string;
+  /** 'YYYY-MM-DD' — jamais un DateTime : un jour de congé n'a ni heure ni fuseau. */
+  date: string;
+  type: CongeType;
+  /** Le ✓ de la maquette. Seuls Master et Director peuvent le poser. */
+  validated: boolean;
+  createdBy: string;
+}

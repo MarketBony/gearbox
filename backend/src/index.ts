@@ -9,6 +9,7 @@ import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth';
 import projectRoutes from './routes/projects';
 import taskRoutes from './routes/tasks';
+import congesRoutes from './routes/conges';
 import campaignRoutes from './routes/campaigns';
 import socialRoutes from './routes/social';
 import budgetRoutes from './routes/budget';
@@ -68,6 +69,9 @@ app.use('/api/projects', projectRoutes);
 // Tâches AUTONOMES uniquement (projectId null) — les tâches de projet passent
 // exclusivement par /api/projects. Voir l'en-tête de routes/tasks.ts.
 app.use('/api/tasks', taskRoutes);
+// Congés (12/09/2026). ⚠️ Le GET est lui aussi sous `requireRole` : `Site Manager` et
+// `External` n'ont pas la rubrique, et masquer une rubrique ne ferme pas une route.
+app.use('/api/conges', congesRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/budget', budgetRoutes);

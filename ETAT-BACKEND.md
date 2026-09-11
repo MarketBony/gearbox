@@ -1084,6 +1084,39 @@ divergé.
 disque, comme pour les avatars. Même fiche que les uploads orphelins au backlog, poids
 comparable (une image par personne qui en pose une).
 
+### 🌴 Congés — `/api/conges` (12/09/2026)
+
+Deux tables : `CongeJour` (une ligne = une personne × un jour, `@@unique([userId, date])`
+pour l'upsert) et `CongeMembre` (le PÉRIMÈTRE, `userId @unique`).
+
+**Trois listes de rôles, déclarées EN TÊTE du fichier** et jamais empruntées à une autre
+route — convention du dépôt : coïncidence de valeurs n'est pas identité de règle.
+- `LECTURE_ROLES` : tous sauf `Site Manager` et `External`.
+- `GESTION_ROLES` : Master / Administrator / Director — le périmètre, et l'écriture POUR
+  AUTRUI.
+- `VALIDATION_ROLES` : **Master et Director seulement**. ⚠️ Administrator en est exclu par
+  décision de Théo. Ce n'est pas un oubli, ne pas « corriger ».
+
+⚠️ **`requireRole` sur le GET aussi** (comme `routes/tasks.ts`) : `Site Manager` n'a pas
+la rubrique, et masquer une rubrique ne ferme pas une route. Son refus vient de son
+**absence** de ces listes.
+
+⚠️ **`peutEcrirePour` est la SEULE PORTE** de la règle « chacun sa ligne, les
+gestionnaires celle de tout le monde ». Les quatre routes d'écriture y passent ; la
+recopier dans chaque handler garantirait qu'une copie finisse par diverger.
+
+⚠️ **Le serveur ne connaît NI les week-ends NI les jours fériés** : ils sont exclus de
+l'affichage et du comptage côté client (`lib/joursFeries.ts`). Dupliquer le calendrier ici
+ajouterait une table à synchroniser (après `PLAQUES_STRUCTURE`) pour un gain nul — une
+ligne posée un dimanche n'est comptée nulle part. C'est un choix, pas un trou.
+
+⚠️ On refuse d'écrire un congé pour quelqu'un **hors périmètre** (400) : sans ce contrôle,
+un gestionnaire créerait des lignes invisibles à l'écran, mais bien comptées le jour où la
+personne est ajoutée au planning.
+
+`PUT /periode` écrit en **transaction** : sur trente jours, un échec au milieu laisserait
+la période à moitié posée.
+
 ## ⚠️ Route DORMANTE — `/api/expenses` (modèle `OneOffExpense`)
 
 Route CRUD complète et fonctionnelle (émissions `expense:*` incluses), mais

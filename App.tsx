@@ -16,6 +16,8 @@ import HelloMarketing from './pages/HelloMarketing';
 import Games from './pages/Games';
 import TodoList from './pages/TodoList';
 import Export, { EXPORT_ALLOWED_ROLES } from './pages/Export';
+import Conges from './pages/Conges';
+import { useCongesAcces, congesAccesStore } from './services/congesAcces';
 import { canSeeGames, SITE_MANAGER_SECTIONS, isSiteManager } from './constants';
 import { appSettingsStore, useAppSettings } from './services/appSettings';
 import { useRealtimeSync, RT_EVENTS } from './services/realtime';
@@ -48,6 +50,14 @@ const InnerApp: React.FC = () => {
   // Bascule par le Master : répercutée chez tout le monde sans rechargement.
   useRealtimeSync(RT_EVENTS.settings, () => { appSettingsStore.refresh(); });
 
+  // Congés : le PÉRIMÈTRE décide de la visibilité de la rubrique. Rechargé à l'ouverture
+  // de session, puis suivi en temps réel — être ajouté au planning doit faire apparaître
+  // la rubrique sans rechargement, et en être retiré doit la faire disparaître.
+  useEffect(() => {
+    if (user) congesAccesStore.refresh(user.role, user.id);
+  }, [user?.id, user?.role]);
+  useRealtimeSync(RT_EVENTS.conges, () => { if (user) congesAccesStore.refresh(user.role, user.id); });
+
   useEffect(() => {
     // Initialize Data Service
     db.init().then(() => setDbReady(true));
@@ -75,9 +85,15 @@ const InnerApp: React.FC = () => {
   const isExternal = user?.role === 'External';
   const canAccessGames = canSeeGames(user?.role, gamesEnabled);
   const canExport = EXPORT_ALLOWED_ROLES.includes(user?.role ?? '');
+  // Congés : visible pour les membres du périmètre et ceux qui le gèrent.
+  const { visible: voitConges } = useCongesAcces();
   let resolvedTab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(activeTab)) ? 'digital' : activeTab;
   if (resolvedTab === 'games' && !canAccessGames) resolvedTab = 'dashboard';
   if (resolvedTab === 'export' && !canExport) resolvedTab = 'dashboard';
+  // ⚠️ Même raison que pour les autres gardes : l'onglet actif est mémorisé en session,
+  // une rubrique retirée du menu reste ATTEIGNABLE sans ceci. Le refus réel est de toute
+  // façon côté serveur (`routes/conges.ts` rend 403, même sur le GET).
+  if (resolvedTab === 'conges' && !voitConges) resolvedTab = 'dashboard';
   // ⚠️ Chef de site : liste FERMÉE de rubriques. Masquer la navigation ne suffit pas —
   // l'onglet actif est mémorisé en session et un événement `gearbox-navigate` peut
   // pointer n'importe où. Sans cette garde, une rubrique interdite restait
@@ -141,6 +157,7 @@ const InnerApp: React.FC = () => {
       case 'budget': return <Budget />;
       case 'fixed-expenses': return <FixedExpenses />;
       case 'export': return <Export />;
+      case 'conges': return <Conges />;
       case 'settings': return <Settings />;
       default: return isExternal ? <Digital /> : <Dashboard />;
     }
