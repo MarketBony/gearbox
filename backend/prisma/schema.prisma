@@ -27,6 +27,20 @@ model User {
   // invisible de tous les autres — l'anniversaire est une donnée d'équipe, pas une
   // préférence. La ville, elle, reste bien en localStorage (météo de son propre poste).
   birthdate         String?
+  /// Fond de discussion du Chat, choisi par l'utilisateur (11/09/2026). Deux formes, et
+  /// deux seulement : `proc:<id>` pour un fond procédural du catalogue
+  /// (`lib/fondsChat.ts`), ou `/uploads/chatbg/<uuid>.<ext>` pour une image importée.
+  /// `null` = fond par défaut de l'application.
+  ///
+  /// ⚠️ EN BASE et non en `localStorage`, à dessein : Théo travaille sur son poste, son
+  /// iPhone et son Pixel (PWA installée sur les trois). Une préférence rangée dans le
+  /// navigateur serait à refaire sur chaque appareil — c'est la leçon de la date de
+  /// naissance et des tags Digital, qui ont tous deux coûté un correctif.
+  ///
+  /// ⚠️ La valeur est VALIDÉE par le serveur (`routes/auth.ts`) : sans ça, ce champ
+  /// deviendrait une seconde version du trou connu d'`avatarUrl`, où une URL externe
+  /// écrite par un appel direct fait charger une ressource tierce dans le navigateur.
+  chatBackground    String?
   // Périmètre du rôle « Site Manager » (chef de site) : les concessions auxquelles le
   // compte est rattaché. Vide pour tous les autres rôles, qui voient l'ensemble.
   //

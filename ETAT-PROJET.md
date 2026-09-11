@@ -2775,6 +2775,82 @@
     sert — comme `redactSiteFields` ou `publicUser`, elle doit être la **seule forme
     possible**, pas une possibilité offerte.
 
+52. **CHAT — barre de saisie utilisable sur mobile, et fonds de discussion**
+    (`feat/chat-saisie-mobile-et-fonds`, 11 septembre 2026). Frontend **et** backend,
+    **avec migration** (`20260911120000_add_user_chat_background`, purement additive).
+    Demande de Théo après un essai sur téléphone : « on n'a plus de place pour la saisie
+    de texte », et « j'aimerais pouvoir mettre des fonds de chat de mon choix, comme sur
+    WhatsApp et Messenger ».
+
+    - **Le champ de saisie faisait 19 px de large à 375 px.** Mesuré, pas estimé : cinq
+      pictos d'action à 44 px (la zone tactile minimale du projet, non négociable) plus
+      leurs écarts occupaient 220 px des 349 disponibles. On écrivait dans une fente.
+      ⚠️ La correction ne pouvait pas être de rétrécir les boutons — c'est le NOMBRE qui
+      devait baisser. Sous `md`, les cinq actions sont repliées derrière un seul bouton
+      « + » qui ouvre un menu, comme le font WhatsApp et Messenger ; sur ordinateur la
+      barre est **inchangée** (vérifié : 5 pictos de 36 px, champ à 580 px).
+      **Mesuré après : 19 px → 227 px**, à hauteur de barre constante (54 px).
+      Le **micro reste à droite**, à la place du bouton d'envoi tant que le champ est
+      vide (convention WhatsApp) : le vocal reste accessible d'un doigt **sans coûter un
+      pixel** au champ de texte — c'est pourquoi il n'est pas dans le menu.
+      ⚠️ **Une seule liste d'actions** (`actionsSaisie`), rendue à deux endroits. Écrire
+      deux fois les mêmes boutons est exactement ce qui a fait diverger la navigation du
+      chef de site (correctif 32) ; les menus GIF et « citer un projet » sont désormais
+      ancrés sur **la barre** et non sur leur picto, qui n'existe plus sur mobile.
+      Corrigé au passage : le placeholder « Écrire un message… (Entrée pour envoyer) »
+      passait sur deux lignes et se faisait couper — et sa parenthèse n'a aucun sens au
+      doigt, où Entrée retourne à la ligne. Un attribut ne se change pas en CSS, d'où un
+      `matchMedia` aligné sur le seuil `md`.
+    - **Fonds de discussion** : 8 fonds **procéduraux** (`lib/fondsChat.ts`) plus l'import
+      d'une image personnelle.
+      ⚠️ **Tout en CSS, aucune image téléchargée pour les fonds du catalogue** — dégradés
+      et motifs SVG en `data:`. Le lot PWA a acté que l'app n'a aucun mode hors-ligne et
+      que tout vient du réseau : huit images de fond auraient alourdi chaque ouverture du
+      chat, et un dégradé reste net à toutes les densités d'écran.
+      ⚠️ **Deux variantes par fond, clair et sombre** : un fond pensé pour le sombre vire
+      au gris sale sur fond blanc et rend les bulles translucides illisibles.
+      ⚠️ **Un voile est posé par-dessus**, plus opaque pour une image importée (55 %) que
+      pour un fond du catalogue (15-20 %) : on ne maîtrise ni la luminosité ni le
+      contraste d'une photo, et c'est lui qui garde le texte lisible.
+      Le fond est **celui de qui regarde**, jamais partagé — chacun le sien, comme sur
+      WhatsApp.
+    - **Stocké en base** (`User.chatBackground`) et **non en `localStorage`** : Théo
+      travaille sur son poste, son iPhone et son Pixel. Une préférence rangée dans le
+      navigateur serait à refaire sur chaque appareil — c'est la leçon de la date de
+      naissance et des tags Digital, qui ont chacun coûté un correctif.
+    - ⚠️ **VALIDÉ CÔTÉ SERVEUR**, et c'est le point à ne pas relâcher. Deux formes
+      acceptées et deux seulement : `proc:<id>` ou `/uploads/chatbg/<uuid>.<ext>`. Sans
+      ça, ce champ serait une seconde version du trou connu d'`avatarUrl`, où un appel
+      direct écrit une URL **externe** ensuite chargée par le navigateur — en pire, un
+      fond s'affiche en grand et en permanence. Le motif n'est volontairement PAS élargi
+      à `/uploads/` : les dossiers `chat/` et `project/` n'ont aucun filtre de format.
+      Le serveur valide la **forme** et non la liste des ids (elle vit côté frontend, que
+      le backend ne peut pas importer) : un id inconnu est sans danger, l'écran retombe
+      proprement sur « aucun fond ».
+    - Nouveau type d'upload `chatbg` (JPEG/PNG/WebP, 8 Mo). **Liste blanche assumée**,
+      contrairement à `chat` et `project` : ce fichier n'est jamais ouvert ni téléchargé,
+      il est rendu dans un `background-image`. `image/gif` en est **volontairement
+      absent** — un fond animé derrière chaque message fatigue la lecture.
+
+    **Vérifié dans l'interface**, sur les deux largeurs : champ 19 → **227 px** à 375 px
+    et **580 px** inchangé à 1 400 px ; menu « + » avec ses 4 actions à 44 px, sans
+    débordement ; micro qui devient bouton d'envoi dès la première frappe et redevient
+    micro à l'effacement ; fond procédural appliqué et **persisté** (relu après
+    rechargement) ; image importée par le vrai chemin de l'interface, rendue avec son
+    voile à 55 % ; aucun scroll horizontal.
+    **Sécurité mesurée** : `https://tiers.example/pixel.gif` → **400**,
+    `/uploads/chat/abcd.png` → **400**, `javascript:alert(1)` → **400**, GIF → **415**,
+    8 Mo + 1 octet → **413**, 8 Mo pile → **200** (la limite est inclusive, correctif 28).
+    **Repli vérifié** sur un id inconnu écrit en base (`proc:inexistant`) : aucun style,
+    **et aucun voile** — le premier jet posait un filtre sur la conversation sans fond
+    derrière, corrigé avant de conclure.
+    `tsc` : **9 à la racine**, **0 au backend** ; `check-plaques-sync` vert ; build de
+    production OK. Fichiers de test supprimés du disque, `chatBackground` remis à `null`.
+
+    ⚠️ **NON VÉRIFIÉ** : le rendu sur un VRAI téléphone (l'émulation ne dit rien du
+    clavier virtuel, qui réduit la hauteur utile), et les fonds en thème **sombre** —
+    l'essai a été fait en thème clair, celui de Théo ce jour-là.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans

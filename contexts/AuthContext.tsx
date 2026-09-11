@@ -10,6 +10,8 @@ interface AuthContextType {
   logout: () => void;
   updateProfile: (updatedUser: User) => Promise<void>;
   setAvatarPhoto: (url: string | null) => Promise<void>;
+  /** Fond du Chat : `proc:<id>`, chemin d'une image importée, ou `null` pour le défaut. */
+  setChatBackground: (valeur: string | null) => Promise<void>;
   loading: boolean;
   isAuthenticated: boolean;
 }
@@ -133,8 +135,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.dispatchEvent(new CustomEvent('gearbox-avatar-updated', { detail: { userId: fullUser.id } }));
   };
 
+  /**
+   * Fond de discussion du Chat de l'utilisateur CONNECTÉ.
+   *
+   * ⚠️ Méthode dédiée, et surtout PAS un passage par `updateProfile` : celui-ci
+   * reconstruit un objet littéral champ par champ, et c'est exactement ce qui a fait
+   * qu'une date de naissance saisie par son propriétaire n'atteignait jamais le serveur
+   * (correctif du 06/08/2026) — le serveur répondait 200, l'interface affichait « profil
+   * mis à jour », et rien n'était écrit. Une méthode par intention évite d'avoir à se
+   * souvenir d'une liste.
+   */
+  const setChatBackground = async (valeur: string | null) => {
+    if (!user) return;
+    // Chaîne vide et non `null` dans le corps : convention du serveur « champ absent =
+    // inchangé, valeur vide = effacement » (routes/auth.ts).
+    const me = await db.updateMe({ chatBackground: valeur ?? '' });
+    const fullUser: User = { ...user, chatBackground: me.chatBackground ?? null } as User;
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUser));
+    setUser(fullUser);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateProfile, setAvatarPhoto, loading, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, updateProfile, setAvatarPhoto, setChatBackground, loading, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

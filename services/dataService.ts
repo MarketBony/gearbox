@@ -459,7 +459,7 @@ class DataService {
   // Upload d'un fichier (chat|avatar|calendar|project) via POST /api/uploads/:type.
   // multipart/form-data : on NE fixe PAS Content-Type (le navigateur ajoute la
   // boundary). Renvoie l'URL relative servie par le backend.
-  async uploadFile(type: 'chat' | 'avatar' | 'calendar' | 'project', file: File): Promise<string> {
+  async uploadFile(type: 'chat' | 'avatar' | 'calendar' | 'project' | 'chatbg', file: File): Promise<string> {
     const form = new FormData();
     form.append('file', file);
     const token = getToken();
@@ -771,7 +771,13 @@ class DataService {
   // reporté ICI **et** dans `AuthContext.updateProfile` — même piège que la
   // déstructuration explicite de `routes/users.ts` (cf. `nissanShare`, `birthdate`).
   // Convention du serveur (routes/auth.ts) : champ absent = inchangé, valeur vide = effacement.
-  async updateMe(data: { name?: string; password?: string; avatarColor?: string; avatarUrl?: string | null; birthdate?: string }): Promise<Omit<User, 'loginId'>> {
+  /**
+   * ⚠️ CETTE SIGNATURE EST UNE LISTE BLANCHE : ce qui n'y figure pas ne PEUT pas être
+   * envoyé (TypeScript refuse les propriétés en trop sur un littéral). C'est ce qui a
+   * réparé la date de naissance le 06/08/2026 — et ce qui impose d'ajouter ici tout
+   * nouveau champ modifiable par son propriétaire, comme `chatBackground`.
+   */
+  async updateMe(data: { name?: string; password?: string; avatarColor?: string; avatarUrl?: string | null; birthdate?: string; chatBackground?: string }): Promise<Omit<User, 'loginId'>> {
     return apiFetch('/auth/me', { method: 'PUT', body: JSON.stringify(data) });
   }
 }

@@ -17,6 +17,10 @@ export const publicUser = (u: any) => ({
   avatarColor: u.avatarColor,
   avatarUrl: u.avatarUrl,
   birthdate: u.birthdate,
+  // Préférence d'affichage personnelle (fond du Chat). Sans conséquence pour les autres
+  // comptes, mais ils la reçoivent comme le reste : `publicUser` est une projection, pas
+  // un filtre par destinataire.
+  chatBackground: u.chatBackground,
   // Périmètre du chef de site. Vide pour tous les autres rôles. Non sensible en
   // soi (ce sont des noms de concession), et nécessaire au frontend pour borner
   // ses sélecteurs de périmètre.
