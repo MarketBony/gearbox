@@ -655,11 +655,24 @@ class DataService {
       return serveur;
   }
 
-  async saveDigitalTags(tags: DigitalTags): Promise<DigitalTags> {
+  /**
+   * ⚠️ ACCEPTE UN PATCH, et c'est le point important : `routes/tags.ts` n'écrit QUE les
+   * catégories présentes dans le corps. Envoyer `{ networks }` seul laisse `co2` et `lom`
+   * intacts en base, quoi qu'ait l'écran dans son état. Le 10/09/2026, l'envoi
+   * systématique des trois catégories a effacé les 34 modèles CO² et les 4 mentions
+   * Loi LOM : l'état de l'écran faisait autorité sur des listes qu'il n'avait pas
+   * chargées. Ne pas revenir à un objet complet « pour simplifier ».
+   */
+  async saveDigitalTags(tags: Partial<DigitalTags>): Promise<DigitalTags> {
       if (this.isElectron && window.electron) {
+          // ⚠️ Electron n'a pas d'équivalent du « patch » : le stockage local remplace la
+          // ligne entière. On relit donc l'existant et on fusionne, pour que la même
+          // signature ne vide pas les catégories absentes ici non plus.
+          const existant = await this.getDigitalTags();
+          const fusionne: DigitalTags = { ...existant, ...tags };
           // Use 'save-data' with array [tags] since it expects array for generic insert
-          await window.electron.saveData('digital_tags', [tags]);
-          return tags;
+          await window.electron.saveData('digital_tags', [fusionne]);
+          return fusionne;
       }
       // Le serveur nettoie et dédoublonne (routes/tags.ts) : on rend SA réponse, pas
       // l'objet envoyé, pour que l'écran reflète ce qui est réellement enregistré.

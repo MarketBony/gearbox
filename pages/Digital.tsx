@@ -1360,7 +1360,8 @@ const LIBELLE_AJOUT: Record<CategorieTag, string> = {
 // --- COMPONENT: TAGS MANAGER ---
 const TagsManager: React.FC<{ 
     tags: DigitalTags, 
-    onUpdate: (newTags: DigitalTags) => void,
+    /** ⚠️ Reçoit un PATCH d'une seule catégorie, jamais l'objet complet. */
+    onUpdate: (patch: Partial<DigitalTags>) => void,
     canEdit: boolean 
 }> = ({ tags, onUpdate, canEdit }) => {
     // --- STATE FOR NEW ITEM ---
@@ -1380,8 +1381,9 @@ const TagsManager: React.FC<{
         const current = tags[type];
         if (current.includes(value.trim())) return;
 
-        const updated = { ...tags, [type]: [...current, value.trim()] };
-        onUpdate(updated);
+        // ⚠️ PATCH D'UNE SEULE CATÉGORIE — voir `handleUpdateTags`. Envoyer l'objet
+        // entier a effacé les classes CO² et les mentions Loi LOM le 10/09/2026.
+        onUpdate({ [type]: [...current, value.trim()] });
 
         if (type === 'networks') setNewNetwork('');
         else if (type === 'co2') setNewCo2('');
@@ -1405,7 +1407,7 @@ const TagsManager: React.FC<{
         const { type, originalValue, currentValue } = editingItem;
         if (currentValue.trim() && currentValue.trim() !== originalValue) {
             const updatedList = tags[type].map(t => t === originalValue ? currentValue.trim() : t);
-            onUpdate({ ...tags, [type]: updatedList });
+            onUpdate({ [type]: updatedList });
         }
         setEditingItem(null);
     };
@@ -1424,8 +1426,7 @@ const TagsManager: React.FC<{
 
         // If already confirming THIS item, then actually delete
         if (confirmDelete && confirmDelete.type === type && confirmDelete.value === value) {
-            const updated = { ...tags, [type]: tags[type].filter(t => t !== value) };
-            onUpdate(updated);
+            onUpdate({ [type]: tags[type].filter(t => t !== value) });
             setConfirmDelete(null);
         } else {
             // First click -> Enter confirm mode
@@ -1614,6 +1615,14 @@ const Digital: React.FC = () => {
       champsFocalisesRef.current = Math.max(0, champsFocalisesRef.current + (focus ? 1 : -1));
   }, []);
   const [tags, setTags] = useState<DigitalTags>({ networks: [], co2: [], lom: [] });
+  /**
+   * Les tags ont-ils été LUS avec succès au moins une fois ?
+   * ⚠️ L'état ci-dessus démarre à trois listes vides : sans ce drapeau, un écran ouvert
+   * pendant une panne de l'API prendrait ces listes vides pour la vérité et les écrirait
+   * en base à la première modification. C'est une des deux causes de la perte du
+   * 10/09/2026 — l'autre étant l'envoi de l'objet complet, voir `handleUpdateTags`.
+   */
+  const [tagsCharges, setTagsCharges] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mediaModalPostId, setMediaModalPostId] = useState<string | null>(null);
@@ -1697,19 +1706,42 @@ const Digital: React.FC = () => {
       () => loadData(true)
   );
 
+  /**
+   * ⚠️ `allSettled` ET NON `all` — corrigé le 10/09/2026 après la perte des classes CO²
+   * et des mentions Loi LOM. Avec `Promise.all`, l'échec de `getSocialPosts()` (une
+   * coupure, un 500, une saturation du pooler) faisait rejeter le tout : `setTags`
+   * n'était jamais atteint et l'écran gardait ses trois listes de tags VIDES, son état
+   * initial. Les deux chargements sont indépendants, ils doivent échouer indépendamment.
+   */
   const loadData = async (silent = false) => {
       if (!silent) setLoading(true);
-      const [pData, tData] = await Promise.all([
+      const [rPosts, rTags] = await Promise.allSettled([
           db.getSocialPosts(),
           db.getDigitalTags()
       ]);
-      // Compteurs de médias dérivés de post.mediaFiles (URLs uploadées).
-      const counts: Record<string, number> = {};
-      pData.forEach(p => { counts[p.id] = p.mediaFiles?.length ?? 0; });
-      setMediaCounts(counts);
-      setPosts(pData);
-      setTags(tData);
+
+      if (rPosts.status === 'fulfilled') {
+          const pData = rPosts.value;
+          // Compteurs de médias dérivés de post.mediaFiles (URLs uploadées).
+          const counts: Record<string, number> = {};
+          pData.forEach(p => { counts[p.id] = p.mediaFiles?.length ?? 0; });
+          setMediaCounts(counts);
+          setPosts(pData);
+      } else {
+          console.error('Digital : chargement des publications échoué', rPosts.reason);
+      }
+
+      if (rTags.status === 'fulfilled') {
+          setTags(rTags.value);
+          setTagsCharges(true);
+      } else {
+          console.error('Digital : chargement des tags échoué', rTags.reason);
+      }
+
       if (!silent) setLoading(false);
+      // On propage l'échec des publications APRÈS avoir posé ce qui a réussi : l'appelant
+      // (et le rechargement temps réel) doit toujours voir passer l'erreur.
+      if (rPosts.status === 'rejected') throw rPosts.reason;
   };
 
   /**
@@ -1828,11 +1860,37 @@ const Digital: React.FC = () => {
       }
   };
 
-  const handleUpdateTags = async (newTags: DigitalTags) => {
+  /**
+   * Écrit UNE catégorie de tags.
+   *
+   * ⚠️⚠️ NE JAMAIS REPASSER À L'OBJET COMPLET. Le 10/09/2026, les 34 modèles CO² et les
+   * 4 mentions Loi LOM ont été effacés de la base : cette fonction envoyait les TROIS
+   * catégories, donc l'état de l'écran faisait autorité sur les trois — y compris sur
+   * celles qu'il n'avait pas réussi à charger. Une seule action sur les réseaux suffisait
+   * alors à écrire `co2: []` et `lom: []`.
+   * `routes/tags.ts` ne touche QUE les catégories présentes dans le corps (c'est écrit
+   * dans son commentaire) : envoyer un patch d'une seule catégorie rend la perte des deux
+   * autres structurellement impossible, au lieu de dépendre de l'état de l'écran.
+   *
+   * ⚠️ Second garde-fou, indépendant : tant que les tags n'ont pas été LUS avec succès,
+   * on n'écrit rien. Sans lui, un écran ouvert pendant une panne de l'API écraserait la
+   * catégorie modifiée avec la liste vide de son état initial.
+   */
+  const handleUpdateTags = async (patch: Partial<DigitalTags>) => {
       if (!canEdit) return;
+      if (!tagsCharges) {
+          alert("Les tags n'ont pas pu être chargés : rien n'a été enregistré. Rechargez la page.");
+          return;
+      }
       setSaving(true);
-      setTags(newTags); // Optimistic Update
-      await db.saveDigitalTags(newTags); // Async Save
+      setTags(prev => ({ ...prev, ...patch })); // Optimistic Update
+      try {
+          await db.saveDigitalTags(patch);
+      } catch (e) {
+          console.error('Digital : enregistrement des tags échoué', e);
+          alert(e instanceof ApiError ? e.message : "Échec de l'enregistrement des tags.");
+          await loadData(true).catch(() => {}); // on remet l'écran d'accord avec la base
+      }
       setTimeout(() => setSaving(false), 500);
   };
 

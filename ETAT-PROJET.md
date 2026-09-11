@@ -2721,6 +2721,60 @@
     **à deux postes**. (3) Les rôles `Site Manager` (qui doit LIRE le fil sans pouvoir
     commenter) et `External`, faute de comptes — même trou qu'aux correctifs 45 et 49.
 
+51. **INCIDENT — les tags CO² et Loi LOM effacés de la base, restaurés, et le trou fermé**
+    (`fix/tags-digital-ecrasement`, 10 septembre 2026). Frontend **et** backend, aucune
+    migration. Signalé par Théo le jour même : les colonnes « CLASSES CO² & MENTIONS » et
+    « MENTIONS LOI LOM » de l'écran Gestion des TAGS étaient vides, les 8 réseaux intacts.
+
+    - **Constat en base avant toute hypothèse** : `DigitalTags` portait `networks` (8),
+      `co2` **[]**, `lom` **[]**.
+    - **Effet de bord plus grave que l'écran vide** : 3 mentions Loi LOM étaient
+      **utilisées par des publications**. Un `<Select>` dont la valeur n'est pas dans ses
+      options retombe sur son placeholder — ces publications affichaient donc « Aucune »,
+      et la première personne qui touchait ce champ aurait écrasé la vraie valeur. Le
+      piège est écrit noir sur blanc dans `constants.ts` depuis le correctif 46 ; il s'est
+      réalisé.
+    - **Restauration** depuis `CO2_OPTIONS` / `LOI_LOM_OPTIONS` de `constants.ts` — la
+      donnée n'était pas perdue, elle vit dans le code — **après union avec les valeurs
+      réellement employées par les 61 publications**, pour ne rien laisser dehors.
+      Résultat : 34 modèles, 4 mentions, `networks` non touché, les 3 mentions utilisées
+      toutes présentes. Les 7 classes A–G du seed n'ont pas été remises (fiche de ménage
+      ouverte depuis le correctif 49). Écrit en base directement, donc **sans événement
+      `tags:updated`** : les écrans ouverts devaient être rechargés une fois.
+    - ⚠️ **CAUSE EXACTE NON ÉTABLIE, et c'est un défaut en soi.** Rien ne journalise cette
+      table : `DigitalTags` n'a pas d'`updatedAt`, l'ActivityLog ne couvre pas les tags, et
+      les logs du conteneur `api` repartent de zéro à chaque déploiement — il n'en restait
+      que 50 lignes. Certain : l'écrasement ne peut venir que d'un `POST /api/tags` portant
+      `co2: []` et `lom: []`, dont le seul émetteur possible est l'écran Gestion des TAGS.
+      Établi dans le code : `handleUpdateTags` envoyait **les trois catégories** à chaque
+      action, donc l'état de l'écran faisait autorité sur des listes qu'il n'avait pas
+      forcément chargées ; et `loadData` chargeait publications et tags dans un
+      **`Promise.all`**, si bien que l'échec du chargement des publications empêchait
+      `setTags` d'être atteint et laissait l'écran sur son état initial — trois listes
+      vides. Les deux se combinent exactement en « une action sur les tags écrit du vide ».
+    - **Trois parades indépendantes**, plutôt qu'un correctif ponctuel :
+      1. l'écran n'envoie plus qu'un **patch d'une seule catégorie**. `routes/tags.ts`
+         savait déjà le traiter — son commentaire dit « un client qui n'envoie que
+         `networks` ne doit pas vider `co2` et `lom` » : **le backend était correct, c'est
+         le client qui ne s'en servait pas**. Vider une catégorie qu'on ne modifie pas
+         devient structurellement impossible.
+      2. drapeau `tagsCharges` : aucune écriture tant que les tags n'ont pas été **lus**
+         avec succès.
+      3. `Promise.allSettled` dans `loadData` : deux chargements indépendants doivent
+         échouer indépendamment. L'erreur des publications est toujours propagée, mais
+         **après** avoir posé ce qui a réussi.
+    - **Trace serveur ajoutée** : `[tags] ⚠️ catégorie "x" VIDÉE : N entrée(s)…` avec l'id
+      de l'auteur. Vider reste permis (c'est une action légitime), mais laisse enfin
+      quelque chose à lire. Second `console.warn` sur toute **troncature** : la plus longue
+      mention Loi LOM fait **exactement 80 caractères**, soit `MAX_LONGUEUR` au caractère
+      près — une mention plus longue serait rognée en silence et ne correspondrait plus à
+      ce que portent les publications.
+
+    **Leçon** : le correctif 49 a livré un backend prudent (écriture par catégorie) et un
+    client qui envoyait tout. Une garantie côté serveur ne protège que si l'appelant s'en
+    sert — comme `redactSiteFields` ou `publicUser`, elle doit être la **seule forme
+    possible**, pas une possibilité offerte.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans

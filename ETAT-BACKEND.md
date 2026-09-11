@@ -910,6 +910,24 @@ métier. Les rendre éditables supprimerait la garantie de compilation **sans ri
 la place** : `schema.prisma` n'a aucun enum et aucune route ne valide ces valeurs. Si le
 besoin se confirme, c'est un lot dédié qui **commence** par écrire cette validation.
 
+⚠️⚠️ **ÉCRITURE PAR CATÉGORIE — et le client doit envoyer un PATCH, pas l'objet complet.**
+La route n'écrit que les catégories présentes dans le corps (« un client qui n'envoie que
+`networks` ne doit pas vider `co2` et `lom` »). Cette prudence n'a servi à rien pendant un
+jour : l'écran envoyait **les trois** catégories à chaque action, donc son état faisait
+autorité sur des listes qu'il n'avait pas forcément chargées — le 10/09/2026, les 34
+modèles CO² et les 4 mentions Loi LOM ont été effacés de la base par ce chemin. Depuis, le
+client envoie `{ [categorie]: liste }` et rien d'autre (`handleUpdateTags`,
+`pages/Digital.tsx`). **Ne pas revenir à l'objet complet « pour simplifier ».** Leçon
+générale, la même que `publicUser` ou `redactSiteFields` : une garantie côté serveur ne
+protège que si elle est la **seule forme possible**, pas une possibilité offerte.
+
+⚠️ **Deux traces ajoutées le 10/09/2026**, parce que l'incident n'a laissé AUCUNE piste
+(pas d'`updatedAt` sur `DigitalTags`, pas d'ActivityLog sur les tags, logs du conteneur
+repartis à zéro au déploiement) : `[tags] ⚠️ catégorie "x" VIDÉE` avec l'id de l'auteur, et
+un avertissement de **troncature** — la plus longue mention Loi LOM fait exactement
+`MAX_LONGUEUR` (80) caractères, et une valeur rognée ne correspondrait plus à ce que
+portent les publications qui l'utilisent.
+
 `POST /api/tags` passait `req.body` **brut** à Prisma (un `id` envoyé aurait tenté de
 réécrire la clé primaire). Il a désormais une liste blanche `CATEGORIES`, un nettoyage
 (trim, dédoublonnage, bornes 200 entrées / 80 caractères) et refuse un corps sans catégorie
