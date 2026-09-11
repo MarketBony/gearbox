@@ -737,3 +737,43 @@ export const hasSocialFeatures = (role?: string | null) => !isSiteManager(role);
  */
 export const allowedSitesFor = (user?: { role?: string | null; sites?: string[] } | null): string[] | null =>
   isSiteManager(user?.role) ? (user?.sites ?? []) : null;
+
+// --- CONGÉS (12/09/2026) -------------------------------------------------------------
+//
+// ⚠️ Copies d'AFFICHAGE des listes de `backend/src/routes/conges.ts`, qui reste le seul
+// garde-fou réel. Elles servent à masquer ce qui serait de toute façon refusé en 403 —
+// un écran qui propose un bouton interdit, c'est « l'interface ment », motif qui a déjà
+// coûté deux passes à ce projet.
+
+/** Rôles ayant accès à la rubrique. `Site Manager` et `External` en sont ABSENTS. */
+export const CONGES_LECTURE_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager', 'Guest'];
+
+/** Gèrent le périmètre et posent des congés POUR AUTRUI. */
+export const CONGES_GESTION_ROLES: string[] = ['Master', 'Administrator', 'Director'];
+
+/**
+ * Posent le ✓ « validé ».
+ * ⚠️ Administrator en est EXCLU — décision de Théo, ce n'est pas un oubli.
+ */
+export const CONGES_VALIDATION_ROLES: string[] = ['Master', 'Director'];
+
+export const peutLireConges = (role?: string) => !!role && CONGES_LECTURE_ROLES.includes(role);
+export const peutGererConges = (role?: string) => !!role && CONGES_GESTION_ROLES.includes(role);
+export const peutValiderConges = (role?: string) => !!role && CONGES_VALIDATION_ROLES.includes(role);
+
+/**
+ * Libellés et couleurs des types de congé, repris de la maquette.
+ * ⚠️ L'ORDRE EST CELUI DU SÉLECTEUR : `Object.keys` alimente le choix au clic sur une
+ * cellule (même piège que `SOCIAL_STATUS_COLORS`).
+ */
+export const CONGES_TYPES: Record<string, { label: string; court: string; couleur: string }> = {
+  CP:    { label: 'Congé payé',      court: 'CP',  couleur: '#3b82f6' },
+  RTT:   { label: 'RTT',             court: 'RTT', couleur: '#8b5cf6' },
+  HR:    { label: 'Heures de récup', court: 'HR',  couleur: '#f59e0b' },
+  CPAM:  { label: 'CP matin',        court: 'AM',  couleur: '#06b6d4' },
+  CPAPM: { label: 'CP après-midi',   court: 'PM',  couleur: '#0ea5e9' },
+};
+
+/** Une demi-journée compte 0,5 ; tout le reste 1. Seule porte du comptage. */
+export const valeurJourConge = (type?: string | null): number =>
+  !type ? 0 : (type === 'CPAM' || type === 'CPAPM' ? 0.5 : 1);

@@ -62,6 +62,9 @@ export const RT_EVENTS = {
   // `projectFiles`.
   socialComments: ['social-comment:updated', 'social-comment:deleted'],
   tags: ['tags:updated'],
+  // Congés (12/09/2026) : un seul événement, les écritures étant toutes des upserts de
+  // cellule. Il sert aussi à rafraîchir le PÉRIMÈTRE, donc l'accès à la rubrique.
+  conges: ['conges:updated'],
   activity: ['activity:created'],
   // Émis par le backend mais aucun écran ne lit /contacts aujourd'hui —
   // référencé ici pour le jour où ce sera le cas.

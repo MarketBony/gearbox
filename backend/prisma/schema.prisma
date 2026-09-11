@@ -567,3 +567,57 @@ model AppSetting {
   updatedAt DateTime @updatedAt
   updatedBy String? // userId, pour savoir qui a basculé quoi
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONGÉS (12/09/2026) — rubrique portée depuis le fichier HTML du boss de Théo.
+//
+// ⚠️ TOUS LES COMPTES GEARBOX NE SONT PAS DU MARKETING : la rubrique a un PÉRIMÈTRE
+// (`CongeMembre`), géré depuis l'écran par Master / Administrator / Director. Un compte
+// hors périmètre ne voit même pas la rubrique.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Un JOUR de congé posé — une ligne = une CELLULE du planning.
+///
+/// ⚠️ Forme choisie sur la maquette, où la saisie se fait cellule par cellule (clic sur
+/// une case). Une ligne par PLAGE aurait obligé à découper/fusionner des intervalles à
+/// chaque modification d'un seul jour. Le volume ne pose aucun problème : ~30 jours posés
+/// par an et par personne, soit quelques centaines de lignes annuelles.
+model CongeJour {
+  id        String   @id @default(uuid())
+  userId    String // référence libre vers User (pas de FK, style du schéma)
+  /// 'YYYY-MM-DD'. String et NON DateTime, comme `User.birthdate` et `Task.deadline` :
+  /// un jour de congé n'a ni heure ni fuseau, et un DateTime rouvrirait la classe de bug
+  /// J+1 que ce projet combat déjà avec `parseLocalDate`.
+  date      String
+  /// 'CP' | 'RTT' | 'HR' | 'CPAM' (CP matin) | 'CPAPM' (CP après-midi).
+  /// String libre en base, liste blanche côté route — le schéma n'a aucun enum, et les
+  /// demi-journées comptent 0,5 jour au lieu de 1.
+  type      String
+  /// Le ✓ de la maquette. ⚠️ Seuls Master et Director peuvent le poser (décision de
+  /// Théo, Administrator en est exclu) — le contrôle est dans `routes/conges.ts`.
+  validated Boolean  @default(false)
+  createdBy String // qui a posé la ligne : soi-même, ou un gestionnaire pour un tiers
+  updatedAt DateTime @updatedAt
+
+  /// Une seule valeur par personne et par jour : c'est ce qui permet l'`upsert` et
+  /// empêche deux onglets de créer deux lignes pour la même cellule.
+  @@unique([userId, date])
+  /// Le planning lit un mois à la fois, donc par intervalle de dates.
+  @@index([date])
+}
+
+/// Périmètre de la rubrique : qui apparaît dans le planning.
+///
+/// ⚠️ Table dédiée plutôt qu'un booléen sur `User`, à dessein : `routes/users.ts`
+/// déstructure ses champs explicitement à plusieurs endroits et `publicUser` doit suivre
+/// — c'est le piège qui a coûté `nissanShare` puis `birthdate`. Une table séparée se gère
+/// par sa propre route, ce qui colle à « géré par Master/Administrator/Director ».
+///
+/// ⚠️ Retirer quelqu'un d'ici ne supprime AUCUN de ses congés : il disparaît du planning,
+/// ses lignes restent. Volontaire — on ne détruit pas un historique par un décochage.
+model CongeMembre {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  addedBy   String
+  createdAt DateTime @default(now())
+}

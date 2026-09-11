@@ -8,6 +8,7 @@ import { db } from '../services/dataService';
 import { chatStore } from '../services/chatStore';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { usePresence } from '../services/presenceStore';
+import { useCongesAcces } from '../services/congesAcces';
 import { setAppBadge } from '../services/pushNotifications';
 import { ActivityLog } from '../types';
 // Source unique des rôles ayant accès aux Jeux (Director en est exclu, règle métier).
@@ -34,7 +35,8 @@ import {
   Sparkles,
   Gamepad2,
   CheckSquare,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Palmtree
 } from 'lucide-react';
 
 const relativeTime = (iso: string): string => {
@@ -199,6 +201,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   // l'interrupteur général piloté par le Master.
   const canAccessGames = canSeeGames(user?.role, gamesEnabled);
   const canExport = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Coordinator';
+  // ⚠️ Congés : la rubrique n'est visible que pour les MEMBRES du périmètre et ceux qui
+  // le gèrent — tous les comptes Gearbox ne sont pas du marketing. Défaut prudent à
+  // `false` tant que la lecture n'a pas abouti (voir services/congesAcces.ts).
+  const { visible: voitConges } = useCongesAcces();
 
   const allMainItems = [
     { id: 'hello-marketing', icon: Sparkles, label: 'Hello Marketing' },
@@ -214,6 +220,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     { id: 'budget', icon: PiggyBank, label: 'Budget' },
     { id: 'fixed-expenses', icon: Euro, label: 'Dépenses' },
     ...(canExport ? [{ id: 'export', icon: FileSpreadsheet, label: 'Export' }] : []),
+    ...(voitConges ? [{ id: 'conges', icon: Palmtree, label: 'Congés' }] : []),
   ];
 
   // Chef de site : liste FERMÉE de rubriques (Dashboard, Projets, Digital, Hello
@@ -324,6 +331,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                   label: 'COMMUNAUTÉ',
                   items: [
                     { id: 'hello-marketing', icon: Sparkles, label: 'Hello Marketing' },
+                    // ⚠️ Cette liste est ÉCRITE EN DUR : une rubrique ajoutée au seul
+                    // `allMainItems` serait invisible ICI, c'est-à-dire sur l'écran
+                    // desktop principal — piège n°1 de ce fichier. Le filtrage par rôle,
+                    // lui, s'applique bien : `idsAutorises` dérive de `mainItems`.
+                    { id: 'conges', icon: Palmtree, label: 'Congés' },
                     ...(canAccessGames ? [{ id: 'games', icon: Gamepad2, label: 'Jeux' }] : []),
                     { id: 'chat', icon: MessageSquare, label: 'Chat' },
                   ],

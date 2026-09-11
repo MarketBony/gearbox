@@ -10,7 +10,13 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 50** (Digital — second
+- master = prod, synchronisés. Dernier lot déployé : **correctif 54** (nouvelle rubrique
+  **Congés**, 12 septembre) — **`api` ET `web`**, **avec migration**
+  (`20260912100000_add_conges`, purement additive : deux tables nouvelles).
+  ℹ️ Migration appliquée depuis ce poste avant le déploiement, puis inscrite dans
+  `_prisma_migrations` par `prisma migrate resolve --applied` — sans cette seconde étape
+  le conteneur `api` la rejouerait au démarrage et ne démarrerait pas.
+  Avant lui le **correctif 50** (Digital — second
   retour de l'équipe : liens cliquables, commentaires par édito, plaques hors du sélecteur
   de sites, statut « Constructeur », 10 septembre) — **`api` ET `web`**, **avec migration**
   (`20260910120000_add_social_comments`, purement additive).
@@ -2924,6 +2930,91 @@
     `tsc` 9 racine / 0 backend, build OK. **Résidus supprimés** : ligne de
     personnalisation de test effacée, fichier importé retiré du disque, compte remis à
     `null` — `ChatCustomization` est vide en base pour tous les comptes.
+
+54. **NOUVELLE RUBRIQUE — CONGÉS** (`feat/rubrique-conges`, 12 septembre 2026).
+    Frontend **et** backend, **avec migration** (`20260912100000_add_conges`, purement
+    additive : deux tables nouvelles).
+
+    Portage du fichier HTML tenu par le boss de Théo (planning 2026 de l'équipe
+    marketing, 15 collaborateurs, données en `localStorage` sur un seul poste). La
+    maquette a servi de **cahier des charges**, pas de code : son thème sombre autonome
+    n'a aucun rapport avec la charte liquid glass.
+
+    **Arbitrages de Théo, tous tranchés avant de coder :**
+    - chacun pose et modifie SA ligne ; Master / Administrator / Director posent pour
+      tout le monde ;
+    - ⚠️ **seuls Master et Director VALIDENT** (le ✓). Administrator en est exclu — ce
+      n'est pas une incohérence avec le point précédent, c'est la demande ;
+    - les 3 équipes de la maquette (Mkt Op. / Digital / Call Center) sont **abandonnées** :
+      Gearbox n'a pas cette notion, une seule liste à plat ;
+    - **tout le monde voit tout** le planning, et il n'y a **aucun solde annuel** — on
+      compte les jours posés, rien à saisir ni à remettre à jour chaque année.
+
+    - **Le PÉRIMÈTRE, cœur de la demande.** « Tous les utilisateurs Gearbox ne sont pas du
+      marketing » : une table `CongeMembre` dit qui apparaît dans le planning, gérée
+      depuis l'écran (bouton « Participants »). La rubrique n'est **visible que** des
+      membres et de ceux qui la gèrent — un store calqué sur `services/appSettings.ts`,
+      avec le même défaut prudent à `false` et le même suivi temps réel.
+      ⚠️ **Table dédiée et non un booléen sur `User`** : `routes/users.ts` déstructure ses
+      champs à plusieurs endroits et `publicUser` doit suivre — c'est le piège qui a coûté
+      `nissanShare` puis `birthdate`.
+      ⚠️ **Retirer quelqu'un ne supprime AUCUN de ses congés** : il sort du planning, ses
+      lignes restent, et le réajouter les fait réapparaître. Vérifié (6 jours conservés au
+      retrait puis au réajout), et dit dans la confirmation — sinon on efface un
+      historique d'un décochage.
+    - **Modèle** : une ligne = une CELLULE (`CongeJour`, `@@unique([userId, date])`), pas
+      une plage. C'est la forme de la maquette, où la saisie se fait au clic ; une ligne
+      par plage obligerait à découper et fusionner des intervalles à chaque jour modifié.
+      Date en `String` 'YYYY-MM-DD' comme `User.birthdate` — un jour de congé n'a ni heure
+      ni fuseau.
+    - **Jours fériés calculés** (`lib/joursFeries.ts`), ce que la maquette ne faisait pas :
+      un 14 juillet posé y comptait comme un jour de congé. Un seul férié est réellement
+      calculé — Pâques, par l'algorithme de Meeus — les dix autres en découlent ou sont
+      fixes. **Vérifié sur 2026 ET 2027**, deux années où Pâques tombe à des dates
+      différentes. Alsace-Moselle volontairement absente (aucune concession concernée).
+      ⚠️ **Le serveur ne connaît PAS le calendrier** : week-ends et fériés sont exclus de
+      l'affichage et du comptage côté client. Dupliquer la table des fériés côté backend
+      créerait une duplication de plus à synchroniser (après `PLAQUES_STRUCTURE`) pour un
+      gain nul — une ligne posée un dimanche par appel direct n'est comptée nulle part.
+    - **Deux vues**, comme la maquette : un PLANNING (lignes = personnes, colonnes =
+      jours, colonne Total, pied « absents/jour », colonne des noms figée au scroll) et un
+      TABLEAU DE BORD annuel (4 KPI, répartition mensuelle cliquable, total par
+      collaborateur, journées les plus chargées).
+      **Sous `md`, pas de grille mais une liste de cartes** — 31 colonnes au doigt sont
+      illisibles, leçon du Digital (correctif 31).
+      Une **pose par période** (`PUT /periode`, en transaction) évite 15 clics pour trois
+      semaines ; elle n'envoie que les jours ouvrés, calculés par le client.
+    - **Branchement de la rubrique** : entrée ajoutée dans les **DEUX** listes de
+      `Sidebar.tsx` (`allMainItems` **et** la nav groupée desktop écrite en dur) — une
+      rubrique ajoutée au seul `allMainItems` est invisible sur l'écran desktop principal,
+      piège qui a coûté une passe au lot du chef de site. Plus la garde de routage dans
+      `App.tsx` : l'onglet actif est mémorisé en session, une rubrique masquée reste
+      sinon atteignable.
+
+    **Vérifié dans l'interface, sur des données réelles puis supprimées** : rubrique
+    visible et page vide au départ, 3 participants ajoutés → 3 lignes ; congé posé au clic
+    (CP), demi-journée (CP matin) comptée **0,5** → total 1,5 ; validation par un Master ;
+    **le 14 juillet n'est pas cliquable** alors que le 13 l'est ; pose du 13 au 17 juillet
+    → **4 jours** écrits, le férié sauté ; tableau de bord recoupé à la main (4 + 1 + 0,5
+    = **5,5 jours**, moyenne 1,8, mois le plus chargé juillet).
+    **Refus serveur mesurés** : type inconnu **400**, `2026-02-31` **400**, date au format
+    français **400**, personne hors périmètre **400**, validation sans congé **404**,
+    période vide **400**.
+    Mobile 375 px : liste de cartes, tableau masqué, **aucun scroll horizontal**.
+    `tsc` **9** racine / **0** backend, `check-plaques-sync` vert, build OK.
+    **Base rendue à l'état initial** : 0 ligne dans les deux tables.
+
+    ⚠️ **Défaut corrigé en recette** : le calendrier « Au » de la pose par période
+    s'ouvrait sur le MOIS COURANT et non sur celui de la date de début — poser des congés
+    de juillet depuis septembre demandait de reculer deux mois à la main. La fin se cale
+    désormais sur le début tant qu'elle est vide ou antérieure.
+
+    ⚠️ **NON VÉRIFIÉ, faute d'un second compte** : le **403** quand un non-gestionnaire
+    écrit sur la ligne d'un collègue, le **403** d'un `Site Manager` sur le GET, et
+    l'absence du bouton « Valider » pour un **Administrator**. Les trois sont écrits et
+    relus dans le code, mais la leçon de ce dépôt est qu'un raisonnement exact ne remplace
+    pas un parcours d'interface — à solder avec un compte Administrator et un compte
+    Coordinator.
 
 ## Backlog — ce qui reste à faire
 
