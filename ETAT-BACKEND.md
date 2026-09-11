@@ -1058,6 +1058,28 @@ injectée dans un attribut `style` côté client — accepter `#f00` ou `linear-
 laisserait un compte écrire une déclaration de style dans la page de l'application. Le
 client résout l'id lui-même et retombe sur le dégradé Bony s'il est inconnu.
 
+### 💬 `ChatCustomization` — la personnalisation est PAR CONVERSATION (11/09/2026)
+
+Une ligne par couple (utilisateur, conversation), contrainte `@@unique([userId, conversationId])`
+qui permet l'`upsert` et empêche deux onglets de créer deux lignes pour le même couple.
+`GET /api/chat/customizations` rend toutes les miennes en une requête ;
+`PUT /api/chat/conversations/:id/customization` en écrit une.
+
+⚠️ **Contrôle d'APPARTENANCE et non de rôle** : le réglage est personnel, aucun rôle n'a à
+être filtré — mais sans ce contrôle, n'importe qui créerait une ligne pour une discussion
+dont il n'est pas membre. Même règle d'accès que le GET des messages (le Général est
+ouvert à tout authentifié sauf `External`). Vérifié : **403** sur une conversation dont on
+n'est pas participant.
+
+⚠️ **Aucun `emitEvent`** : ce réglage ne regarde que son auteur. Le diffuser ferait
+recharger l'écran de collègues que ça ne concerne pas — c'est l'inverse du raisonnement
+tenu pour les tags, qui sont partagés.
+
+`User.chatBackground` / `User.chatBubble` restent le **défaut** des conversations sans
+ligne propre. Les deux routes valident via la même porte,
+`utils/personnalisationChat.ts` : deux copies des mêmes expressions régulières auraient
+divergé.
+
 ℹ️ Aucune purge des fonds importés : remplacer son fond laisse l'ancien fichier sur le
 disque, comme pour les avatars. Même fiche que les uploads orphelins au backlog, poids
 comparable (une image par personne qui en pose une).

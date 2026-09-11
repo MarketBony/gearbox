@@ -395,6 +395,34 @@ model EquipmentBooking {
 }
 
 // Module Chat — calqué sur types.ts (ChatConversation / ChatMessage).
+/// Personnalisation du Chat, PAR UTILISATEUR ET PAR CONVERSATION (11/09/2026).
+///
+/// Demande de Theo apres un premier jet global : « je veux que la personnalisation soit
+/// propre a chaque discussion ». `User.chatBackground` / `User.chatBubble` restent le
+/// DEFAUT applique aux conversations qui n'ont pas de ligne ici (bouton « appliquer a
+/// toutes mes discussions »), exactement comme le fond par defaut de WhatsApp.
+///
+/// ⚠️ Une ligne par (utilisateur, conversation) : la contrainte d'unicite est ce qui
+/// permet l'upsert et empeche les doublons si deux onglets enregistrent en meme temps.
+///
+/// ⚠️ `userId` est une reference libre (style du schema) mais `conversationId` porte une
+/// vraie FK en cascade : une conversation supprimee ne doit pas laisser des reglages
+/// orphelins que plus rien ne peut atteindre.
+model ChatCustomization {
+  id             String           @id @default(uuid())
+  userId         String
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  /// Memes formes que `User.chatBackground` : `proc:<id>` ou /uploads/chatbg/<uuid>.<ext>
+  background     String?
+  /// Identifiant d'une couleur de bulle du catalogue, jamais du CSS.
+  bubble         String?
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([userId, conversationId])
+  @@index([userId])
+}
+
 model ChatConversation {
   id            String        @id @default(uuid())
   type          String // 'general' | 'private' | 'group'
@@ -408,6 +436,7 @@ model ChatConversation {
   // null = pas de photo, le client retombe sur les avatars empilés des membres.
   // Ne concerne que type='group' (garanti par le handler `chat:conversation:avatar`).
   avatarUrl     String?
+  customizations ChatCustomization[]
   pinnedBy      String[]      @default([])
   // Sourdine par utilisateur. ⚠️ Contrairement à `pinnedBy`, qui n'est JAMAIS
   // écrit en base (l'épinglage est un overlay localStorage côté client), ce
