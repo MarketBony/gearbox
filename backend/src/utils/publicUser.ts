@@ -21,6 +21,7 @@ export const publicUser = (u: any) => ({
   // comptes, mais ils la reçoivent comme le reste : `publicUser` est une projection, pas
   // un filtre par destinataire.
   chatBackground: u.chatBackground,
+  chatBubble: u.chatBubble,
   // Périmètre du chef de site. Vide pour tous les autres rôles. Non sensible en
   // soi (ce sont des noms de concession), et nécessaire au frontend pour borner
   // ses sélecteurs de périmètre.

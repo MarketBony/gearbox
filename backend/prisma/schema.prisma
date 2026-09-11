@@ -29,7 +29,7 @@ model User {
   birthdate         String?
   /// Fond de discussion du Chat, choisi par l'utilisateur (11/09/2026). Deux formes, et
   /// deux seulement : `proc:<id>` pour un fond procédural du catalogue
-  /// (`lib/fondsChat.ts`), ou `/uploads/chatbg/<uuid>.<ext>` pour une image importée.
+  /// (`lib/personnalisationChat.ts`), ou `/uploads/chatbg/<uuid>.<ext>` pour une image importée.
   /// `null` = fond par défaut de l'application.
   ///
   /// ⚠️ EN BASE et non en `localStorage`, à dessein : Théo travaille sur son poste, son
@@ -41,6 +41,11 @@ model User {
   /// deviendrait une seconde version du trou connu d'`avatarUrl`, où une URL externe
   /// écrite par un appel direct fait charger une ressource tierce dans le navigateur.
   chatBackground    String?
+  /// Couleur des bulles de MES messages dans le Chat (11/09/2026) : un identifiant du
+  /// catalogue de `lib/personnalisationChat.ts`, jamais une couleur CSS libre — accepter
+  /// du CSS venu du client reviendrait a injecter une declaration de style dans la page.
+  /// `null` = le degrade Bony historique.
+  chatBubble        String?
   // Périmètre du rôle « Site Manager » (chef de site) : les concessions auxquelles le
   // compte est rattaché. Vide pour tous les autres rôles, qui voient l'ensemble.
   //

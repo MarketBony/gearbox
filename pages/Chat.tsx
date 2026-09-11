@@ -17,7 +17,7 @@ import { getSocket, connectSocket, emitWithAck } from '../services/socket';
 import { chatStore } from '../services/chatStore';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { FONDS_CHAT, PREFIXE_PROC, styleFondChat, voileFondChat, estFondImporte } from '../lib/fondsChat';
+import { FONDS_CHAT, BULLES_CHAT, PREFIXE_PROC, styleFondChat, voileFondChat, estFondImporte, bulleDe } from '../lib/personnalisationChat';
 import {
   MessageSquare, Plus, Send, Star, StarOff, ArrowLeft,
   MoreHorizontal, Pencil, Trash2, X, Image, Reply, Check,
@@ -431,7 +431,7 @@ const GroupAvatarCropModal: React.FC<GroupAvatarModalProps> = ({ convId, convNam
 // --- MAIN COMPONENT ---
 // ========================
 const Chat: React.FC = () => {
-  const { user: me, setChatBackground } = useAuth();
+  const { user: me, setChatBackground, setChatBubble } = useAuth();
   const isExternal = me?.role === 'External';
 
   const [users, setUsers] = useState<User[]>([]);
@@ -578,6 +578,8 @@ const Chat: React.FC = () => {
    */
   const styleFond = styleFondChat(fondActuel, sombre);
   const aUnFond = Object.keys(styleFond).length > 0;
+  /** Couleur de MES bulles. Un id inconnu retombe sur le dégradé Bony (`bulleDe`). */
+  const maBulle = bulleDe(me?.chatBubble);
   /** Ancre des menus GIF et « citer un projet » : la BARRE, pas leur picto — celui-ci
    *  n'existe plus sur mobile, où l'action est déclenchée depuis le menu « + ». */
   const barreSaisieRef = useRef<HTMLDivElement>(null);
@@ -651,6 +653,18 @@ const Chat: React.FC = () => {
     } catch (e) {
       console.error('Fond de chat : import échoué', e);
       alert(e instanceof ApiError ? e.message : "Import du fond impossible.");
+    } finally {
+      setFondEnCours(false);
+    }
+  };
+
+  const choisirBulle = async (id: string) => {
+    setFondEnCours(true);
+    try {
+      await setChatBubble(id);
+    } catch (e) {
+      console.error('Couleur de bulle : enregistrement échoué', e);
+      alert(e instanceof ApiError ? e.message : "Enregistrement de la couleur impossible.");
     } finally {
       setFondEnCours(false);
     }
@@ -1249,7 +1263,7 @@ const Chat: React.FC = () => {
               <button
                 onClick={() => setShowFonds(true)}
                 className="shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[34px] md:min-w-[34px] rounded-lg border border-bony-border text-slate-500 hover:border-bony-orange hover:text-bony-orange transition"
-                title="Fond de discussion"
+                title="Personnaliser la discussion"
               >
                 <Palette size={15} />
               </button>
@@ -1401,7 +1415,10 @@ const Chat: React.FC = () => {
                                     <div>
                                       <div
                                         className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${isMe ? 'text-white rounded-br-sm' : 'bg-bony-panel border border-bony-border text-bony-text rounded-bl-sm'}`}
-                                        style={isMe ? { background: 'linear-gradient(135deg, #f75632, #8f12ab)' } : {}}
+                                        // ⚠️ Seules MES bulles changent de couleur : celles des
+                                        // autres gardent le panneau neutre, sinon on ne
+                                        // distingue plus qui parle.
+                                        style={isMe ? { background: maBulle.css, color: maBulle.texteSombre ? '#0f172a' : undefined } : {}}
                                       >
                                         {renduTexteRiche(msg.content)}
                                         {msg.edited && <span className="text-[9px] opacity-60 ml-1">(modifié)</span>}
@@ -1897,7 +1914,7 @@ const Chat: React.FC = () => {
           <div className="gx-glass-panel border border-bony-border rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-bony-border shrink-0">
               <div>
-                <h3 className="font-title text-sm text-bony-text">Fond de discussion</h3>
+                <h3 className="font-title text-sm text-bony-text">Personnaliser la discussion</h3>
                 {/* Dire explicitement que le choix est personnel : sans ça, on hésite à
                     en mettre un, de peur de l'imposer à toute l'équipe. */}
                 <p className="text-[10px] text-bony-muted mt-0.5">Visible par vous seul, sur tous vos appareils.</p>
@@ -1906,7 +1923,10 @@ const Chat: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
-              {['Dégradés', 'Motifs', 'Sobres'].map(famille => (
+              {/* ⚠️ Liste dérivée du catalogue et non écrite à la main : une famille
+                  renommée dans `personnalisationChat.ts` faisait disparaître toute sa
+                  section sans la moindre erreur (constaté avec « Couleurs »). */}
+              {[...new Set(FONDS_CHAT.map(f => f.famille))].map(famille => (
                 <div key={famille}>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-bony-muted mb-2">{famille}</p>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -1936,6 +1956,32 @@ const Chat: React.FC = () => {
                   </div>
                 </div>
               ))}
+
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-bony-muted mb-2">Couleur de vos bulles</p>
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                  {BULLES_CHAT.map(b => {
+                    const choisi = (me?.chatBubble ?? 'bony') === b.id;
+                    return (
+                      <button
+                        key={b.id}
+                        onClick={() => choisirBulle(b.id)}
+                        disabled={fondEnCours}
+                        title={b.nom}
+                        className={`relative h-12 rounded-xl border-2 transition disabled:opacity-50 ${choisi ? 'border-bony-orange' : 'border-transparent hover:border-bony-orange/50'}`}
+                        style={{ background: b.css }}
+                      >
+                        {choisi && (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <Check size={14} className={b.texteSombre ? 'text-slate-900' : 'text-white'} />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-bony-muted mt-1.5">Ne change que vos messages — vos collègues gardent la couleur qu'ils ont choisie.</p>
+              </div>
 
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-bony-muted mb-2">Votre image</p>

@@ -12,6 +12,8 @@ interface AuthContextType {
   setAvatarPhoto: (url: string | null) => Promise<void>;
   /** Fond du Chat : `proc:<id>`, chemin d'une image importée, ou `null` pour le défaut. */
   setChatBackground: (valeur: string | null) => Promise<void>;
+  /** Couleur des bulles de mes messages : un id du catalogue, ou `null` pour le défaut. */
+  setChatBubble: (valeur: string | null) => Promise<void>;
   loading: boolean;
   isAuthenticated: boolean;
 }
@@ -145,6 +147,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * mis à jour », et rien n'était écrit. Une méthode par intention évite d'avoir à se
    * souvenir d'une liste.
    */
+  /** Même patron que `setChatBackground` — et pour la même raison, voir son avertissement. */
+  const setChatBubble = async (valeur: string | null) => {
+    if (!user) return;
+    const me = await db.updateMe({ chatBubble: valeur ?? '' });
+    const fullUser: User = { ...user, chatBubble: me.chatBubble ?? null } as User;
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUser));
+    setUser(fullUser);
+  };
+
   const setChatBackground = async (valeur: string | null) => {
     if (!user) return;
     // Chaîne vide et non `null` dans le corps : convention du serveur « champ absent =
@@ -156,7 +167,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateProfile, setAvatarPhoto, setChatBackground, loading, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, updateProfile, setAvatarPhoto, setChatBackground, setChatBubble, loading, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

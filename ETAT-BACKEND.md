@@ -1027,7 +1027,7 @@ venait de supprimer. Le payload est `{ postId }`, sans contenu.
 le renvoient aussi** : le client remplace sa copie locale par la réponse du PUT, la pastille
 de la ligne tomberait sinon à zéro dès qu'on y change un statut.
 
-### 🎨 Fond de discussion — `User.chatBackground` (11/09/2026)
+### 🎨 Personnalisation du Chat — `User.chatBackground` et `User.chatBubble` (11/09/2026)
 
 Préférence personnelle, écrite par `PUT /api/auth/me` et renvoyée par `publicUser`.
 
@@ -1051,6 +1051,12 @@ Nouveau type d'upload **`chatbg`** (`routes/uploads.ts`) : JPEG/PNG/WebP, **8 Mo
 blanche assumée, contrairement à `chat` et `project` — ce fichier n'est jamais ouvert ni
 téléchargé, il est rendu dans un `background-image`. `image/gif` en est volontairement
 absent (un fond animé en permanence fatigue la lecture et coûte en rendu).
+
+**`chatBubble`** suit la même doctrine, avec une nuance qui compte : la valeur est un
+**identifiant** du catalogue (`^[a-z0-9-]{1,30}$`), **jamais une couleur CSS**. Elle est
+injectée dans un attribut `style` côté client — accepter `#f00` ou `linear-gradient(...)`
+laisserait un compte écrire une déclaration de style dans la page de l'application. Le
+client résout l'id lui-même et retombe sur le dégradé Bony s'il est inconnu.
 
 ℹ️ Aucune purge des fonds importés : remplacer son fond laisse l'ancien fichier sur le
 disque, comme pour les avatars. Même fiche que les uploads orphelins au backlog, poids

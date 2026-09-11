@@ -27,7 +27,7 @@ const CHATBG_UPLOAD_PATH =
 /**
  * Fond du catalogue procédural : `proc:<id>`.
  *
- * ⚠️ Le serveur ne connaît PAS la liste des ids — elle vit dans `lib/fondsChat.ts`, côté
+ * ⚠️ Le serveur ne connaît PAS la liste des ids — elle vit dans `lib/personnalisationChat.ts`, côté
  * frontend, et le backend ne peut pas importer ce fichier (il n'est compilé que dans le
  * bundle web, même raison que `PLAQUES_STRUCTURE`). On valide donc la FORME, pas la
  * valeur : un id inconnu est sans danger, le client retombe proprement sur le fond par
@@ -35,6 +35,17 @@ const CHATBG_UPLOAD_PATH =
  * duplication à garder synchronisée pour un gain nul.
  */
 const FOND_PROCEDURAL = /^proc:[a-z0-9-]{1,40}$/;
+
+/**
+ * Couleur des bulles : un IDENTIFIANT du catalogue, jamais une couleur CSS.
+ *
+ * ⚠️ La distinction est le tout : la valeur est injectée dans un `style` côté client.
+ * Accepter `#f00` ou `linear-gradient(...)` reviendrait à laisser un compte écrire une
+ * déclaration de style dans la page de l'application — on ne laisse donc passer qu'un
+ * mot-clé, que le client résout lui-même. Même raison que pour les fonds : le serveur
+ * valide la FORME, la liste vit côté frontend et un id inconnu retombe sur le défaut.
+ */
+const BULLE_ID = /^[a-z0-9-]{1,30}$/;
 
 router.post('/login', async (req, res) => {
   const { loginId, password } = req.body;
@@ -96,7 +107,7 @@ router.put('/me', async (req, res) => {
   const decoded = decodeToken(req);
   if (!decoded) return res.sendStatus(403);
 
-  const { name, password, avatarColor, avatarUrl, birthdate, chatBackground } = req.body;
+  const { name, password, avatarColor, avatarUrl, birthdate, chatBackground, chatBubble } = req.body;
 
   // avatarUrl : undefined = champ absent (non modifié) ; null = suppression de la photo.
   const updateData: any = { name, avatarColor };
@@ -118,6 +129,17 @@ router.put('/me', async (req, res) => {
       updateData.chatBackground = v;
     } else {
       return res.status(400).json({ error: 'Fond de discussion refusé : seuls un fond du catalogue ou une image déposée dans Gearbox sont acceptés.' });
+    }
+  }
+  // Couleur des bulles : même convention (vide = retour au dégradé Bony).
+  if (chatBubble !== undefined) {
+    const v = typeof chatBubble === 'string' ? chatBubble.trim() : '';
+    if (!v) {
+      updateData.chatBubble = null;
+    } else if (BULLE_ID.test(v)) {
+      updateData.chatBubble = v;
+    } else {
+      return res.status(400).json({ error: 'Couleur de bulle refusée.' });
     }
   }
   if (password) {

@@ -2801,8 +2801,23 @@
       passait sur deux lignes et se faisait couper — et sa parenthèse n'a aucun sens au
       doigt, où Entrée retourne à la ligne. Un attribut ne se change pas en CSS, d'où un
       `matchMedia` aligné sur le seuil `md`.
-    - **Fonds de discussion** : 8 fonds **procéduraux** (`lib/fondsChat.ts`) plus l'import
-      d'une image personnelle.
+    - **Fonds de discussion** : 12 fonds **procéduraux** (`lib/personnalisationChat.ts`)
+      plus l'import d'une image personnelle, et **12 couleurs de bulles**.
+      ⚠️ **Le premier jet a été refusé** — « ils sont d'une tristesse omg ». Cause : ses
+      opacités étaient bridées à 0,12-0,16 comme si le fond devait rester lisible SOUS du
+      texte. Précaution inutile : le texte d'un message est toujours sur une bulle, jamais
+      sur le fond ; seuls les séparateurs de date et les horodatages y flottent. Le
+      catalogue a donc été refait franchement coloré (Miami, Aurore boréale, Agrumes,
+      Lagon, Holographique, Synthwave, Terrazzo, Confettis, Memphis, Bulles néon) en
+      gardant deux sobres, et le voile des fonds du catalogue est descendu à 10 % — le
+      monter délave précisément ce qu'on vient d'ajouter.
+      **Couleur des bulles** demandée dans le même message (« le dégradé on peut vite s'en
+      lasser ») : elle ne change QUE mes messages, ceux des autres gardant le panneau
+      neutre — sinon on ne distingue plus qui parle. Deux couleurs claires (Or, Menthe)
+      portent un drapeau `texteSombre` : du blanc sur du jaune ne se lit pas.
+      ⚠️ La valeur stockée est un **identifiant**, jamais du CSS : elle est injectée dans
+      un attribut `style`, et accepter `linear-gradient(...)` reviendrait à laisser un
+      compte écrire une déclaration de style dans la page.
       ⚠️ **Tout en CSS, aucune image téléchargée pour les fonds du catalogue** — dégradés
       et motifs SVG en `data:`. Le lot PWA a acté que l'app n'a aucun mode hors-ligne et
       que tout vient du réseau : huit images de fond auraient alourdi chaque ouverture du
@@ -2847,9 +2862,19 @@
     `tsc` : **9 à la racine**, **0 au backend** ; `check-plaques-sync` vert ; build de
     production OK. Fichiers de test supprimés du disque, `chatBackground` remis à `null`.
 
+    **Vérifié aussi après la refonte** : les 12 fonds et les 12 bulles présents dans la
+    modale, fond + bulle appliqués et **persistés** (`proc:miami` / `ocean` relus en base),
+    rendu contrôlé en thème **clair ET sombre** (le fond bascule bien sur sa variante),
+    puis tout remis à `null`.
+    ⚠️ **Défaut trouvé à la refonte, et il serait passé inaperçu** : la modale itérait sur
+    une liste de familles écrite **à la main** (`['Dégradés','Motifs','Sobres']`). Renommer
+    une famille dans le catalogue a fait disparaître **toute sa section** — les six
+    nouveaux fonds « Couleurs » — sans la moindre erreur, ni au typecheck ni à l'exécution.
+    La liste est désormais **dérivée du catalogue**. Même famille de piège que les listes
+    de boutons recopiées.
+
     ⚠️ **NON VÉRIFIÉ** : le rendu sur un VRAI téléphone (l'émulation ne dit rien du
-    clavier virtuel, qui réduit la hauteur utile), et les fonds en thème **sombre** —
-    l'essai a été fait en thème clair, celui de Théo ce jour-là.
+    clavier virtuel, qui réduit la hauteur utile).
 
 ## Backlog — ce qui reste à faire
 

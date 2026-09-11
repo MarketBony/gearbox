@@ -49,12 +49,14 @@ export interface User {
   // confondre avec la ville, qui reste une préférence locale (météo de son poste).
   birthdate?: string;
   /**
-   * Fond de discussion du Chat. `proc:<id>` (catalogue de `lib/fondsChat.ts`) ou
+   * Fond de discussion du Chat. `proc:<id>` (catalogue de `lib/personnalisationChat.ts`) ou
    * `/uploads/chatbg/<uuid>.<ext>` (image importée). Absent/`null` = fond par défaut.
    * Donnée SERVEUR : elle suit l'utilisateur d'un appareil à l'autre, contrairement au
    * thème clair/sombre qui reste une préférence du poste.
    */
   chatBackground?: string | null;
+  /** Couleur des bulles de mes messages : un id du catalogue, ou absent pour le défaut. */
+  chatBubble?: string | null;
   // Périmètre du rôle « Site Manager » : les concessions auxquelles il est rattaché.
   // Vide ou absent pour tous les autres rôles, qui voient l'ensemble.
   // ⚠️ Liste vide = ne voit RIEN (fail closed), jamais « voit tout ».

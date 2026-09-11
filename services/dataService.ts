@@ -777,7 +777,7 @@ class DataService {
    * réparé la date de naissance le 06/08/2026 — et ce qui impose d'ajouter ici tout
    * nouveau champ modifiable par son propriétaire, comme `chatBackground`.
    */
-  async updateMe(data: { name?: string; password?: string; avatarColor?: string; avatarUrl?: string | null; birthdate?: string; chatBackground?: string }): Promise<Omit<User, 'loginId'>> {
+  async updateMe(data: { name?: string; password?: string; avatarColor?: string; avatarUrl?: string | null; birthdate?: string; chatBackground?: string; chatBubble?: string }): Promise<Omit<User, 'loginId'>> {
     return apiFetch('/auth/me', { method: 'PUT', body: JSON.stringify(data) });
   }
 }
