@@ -399,9 +399,14 @@ declare global {
 
 // --- CONGÉS (12/09/2026) ---
 //
-// ⚠️ `CPAM` = CP matin, `CPAPM` = CP après-midi : ce sont les DEMI-JOURNÉES, qui comptent
-// 0,5 jour. RTT et HR n'en ont pas — la maquette d'origine n'en prévoyait que pour les CP.
-export type CongeType = 'CP' | 'RTT' | 'HR' | 'CPAM' | 'CPAPM';
+// ⚠️ La FAMILLE ne porte plus la demi-journée (12/09/2026). Les codes 'CPAM'/'CPAPM' du
+// correctif 54 mélangeaient les deux notions : ajouter « HR matin » et « congé sans solde »
+// aurait demandé 'HRAM', 'HRAPM', 'CSSAM'… Toute famille peut désormais être posée en
+// demi-journée, via `demi`.
+export type CongeType = 'CP' | 'RTT' | 'HR' | 'CSS' | 'CR';
+
+/** Demi-journée. `null` = jour entier, seule valeur qui fasse compter 1 au lieu de 0,5. */
+export type CongeDemi = 'AM' | 'PM' | null;
 
 /** Une cellule du planning : une personne, un jour. */
 export interface CongeJour {
@@ -410,7 +415,20 @@ export interface CongeJour {
   /** 'YYYY-MM-DD' — jamais un DateTime : un jour de congé n'a ni heure ni fuseau. */
   date: string;
   type: CongeType;
+  demi: CongeDemi;
   /** Le ✓ de la maquette. Seuls Master et Director peuvent le poser. */
   validated: boolean;
   createdBy: string;
+}
+
+/**
+ * Droit à congés payés d'une personne sur une période de référence (juin → mai).
+ * ⚠️ Une ligne n'existe QUE si le droit a été modifié : l'absence vaut
+ * `CONGES_DROIT_DEFAUT` (25 jours ouvrés).
+ */
+export interface CongeDroit {
+  userId: string;
+  /** Année de DÉBUT de la période : 2026 = 1er juin 2026 → 31 mai 2027. */
+  periode: number;
+  jours: number;
 }

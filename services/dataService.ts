@@ -1,5 +1,5 @@
 
-import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment, CongeJour, CongeType } from '../types';
+import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment, CongeJour, CongeType, CongeDemi, CongeDroit } from '../types';
 import type { LobbyData, GameSession, GameChallenge, GameType } from '../components/games/gameTypes';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS, LOI_LOM_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
@@ -789,16 +789,23 @@ class DataService {
   // ⚠️ Le GET rend les jours ET le périmètre en une seule réponse : l'écran a besoin des
   // deux pour dessiner une ligne par membre, même vide. Les séparer ferait deux requêtes
   // au chargement pour une donnée qui ne se lit jamais l'une sans l'autre.
-  async getConges(debut: string, fin: string): Promise<{ jours: CongeJour[]; membres: string[] }> {
+  async getConges(debut: string, fin: string): Promise<{ jours: CongeJour[]; membres: string[]; droits: CongeDroit[] }> {
     return apiFetch(`/conges?debut=${debut}&fin=${fin}`);
   }
-  /** `type: null` efface la cellule. */
-  async setCongeJour(userId: string, date: string, type: CongeType | null) {
-    return apiFetch('/conges/jour', { method: 'PUT', body: JSON.stringify({ userId, date, type }) });
+  /** `type: null` efface la cellule. `demi` : 'AM', 'PM' ou null pour un jour entier. */
+  async setCongeJour(userId: string, date: string, type: CongeType | null, demi: CongeDemi = null) {
+    return apiFetch('/conges/jour', { method: 'PUT', body: JSON.stringify({ userId, date, type, demi }) });
   }
   /** Pose en lot. `jours` = les jours OUVRÉS calculés par le client (voir lib/joursFeries). */
-  async setCongePeriode(userId: string, jours: string[], type: CongeType | null) {
-    return apiFetch<{ jours: number }>('/conges/periode', { method: 'PUT', body: JSON.stringify({ userId, jours, type }) });
+  async setCongePeriode(userId: string, jours: string[], type: CongeType | null, demi: CongeDemi = null) {
+    return apiFetch<{ jours: number }>('/conges/periode', { method: 'PUT', body: JSON.stringify({ userId, jours, type, demi }) });
+  }
+  /**
+   * Droit à CP d'une personne sur une période de référence (juin `periode` → mai +1).
+   * ⚠️ Réservé aux gestionnaires côté serveur ; poser la valeur par défaut EFFACE la ligne.
+   */
+  async setCongeDroit(userId: string, periode: number, jours: number) {
+    await apiFetch('/conges/droit', { method: 'PUT', body: JSON.stringify({ userId, periode, jours }) });
   }
   /** Le ✓. Réservé Master/Director côté serveur — un autre rôle reçoit 403. */
   async setCongeValidation(userId: string, date: string, validated: boolean) {

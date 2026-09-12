@@ -762,18 +762,76 @@ export const peutGererConges = (role?: string) => !!role && CONGES_GESTION_ROLES
 export const peutValiderConges = (role?: string) => !!role && CONGES_VALIDATION_ROLES.includes(role);
 
 /**
- * Libellés et couleurs des types de congé, repris de la maquette.
+ * FAMILLES de congé — libellés, couleurs, et impact sur le solde.
+ *
  * ⚠️ L'ORDRE EST CELUI DU SÉLECTEUR : `Object.keys` alimente le choix au clic sur une
  * cellule (même piège que `SOCIAL_STATUS_COLORS`).
+ *
+ * ⚠️ La demi-journée n'est PLUS dans la famille (12/09/2026). Le correctif 54 codait
+ * 'CPAM' / 'CPAPM' ; ajouter « heures de récup matin » et « congé sans solde » aurait
+ * imposé 'HRAM', 'HRAPM', 'CSSAM'… — une combinatoire qui double à chaque type. La
+ * demi-journée est désormais un champ à part (`demi`), valable pour TOUTES les familles.
  */
-export const CONGES_TYPES: Record<string, { label: string; court: string; couleur: string }> = {
-  CP:    { label: 'Congé payé',      court: 'CP',  couleur: '#3b82f6' },
-  RTT:   { label: 'RTT',             court: 'RTT', couleur: '#8b5cf6' },
-  HR:    { label: 'Heures de récup', court: 'HR',  couleur: '#f59e0b' },
-  CPAM:  { label: 'CP matin',        court: 'AM',  couleur: '#06b6d4' },
-  CPAPM: { label: 'CP après-midi',   court: 'PM',  couleur: '#0ea5e9' },
+export const CONGES_TYPES: Record<string, { label: string; court: string; couleur: string; solde: boolean }> = {
+  CP:  { label: 'Congé payé',        court: 'CP',  couleur: '#3b82f6', solde: true },
+  RTT: { label: 'RTT',               court: 'RTT', couleur: '#8b5cf6', solde: false },
+  HR:  { label: 'Heures de récup',   court: 'HR',  couleur: '#f59e0b', solde: false },
+  CSS: { label: 'Congé sans solde',  court: 'SS',  couleur: '#64748b', solde: false },
+  CR:  { label: 'Congé révision',    court: 'CR',  couleur: '#10b981', solde: false },
 };
 
-/** Une demi-journée compte 0,5 ; tout le reste 1. Seule porte du comptage. */
-export const valeurJourConge = (type?: string | null): number =>
-  !type ? 0 : (type === 'CPAM' || type === 'CPAPM' ? 0.5 : 1);
+/** Les deux demi-journées possibles. `null` = jour entier. */
+export const CONGES_DEMI: Record<string, { label: string; court: string }> = {
+  AM: { label: 'Matin',       court: 'matin' },
+  PM: { label: 'Après-midi',  court: 'a.-m.' },
+};
+
+/**
+ * Valeur en jours d'une cellule. Une demi-journée compte 0,5, tout le reste 1.
+ * ⚠️ SEULE PORTE du comptage — le total d'une ligne, le pied de colonne et le tableau de
+ * bord passent tous par ici, sans quoi ils divergeraient (leçon de `splitShareToBuckets`).
+ */
+export const valeurJourConge = (type?: string | null, demi?: string | null): number =>
+  !type ? 0 : (demi === 'AM' || demi === 'PM' ? 0.5 : 1);
+
+/** Ce type décompte-t-il le solde de congés payés ? Seuls les CP, par construction. */
+export const congeDecompteSolde = (type?: string | null): boolean =>
+  !!type && !!CONGES_TYPES[type]?.solde;
+
+// --- PÉRIODE DE RÉFÉRENCE DES CONGÉS PAYÉS ------------------------------------------
+//
+// Art. L3141-3 du Code du travail : 2,5 jours ouvrables acquis par mois de travail
+// effectif, 30 jours ouvrables au maximum — soit **25 jours ouvrés** — sur une période
+// de référence qui, à défaut d'accord d'entreprise, court du **1er juin au 31 mai**.
+//
+// ⚠️ C'est la correction du correctif 54, qui agrégeait par ANNÉE CIVILE. Le fichier du
+// boss de Théo compte lui aussi par année civile ; ses totaux et ceux de Gearbox ne se
+// recoupent donc PAS à l'identique sur 2026, et c'est normal. Si un accord d'entreprise
+// fixait un jour la période à l'année civile, c'est ici — et ici seulement — que ça se
+// change : `debutPeriodeConges` est la seule porte.
+
+/** Droit annuel par défaut, en jours ouvrés, quand aucune ligne `CongeDroit` n'existe. */
+export const CONGES_DROIT_DEFAUT = 25;
+
+/** Mois (0-11) où démarre la période de référence. Juin. */
+export const CONGES_MOIS_DEBUT = 5;
+
+/**
+ * Année de DÉBUT de la période de référence contenant `jour` ('YYYY-MM-DD').
+ * Janvier à mai appartiennent à la période ouverte l'année PRÉCÉDENTE.
+ */
+export const periodeCongesDe = (jour: string): number => {
+  const annee = Number(jour.slice(0, 4));
+  const mois = Number(jour.slice(5, 7)) - 1;
+  return mois >= CONGES_MOIS_DEBUT ? annee : annee - 1;
+};
+
+/** Bornes 'YYYY-MM-DD' incluses de la période ouverte en juin `periode`. */
+export const bornesPeriodeConges = (periode: number): { debut: string; fin: string } => ({
+  debut: `${periode}-06-01`,
+  fin: `${periode + 1}-05-31`,
+});
+
+/** « Juin 2026 – Mai 2027 », pour les en-têtes. */
+export const libellePeriodeConges = (periode: number): string =>
+  `Juin ${periode} – Mai ${periode + 1}`;

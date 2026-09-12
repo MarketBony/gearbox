@@ -45,13 +45,34 @@ const GESTION_ROLES = ['Master', 'Administrator', 'Director'];
 const VALIDATION_ROLES = ['Master', 'Director'];
 
 /**
- * Types de congé — liste blanche.
+ * FAMILLES de congé — liste blanche. Le schéma Prisma n'a aucun enum (convention du
+ * projet), cette liste est donc le seul garde-fou contre une valeur inventée par un client.
  *
- * `CPAM` = CP matin, `CPAPM` = CP après-midi : ce sont les demi-journées, qui comptent
- * 0,5 jour. Le schéma Prisma n'a aucun enum (convention du projet), cette liste est donc
- * le seul garde-fou contre une valeur inventée par un client.
+ * ⚠️ 12/09/2026 — les codes 'CPAM'/'CPAPM' ont DISPARU : la demi-journée est un champ à
+ * part (`demi`), valable pour toutes les familles. Un vieux client qui enverrait 'CPAM'
+ * reçoit un 400, ce qui est le comportement voulu (aucune ligne de ce type n'existe en
+ * base, la table était vide au moment de la bascule).
  */
-const TYPES_CONGE = ['CP', 'RTT', 'HR', 'CPAM', 'CPAPM'];
+const TYPES_CONGE = ['CP', 'RTT', 'HR', 'CSS', 'CR'];
+
+/** Demi-journées. `null` / absent = jour entier. */
+const DEMIS_CONGE = ['AM', 'PM'];
+
+/**
+ * Normalise le champ `demi` reçu, ou rend `undefined` s'il est invalide.
+ * `null`, `''` et l'absence valent toutes « jour entier ».
+ */
+const demiValide = (v: unknown): string | null | undefined => {
+  if (v === undefined || v === null || v === '') return null;
+  return typeof v === 'string' && DEMIS_CONGE.includes(v) ? v : undefined;
+};
+
+/**
+ * Droit à CP par défaut, en jours ouvrés, quand aucune ligne `CongeDroit` n'existe.
+ * Art. L3141-3 : 2,5 jours ouvrables par mois, 30 ouvrables au plus = 25 jours ouvrés.
+ * ⚠️ Doit rester égal à `CONGES_DROIT_DEFAUT` dans `constants.ts` (copie d'affichage).
+ */
+const DROIT_DEFAUT = 25;
 
 /** 'YYYY-MM-DD' — et une vraie date, pas un 2026-02-31. */
 const FORMAT_JOUR = /^\d{4}-\d{2}-\d{2}$/;
@@ -110,11 +131,48 @@ router.get('/', authenticateToken, requireRole(LECTURE_ROLES), async (req: AuthR
   const { debut, fin } = req.query as { debut?: string; fin?: string };
   const where = (jourValide(debut) && jourValide(fin)) ? { date: { gte: debut, lte: fin } } : {};
 
-  const [jours, membres] = await Promise.all([
+  const [jours, membres, droits] = await Promise.all([
     prisma.congeJour.findMany({ where, orderBy: { date: 'asc' } }),
     prisma.congeMembre.findMany({ orderBy: { createdAt: 'asc' } }),
+    // Les droits sont peu nombreux (une ligne par personne et par période, et seulement
+    // quand le défaut a été modifié) : on les renvoie tous plutôt que de filtrer sur la
+    // période demandée, que le tableau de bord fait varier indépendamment du planning.
+    prisma.congeDroit.findMany({ select: { userId: true, periode: true, jours: true } }),
   ]);
-  res.json({ jours, membres: membres.map(m => m.userId) });
+  res.json({ jours, membres: membres.map(m => m.userId), droits });
+});
+
+/**
+ * Droit à CP d'une personne sur une période de référence (juin `periode` → mai +1).
+ *
+ * ⚠️ Écrire le droit par défaut SUPPRIME la ligne au lieu d'en écrire une : l'absence de
+ * ligne vaut 25 jours, et garder une ligne « 25 » ferait diverger les deux représentations
+ * du même état le jour où le défaut changerait.
+ */
+router.put('/droit', authenticateToken, requireRole(GESTION_ROLES), async (req: AuthRequest, res) => {
+  const { userId, periode, jours } = req.body ?? {};
+  if (typeof userId !== 'string' || !userId) return res.status(400).json({ error: 'userId requis.' });
+  if (!Number.isInteger(periode) || periode < 2000 || periode > 2100) {
+    return res.status(400).json({ error: 'Période invalide (année de début attendue).' });
+  }
+  if (typeof jours !== 'number' || !Number.isFinite(jours) || jours < 0 || jours > 366) {
+    return res.status(400).json({ error: 'Nombre de jours invalide.' });
+  }
+  if (!(await estMembre(userId))) {
+    return res.status(400).json({ error: 'Cette personne ne fait pas partie de la rubrique Congés.' });
+  }
+
+  if (jours === DROIT_DEFAUT) {
+    await prisma.congeDroit.deleteMany({ where: { userId, periode } });
+  } else {
+    await prisma.congeDroit.upsert({
+      where: { userId_periode: { userId, periode } },
+      create: { userId, periode, jours, updatedBy: req.user!.id },
+      update: { jours, updatedBy: req.user!.id },
+    });
+  }
+  emitEvent('conges:updated', { userId, periode });
+  res.sendStatus(204);
 });
 
 // ───────────────────────────── PÉRIMÈTRE ─────────────────────────────
@@ -160,7 +218,7 @@ router.delete('/membres/:userId', authenticateToken, requireRole(GESTION_ROLES),
  * laisse validé, et seuls Master/Director peuvent basculer ce drapeau (route dédiée).
  */
 router.put('/jour', authenticateToken, requireRole(LECTURE_ROLES), async (req: AuthRequest, res) => {
-  const { userId, date, type } = req.body ?? {};
+  const { userId, date, type, demi } = req.body ?? {};
   if (typeof userId !== 'string' || !userId) return res.status(400).json({ error: 'userId requis.' });
   if (!jourValide(date)) return res.status(400).json({ error: 'Date invalide (attendu YYYY-MM-DD).' });
   if (!peutEcrirePour(req, userId)) {
@@ -176,11 +234,13 @@ router.put('/jour', authenticateToken, requireRole(LECTURE_ROLES), async (req: A
     return res.sendStatus(204);
   }
   if (!TYPES_CONGE.includes(type)) return res.status(400).json({ error: 'Type de congé inconnu.' });
+  const demiNorm = demiValide(demi);
+  if (demiNorm === undefined) return res.status(400).json({ error: 'Demi-journée inconnue (AM, PM ou rien).' });
 
   const jour = await prisma.congeJour.upsert({
     where: { userId_date: { userId, date } },
-    create: { userId, date, type, createdBy: req.user!.id },
-    update: { type },
+    create: { userId, date, type, demi: demiNorm, createdBy: req.user!.id },
+    update: { type, demi: demiNorm },
   });
   emitEvent('conges:updated', { userId, date });
   res.json(jour);
@@ -194,7 +254,7 @@ router.put('/jour', authenticateToken, requireRole(LECTURE_ROLES), async (req: A
  * des jours ouvrés, et une ligne parasite ne serait comptée nulle part.
  */
 router.put('/periode', authenticateToken, requireRole(LECTURE_ROLES), async (req: AuthRequest, res) => {
-  const { userId, debut, fin, type, jours } = req.body ?? {};
+  const { userId, debut, fin, type, demi, jours } = req.body ?? {};
   if (typeof userId !== 'string' || !userId) return res.status(400).json({ error: 'userId requis.' });
   if (!peutEcrirePour(req, userId)) {
     return res.status(403).json({ error: "Vous ne pouvez modifier que vos propres congés." });
@@ -212,6 +272,8 @@ router.put('/periode', authenticateToken, requireRole(LECTURE_ROLES), async (req
   if (type !== null && type !== '' && !TYPES_CONGE.includes(type)) {
     return res.status(400).json({ error: 'Type de congé inconnu.' });
   }
+  const demiNorm = demiValide(demi);
+  if (demiNorm === undefined) return res.status(400).json({ error: 'Demi-journée inconnue (AM, PM ou rien).' });
 
   if (type === null || type === '') {
     await prisma.congeJour.deleteMany({ where: { userId, date: { in: cibles } } });
@@ -221,8 +283,8 @@ router.put('/periode', authenticateToken, requireRole(LECTURE_ROLES), async (req
     await prisma.$transaction(
       cibles.map(date => prisma.congeJour.upsert({
         where: { userId_date: { userId, date } },
-        create: { userId, date, type, createdBy: req.user!.id },
-        update: { type },
+        create: { userId, date, type, demi: demiNorm, createdBy: req.user!.id },
+        update: { type, demi: demiNorm },
       }))
     );
   }

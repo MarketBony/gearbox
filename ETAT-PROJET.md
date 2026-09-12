@@ -10,12 +10,20 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 54** (nouvelle rubrique
-  **Congés**, 12 septembre) — **`api` ET `web`**, **avec migration**
-  (`20260912100000_add_conges`, purement additive : deux tables nouvelles).
+- master = prod, synchronisés. Dernier lot déployé : **correctif 55** (Congés v2 — période
+  de référence légale juin→mai, solde de CP, congé sans solde et récup matin/après-midi,
+  planning pleine largeur, vue Agenda, reprise du fichier Excel du boss, 12 septembre) —
+  **`api` ET `web`**, **avec migration** (`20260912170000_conges_demi_et_droits`, additive :
+  une colonne nullable `CongeJour.demi` et une table `CongeDroit`).
   ℹ️ Migration appliquée depuis ce poste avant le déploiement, puis inscrite dans
   `_prisma_migrations` par `prisma migrate resolve --applied` — sans cette seconde étape
   le conteneur `api` la rejouerait au démarrage et ne démarrerait pas.
+  ℹ️ **313 lignes de congés ont été importées en base** au passage (fichier Excel de
+  l'équipe marketing, 13 personnes) : c'est de la VRAIE donnée, pas de la recette, elle
+  reste en place. Script rejouable : `backend/scripts/import-conges-2026.mjs`.
+  Avant lui le **correctif 54** (nouvelle rubrique
+  **Congés**, 12 septembre) — **`api` ET `web`**, **avec migration**
+  (`20260912100000_add_conges`, purement additive : deux tables nouvelles).
   Avant lui le **correctif 50** (Digital — second
   retour de l'équipe : liens cliquables, commentaires par édito, plaques hors du sélecteur
   de sites, statut « Constructeur », 10 septembre) — **`api` ET `web`**, **avec migration**
@@ -3015,6 +3023,125 @@
     relus dans le code, mais la leçon de ce dépôt est qu'un raisonnement exact ne remplace
     pas un parcours d'interface — à solder avec un compte Administrator et un compte
     Coordinator.
+
+55. **CONGÉS — PÉRIODE DE RÉFÉRENCE LÉGALE, SOLDE, NOUVEAUX TYPES, VUE AGENDA ET REPRISE
+    DU FICHIER EXCEL** (`feat/conges-v2`, 12 septembre 2026). Frontend **et** backend,
+    **avec migration** (`20260912170000_conges_demi_et_droits`, additive : une colonne
+    nullable, une table nouvelle).
+
+    Cinq demandes de Théo à la découverte de la rubrique livrée au 54.
+
+    - **La période de référence n'est PAS l'année civile.** Le 54 agrégeait par année
+      civile, sur le modèle du fichier Excel. Théo a demandé de vérifier la règle : elle
+      est à l'art. **L3141-3** du Code du travail — 2,5 jours ouvrables acquis par mois de
+      travail effectif, **30 jours ouvrables au maximum, soit 25 jours ouvrés**, sur une
+      période qui court du **1er juin au 31 mai** à défaut d'accord d'entreprise
+      (confirmé sur travail-emploi.gouv.fr et l'Urssaf). Le tableau de bord et l'agenda
+      agrègent donc de juin à mai ; le planning reste mois par mois.
+      ⚠️ **Conséquence à connaître** : les totaux de Gearbox et ceux du fichier du boss ne
+      se recoupent PAS à l'identique, puisqu'ils ne comptent pas la même fenêtre. Ce n'est
+      pas une erreur de reprise. Si un accord d'entreprise fixait un jour la période à
+      l'année civile, `debutPeriodeConges` / `CONGES_MOIS_DEBUT` dans `constants.ts` sont
+      la **seule porte** à changer.
+    - **Solde de congés payés** (Théo revient sur le « pas de solde » du 54) : acquis /
+      pris / restants par personne et par période. Table `CongeDroit`, avec un choix de
+      forme : **une ligne n'existe QUE si le droit a été modifié**, l'absence valant
+      25 jours. C'est ce qui évite de créer une ligne par personne chaque 1er juin, donc
+      de dépendre d'une tâche planifiée qui n'existe pas. Poser explicitement 25 **efface**
+      la ligne, pour ne pas garder deux représentations du même état.
+      ⚠️ **Seuls les CP décomptent** (`congeDecompteSolde`) : RTT, heures de récup, sans
+      solde et révision sont suivis mais relèvent de compteurs qui ne sont pas dans
+      Gearbox. Modifiable au crayon par un gestionnaire seulement.
+    - **Types : la demi-journée sort du type.** Le 54 codait `CPAM` / `CPAPM` ; ajouter
+      « congé sans solde » et « heures de récup matin/après-midi » aurait demandé `HRAM`,
+      `HRAPM`, `CSSAM`… — une combinatoire qui double à chaque famille. Désormais
+      `type` ∈ {CP, RTT, HR, **CSS**, **CR**} et `demi` ∈ {AM, PM, null}, **toute** famille
+      pouvant être posée en demi-journée. `CR` (congé révision) n'était pas demandé : il
+      est **dans les données** du fichier (Hugo, semaine du 14 juin 2027) et il fallait un
+      type pour l'accueillir.
+      ⚠️ Bascule faite **au bon moment** : la table `CongeJour` était VIDE en production
+      (les données du 54 étaient de la recette, supprimées en fin de lot), il n'y avait
+      donc aucune ligne à convertir. Vérifié avant d'écrire la migration.
+    - **Le planning ne prenait pas la largeur de l'écran** (capture de Théo). Cause : la
+      `<table>` n'avait pas de `w-full` et prenait sa largeur naturelle. `table-fixed
+      w-full` + `minWidth` : l'espace restant se répartit entre les jours, le défilement
+      horizontal reste quand la place manque. **Mesuré à 1680 px : conteneur 1408, table
+      1406** (contre ~1300 avant, un tiers de colonne vide à droite) ; colonne des jours
+      **38 px** au lieu de 34 fixes. Filet plus marqué le lundi pour découper les semaines.
+    - **Vue AGENDA** (3e onglet), la demande telle qu'elle a été posée : « un calendrier
+      déroulant, en mode agenda, où tout le monde est mêlé, pour voir qui est là ou pas là
+      sur plusieurs mois ». Douze mois empilés en grilles lundi→dimanche, défilement
+      continu, une pastille par absent (avatar cerclé de la couleur du type au-dessus de
+      `md`, point coloré en dessous — un avatar de 16 px au doigt n'identifie personne),
+      le compte d'absents du jour, les fériés nommés, et un clic qui ouvre la liste des
+      absents. Inspiration assumée du « team calendar » / wallchart de Timetastic, Leave
+      Dates et actiPLANS, benchmarkés avant de dessiner.
+      ⚠️ **En lecture** : une case d'agenda mêle tout le monde, un clic n'y désigne
+      personne. La saisie reste dans le planning, où la ligne est explicite.
+
+    **Reprise du fichier Excel** (`backend/scripts/import-conges-2026.mjs`, rejouable et
+    idempotent, lit `donnees-conges-2026.json`) : **313 cellules** écrites pour
+    **13 personnes**, 3 ajoutées au périmètre. Ce qui a été écarté, et pourquoi :
+    - **Alison et Mélanie** (44 cellules) — elles ne font plus partie du marketing
+      (décision de Théo). Au passage, les colonnes de Mélanie sont intitulées « Lucy » /
+      « LUCY » dans les blocs juillet et août du fichier d'origine : l'extraction se fait
+      donc par **position de colonne**, jamais par l'intitulé.
+    - **5 cellules posées un samedi** (Lucie ×3, Zakaria ×2) — Gearbox n'affiche ni ne
+      compte les jours chômés ; les importer aurait créé des lignes invisibles en base.
+    ⚠️ La correspondance prénom → compte est **explicite et par nom COMPLET** : le fichier
+    ne donne que des prénoms et Gearbox contient « Lucie » ET « Lucien Marchetti ». Un
+    rapprochement approximatif aurait versé les congés de l'une dans la ligne de l'autre.
+    Le script refuse de démarrer sur un nom ambigu, absent, ou dont le rôle n'a pas accès
+    à la rubrique (il écrit en base sans passer par la route, le contrôle de rôle y est
+    donc refait).
+    ℹ️ **Deux écarts de 0,5 jour avec le récap du fichier** (Bastien 22 vs 21,5 ;
+    Ludivine 22,5 vs 22) : le fichier note les demi-journées de trois façons
+    (« CP (APM)-V », « CP APM-V », « HR Matin-V ») et sa formule n'en attrape pas toutes.
+    L'import les normalise ; c'est Gearbox qui a raison, pas le tableur.
+
+    **Vérifié dans l'interface, au clic réel**, puis recoupé par un calcul indépendant sur
+    le JSON source : tableau de bord **212 jours posés**, moyenne **16,3**, mois le plus
+    chargé **août (87 j)**, pic **10 absents le 13/07/2026**, Hugo **26/25 CP → -1
+    restant** — les cinq chiffres retrouvés à la main. Agenda : clic sur le 27 juillet →
+    **8 absents sur 13**, liste nominative conforme au fichier. Planning : pose d'un HR
+    au clic → total **1**, bascule en « Matin » → **0,5**, validation → pastille pleine,
+    retrait → total « — » et pied de colonne revenu de 2 à 1.
+    **Refus serveur mesurés** : ancien code `CPAM` **400** (la bascule est bien étanche),
+    demi-journée inventée **400**, `2026-02-31` **400**, personne hors périmètre **400**,
+    droit négatif **400**, droit en toutes lettres **400**, période 1200 **400**.
+    Droit posé à 12,5 puis remis à 25 → **ligne supprimée**, table revenue à 0.
+    Mobile 375 px : cartes au planning (« 18 Sep · CP a.-m. », total « 1,5 j »), agenda en
+    pastilles, **aucun débordement horizontal** sur les trois onglets.
+    `tsc` **9** racine / **0** backend, `check-plaques-sync` vert.
+
+    ⚠️ **Défaut trouvé et corrigé en recette** : l'agenda s'ouvrait **un mois trop tôt**.
+    Le calage sur le mois courant visait 958 px là où la section se trouvait finalement à
+    1 490 — les avatars des mois du dessus n'étaient pas encore posés au premier cadre et
+    la cible descendait ensuite. On recale désormais tant que l'écart persiste, au plus
+    cinq cadres. Vérifié : `scrollTop` 1 490, mois en haut = 2026-09.
+
+    ⚠️ **À TRANCHER PAR THÉO — le lundi de Pentecôte.** Trois personnes (Alexis, Morgane,
+    Romane) ont un congé posé le **25 mai 2026**, qui est le lundi de Pentecôte. Or
+    personne ne pose de congé un jour chômé : cela laisse penser qu'il est **travaillé**
+    chez Bony, au titre de la journée de solidarité — ce que la loi permet (c'est un férié
+    ordinaire, pas un férié obligatoirement chômé). Les trois cellules sont **en base**
+    mais **invisibles**, puisque `lib/joursFeries.ts` le tient pour chômé. Si c'est un jour
+    travaillé, le correctif tient en une ligne : retirer `Lundi de Pentecôte` de
+    `feriesDe()`. Ne pas décider à sa place.
+
+    ⚠️ **Défaut signalé par Théo à la recette, corrigé dans le même lot** : les en-têtes de
+    mois de l'agenda étaient **blancs sur blanc en thème sombre**. `dark:bg-bony-panel/90`
+    ne produit aucune règle avec Tailwind CDN Play — l'élément gardait son `bg-white/90`.
+    Mesuré sur l'élément réel, thème sombre actif : `rgba(255,255,255,0.9)` avant,
+    `rgb(30,30,30)` après. Corrigé en `bg-white dark:bg-bony-panel`, comme l'en-tête figé
+    du planning. ⚠️ **Pas de `/opacité` sur une couleur `bony-*` derrière un `dark:`** —
+    même famille que `md:gx-glass-panel`, et tout aussi silencieux. Détail et piège de
+    diagnostic dans `BUGS-CONNUS.md`.
+
+    ⚠️ **TOUJOURS NON VÉRIFIÉ, faute d'un second compte** (hérité du 54, et le lot en
+    ajoute une) : le **403** quand un non-gestionnaire écrit sur la ligne d'un collègue,
+    le **403** d'un `Site Manager` sur le GET, l'absence du bouton « Valider » pour un
+    **Administrator**, et désormais l'absence du **crayon du solde** pour un non-gestionnaire.
 
 ## Backlog — ce qui reste à faire
 
