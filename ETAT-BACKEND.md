@@ -1086,8 +1086,9 @@ comparable (une image par personne qui en pose une).
 
 ### 🌴 Congés — `/api/conges` (12/09/2026)
 
-Deux tables : `CongeJour` (une ligne = une personne × un jour, `@@unique([userId, date])`
-pour l'upsert) et `CongeMembre` (le PÉRIMÈTRE, `userId @unique`).
+Trois tables : `CongeJour` (une ligne = une personne × un jour, `@@unique([userId, date])`
+pour l'upsert), `CongeMembre` (le PÉRIMÈTRE, `userId @unique`) et, depuis le correctif 55,
+`CongeDroit` (le droit à CP d'une personne sur une période de référence).
 
 **Trois listes de rôles, déclarées EN TÊTE du fichier** et jamais empruntées à une autre
 route — convention du dépôt : coïncidence de valeurs n'est pas identité de règle.
@@ -1116,6 +1117,38 @@ personne est ajoutée au planning.
 
 `PUT /periode` écrit en **transaction** : sur trente jours, un échec au milieu laisserait
 la période à moitié posée.
+
+### Correctif 55 (12/09/2026) — demi-journées, nouveaux types, droits
+
+⚠️ **La FAMILLE de congé ne porte plus la demi-journée.** `TYPES_CONGE` est passé de
+`['CP','RTT','HR','CPAM','CPAPM']` à **`['CP','RTT','HR','CSS','CR']`**, et la
+demi-journée est un champ à part : `demi` ∈ `'AM' | 'PM' | null`, accepté par `PUT /jour`
+et `PUT /periode` et validé par `demiValide()`. Motif : ajouter « congé sans solde » et
+« heures de récup matin/après-midi » aurait demandé `HRAM`, `HRAPM`, `CSSAM`… — une
+combinatoire qui double à chaque famille.
+⚠️ Un vieux client qui enverrait `CPAM` reçoit **400**, et c'est voulu : la table était
+VIDE en production au moment de la bascule, aucune ligne n'était à convertir.
+
+⚠️ **`PUT /droit`** (`GESTION_ROLES`) — `{ userId, periode, jours }`, `periode` étant
+l'**année de DÉBUT** de la période de référence (2026 = 1er juin 2026 → 31 mai 2027).
+**Écrire la valeur par défaut (25) SUPPRIME la ligne** au lieu d'en écrire une : l'absence
+de ligne vaut 25 jours (art. L3141-3 : 2,5 j ouvrables/mois, 30 ouvrables max = 25 ouvrés),
+et garder une ligne « 25 » ferait diverger deux représentations du même état le jour où le
+défaut changerait. C'est aussi ce qui évite de devoir créer une ligne par personne chaque
+1er juin, donc de dépendre d'une tâche planifiée qui n'existe pas.
+⚠️ `DROIT_DEFAUT` dans la route est une **copie** de `CONGES_DROIT_DEFAUT`
+(`constants.ts`) : les changer ensemble.
+
+Le `GET /` renvoie désormais **`{ jours, membres, droits }`**. Les droits ne sont pas
+filtrés sur la période demandée : ils sont peu nombreux (une ligne par personne et par
+période, et seulement quand le défaut a été modifié) et le tableau de bord fait varier sa
+période indépendamment du planning.
+
+ℹ️ **Import du fichier Excel du boss** : `backend/scripts/import-conges-2026.mjs`
+(rejouable, idempotent, lit `donnees-conges-2026.json`). ⚠️ Il écrit **en base directement**
+— il ne passe pas par `POST /conges/membres`, donc il **refait lui-même** le contrôle de
+rôle `LECTURE_ROLES`, faute de quoi il créerait une ligne de planning que la personne
+n'aurait pas le droit de lire.
 
 ## ⚠️ Route DORMANTE — `/api/expenses` (modèle `OneOffExpense`)
 

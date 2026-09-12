@@ -589,10 +589,17 @@ model CongeJour {
   /// un jour de congé n'a ni heure ni fuseau, et un DateTime rouvrirait la classe de bug
   /// J+1 que ce projet combat déjà avec `parseLocalDate`.
   date      String
-  /// 'CP' | 'RTT' | 'HR' | 'CPAM' (CP matin) | 'CPAPM' (CP après-midi).
-  /// String libre en base, liste blanche côté route — le schéma n'a aucun enum, et les
-  /// demi-journées comptent 0,5 jour au lieu de 1.
+  /// FAMILLE de congé : 'CP' | 'RTT' | 'HR' | 'CSS' (sans solde) | 'CR' (révision).
+  /// String libre en base, liste blanche côté route — le schéma n'a aucun enum.
+  ///
+  /// ⚠️ 12/09/2026 — la famille ne porte PLUS la demi-journée. Les codes 'CPAM'/'CPAPM'
+  /// du correctif 54 mélangeaient les deux notions : ajouter « HR matin » et « congé sans
+  /// solde » aurait demandé 'HRAM', 'HRAPM', 'CSSAM'… soit une combinatoire qui grossit à
+  /// chaque type. Le moment était le bon : la table était VIDE en production.
   type      String
+  /// Demi-journée : 'AM' (matin), 'PM' (après-midi), ou `null` pour un jour entier.
+  /// Seule chose qui fait passer le comptage de 1 à 0,5 — voir `valeurJourConge()`.
+  demi      String?
   /// Le ✓ de la maquette. ⚠️ Seuls Master et Director peuvent le poser (décision de
   /// Théo, Administrator en est exclu) — le contrôle est dans `routes/conges.ts`.
   validated Boolean  @default(false)
@@ -620,4 +627,31 @@ model CongeMembre {
   userId    String   @unique
   addedBy   String
   createdAt DateTime @default(now())
+}
+
+/// Droit à congés payés d'une personne pour UNE période de référence.
+///
+/// La période de référence légale court du 1er juin au 31 mai (art. L3141-3 : 2,5 jours
+/// ouvrables par mois travaillé, 30 ouvrables au plus, soit 25 jours ouvrés). Elle est
+/// identifiée par son année de DÉBUT : `2026` = 1er juin 2026 → 31 mai 2027.
+///
+/// ⚠️ Une ligne n'existe que si quelqu'un a modifié le droit par défaut. L'absence de
+/// ligne vaut 25 jours (`CONGES_DROIT_DEFAUT`) — c'est ce qui évite d'avoir à créer
+/// 16 lignes chaque 1er juin, et donc de dépendre d'une tâche planifiée qui n'existe pas.
+///
+/// ⚠️ Ne concerne QUE les CP. RTT, heures de récup, congé sans solde et congé révision
+/// sont suivis mais ne décomptent aucun solde : ils relèvent d'autres compteurs (paie,
+/// annualisation), qui ne sont pas dans Gearbox.
+model CongeDroit {
+  id        String   @id @default(uuid())
+  userId    String
+  /// Année de DÉBUT de la période de référence (2026 = juin 2026 → mai 2027).
+  periode   Int
+  /// Jours ouvrés acquis sur la période. Décimal : un temps partiel ou une arrivée en
+  /// cours d'année donne des demi-journées (ex. 12,5).
+  jours     Float
+  updatedBy String
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, periode])
 }
