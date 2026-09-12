@@ -10,12 +10,20 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 54** (nouvelle rubrique
-  **Congés**, 12 septembre) — **`api` ET `web`**, **avec migration**
-  (`20260912100000_add_conges`, purement additive : deux tables nouvelles).
+- master = prod, synchronisés. Dernier lot déployé : **correctif 55** (Congés v2 — période
+  de référence légale juin→mai, solde de CP, congé sans solde et récup matin/après-midi,
+  planning pleine largeur, vue Agenda, reprise du fichier Excel du boss, 12 septembre) —
+  **`api` ET `web`**, **avec migration** (`20260912170000_conges_demi_et_droits`, additive :
+  une colonne nullable `CongeJour.demi` et une table `CongeDroit`).
   ℹ️ Migration appliquée depuis ce poste avant le déploiement, puis inscrite dans
   `_prisma_migrations` par `prisma migrate resolve --applied` — sans cette seconde étape
   le conteneur `api` la rejouerait au démarrage et ne démarrerait pas.
+  ℹ️ **313 lignes de congés ont été importées en base** au passage (fichier Excel de
+  l'équipe marketing, 13 personnes) : c'est de la VRAIE donnée, pas de la recette, elle
+  reste en place. Script rejouable : `backend/scripts/import-conges-2026.mjs`.
+  Avant lui le **correctif 54** (nouvelle rubrique
+  **Congés**, 12 septembre) — **`api` ET `web`**, **avec migration**
+  (`20260912100000_add_conges`, purement additive : deux tables nouvelles).
   Avant lui le **correctif 50** (Digital — second
   retour de l'équipe : liens cliquables, commentaires par édito, plaques hors du sélecteur
   de sites, statut « Constructeur », 10 septembre) — **`api` ET `web`**, **avec migration**
@@ -3120,6 +3128,15 @@
     mais **invisibles**, puisque `lib/joursFeries.ts` le tient pour chômé. Si c'est un jour
     travaillé, le correctif tient en une ligne : retirer `Lundi de Pentecôte` de
     `feriesDe()`. Ne pas décider à sa place.
+
+    ⚠️ **Défaut signalé par Théo à la recette, corrigé dans le même lot** : les en-têtes de
+    mois de l'agenda étaient **blancs sur blanc en thème sombre**. `dark:bg-bony-panel/90`
+    ne produit aucune règle avec Tailwind CDN Play — l'élément gardait son `bg-white/90`.
+    Mesuré sur l'élément réel, thème sombre actif : `rgba(255,255,255,0.9)` avant,
+    `rgb(30,30,30)` après. Corrigé en `bg-white dark:bg-bony-panel`, comme l'en-tête figé
+    du planning. ⚠️ **Pas de `/opacité` sur une couleur `bony-*` derrière un `dark:`** —
+    même famille que `md:gx-glass-panel`, et tout aussi silencieux. Détail et piège de
+    diagnostic dans `BUGS-CONNUS.md`.
 
     ⚠️ **TOUJOURS NON VÉRIFIÉ, faute d'un second compte** (hérité du 54, et le lot en
     ajoute une) : le **403** quand un non-gestionnaire écrit sur la ligne d'un collègue,

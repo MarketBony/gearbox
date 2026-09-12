@@ -601,7 +601,14 @@ const Conges: React.FC = () => {
           const total = lignes.reduce((t, l) => t + totalMoisDe(l.id, a, m), 0);
           return (
             <section key={`${a}-${m}`} data-mois={`${a}-${String(m + 1).padStart(2, '0')}`} className="pb-5">
-              <div className="sticky top-0 z-10 -mx-3 md:-mx-4 px-3 md:px-4 py-2 bg-white/90 dark:bg-bony-panel/90 backdrop-blur border-b border-bony-border flex items-baseline gap-2">
+              {/* ⚠️ Fond OPAQUE, et SANS modificateur d'opacité sur la couleur custom.
+                  `dark:bg-bony-panel/90` ne produit AUCUNE règle avec Tailwind CDN Play
+                  (mesuré : l'en-tête restait à `rgba(255,255,255,0.9)` en thème sombre,
+                  soit du blanc sur blanc — signalé par Théo). `dark:bg-bony-panel` seul
+                  fonctionne, et c'est déjà ce qu'utilise l'en-tête figé du planning.
+                  Un en-tête `sticky` a de toute façon besoin d'un fond opaque : le mois
+                  suivant défilerait visiblement derrière. */}
+              <div className="sticky top-0 z-10 -mx-3 md:-mx-4 px-3 md:px-4 py-2 bg-white dark:bg-bony-panel border-b border-bony-border flex items-baseline gap-2">
                 <h3 className="font-title text-sm text-bony-text">{MOIS_FR[m]} {a}</h3>
                 <span className="text-[10px] text-bony-muted">
                   {total > 0 ? `${fmtJours(total)} jour${total > 1 ? 's' : ''} posé${total > 1 ? 's' : ''}` : 'personne d’absent'}
