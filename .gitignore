@@ -45,3 +45,11 @@ screenshots/
 #  - la presentation de la stack faite pour l'equipe, livrable ponctuel hors application.
 budget market 2026.xlsx
 PRESENTATION-EQUIPE.html
+
+# L'index graphify de ce depot : 4,0 Mo, regenere tout seul a chaque commit par
+# le hook post-commit, et reconstructible a tout moment. Il n'a rien a faire
+# dans l'historique — meme raison que les deux exclusions ci-dessus, inscrites
+# apres un `git add -A` malheureux : l'exclusion ne doit pas dependre de la
+# vigilance. Il contient aussi .graphify_python et .graphify_root, qui portent
+# des chemins absolus propres a cette machine.
+graphify-out/
