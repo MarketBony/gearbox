@@ -178,7 +178,7 @@ const VisualMultiSelect: React.FC<VisualMultiSelectProps> = ({ label, options, s
                 ref={triggerRef}
                 onClick={() => !disabled && setIsOpen(o => !o)}
                 disabled={disabled}
-                title={selected.length ? selected.join(' · ') : label}
+                title={selected.length ? selected.map(s => (type === 'brand' ? libelleMarqueDigital(s) : s)).join(' · ') : label}
                 className={`h-11 md:h-[34px] w-full min-w-0 bg-[var(--bg-input)] border rounded-lg px-1.5 flex items-center gap-1 overflow-hidden text-left transition-colors ${isOpen ? 'border-bony-orange/60' : 'border-bony-border hover:border-bony-orange/40'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
                 {selected.length > 0 ? (
@@ -228,7 +228,9 @@ const VisualMultiSelect: React.FC<VisualMultiSelectProps> = ({ label, options, s
                                 <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'border-bony-orange bg-bony-orange' : 'border-slate-300 dark:border-slate-600'}`}>
                                     {isSelected && <Check size={10} className="text-white" />}
                                 </span>
-                                <span className="truncate min-w-0">{opt}</span>
+                                {/* Libellé traduit comme la pastille : le tag stocké reste `Holding`,
+                                    l'équipe le connaît sous le nom « GROUPE BONY ». */}
+                                <span className="truncate min-w-0">{type === 'brand' ? libelleMarqueDigital(opt) : opt}</span>
                             </button>
                         );
                     })}
