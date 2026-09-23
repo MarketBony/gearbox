@@ -448,6 +448,11 @@ const Chat: React.FC = () => {
   // côté de chaque message serait illisible sur 320 px. Même mécanisme que
   // `menuMsgId` plutôt qu'un second système de popover.
   const [reactMsgId, setReactMsgId] = useState<string | null>(null);
+  // « Qui a réagi » : bulle ouverte sur UNE pastille, clé `${msgId}|${emoji}`.
+  // Survol sur ordinateur, APPUI LONG au doigt — le clic simple garde son rôle
+  // historique (ajouter / retirer sa réaction), on ne le détourne pas.
+  const [reactWho, setReactWho] = useState<string | null>(null);
+  const appuiLong = useRef<{ timer: number | null; declenche: boolean }>({ timer: null, declenche: false });
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [showMobileChat, setShowMobileChat] = useState(false);
 
@@ -772,6 +777,13 @@ const Chat: React.FC = () => {
     return conv.participants.map(pid => users.find(u => u.id === pid)).filter(Boolean) as User[];
   }, [users]);
 
+  /** Noms des auteurs d'une réaction, « Vous » en tête s'il y est. */
+  const nomsReaction = (ids: string[]): string[] => {
+    const noms = ids.filter(id => id !== me?.id)
+      .map(id => users.find(u => u.id === id)?.name ?? 'Ancien membre');
+    return me && ids.includes(me.id) ? ['Vous', ...noms] : noms;
+  };
+
   const getConvName = (conv: ChatConversation): string => {
     if (conv.name) return conv.name;
     if (conv.type === 'general') return 'Chat Général';
@@ -1065,7 +1077,7 @@ const Chat: React.FC = () => {
   return (
     // Un clic n'importe où referme le menu d'un message ET le sélecteur de
     // réactions — ce dernier suit la même règle, sinon il resterait ouvert.
-    <div className="flex h-full overflow-hidden text-bony-text" onClick={() => { setMenuMsgId(null); setReactMsgId(null); }}>
+    <div className="flex h-full overflow-hidden text-bony-text" onClick={() => { setMenuMsgId(null); setReactMsgId(null); setReactWho(null); }}>
 
       {/* ===== LEFT: CONVERSATION LIST ===== */}
       <div className={`${showMobileChat ? 'hidden md:flex' : 'flex'} w-full md:w-[280px] md:min-w-[280px] border-r border-bony-border flex-col glass-strong h-full shrink-0`}>
@@ -1130,8 +1142,14 @@ const Chat: React.FC = () => {
             </>
           )}
 
-          {/* GROUPES */}
-          {!isExternal && (
+          {/* GROUPES
+              ⚠️ Affichés AUSSI à l'External (23/09/2026). Cette section lui était masquée
+              par un `!isExternal` antérieur au correctif 41 — qui l'a rendu ajoutable aux
+              groupes (« il discute avec tout le monde ») sans rouvrir cette liste. Membre
+              côté serveur, il ne voyait donc pas ses groupes : c'est ce qui a coupé Ali du
+              groupe « équipe digital ». Le serveur filtre déjà par `participants`, un
+              External ne reçoit que les groupes dont il est membre. */}
+          {(
             <>
               <SectionLabel label={`Groupes${groupConvs.length > 0 ? ` (${groupConvs.length})` : ''}`} />
               {groupConvs.length === 0
@@ -1534,15 +1552,50 @@ const Chat: React.FC = () => {
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {(Object.entries(msg.reactions) as [string, string[]][])
                                     .filter(([, ids]) => ids.length > 0)
-                                    .map(([emoji, ids]) => (
-                                      <button
-                                        key={emoji}
-                                        onClick={() => toggleReaction(msg.id, emoji)}
-                                        className={`text-[11px] px-1.5 py-0.5 rounded-full border transition-all flex items-center gap-0.5 ${me && ids.includes(me.id) ? 'bg-bony-orange/20 border-bony-orange/50 text-bony-orange' : 'bg-bony-panel border-bony-border text-bony-muted hover:border-bony-orange/30'}`}
-                                      >
-                                        {emoji} {ids.length}
-                                      </button>
-                                    ))}
+                                    .map(([emoji, ids]) => {
+                                      const cle = `${msg.id}|${emoji}`;
+                                      const noms = nomsReaction(ids);
+                                      return (
+                                        <div key={emoji} className="relative">
+                                          <button
+                                            onClick={() => {
+                                              // Un appui long vient d'ouvrir la liste : le clic qui suit n'ajoute rien.
+                                              if (appuiLong.current.declenche) { appuiLong.current.declenche = false; return; }
+                                              toggleReaction(msg.id, emoji);
+                                            }}
+                                            onMouseEnter={() => setReactWho(cle)}
+                                            onMouseLeave={() => setReactWho(w => (w === cle ? null : w))}
+                                            onTouchStart={() => {
+                                              appuiLong.current.declenche = false;
+                                              appuiLong.current.timer = window.setTimeout(() => {
+                                                appuiLong.current.declenche = true;
+                                                setReactWho(cle);
+                                              }, 450);
+                                            }}
+                                            onTouchMove={() => { if (appuiLong.current.timer) window.clearTimeout(appuiLong.current.timer); }}
+                                            onTouchEnd={e => {
+                                              if (appuiLong.current.timer) window.clearTimeout(appuiLong.current.timer);
+                                              // Empêche le clic synthétique : la bulle reste ouverte, rien n'est ajouté.
+                                              if (appuiLong.current.declenche) { e.preventDefault(); appuiLong.current.declenche = false; }
+                                            }}
+                                            onContextMenu={e => e.preventDefault()}
+                                            aria-label={`${emoji} : ${noms.join(', ')}`}
+                                            className={`text-[11px] px-1.5 py-0.5 rounded-full border transition-all flex items-center gap-0.5 select-none ${me && ids.includes(me.id) ? 'bg-bony-orange/20 border-bony-orange/50 text-bony-orange' : 'bg-bony-panel border-bony-border text-bony-muted hover:border-bony-orange/30'}`}
+                                          >
+                                            {emoji} {ids.length}
+                                          </button>
+                                          {reactWho === cle && (
+                                            <div
+                                              role="tooltip"
+                                              onClick={e => e.stopPropagation()}
+                                              className={`absolute bottom-full mb-1.5 z-30 w-max max-w-[220px] glass-strong rounded-lg shadow-glass-lg border border-bony-border px-2.5 py-1.5 text-[11px] text-bony-text leading-snug ${isMe ? 'right-0' : 'left-0'}`}
+                                            >
+                                              <span className="mr-1">{emoji}</span>{noms.join(', ')}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                 </div>
                               )}
 

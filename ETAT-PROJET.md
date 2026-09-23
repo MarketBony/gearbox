@@ -10,7 +10,10 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 55** (Congés v2 — période
+- master = prod, synchronisés. Dernier lot déployé : **correctif 56** (retours d'équipe,
+  lot 1 : groupes du Chat visibles pour l'External, « qui a réagi », « GROUPE BONY » dans
+  les marques du Digital, 23 septembre) — **`web` seul**, aucune migration.
+  Avant lui le **correctif 55** (Congés v2 — période
   de référence légale juin→mai, solde de CP, congé sans solde et récup matin/après-midi,
   planning pleine largeur, vue Agenda, reprise du fichier Excel du boss, 12 septembre) —
   **`api` ET `web`**, **avec migration** (`20260912170000_conges_demi_et_droits`, additive :
@@ -3142,6 +3145,42 @@
     ajoute une) : le **403** quand un non-gestionnaire écrit sur la ligne d'un collègue,
     le **403** d'un `Site Manager` sur le GET, l'absence du bouton « Valider » pour un
     **Administrator**, et désormais l'absence du **crayon du solde** pour un non-gestionnaire.
+
+56. **RETOURS D'ÉQUIPE, LOT 1 — groupes du Chat pour l'External, « qui a réagi »,
+    « GROUPE BONY » dans les marques du Digital** (`feat/lot1-marques-reactions`,
+    23 septembre 2026). **`web` seul**, aucune migration.
+
+    - **Ali (External) ne voyait plus le groupe « équipe digital » dont il est membre.**
+      Cause : la section « Groupes » de la liste de conversations était entièrement
+      masquée au rôle External (`{!isExternal && (…)}` dans `pages/Chat.tsx`), une
+      condition **antérieure au correctif 41**. Ce dernier a rendu l'External ajoutable
+      aux groupes (« il discute avec tout le monde sauf les chefs de site ») et le serveur
+      l'y accepte, mais la liste n'a pas été rouverte : membre côté serveur, invisible
+      côté écran. Corrigé en affichant la section à tous — le serveur ne renvoie de toute
+      façon que les groupes dont l'utilisateur est `participant`, rien ne fuit.
+      ℹ️ Diagnostic fait en lecture seule (GET `/api/users` et `/api/chat/conversations`
+      depuis la session de Théo) : Ali = rôle `External`. Théo n'étant pas membre du
+      groupe, sa liste de participants n'a pas pu être relue.
+      ℹ️ Inchangé, et non demandé : un External ne peut toujours pas CRÉER de groupe (le
+      « + » ouvre directement un message privé).
+    - **« Qui a réagi »** : la donnée existait déjà (`ChatMessage.reactions` =
+      `Record<emoji, userId[]>`), seul l'affichage manquait. Bulle au **survol** d'une
+      pastille (« Vous » en tête), et à l'**appui long** (~450 ms) au doigt. Le clic simple
+      garde son rôle historique (ajouter / retirer sa réaction) : l'appui long empêche le
+      clic synthétique qui le suit (`preventDefault` sur `touchend`).
+    - **Digital, liste des Marques** : l'option affichait `Holding` alors que la pastille
+      affichait déjà « GROUPE BONY » (`libelleMarqueDigital`). Corrigé sur l'option et sur
+      l'infobulle. La valeur stockée reste `Holding` — aucun effet budgétaire.
+
+    **Vérifié dans l'interface** : liste Marques de l'édito « FORUM PR » → « GROUPE BONY ✓ »
+    (ouverte et refermée sans rien cocher) ; bulle « 👍 Hugo Culetto, Alexis Perz » au
+    survol, alignée à droite sur un message de Théo, non rognée par la zone de défilement ;
+    appui long simulé → bulle à 600 ms, absente à 200 ms, clic synthétique bloqué ; tap
+    court → pas de bulle, clic laissé passer. **Aucune écriture** : que des GET pendant
+    la recette. `tsc` **9** racine.
+    ⚠️ **NON VÉRIFIÉ** : la vue External elle-même (compte Master seulement, pas de jeton
+    fabriqué) — à confirmer par Ali après mise en ligne ; et l'appui long sur un vrai
+    téléphone (simulé par `TouchEvent`, pas joué sur un appareil).
 
 ## Backlog — ce qui reste à faire
 
