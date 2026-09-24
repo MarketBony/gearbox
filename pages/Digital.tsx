@@ -1247,15 +1247,45 @@ const EditoRow = React.memo(function EditoRow({ post, onChangerChamp, onDelete, 
                     />
                 </div>
 
+                {/* Classes CO² : PLUSIEURS depuis le 24/09/2026 (demande des Digital
+                    Managers). `co2` hérité est recalculé par le serveur, on n'écrit que `co2s`. */}
                 <div className="min-w-0">
-                    <Etiquette>Classe CO²</Etiquette>
-                    <Select
-                        value={post.co2}
+                    <Etiquette>Classes CO²</Etiquette>
+                    <VisualMultiSelect
+                        label="Aucune"
+                        // Une classe enregistrée puis retirée du catalogue (Gestion des TAGS)
+                        // reste listée : sinon elle serait cochée sans pouvoir être décochée.
+                        options={[...co2Options, ...(post.co2s ?? []).filter(c => !co2Options.includes(c))]}
+                        selected={post.co2s ?? []}
+                        onChange={v => onChangerChamp(post.id, 'co2s', v)}
                         disabled={!canEdit}
-                        onChange={v => onChangerChamp(post.id, 'co2', v)}
-                        options={[{ value: '', label: 'Aucune' }, ...co2Options.map(c => ({ value: c, label: c }))]}
-                        size="sm"
+                        maxVisible={1}
                     />
+                </div>
+
+                {/* PRO+ (B2B) — même bouton-case que la fiche projet. Marqueur d'affichage :
+                    le Digital n'a pas de budget, rien d'autre ne change. */}
+                <div className="min-w-0">
+                    <Etiquette>Client B2B</Etiquette>
+                    <button
+                        type="button"
+                        disabled={!canEdit}
+                        onClick={() => onChangerChamp(post.id, 'proPlus', !post.proPlus)}
+                        className={`w-full h-11 md:h-[34px] flex items-center justify-center gap-2 px-2 rounded-lg border text-[10px] font-bold uppercase tracking-wide transition-all ${
+                            post.proPlus
+                                ? 'bg-bony-gradient text-white border-transparent shadow'
+                                : 'bg-[var(--bg-input)] text-slate-500 border-bony-border hover:text-bony-text'
+                        } ${!canEdit ? 'cursor-not-allowed opacity-50' : ''}`}
+                        title="Marquer cette publication comme PRO+ (B2B)"
+                        aria-pressed={!!post.proPlus}
+                    >
+                        <span className={`flex items-center justify-center w-4 h-4 rounded border transition-colors ${
+                            post.proPlus ? 'bg-white/25 border-white/60' : 'border-slate-400 dark:border-slate-500'
+                        }`}>
+                            {post.proPlus && <Check size={11} strokeWidth={3} />}
+                        </span>
+                        PRO+
+                    </button>
                 </div>
             </div>
 
@@ -1923,6 +1953,8 @@ const Digital: React.FC = () => {
               wording: '',
               lom: '',
               co2: '',
+              co2s: [],
+              proPlus: false,
               archived: false
           });
           setPosts([created, ...posts]);

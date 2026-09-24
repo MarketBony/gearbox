@@ -203,7 +203,12 @@ export interface SocialPost {
   link: string;
   wording: string;
   lom: string;
+  /** ⚠️ Hérité : première valeur de `co2s`, recalculée par le serveur. Ne plus l'écrire. */
   co2: string;
+  /** Classes CO² — plusieurs par publication depuis le 24/09/2026 (correctif 58). */
+  co2s: string[];
+  /** Marqueur PRO+ (B2B), affichage seul — le Digital n'a pas de budget. */
+  proPlus?: boolean;
   archived: boolean;
   archivedAt?: string; // Renseigné par le backend à l'archivage ; ancre la purge des médias
 }

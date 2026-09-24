@@ -123,7 +123,7 @@ const validerMediaFiles = (valeur: unknown, existantes: string[] = []): string |
  */
 const SOCIAL_FIELDS = [
   'title', 'status', 'date', 'targets', 'brands', 'service', 'networks',
-  'concessions', 'mediaFiles', 'mediaNames', 'link', 'wording', 'lom', 'co2', 'archived',
+  'concessions', 'mediaFiles', 'mediaNames', 'link', 'wording', 'lom', 'co2', 'co2s', 'proPlus', 'archived',
 ] as const;
 
 /**
@@ -147,6 +147,16 @@ const pickSocialData = (corps: any): Record<string, any> => {
   for (const champ of SOCIAL_FIELDS) {
     if (Object.prototype.hasOwnProperty.call(corps, champ)) data[champ] = corps[champ];
   }
+  // Classes CO² multiples (24/09/2026). Nettoyées ici plutôt que confiées à Prisma, qui
+  // rendrait un 500 sur une valeur mal formée. `co2` (hérité, une seule valeur) est
+  // RECALCULÉ comme première classe : le client renvoie la publication entière, donc
+  // avec l'ancien `co2` — sans cette ligne, les deux colonnes divergeraient.
+  if (Object.prototype.hasOwnProperty.call(data, 'co2s')) {
+    const liste = Array.isArray(data.co2s) ? data.co2s : [];
+    data.co2s = [...new Set(liste.filter((v: unknown): v is string => typeof v === 'string').map(v => v.trim()).filter(Boolean))].slice(0, 20);
+    data.co2 = data.co2s[0] ?? '';
+  }
+  if (Object.prototype.hasOwnProperty.call(data, 'proPlus')) data.proPlus = data.proPlus === true;
   return data;
 };
 
