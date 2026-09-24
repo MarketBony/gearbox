@@ -280,6 +280,9 @@ const transformer = (lignes) => {
         wording: norm(r['Wording']),
         lom,
         co2: norm(r['Graphe CO²']),
+        // Correctif 58 : la source de vérité est la LISTE `co2s` ; `co2` n'en est que la
+        // première valeur. Sans cette ligne, la classe importée n'apparaîtrait pas à l'écran.
+        co2s: norm(r['Graphe CO²']) ? [norm(r['Graphe CO²'])] : [],
         archived: false,
       },
     };

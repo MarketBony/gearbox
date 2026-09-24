@@ -256,7 +256,15 @@ model SocialPost {
   link        String
   wording     String
   lom         String
+  /// ⚠️ HÉRITÉ depuis le 24/09/2026 : une seule classe. La source de vérité est `co2s`
+  /// ci-dessous ; `co2` n'est plus que sa PREMIÈRE valeur, recalculée par la route à
+  /// chaque écriture, gardée pour un retour arrière sans perte.
   co2         String
+  /// Classes CO² — PLUSIEURS par publication (demande des Digital Managers, correctif 58).
+  co2s        String[]  @default([])
+  /// Marqueur PRO+ (B2B), comme `Project.proPlus`. Affichage seul : le Digital n'a pas de
+  /// budget, ce marqueur ne change aucun montant.
+  proPlus     Boolean   @default(false)
   archived    Boolean   @default(false)
   archivedAt  DateTime? // Renseigné à la bascule archived->true ; ancre la purge des médias (30j)
   createdAt   DateTime  @default(now())

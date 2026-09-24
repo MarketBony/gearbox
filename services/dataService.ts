@@ -123,7 +123,11 @@ const normalizeBooking = (b: any): EquipmentBooking => ({
 });
 const normalizeSocialPost = (p: any): SocialPost => ({
   ...p,
-  date: toDay(p.date)
+  date: toDay(p.date),
+  // Repli sur l'ancienne classe unique : un onglet servi par une API d'avant le
+  // correctif 58 ne porte pas `co2s`.
+  co2s: Array.isArray(p.co2s) ? p.co2s : (p.co2 ? [p.co2] : []),
+  proPlus: p.proPlus === true,
 });
 // Le backend génère les ids et gère createdAt/updatedAt : on ne les renvoie
 // pas dans les corps de mutation (les routes social/campaigns passent le body

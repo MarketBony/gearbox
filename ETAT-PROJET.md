@@ -10,7 +10,12 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 57** (Chat : thème de
+- master = prod, synchronisés. Dernier lot déployé : **correctif 58** (Digital : plusieurs
+  classes CO² par édito, case PRO+, 24 septembre) — **`api` ET `web`**, **avec migration**
+  (`20260924150000_social_co2_multi_et_proplus`, additive : `SocialPost.co2s` et
+  `SocialPost.proPlus`, reprise des 7 classes existantes). Push et déploiement autorisés
+  par Théo dans la demande même, recette faite en local avant le push.
+  Avant lui le **correctif 57** (Chat : thème de
   discussion partagé, « Vu par », membres et renommage de groupe côté serveur,
   24 septembre) — **`api` ET `web`**, **avec migration**
   (`20260924100000_chat_theme_partage_et_lectures`, additive : trois colonnes sur
@@ -3242,6 +3247,33 @@
     les lectures ne s'accumulent qu'à partir du déploiement).
     ℹ️ Comme le compteur de non-lus, une conversation OUVERTE compte comme lue même
     fenêtre en arrière-plan — sémantique préexistante, conservée.
+
+58. **DIGITAL — plusieurs classes CO² par édito, et case PRO+** (`feat/digital-co2-multi-proplus`,
+    24 septembre 2026). **`api` ET `web`**, **avec migration**
+    (`20260924150000_social_co2_multi_et_proplus`, additive).
+
+    - **Classes CO² multiples** (demande des Digital Managers) : nouvelle colonne
+      `SocialPost.co2s`, sélecteur multiple dans la ligne d'édito. `co2` (valeur unique)
+      est **conservé** et recalculé par le serveur comme première classe — retour arrière
+      sans perte. Reprise : les **7** publications qui avaient une classe la retrouvent
+      comme seule valeur de la liste (75 publications au total).
+      Au passage : une classe enregistrée puis **retirée du catalogue** restait cochée sans
+      pouvoir être décochée (défaut latent, déjà vrai avec l'ancien sélecteur simple) — elle
+      est désormais listée tant qu'elle est sélectionnée.
+    - **PRO+ (B2B)** : même bouton-case que la fiche projet, dans la 10ᵉ case de la grille,
+      jusque-là vide. Marqueur d'affichage, sans filtre ni effet de montant.
+    - Les deux champs entrent dans `SOCIAL_FIELDS` dans le même lot, et
+      `scripts/import-edito.mjs` remplit `co2s`.
+
+    **Vérifié** sur une publication jetable (supprimée, base revenue à 75) : PRO+ au clic →
+    `proPlus: true` en base, rendu en dégradé, largeur égale aux voisines (112 px) ; deux
+    classes cochées au clic → `co2s` en base, déclencheur « CLIO - B120 +1 » après
+    rechargement ; classes hors catalogue décochées → retirées, `co2` recalculé. Nettoyage
+    serveur : `['A',' A ',5,'','B']` → `['A','B']`, `co2` envoyé « Z » ignoré (recalculé
+    « A »), `proPlus: 'oui'` → `false`. `tsc` **9** racine / **0** backend.
+    ℹ️ Fenêtre de quelques minutes entre la migration et le déploiement : une classe
+    choisie dans l'ancienne interface pendant ce laps n'aurait écrit que `co2` — la reprise
+    (idempotente) a été rejouée après la mise en ligne.
 
 ## Backlog — ce qui reste à faire
 

@@ -983,9 +983,20 @@ liste blanche d'écriture est donc un piège à retardement.
 ⚠️ **Même comportement que `TASK_FIELDS` : un champ absent de la liste est jeté EN
 SILENCE.** La valeur part, le serveur répond 200, elle a disparu au rechargement, et il n'y
 a d'erreur ni côté client ni dans les logs. **Toute colonne ajoutée à `SocialPost` doit être
-ajoutée à `SOCIAL_FIELDS` dans le même lot.** Les 15 champs actuels : `title`, `status`,
+ajoutée à `SOCIAL_FIELDS` dans le même lot.** Les 17 champs actuels : `title`, `status`,
 `date`, `targets`, `brands`, `service`, `networks`, `concessions`, `mediaFiles`,
-`mediaNames`, `link`, `wording`, `lom`, `co2`, `archived`.
+`mediaNames`, `link`, `wording`, `lom`, `co2`, **`co2s`**, **`proPlus`**, `archived`.
+
+**Depuis le 24/09/2026 (correctif 58, migration `20260924150000_social_co2_multi_et_proplus`)** :
+- **`co2s String[]`** = les classes CO², plusieurs par publication. **`co2` est HÉRITÉ** :
+  `pickSocialData` le **recalcule** comme première valeur de `co2s` à chaque écriture —
+  le client renvoie la publication entière, donc avec l'ancien `co2`, et les deux colonnes
+  divergeraient sinon. `co2s` est nettoyé au passage (chaînes seules, rognées, dédoublonnées,
+  20 au plus) plutôt que confié à Prisma, qui rendrait un 500.
+- **`proPlus Boolean`** — marqueur PRO+ (B2B), comme `Project.proPlus`. Forcé en booléen
+  strict (`=== true`). Aucun effet de montant : le Digital n'a pas de budget.
+- ⚠️ `scripts/import-edito.mjs` écrit en base SANS passer par la route : il remplit donc
+  `co2s` lui-même.
 
 Exclus volontairement : `archivedAt` (posé par le serveur seul, ancre de la purge 30 j),
 `createdAt`/`updatedAt` (Prisma), et `id` — **toléré au POST uniquement**, la migration
