@@ -819,17 +819,6 @@ class DataService {
     await apiFetch(`/conges/membres/${userId}`, { method: 'DELETE' });
   }
 
-  async getChatCustomizations(): Promise<{ conversationId: string; background: string | null; bubble: string | null }[]> {
-    return apiFetch('/chat/customizations');
-  }
-  /** `''` efface le réglage (retour au défaut) — même convention que le reste de l'API. */
-  async setChatCustomization(conversationId: string, patch: { background?: string; bubble?: string }) {
-    return apiFetch<{ conversationId: string; background: string | null; bubble: string | null }>(
-      `/chat/conversations/${conversationId}/customization`,
-      { method: 'PUT', body: JSON.stringify(patch) }
-    );
-  }
-
   async updateMe(data: { name?: string; password?: string; avatarColor?: string; avatarUrl?: string | null; birthdate?: string; chatBackground?: string; chatBubble?: string }): Promise<Omit<User, 'loginId'>> {
     return apiFetch('/auth/me', { method: 'PUT', body: JSON.stringify(data) });
   }

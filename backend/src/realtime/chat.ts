@@ -2,6 +2,8 @@ import { Server, Socket } from 'socket.io';
 import { sendPushToUsers, resolvePushRecipients } from '../utils/pushSender';
 import { getUserIdsOnSection } from './presence';
 import { prisma } from '../db';
+import { hasSocialFeatures } from '../auth/roles';
+import { normaliserFond, normaliserBulle } from '../utils/personnalisationChat';
 
 
 // Rooms : une par conversation (diffusion ciblée aux participants, jamais de
@@ -325,9 +327,14 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
 
       const counts: Record<string, number> = { ...((conversation.unreadCounts as any) ?? {}) };
       counts[userId] = 0;
+      // Accusé de lecture (24/09/2026) : date du passage, horloge du SERVEUR — comparée à
+      // `ChatMessage.timestamp`, posé lui aussi par le serveur. Une horloge client décalée
+      // (celle de ce poste l'a déjà été) fausserait tous les « Vu par ».
+      const readAt: Record<string, string> = { ...((conversation.readAt as any) ?? {}) };
+      readAt[userId] = new Date().toISOString();
       const updatedConv = await prisma.chatConversation.update({
         where: { id: conversationId },
-        data: { unreadCounts: counts }
+        data: { unreadCounts: counts, readAt }
       });
       io.to(convRoom(conversationId)).emit('chat:conversation:updated', updatedConv);
       reply(ack, updatedConv);
@@ -422,6 +429,137 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       reply(ack, updatedConv);
     } catch (e) {
       reply(ack, { error: 'Échec de la mise à jour de la photo du groupe.' });
+    }
+  });
+
+  // THÈME PARTAGÉ d'une conversation (24/09/2026) — fond et couleur de bulle, vus par
+  // tous les membres. Remplace la personnalisation personnelle du correctif 53 (« ça ne
+  // s'affiche que chez moi, c'est un peu con » — retour de l'équipe).
+  //
+  // Droits arbitrés par Théo : TOUT participant peut le changer (comme la photo de
+  // groupe), et le Chat Général est INVIOLABLE — refusé ici, pas seulement masqué à
+  // l'écran. Convention de `normaliserFond` : champ absent = inchangé, chaîne vide = retrait.
+  socket.on('chat:conversation:theme', async (payload: any, ack: Ack) => {
+    try {
+      const { conversationId } = payload ?? {};
+      if (typeof conversationId !== 'string') return reply(ack, { error: 'Champ "conversationId" requis.' });
+
+      const data: { background?: string | null; bubble?: string | null } = {};
+      if (Object.prototype.hasOwnProperty.call(payload, 'background')) {
+        const v = normaliserFond(payload.background);
+        if (v === false) return reply(ack, { error: 'Fond refusé : seuls un fond du catalogue ou une image déposée dans Gearbox sont acceptés.' });
+        data.background = v;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, 'bubble')) {
+        const v = normaliserBulle(payload.bubble);
+        if (v === false) return reply(ack, { error: 'Couleur de bulle refusée.' });
+        data.bubble = v;
+      }
+      if (Object.keys(data).length === 0) return reply(ack, { error: 'Rien à enregistrer.' });
+
+      const conversation = await prisma.chatConversation.findUnique({ where: { id: conversationId } });
+      if (!conversation) return reply(ack, { error: 'Conversation introuvable.' });
+      if (conversation.type === 'general') {
+        return reply(ack, { error: 'Le thème du Chat Général ne se modifie pas.' });
+      }
+      if (!conversation.participants.includes(userId)) {
+        return reply(ack, { error: "Vous n'êtes pas participant de cette conversation." });
+      }
+
+      const updatedConv = await prisma.chatConversation.update({ where: { id: conversationId }, data });
+      io.to(convRoom(conversationId)).emit('chat:conversation:updated', updatedConv);
+      reply(ack, updatedConv);
+    } catch (e) {
+      reply(ack, { error: 'Échec de la mise à jour du thème.' });
+    }
+  });
+
+  // Renommage d'un groupe (24/09/2026). Jusqu'ici un overlay `localStorage` : le nouveau
+  // nom ne sortait jamais du poste qui l'avait saisi.
+  // ⚠️ Réservé aux `adminIds`, comme l'était le crayon à l'écran — contrairement à la
+  // photo et au thème, ouverts à tous les participants (décisions de Théo).
+  socket.on('chat:conversation:rename', async (payload: any, ack: Ack) => {
+    try {
+      const { conversationId, name } = payload ?? {};
+      if (typeof conversationId !== 'string') return reply(ack, { error: 'Champ "conversationId" requis.' });
+      const nom = typeof name === 'string' ? name.trim() : '';
+      if (!nom) return reply(ack, { error: 'Le nom du groupe ne peut pas être vide.' });
+      if (nom.length > 80) return reply(ack, { error: 'Nom trop long : 80 caractères maximum.' });
+
+      const conversation = await prisma.chatConversation.findUnique({ where: { id: conversationId } });
+      if (!conversation) return reply(ack, { error: 'Conversation introuvable.' });
+      if (conversation.type !== 'group') return reply(ack, { error: 'Seul un groupe se renomme.' });
+      if (!conversation.adminIds.includes(userId)) {
+        return reply(ack, { error: 'Seul un administrateur du groupe peut le renommer.' });
+      }
+
+      const updatedConv = await prisma.chatConversation.update({ where: { id: conversationId }, data: { name: nom } });
+      io.to(convRoom(conversationId)).emit('chat:conversation:updated', updatedConv);
+      reply(ack, updatedConv);
+    } catch (e) {
+      reply(ack, { error: 'Échec du renommage.' });
+    }
+  });
+
+  // Membres d'un groupe : ajout / retrait (24/09/2026). Jusqu'ici un overlay
+  // `localStorage`, donc un membre « ajouté » ne l'était QUE sur le poste de l'admin —
+  // jamais côté serveur, qui décide seul de l'accès (`participants`).
+  //
+  // Règles, alignées sur l'écran d'origine :
+  //  - réservé aux `adminIds` ;
+  //  - on ne retire ni un admin ni soi-même (l'écran ne le proposait pas, et retirer le
+  //    dernier admin laisserait un groupe que plus personne ne gère) ;
+  //  - un ajouté doit exister et avoir accès au chat — même contrôle que la création
+  //    (`POST /api/chat/conversations`), sinon conversation FANTÔME pour un chef de site.
+  socket.on('chat:conversation:members', async (payload: any, ack: Ack) => {
+    try {
+      const { conversationId, add, remove } = payload ?? {};
+      if (typeof conversationId !== 'string') return reply(ack, { error: 'Champ "conversationId" requis.' });
+      const estListe = (v: unknown) => v === undefined || (Array.isArray(v) && v.every(x => typeof x === 'string'));
+      if (!estListe(add) || !estListe(remove)) return reply(ack, { error: 'Champs "add" / "remove" : tableaux d\'ids attendus.' });
+      const aAjouter: string[] = add ?? [];
+      const aRetirer: string[] = remove ?? [];
+      if (aAjouter.length === 0 && aRetirer.length === 0) return reply(ack, { error: 'Rien à modifier.' });
+
+      const conversation = await prisma.chatConversation.findUnique({ where: { id: conversationId } });
+      if (!conversation) return reply(ack, { error: 'Conversation introuvable.' });
+      if (conversation.type !== 'group') return reply(ack, { error: 'Seul un groupe a des membres modifiables.' });
+      if (!conversation.adminIds.includes(userId)) {
+        return reply(ack, { error: 'Seul un administrateur du groupe peut gérer ses membres.' });
+      }
+      if (aRetirer.includes(userId)) return reply(ack, { error: 'Vous ne pouvez pas vous retirer vous-même.' });
+      if (aRetirer.some(id => conversation.adminIds.includes(id))) {
+        return reply(ack, { error: 'Un administrateur du groupe ne peut pas être retiré.' });
+      }
+
+      const nouveaux = aAjouter.filter(id => !conversation.participants.includes(id));
+      if (nouveaux.length > 0) {
+        const profils = await prisma.user.findMany({ where: { id: { in: nouveaux } }, select: { id: true, name: true, role: true } });
+        if (profils.length !== nouveaux.length) return reply(ack, { error: 'Un des membres ajoutés est introuvable.' });
+        const sansChat = profils.filter(u => !hasSocialFeatures(u.role));
+        if (sansChat.length > 0) {
+          return reply(ack, { error: `Impossible : ${sansChat.map(u => u.name).join(', ')} n'a pas accès au chat.` });
+        }
+      }
+      const retires = aRetirer.filter(id => conversation.participants.includes(id));
+
+      const participants = [...conversation.participants.filter(id => !retires.includes(id)), ...nouveaux];
+      const updatedConv = await prisma.chatConversation.update({ where: { id: conversationId }, data: { participants } });
+
+      // Les sockets connectées suivent : l'ajouté rejoint la room et reçoit la
+      // conversation, le retiré la quitte et la voit disparaître — sans rechargement.
+      for (const uid of nouveaux) {
+        io.in(userRoom(uid)).socketsJoin(convRoom(conversationId));
+        io.to(userRoom(uid)).emit('chat:conversation:created', updatedConv);
+      }
+      for (const uid of retires) {
+        io.in(userRoom(uid)).socketsLeave(convRoom(conversationId));
+        io.to(userRoom(uid)).emit('chat:conversation:removed', { id: conversationId });
+      }
+      io.to(convRoom(conversationId)).emit('chat:conversation:updated', updatedConv);
+      reply(ack, updatedConv);
+    } catch (e) {
+      reply(ack, { error: 'Échec de la mise à jour des membres.' });
     }
   });
 };

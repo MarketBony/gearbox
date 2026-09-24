@@ -318,6 +318,12 @@ export interface ChatConversation {
   lastMessage?: string;
   lastMessageAt?: string;
   unreadCounts: Record<string, number>; // userId -> count
+  // THÈME PARTAGÉ (24/09/2026) : vu par tous les membres, écrit par
+  // `chat:conversation:theme`. Jamais renseigné sur le Chat Général (inviolable).
+  background?: string | null;
+  bubble?: string | null;
+  // Accusés de lecture : userId -> date ISO (horloge serveur) du dernier passage.
+  readAt?: Record<string, string>;
 }
 
 export interface ChatMessage {

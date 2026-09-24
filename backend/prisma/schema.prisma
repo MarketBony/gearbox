@@ -436,6 +436,21 @@ model ChatConversation {
   // null = pas de photo, le client retombe sur les avatars empilés des membres.
   // Ne concerne que type='group' (garanti par le handler `chat:conversation:avatar`).
   avatarUrl     String?
+  // THÈME PARTAGÉ de la conversation (24/09/2026) — vu par TOUS les membres, modifiable
+  // par tout participant, jamais sur le Chat Général (« inviolable », décision de Théo).
+  // Mêmes formes que l'ancienne personnalisation : `proc:<id>` ou /uploads/chatbg/<uuid>.<ext>
+  // pour le fond, identifiant du catalogue `BULLES_CHAT` pour la bulle — validés par
+  // `utils/personnalisationChat.ts`, seule porte. La bulle colore les messages de
+  // CELUI QUI REGARDE (convention Messenger) : chacun voit ses propres bulles dans la
+  // couleur du thème.
+  background    String?
+  bubble        String?
+  // Accusés de lecture : Record<userId, ISO datetime> du dernier passage de chacun,
+  // posé par `chat:conversation:read`. « Vu par » = membres dont la date dépasse
+  // l'horodatage du dernier message.
+  readAt        Json          @default("{}")
+  /// ⚠️ OBSOLÈTE depuis le 24/09/2026 (thème partagé ci-dessus) : plus lue ni écrite.
+  /// Table conservée pour permettre un retour arrière sans perte.
   customizations ChatCustomization[]
   pinnedBy      String[]      @default([])
   // Sourdine par utilisateur. ⚠️ Contrairement à `pinnedBy`, qui n'est JAMAIS

@@ -10,7 +10,14 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 56** (retours d'équipe,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 57** (Chat : thème de
+  discussion partagé, « Vu par », membres et renommage de groupe côté serveur,
+  24 septembre) — **`api` ET `web`**, **avec migration**
+  (`20260924100000_chat_theme_partage_et_lectures`, additive : trois colonnes sur
+  `ChatConversation`, plus la reprise des 7 personnalisations existantes).
+  ℹ️ Migration appliquée depuis ce poste avant le déploiement (`db execute` puis
+  `migrate resolve --applied`).
+  Avant lui le **correctif 56** (retours d'équipe,
   lot 1 : groupes du Chat visibles pour l'External, « qui a réagi », « GROUPE BONY » dans
   les marques du Digital, 23 septembre) — **`web` seul**, aucune migration.
   Avant lui le **correctif 55** (Congés v2 — période
@@ -3182,6 +3189,60 @@
     fabriqué) — à confirmer par Ali après mise en ligne ; et l'appui long sur un vrai
     téléphone (simulé par `TouchEvent`, pas joué sur un appareil).
 
+57. **CHAT — thème de discussion PARTAGÉ, « Vu par », membres et renommage de groupe
+    côté serveur** (`feat/chat-social`, 24 septembre 2026). **`api` ET `web`**, **avec
+    migration** (`20260924100000_chat_theme_partage_et_lectures`, additive).
+
+    Retours d'équipe du 23/09, arbitrés par Théo : thème **et** couleur de bulle partagés,
+    modifiables par **tout membre** ; **Chat Général inviolable** ; « Vu par » avec, au-delà
+    d'un seuil, le seul nombre de lecteurs.
+
+    - **Thème partagé.** Le fond et la bulle vivent sur `ChatConversation`
+      (`background`, `bubble`), écrits par le handler `chat:conversation:theme`. La bulle
+      colore les messages de **celui qui regarde** (convention Messenger). Le bouton est
+      absent du Général ET le serveur le refuse. Le bouton « Toutes mes discussions »
+      (défaut du compte) disparaît : il n'a plus de sens avec un thème partagé.
+      **Reprise** dans la migration : la valeur non nulle la plus récente de chaque
+      conversation dans `ChatCustomization` (8 lignes, une par conversation, aucun
+      conflit) → **7 thèmes** repris, la 8ᵉ ligne étant vide. ⚠️ Conséquence acceptée par
+      Théo : 5 images de fond qu'il avait importées dans des conversations privées sont
+      désormais visibles de ses interlocuteurs. Le défaut global de compte d'Hugo
+      (`proc:miami`) n'est pas repris — il aurait imposé un réglage personnel à toutes
+      ses discussions.
+    - **« Vu par »** sous le dernier message : lecteurs = membres dont `readAt` (horloge
+      serveur, écrit par `chat:conversation:read`) dépasse l'horodatage du message, hors
+      auteur et hors moi. « Vu par tout le monde » si tous ont lu, **« Vu par N
+      personnes » au-delà de 5** (`VU_PAR_MAX_NOMS`), liste complète en infobulle. En privé
+      la mention n'apparaît donc que sous ses propres messages. Membres du Général = tous
+      les comptes ayant le chat sauf External, même appartenance implicite que le serveur.
+    - **Membres et renommage côté serveur** (`chat:conversation:members` /
+      `:rename`, réservés aux `adminIds`). C'était le défaut du backlog « renommer un
+      groupe ou changer ses membres reste invisible » : un membre « ajouté » ne l'était
+      que sur le poste de l'admin. L'overlay `gearbox_chat_overlay` ne porte plus que
+      l'épingle ; ses anciens champs `name` / `participants` sont **ignorés** (chaque poste
+      en avait sa version — même arbitrage que la photo de groupe). Un retrait demande
+      confirmation ; la personne retirée voit la conversation disparaître en direct
+      (`chat:conversation:removed`).
+
+    **Vérifié** sur un groupe jetable (Théo seul membre, supprimé en fin de recette) :
+    fond « Lagon » + bulle verte choisis au clic → en base et à l'écran (dégradé mesuré
+    sur la bulle) ; renommage au crayon → en base, rien en `localStorage` ; ajout puis
+    retrait d'Isabelle Auclair au panneau Membres → `participants` suivi en base.
+    **16 refus serveur** au bon message : thème et renommage du Général, fond externe,
+    bulle en CSS brut, thème vide, nom vide / > 80 caractères, retrait de soi, membre
+    inconnu, chef de site ajouté, membres du Général, non-membre (thème et lecture sur
+    « équipe digitale »), non-admin (renommage, membres) — et un simple membre **peut**
+    changer le thème. « Vu par » par dates de lecture posées en base puis remises à `{}` :
+    Général 3 → les 3 noms, 7 → « Vu par 7 personnes », 13/13 → « Vu par tout le monde »,
+    lecture antérieure au message écartée ; privé → « Vu par Bastien Fuziol » sous le
+    message de Théo, rien quand le dernier message vient de l'autre. Aucun bouton thème
+    sur le Général. `tsc` **9** racine / **0** backend, `check-plaques-sync` vert.
+    ⚠️ **NON VÉRIFIÉ** : le côté de la personne retirée (disparition en direct — exige sa
+    session) ; « Vu par » en conditions réelles (la prod d'avant n'écrivait pas `readAt`,
+    les lectures ne s'accumulent qu'à partir du déploiement).
+    ℹ️ Comme le compteur de non-lus, une conversation OUVERTE compte comme lue même
+    fenêtre en arrière-plan — sémantique préexistante, conservée.
+
 ## Backlog — ce qui reste à faire
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
@@ -3240,12 +3301,19 @@
   ces écrans atteignent les tâches via les projets, une tâche sans projet n'y entre
   donc pas. Charge d'équipe et campagnes programmées deviennent incomplètes. Sans
   impact budgétaire (pas de coût sur ces tâches). À brancher si le besoin se confirme.
-- **Renommer un groupe ou changer ses membres reste invisible des autres postes**
-  (overlay `gearbox_chat_overlay`). Même classe que la photo de groupe, corrigée au
-  correctif 33 ; laissé hors périmètre par décision de Théo. ⚠️ Le nom donné **à la
-  création** part bien au serveur, lui — c'est le renommage **après coup** qui ne sort
-  pas du navigateur. La gestion des membres a de vrais effets de bord (rooms socket,
-  compteurs de non-lus, notifications), d'où un lot dédié.
+- **✅ SOLDÉ au correctif 57 (24/09/2026)** — renommage et membres d'un groupe passent
+  désormais par le serveur (`chat:conversation:rename` / `:members`).
+- **Performance — PC de collègues qui chauffent : audit du 23/09/2026 GELÉ** jusqu'à la
+  refonte graphique envisagée par Théo (pas d'accès aux postes concernés). Pistes :
+  fond animé (`.gx-blob`, `blur(90px)`, animation infinie) SOUS 6 à 10 panneaux
+  `backdrop-filter: blur(30px)` → flou recalculé à chaque frame ; hypothèse principale
+  non vérifiée : accélération graphique désactivée (`chrome://gpu` « Software only ») sur
+  ces postes, donc flou calculé par le CPU. Côté code : 0 activité au repos, mais le
+  Dashboard recharge 6 sources (~760 Ko) à chaque événement temps réel de n'importe qui,
+  **même onglet masqué**. Test de Théo sur son poste (qui ne chauffe pas) : 6,0 → 5,4 →
+  4,6 % CPU, non concluant (pas de référence, pas de ligne « Processus GPU »). Pour la
+  refonte : pas de fond animé sous du verre, repli sans flou, `useRealtimeSync` différé
+  onglet masqué.
 
 - **Suite naturelle du mode Expert, par ordre de rapport valeur/effort** :
   1. **Rappel push d'échéance** (« ta tâche X est due demain ») — toute l'infrastructure

@@ -40,6 +40,13 @@ export const chatStore = {
       : conversations.map(c => (c.id === conv.id ? conv : c));
     notify();
   },
+  // Retrait d'un membre (24/09/2026) : la conversation disparaît de sa liste sans
+  // rechargement — le serveur l'a déjà sorti de la room.
+  removeConversation(id: string) {
+    if (!conversations.some(c => c.id === id)) return;
+    conversations = conversations.filter(c => c.id !== id);
+    notify();
+  },
   getUnreadTotal(userId: string): number {
     return conversations.reduce((sum, c) => sum + (c.unreadCounts?.[userId] ?? 0), 0);
   },

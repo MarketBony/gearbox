@@ -6,6 +6,9 @@
  * le défaut global, `PUT /api/chat/conversations/:id/customization` pour une discussion).
  * Deux copies de ces expressions régulières auraient divergé — c'est exactement ce que le
  * dépôt reproche aux `where` de site recopiés et aux listes de boutons dupliquées.
+ *
+ * ℹ️ Depuis le 24/09/2026, la route par discussion est remplacée par le handler socket
+ * `chat:conversation:theme` (thème PARTAGÉ, `realtime/chat.ts`), qui passe ici aussi.
  */
 
 /**
