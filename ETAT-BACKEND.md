@@ -1150,6 +1150,36 @@ période indépendamment du planning.
 rôle `LECTURE_ROLES`, faute de quoi il créerait une ligne de planning que la personne
 n'aurait pas le droit de lire.
 
+### 💬 Chat — thème PARTAGÉ, accusés de lecture, membres et renommage (24/09/2026)
+Correctif 57, migration additive `20260924100000_chat_theme_partage_et_lectures` : trois
+colonnes sur `ChatConversation` — `background`, `bubble` (nullables) et `readAt`
+(`Json`, défaut `{}`, `Record<userId, ISO>`).
+
+Trois handlers socket nouveaux dans `realtime/chat.ts`, tous sur le modèle de
+`chat:conversation:mute` (contrôle d'appartenance, `reply(ack)`, émission
+`chat:conversation:updated` à la room) :
+- **`chat:conversation:theme`** — tout **participant** ; **refusé sur le Chat Général**
+  (inviolable, décision de Théo). Valeurs validées par `utils/personnalisationChat.ts`,
+  seule porte : champ absent = inchangé, chaîne vide = retrait.
+- **`chat:conversation:rename`** — `adminIds` seulement, groupe seulement, 1 à 80 caractères.
+- **`chat:conversation:members`** `{ add?, remove? }` — `adminIds` seulement ; ni soi-même ni
+  un admin ne peut être retiré ; un ajouté doit exister et passer `hasSocialFeatures`
+  (même contrôle que `POST /api/chat/conversations`). Les sockets suivent : l'ajouté
+  `socketsJoin` + reçoit `chat:conversation:created`, le retiré `socketsLeave` + reçoit
+  **`chat:conversation:removed` `{ id }`** (nouvel événement, écouté par `services/socket.ts`
+  → `chatStore.removeConversation`).
+
+**`chat:conversation:read`** écrit désormais aussi `readAt[userId]` à l'**horloge du
+serveur** — comparée à `ChatMessage.timestamp`, posé lui aussi par le serveur.
+
+⚠️ **Routes RETIRÉES** : `GET /api/chat/customizations` et
+`PUT /api/chat/conversations/:id/customization` (personnalisation personnelle du correctif
+53). La table `ChatCustomization` reste en base, **obsolète** : plus lue ni écrite, gardée
+pour un retour arrière sans perte. Sa reprise a été faite dans la migration (valeur non
+nulle la plus récente par conversation, jamais sur le Général) : 7 conversations.
+`User.chatBackground` / `chatBubble` ne sont plus lus par le Chat (toujours acceptés par
+`PUT /api/auth/me`).
+
 ## ⚠️ Route DORMANTE — `/api/expenses` (modèle `OneOffExpense`)
 
 Route CRUD complète et fonctionnelle (émissions `expense:*` incluses), mais

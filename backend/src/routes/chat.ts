@@ -3,7 +3,6 @@ import { Prisma } from '@prisma/client';
 import { authenticateToken, AuthRequest } from '../auth/middleware';
 import { hasSocialFeatures } from '../auth/roles';
 import { joinConversationRooms, notifyConversationCreated } from '../realtime';
-import { normaliserFond, normaliserBulle } from '../utils/personnalisationChat';
 import { prisma } from '../db';
 
 const router = Router();
@@ -29,61 +28,12 @@ router.get('/conversations', authenticateToken, async (req: AuthRequest, res) =>
 });
 
 // ---------------------------------------------------------------------------------
-// PERSONNALISATION PAR CONVERSATION (11/09/2026)
-//
-// ⚠️ Déclarées AVANT `/conversations/:id/messages` ? Non : les chemins ne se recouvrent
-// pas (`/customizations` est une ressource distincte, et `/conversations/:id/customization`
-// a un segment final propre). C'est noté pour la relecture — le piège de l'ordre existe,
-// il ne s'applique pas ici.
-//
-// Le réglage est PERSONNEL : chacun voit le sien, personne ne l'impose aux autres. Aucun
-// contrôle de rôle, donc, mais un contrôle d'APPARTENANCE à la conversation — sans lui,
-// n'importe qui pourrait créer une ligne pour une discussion dont il n'est pas membre.
+// PERSONNALISATION PERSONNELLE — RETIRÉE le 24/09/2026.
+// `GET /customizations` et `PUT /conversations/:id/customization` écrivaient un réglage
+// que seul son auteur voyait. Remplacés par le THÈME PARTAGÉ de la conversation, écrit
+// par le handler socket `chat:conversation:theme` (realtime/chat.ts). La table
+// `ChatCustomization` reste en base, obsolète, pour un retour arrière sans perte.
 // ---------------------------------------------------------------------------------
-
-/** Toutes MES personnalisations, en une requête : l'écran les applique en changeant de fil. */
-router.get('/customizations', authenticateToken, async (req: AuthRequest, res) => {
-  const rows = await prisma.chatCustomization.findMany({
-    where: { userId: req.user!.id },
-    select: { conversationId: true, background: true, bubble: true },
-  });
-  res.json(rows);
-});
-
-router.put('/conversations/:id/customization', authenticateToken, async (req: AuthRequest, res) => {
-  const userId = req.user!.id;
-  const { id } = req.params;
-
-  // Appartenance : le Chat Général est ouvert à tous sauf External, comme au GET.
-  const conv = await prisma.chatConversation.findUnique({ where: { id }, select: { type: true, participants: true } });
-  if (!conv) return res.status(404).json({ error: 'Conversation introuvable.' });
-  const membre = conv.participants.includes(userId) || (conv.type === 'general' && req.user!.role !== 'External');
-  if (!membre) return res.status(403).json({ error: 'Conversation non accessible.' });
-
-  const data: { background?: string | null; bubble?: string | null } = {};
-  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'background')) {
-    const v = normaliserFond(req.body.background);
-    if (v === false) return res.status(400).json({ error: 'Fond de discussion refusé : seuls un fond du catalogue ou une image déposée dans Gearbox sont acceptés.' });
-    data.background = v;
-  }
-  if (Object.prototype.hasOwnProperty.call(req.body ?? {}, 'bubble')) {
-    const v = normaliserBulle(req.body.bubble);
-    if (v === false) return res.status(400).json({ error: 'Couleur de bulle refusée.' });
-    data.bubble = v;
-  }
-  if (Object.keys(data).length === 0) return res.status(400).json({ error: 'Rien à enregistrer.' });
-
-  // ⚠️ `upsert` sur la contrainte (userId, conversationId) : deux onglets qui enregistrent
-  // en même temps ne peuvent pas créer deux lignes pour le même couple.
-  const row = await prisma.chatCustomization.upsert({
-    where: { userId_conversationId: { userId, conversationId: id } },
-    create: { userId, conversationId: id, ...data },
-    update: data,
-  });
-  // Aucun `emitEvent` : ce réglage ne regarde QUE son auteur. Le diffuser ferait
-  // recharger l'écran de collègues que ça ne concerne pas.
-  res.json({ conversationId: row.conversationId, background: row.background, bubble: row.bubble });
-});
 
 // GET /api/chat/conversations/:id/messages — historique complet trié par date
 // (aucun pattern de pagination n'existe dans le backend — liste complète,

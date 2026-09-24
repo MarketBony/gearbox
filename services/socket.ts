@@ -75,6 +75,7 @@ export const connectSocket = (): Socket | null => {
   // l'app (badge Sidebar temps réel même hors page Chat).
   socket.on('chat:conversation:updated', (conv: any) => chatStore.upsertConversation(conv));
   socket.on('chat:conversation:created', (conv: any) => chatStore.upsertConversation(conv));
+  socket.on('chat:conversation:removed', (p: { id: string }) => chatStore.removeConversation(p.id));
 
   // Présence : instantané complet rubrique -> utilisateurs, rediffusé par le
   // serveur à chaque changement (connexion, changement d'onglet, déconnexion).

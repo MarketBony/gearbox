@@ -23,7 +23,7 @@ import {
   MoreHorizontal, Pencil, Trash2, X, Image, Reply, Check,
   Users, UserPlus, UserMinus, ChevronRight, Hash, Camera, Upload, ZoomIn,
   Bell, BellOff, Paperclip, FileText, FileX, Download, SmilePlus,
-  FolderKanban, Search, ExternalLink, Mic, Palette
+  FolderKanban, Search, ExternalLink, Mic, Palette, CheckCheck
 } from 'lucide-react';
 import Avatar from '../components/Avatar';
 import Cropper from 'react-easy-crop';
@@ -74,12 +74,17 @@ const resumeMessage = (msg: ChatMessage, projets: Project[], max = 60): string =
 };
 
 
-// Overlay client-only pour les features HORS PÉRIMÈTRE (épingle, renommage et
-// membres de groupe) : le backend n'expose aucun événement pour elles. Stocké
-// par navigateur et ré-appliqué sur les conversations du store à l'affichage,
-// pour survivre aux chat:conversation:updated du backend. Comportement identique
-// à aujourd'hui (par navigateur, non propagé aux autres utilisateurs).
-type ConvOverlay = { pinnedBy?: string[]; name?: string; participants?: string[] };
+// Overlay client-only — ne porte plus que l'ÉPINGLE (préférence personnelle, par
+// navigateur). Stocké par navigateur et ré-appliqué sur les conversations du store à
+// l'affichage, pour survivre aux chat:conversation:updated du backend.
+//
+// ⚠️ Jusqu'au 24/09/2026 il portait AUSSI le renommage et les membres d'un groupe, que
+// le serveur ignorait : un membre « ajouté » ne l'était que sur le poste de l'admin, un
+// nom ne sortait jamais du navigateur. Les deux passent désormais par le serveur
+// (`chat:conversation:rename` / `:members`). Les champs `name` / `participants` encore
+// présents dans d'anciens overlays sont IGNORÉS, volontairement : chaque poste en a sa
+// propre version, aucune n'est « la bonne » — même arbitrage que pour la photo de groupe.
+type ConvOverlay = { pinnedBy?: string[] };
 const OVERLAY_KEY = 'gearbox_chat_overlay';
 const readOverlay = (): Record<string, ConvOverlay> => {
   try { const d = localStorage.getItem(OVERLAY_KEY); return d ? JSON.parse(d) : {}; }
@@ -95,12 +100,7 @@ const applyOverlay = (convs: ChatConversation[]): ChatConversation[] => {
   return convs.map(c => {
     const o = overlay[c.id];
     if (!o) return c;
-    return {
-      ...c,
-      pinnedBy: o.pinnedBy ?? c.pinnedBy,
-      name: o.name ?? c.name,
-      participants: o.participants ?? c.participants
-    };
+    return { ...c, pinnedBy: o.pinnedBy ?? c.pinnedBy };
   });
 };
 
@@ -431,7 +431,7 @@ const GroupAvatarCropModal: React.FC<GroupAvatarModalProps> = ({ convId, convNam
 // --- MAIN COMPONENT ---
 // ========================
 const Chat: React.FC = () => {
-  const { user: me, setChatBackground, setChatBubble } = useAuth();
+  const { user: me } = useAuth();
   const isExternal = me?.role === 'External';
 
   const [users, setUsers] = useState<User[]>([]);
@@ -545,11 +545,12 @@ const Chat: React.FC = () => {
   const [showActions, setShowActions] = useState(false);
   const actionsBtnRef = useRef<HTMLDivElement>(null);
   /**
-   * Fond de discussion — préférence personnelle, stockée en base sur le compte.
+   * Fond de discussion — THÈME PARTAGÉ de la conversation depuis le 24/09/2026.
    *
-   * ⚠️ Le fond est celui de CELUI QUI REGARDE, pas de la conversation : chacun voit le
-   * sien, comme sur WhatsApp. Rien n'est partagé, donc aucun risque d'imposer aux
-   * collègues une image illisible.
+   * ⚠️ Il était jusque-là PERSONNEL (correctif 53 : chacun voyait le sien), et c'est ce
+   * que l'équipe a refusé — « ça ne s'affiche que chez moi, c'est un peu con ». Il vit
+   * désormais sur `ChatConversation.background` / `.bubble`, modifiable par tout membre,
+   * jamais sur le Chat Général (inviolable). Le serveur le refuse, l'écran le masque.
    */
   const { theme } = useTheme();
   const sombre = theme === 'dark';
@@ -570,28 +571,11 @@ const Chat: React.FC = () => {
   const [showFonds, setShowFonds] = useState(false);
   const [fondEnCours, setFondEnCours] = useState(false);
   const fondBgInputRef = useRef<HTMLInputElement>(null);
-  /**
-   * Personnalisation PAR CONVERSATION.
-   *
-   * ⚠️ Le premier jet était GLOBAL, et c'est ce que Théo a refusé : « je veux que la
-   * personnalisation soit propre à chaque discussion ». Les valeurs du compte
-   * (`me.chatBackground` / `me.chatBubble`) restent le DÉFAUT des discussions sans
-   * réglage propre — c'est ce qu'applique le bouton « toutes mes discussions » — et une
-   * ligne par conversation le remplace dès qu'elle existe.
-   */
-  const [persos, setPersos] = useState<Record<string, { background: string | null; bubble: string | null }>>({});
-  useEffect(() => {
-    if (!me) return;
-    db.getChatCustomizations()
-      .then(rows => setPersos(Object.fromEntries(rows.map(r => [r.conversationId, { background: r.background, bubble: r.bubble }]))))
-      .catch(e => console.error('Chat : personnalisations non chargées', e));
-  }, [me?.id]);
-
-  const persoCourante = activeConvId ? persos[activeConvId] : undefined;
-  // ⚠️ `??` et non `||` : une chaîne vide enregistrée signifierait « pas de fond », et
-  // `||` la remplacerait par le défaut global — donc on ne pourrait plus RETIRER un fond
-  // sur une seule discussion.
-  const fondActuel = persoCourante?.background ?? me?.chatBackground ?? null;
+  // Thème de la conversation ouverte. Le Chat Général n'en a jamais : même si une valeur
+  // traînait en base, on ne l'applique pas.
+  const themeModifiable = !!activeConvId && activeConvId !== 'general';
+  const convTheme = themeModifiable ? conversations.find(c => c.id === activeConvId) : undefined;
+  const fondActuel = convTheme?.background ?? null;
   /**
    * Style résolu, et surtout : A-T-ON VRAIMENT un fond à afficher ?
    *
@@ -604,8 +588,12 @@ const Chat: React.FC = () => {
    */
   const styleFond = styleFondChat(fondActuel, sombre);
   const aUnFond = Object.keys(styleFond).length > 0;
-  /** Couleur de MES bulles. Un id inconnu retombe sur le dégradé Bony (`bulleDe`). */
-  const maBulle = bulleDe(persoCourante?.bubble ?? me?.chatBubble);
+  /**
+   * Couleur de MES bulles : celle du thème de la conversation. Chacun voit ses propres
+   * messages dans cette couleur (convention Messenger). Un id inconnu retombe sur le
+   * dégradé Bony (`bulleDe`).
+   */
+  const maBulle = bulleDe(convTheme?.bubble);
   /** Ancre des menus GIF et « citer un projet » : la BARRE, pas leur picto — celui-ci
    *  n'existe plus sur mobile, où l'action est déclenchée depuis le menu « + ». */
   const barreSaisieRef = useRef<HTMLDivElement>(null);
@@ -685,21 +673,20 @@ const Chat: React.FC = () => {
   };
 
   /**
-   * Enregistre un réglage SUR LA CONVERSATION COURANTE.
+   * Enregistre le thème DE LA CONVERSATION COURANTE, pour tous ses membres.
    *
    * ⚠️ `''` et non `null` dans le corps : convention du serveur « champ absent =
-   * inchangé, valeur vide = retour au défaut ». C'est ce qui permet de retirer un fond
-   * sur une seule discussion sans toucher aux autres.
+   * inchangé, valeur vide = retrait ».
    */
   const enregistrerPerso = async (patch: { background?: string; bubble?: string }) => {
-    if (!activeConvId) return;
+    if (!activeConvId || !themeModifiable) return;
     setFondEnCours(true);
     try {
-      const row = await db.setChatCustomization(activeConvId, patch);
-      setPersos(prev => ({ ...prev, [activeConvId]: { background: row.background, bubble: row.bubble } }));
+      const conv = await emitWithAck<ChatConversation>('chat:conversation:theme', { conversationId: activeConvId, ...patch });
+      chatStore.upsertConversation(conv);
     } catch (e) {
-      console.error('Personnalisation : enregistrement échoué', e);
-      alert(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+      console.error('Thème de discussion : enregistrement échoué', e);
+      alert(e instanceof Error ? e.message : "Enregistrement impossible.");
     } finally {
       setFondEnCours(false);
     }
@@ -712,25 +699,6 @@ const Chat: React.FC = () => {
     // « Aucun fond » laisse la modale ouverte : on vient de retirer quelque chose, on
     // veut voir le résultat et pouvoir choisir autre chose dans la foulée.
     if (valeur) setShowFonds(false);
-  };
-
-  /**
-   * Applique le réglage de CETTE discussion à toutes les autres, en l'écrivant comme
-   * défaut du compte. Les discussions ayant leur propre réglage le gardent — c'est le
-   * principe d'un défaut, et c'est aussi ce que fait WhatsApp.
-   */
-  const appliquerPartout = async () => {
-    setFondEnCours(true);
-    try {
-      await setChatBackground(fondActuel);
-      await setChatBubble(persoCourante?.bubble ?? me?.chatBubble ?? null);
-      setShowFonds(false);
-    } catch (e) {
-      console.error('Personnalisation globale : enregistrement échoué', e);
-      alert(e instanceof ApiError ? e.message : "Enregistrement impossible.");
-    } finally {
-      setFondEnCours(false);
-    }
   };
 
   // Auto-ouverture de la 1re conversation visible une fois la liste chargée.
@@ -822,6 +790,48 @@ const Chat: React.FC = () => {
 
   const activeConv = conversations.find(c => c.id === activeConvId) ?? null;
   const activeMembers = activeConv ? getConvMembers(activeConv) : [];
+  /**
+   * « Vu par » sous le DERNIER message de la conversation (24/09/2026).
+   *
+   * Lecteurs = membres dont `readAt` (horloge serveur) dépasse l'horodatage du message,
+   * hors son auteur et hors moi — je l'ai forcément vu, puisque je le regarde. D'où :
+   * en privé, la mention n'apparaît que sous MES messages (convention Messenger).
+   * Membres du Général = tous les comptes ayant le chat, sauf les External — la même
+   * appartenance implicite que le serveur.
+   * Au-delà de VU_PAR_MAX_NOMS lecteurs on n'affiche que le nombre (décision de Théo,
+   * pensée pour le Général), la liste complète restant en infobulle.
+   */
+  const VU_PAR_MAX_NOMS = 5;
+  const vuPar = useMemo(() => {
+    if (!activeConv || !me) return null;
+    const dernier = [...messages].reverse().find(m => !m.deleted);
+    if (!dernier) return null;
+    const membres = activeConv.type === 'general'
+      ? users.filter(u => u.role !== 'External' && hasSocialFeatures(u.role))
+      : activeMembers;
+    const candidats = membres.filter(u => u.id !== dernier.senderId && u.id !== me.id);
+    if (candidats.length === 0) return null;
+    const lu = activeConv.readAt ?? {};
+    const t = new Date(dernier.timestamp).getTime();
+    const lecteurs = candidats.filter(u => lu[u.id] && new Date(lu[u.id]).getTime() >= t);
+    if (lecteurs.length === 0) return null;
+    const noms = lecteurs.map(u => u.name);
+    const libelle = lecteurs.length === candidats.length && candidats.length > 1
+      ? 'Vu par tout le monde'
+      : lecteurs.length > VU_PAR_MAX_NOMS
+        ? `Vu par ${lecteurs.length} personnes`
+        : `Vu par ${noms.join(', ')}`;
+    return { libelle, noms, aMoi: dernier.senderId === me.id };
+  }, [activeConv, messages, users, activeMembers, me?.id]);
+
+  // Retiré d'un groupe pendant qu'on l'avait ouvert : la conversation quitte le store,
+  // on referme le fil plutôt que de garder à l'écran des messages qu'on ne recevra plus.
+  useEffect(() => {
+    if (activeConvId && conversations.length > 0 && !activeConv) {
+      setActiveConvId(null);
+      setMessages([]);
+    }
+  }, [activeConvId, activeConv, conversations.length]);
   const isGroupAdmin = !!(activeConv?.type === 'group' && me && (activeConv.adminIds ?? []).includes(me.id));
 
   const unreadCount = (conv: ChatConversation) => conv.unreadCounts?.[me?.id ?? ''] ?? 0;
@@ -1007,25 +1017,39 @@ const Chat: React.FC = () => {
     }
   };
 
-  // ---- GROUP MANAGEMENT (HORS PÉRIMÈTRE — overlay client-only, aucun backend) ----
-  const addMemberToGroup = (userId: string) => {
+  // ---- GROUP MANAGEMENT — par le SERVEUR depuis le 24/09/2026 ----
+  // (auparavant un overlay localStorage : rien ne sortait du poste de l'admin).
+  // La réponse est poussée dans le store tout de suite ; l'événement
+  // `chat:conversation:updated` qui suit la rediffuse aux autres membres.
+  const modifierMembres = async (patch: { add?: string[]; remove?: string[] }) => {
     if (!activeConv || activeConv.type !== 'group') return;
-    if (activeConv.participants.includes(userId)) return;
-    updateOverlay(activeConv.id, { participants: [...activeConv.participants, userId] });
-    setConversations(applyOverlay(chatStore.getConversations()));
+    try {
+      const conv = await emitWithAck<ChatConversation>('chat:conversation:members', { conversationId: activeConv.id, ...patch });
+      chatStore.upsertConversation(conv);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Mise à jour des membres impossible.');
+    }
   };
-
+  const addMemberToGroup = (userId: string) => {
+    if (!activeConv || activeConv.participants.includes(userId)) return;
+    modifierMembres({ add: [userId] });
+  };
   const removeMemberFromGroup = (userId: string) => {
-    if (!activeConv || activeConv.type !== 'group' || !me || userId === me.id) return;
-    updateOverlay(activeConv.id, { participants: activeConv.participants.filter(id => id !== userId) });
-    setConversations(applyOverlay(chatStore.getConversations()));
+    if (!me || userId === me.id) return;
+    const u = users.find(x => x.id === userId);
+    if (!window.confirm(`Retirer ${u?.name ?? 'ce membre'} du groupe ? Cette personne n'y aura plus accès.`)) return;
+    modifierMembres({ remove: [userId] });
   };
 
-  const renameGroup = () => {
+  const renameGroup = async () => {
     if (!activeConv || !tempGroupName.trim()) return;
-    updateOverlay(activeConv.id, { name: tempGroupName.trim() });
-    setConversations(applyOverlay(chatStore.getConversations()));
-    setEditingGroupName(false);
+    try {
+      const conv = await emitWithAck<ChatConversation>('chat:conversation:rename', { conversationId: activeConv.id, name: tempGroupName.trim() });
+      chatStore.upsertConversation(conv);
+      setEditingGroupName(false);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Renommage impossible.');
+    }
   };
 
   // ---- SORTED SECTIONS ----
@@ -1321,8 +1345,9 @@ const Chat: React.FC = () => {
                 )}
               </div>
 
-              {/* Fond de discussion — préférence personnelle, donc disponible sur TOUTE
-                  conversation (privée, groupe, général), contrairement au bouton Membres. */}
+              {/* Thème de la discussion — partagé avec tous les membres. Absent du Chat
+                  Général, inviolable (le serveur refuse aussi). */}
+              {activeConv.type !== 'general' && (
               <button
                 onClick={() => setShowFonds(true)}
                 className="shrink-0 flex items-center justify-center min-h-[44px] min-w-[44px] md:min-h-[34px] md:min-w-[34px] rounded-lg border border-bony-border text-slate-500 hover:border-bony-orange hover:text-bony-orange transition"
@@ -1330,6 +1355,7 @@ const Chat: React.FC = () => {
               >
                 <Palette size={15} />
               </button>
+              )}
 
               {/* Membres button (group only) */}
               {activeConv.type === 'group' && (
@@ -1608,6 +1634,14 @@ const Chat: React.FC = () => {
                       })}
                     </div>
                   ))}
+                  {vuPar && (
+                    <div className={`flex ${vuPar.aMoi ? 'justify-end' : 'justify-start pl-10'} -mt-1 mb-1`}>
+                      <span className="text-[10px] text-bony-muted flex items-center gap-1" title={vuPar.noms.join(', ')}>
+                        <CheckCheck size={12} className="text-bony-orange" />
+                        {vuPar.libelle}
+                      </span>
+                    </div>
+                  )}
                   <div ref={bottomRef} />
                 </div>
 
@@ -2013,9 +2047,9 @@ const Chat: React.FC = () => {
             <div className="flex items-center justify-between p-4 border-b border-bony-border shrink-0">
               <div>
                 <h3 className="font-title text-sm text-bony-text">Personnaliser la discussion</h3>
-                {/* Dire explicitement que le choix est personnel : sans ça, on hésite à
-                    en mettre un, de peur de l'imposer à toute l'équipe. */}
-                <p className="text-[10px] text-bony-muted mt-0.5">« {getConvName(activeConv)} » — visible par vous seul, sur tous vos appareils.</p>
+                {/* Dire explicitement que le choix est PARTAGÉ : on change l'écran de
+                    tous les membres, pas seulement le sien. */}
+                <p className="text-[10px] text-bony-muted mt-0.5">« {getConvName(activeConv)} » — visible par tous les membres de la discussion.</p>
               </div>
               <button onClick={() => setShowFonds(false)} className="text-slate-400 hover:text-bony-text"><X size={18} /></button>
             </div>
@@ -2056,10 +2090,10 @@ const Chat: React.FC = () => {
               ))}
 
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-bony-muted mb-2">Couleur de vos bulles</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-bony-muted mb-2">Couleur des bulles</p>
                 <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                   {BULLES_CHAT.map(b => {
-                    const choisi = (persoCourante?.bubble ?? me?.chatBubble ?? 'bony') === b.id;
+                    const choisi = (convTheme?.bubble ?? 'bony') === b.id;
                     return (
                       <button
                         key={b.id}
@@ -2078,11 +2112,11 @@ const Chat: React.FC = () => {
                     );
                   })}
                 </div>
-                <p className="text-[10px] text-bony-muted mt-1.5">Ne change que vos messages — vos collègues gardent la couleur qu'ils ont choisie.</p>
+                <p className="text-[10px] text-bony-muted mt-1.5">Partagée : chaque membre voit ses propres messages dans cette couleur.</p>
               </div>
 
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-bony-muted mb-2">Votre image</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-bony-muted mb-2">Une image</p>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   <button
                     onClick={() => fondBgInputRef.current?.click()}
@@ -2097,7 +2131,7 @@ const Chat: React.FC = () => {
                     <div
                       className="relative h-20 rounded-xl border-2 border-bony-orange overflow-hidden"
                       style={{ backgroundImage: `url("${fondActuel}")`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-                      title="Votre image actuelle"
+                      title="Image actuelle de la discussion"
                     >
                       <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-bony-orange flex items-center justify-center">
                         <Check size={10} className="text-white" />
@@ -2116,14 +2150,6 @@ const Chat: React.FC = () => {
                 className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-bony-text border border-bony-border disabled:opacity-40 transition"
               >
                 Aucun fond
-              </button>
-              <button
-                onClick={appliquerPartout}
-                disabled={fondEnCours}
-                className="px-3 py-2 rounded-xl text-xs font-bold text-bony-orange border border-bony-orange/50 hover:bg-bony-orange/10 disabled:opacity-40 transition"
-                title="Utiliser ce réglage comme défaut pour les discussions non personnalisées"
-              >
-                {fondEnCours ? 'Enregistrement…' : 'Toutes mes discussions'}
               </button>
             </div>
           </div>
