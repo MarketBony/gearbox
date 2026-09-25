@@ -1,14 +1,29 @@
 # CLAUDE.md — méthodologie de travail sur GEARBOX
 
-Ce fichier décrit **comment on travaille sur ce projet**, pas l'état du code. Pour
-l'état du code, lis d'abord :
-- `ETAT-PROJET.md` — mémoire de référence globale (déploiement, historique des
-  correctifs, backlog en cours)
+Ce fichier décrit **comment on travaille sur ce projet**, pas l'état du code. Il est
+chargé automatiquement à chaque session : c'est lui, et non un prompt de reprise
+recopié, qui porte la méthode — un prompt vit dans un presse-papier et se périme, ce
+fichier suit les lots.
+
+Pour l'état du code :
+- `ETAT-PROJET.md` — mémoire de référence globale. **Il fait ~270 Ko : ne le lis pas
+  en entier.** En début de session, lis la section `## Déploiement` (dernier correctif
+  en ligne, tout en haut) et `## Pièges connus qui font perdre du temps`. Le reste
+  (historique, backlog) se consulte au besoin, par le graphe ou par recherche ciblée.
 - `ETAT-BACKEND.md` — état détaillé du backend/API
-- `BUGS-CONNUS.md` — bugs identifiés, corrigés ou non
+- `BUGS-CONNUS.md` — bugs identifiés, corrigés ou non. ⚠️ Une cause écrite dans une
+  fiche n'est pas forcément la bonne : plusieurs diagnostics étaient faux. Revérifier
+  dans le code avant de coder dessus.
 - `DEPLOIEMENT.md` — mode d'emploi technique du VPS (référence, pas à dupliquer ici)
+- Ne pas se fier à `BACKEND-AUDIT.md` : document historique, il porte un bandeau.
 
 Ne duplique jamais leur contenu ici : ce fichier ne parle que de méthode.
+
+**Démarrage de session** : fais le point à Théo — dernier correctif en ligne, `master`
+synchronisé ou non avec `origin` (`git fetch` d'abord), branchement graphify/ECU (voir
+en bas) — puis attends le sujet. Fonctionnement attendu : tu audites, tu proposes un
+plan, Théo valide, puis on attaque. Signale ce qui cloche même sans qu'on te le
+demande, et dis franchement ce que tu n'as pas pu vérifier.
 
 ## Qui fait quoi
 
@@ -22,53 +37,67 @@ métier ci-dessous.
 1. **Modifs locales** dans ce dossier (`gearbox3backup`), sur une branche dédiée
    nommée `fix/...`, `feat/...` ou `chore/...` selon la nature du changement
    (convention déjà en place, voir `git log`).
-2. **Vérification locale avant tout commit** :
-   - frontend : `npm run dev` (Vite, port 3000)
-   - backend : `cd backend && npm run dev` (nodemon)
-   - Utilise le PowerShell embarqué pour lancer ces serveurs et vérifier
-     concrètement (pas juste `tsc --noEmit`, un vrai test dans le navigateur/via
-     `curl` quand c'est pertinent).
-   - Si le changement touche le schéma Prisma : migration en local d'abord
-     (`npx prisma migrate dev`), jamais direct en prod.
-3. **Si les tests locaux sont OK** :
+2. **Test réel sur localhost** — jamais un `tsc` seul :
+   - serveurs **par nom** depuis `.claude/launch.json` : `gearbox-web` (Vite,
+     port 3000) et `gearbox-api` (nodemon, port 3001) ;
+   - vrai test dans le navigateur, avec le vrai rôle concerné (voir « Rôles
+     cloisonnés ») ; `curl` en complément quand c'est pertinent. Aucun compte de
+     test et pas de jeton fabriqué : c'est Théo qui se connecte (son JWT dure
+     24 h — s'il a expiré, demande-lui de se reconnecter) ;
+   - **pas de base de dev : le backend local écrit dans la base de PRODUCTION.**
+     Créer une entité clairement nommée, vérifier, supprimer, contrôler qu'il ne
+     reste aucun résidu. Sur un VRAI projet, rester en lecture seule (onglet
+     réseau : que des GET). Une page ouverte sur l'entité testée est un écrivain
+     concurrent : en sortir avant de mesurer ;
+   - **schéma Prisma** : jamais `prisma migrate dev` (il vise la base de prod).
+     On écrit la migration à la main dans `backend/prisma/migrations/`, puis on
+     l'applique avec `prisma db execute` **puis** `prisma migrate resolve
+     --applied` (sans la seconde étape, le conteneur `api` rejoue la migration au
+     démarrage et ne démarre plus). Toujours additive tant que possible. Hotspot
+     4G obligatoire (ports 5432/6543) — signale-le dès le plan.
+3. **🛑 RECETTE PAR THÉO — tu t'arrêtes ici et tu montres.** Ce n'est pas une
+   demande de permission, c'est une étape de recette qui lui appartient.
+   ⚠️ **Une autorisation de push vaut pour LE lot en cours, jamais pour le
+   suivant.** Le mode Expert (correctif 43) est parti en prod sans recette parce
+   que le « push and deploy » du lot précédent avait été reconduit tout seul :
+   quatre modules à jeter, et le correctif 44 entièrement consacré à réparer.
+4. **Après la validation de Théo** :
    - **RÈGLE D'OR — mettre à jour les `.md` de suivi AVANT de pousser.**
-     `ETAT-PROJET.md` (SHA courant, historique des correctifs, backlog),
+     `ETAT-PROJET.md` (dernier correctif, historique, backlog),
      `ETAT-BACKEND.md` si le backend bouge, `BUGS-CONNUS.md` (cocher ce qui est
      corrigé, ajouter ce qui a été découvert), `DEPLOIEMENT.md` si la procédure
      change. La doc fait partie du lot déployé — **jamais** « je documenterai
      après », c'est trop tard : un déploiement non documenté fait repartir la
-     session suivante sur de fausses bases.
+     session suivante sur de fausses bases. Vérifie la date du jour (`date`)
+     avant de dater une entrée.
    - commit, merge sur `master` en local,
-   - **STOP avant le push** : montre à Théo le diff / le résumé du commit et
-     attends son OK explicite. Ne lance `git push` qu'après confirmation — ne
-     jamais pousser sur GitHub sans validation, même si les tests locaux sont
-     verts.
-4. **Déploiement VPS — autonome, via SSH direct.** Tu as un accès SSH complet au
-   VPS (clé `~/.ssh/id_ed25519` sur ce poste, `ssh ubuntu@51.83.75.181` ou
-   l'alias `gearbox-vps` si configuré — voir `ACCES-INFRA-SECRET.md`, hors
-   dépôt git, pour le détail des accès). Accès complet décidé explicitement par
-   Théo, différent de la deploy key GitHub lecture seule installée sur le VPS.
-   Concrètement :
-   - une fois le push GitHub validé et fait, connecte-toi (`ssh gearbox-vps`
-     ou `ssh ubuntu@51.83.75.181`) et lance
-     `cd ~/gearbox && git pull && sudo docker compose up -d --build <service>`,
-     en ciblant `api` ou `web` seul plutôt qu'un rebuild complet quand c'est
-     possible,
-   - si une migration Prisma est nécessaire, applique-la (`prisma migrate
-     deploy` tourne de toute façon au démarrage du conteneur `api`, mais
-     vérifie l'ordre si la migration doit précéder un autre changement),
+   - **`git pull` avant tout push** : un workflow GitHub pousse un dump Supabase
+     dans `backups/` chaque semaine, le local est vite en retard,
+   - push GitHub (HTTPS, voir « Garde-fous »), migration Supabase si besoin
+     (étape 2), puis VPS.
+5. **Déploiement VPS — autonome, via SSH direct.** Clé `~/.ssh/id_ed25519` sur ce
+   poste : `ssh ubuntu@51.83.75.181` — **l'alias `gearbox-vps` n'existe pas**
+   (voir `ACCES-INFRA-SECRET.md`, hors dépôt git, pour le détail des accès). Accès
+   complet décidé explicitement par Théo, différent de la deploy key GitHub
+   lecture seule installée sur le VPS. Concrètement :
+   - `cd ~/gearbox && git pull && sudo docker compose up -d --build <service>`,
+   - **quel service ?** Décide-le avec `git diff --name-only <avant>..<après>`, ne
+     le suppose pas : un fichier sous `backend/` → `api` ; un fichier hors de
+     `backend/` (pages, composants, `constants.ts`, `types.ts`, `index.html`…) →
+     `web` ; les deux si le lot touche les deux côtés. L'image `web` ne compile
+     pas `backend/`, et le client Prisma est généré au build de l'image `api`,
+   - `prisma migrate deploy` tourne au démarrage du conteneur `api` : la migration
+     doit donc déjà être appliquée **et** inscrite (étape 2). Contrôle : ligne
+     `No pending migrations to apply.` dans `sudo docker compose logs api`,
    - **vérifie systématiquement après coup** : `sudo docker compose ps` (3
      conteneurs Up) et un `curl` sur le domaine public (200) avant de
      considérer le déploiement terminé,
    - **rends compte à Théo de ce que tu as exécuté et du résultat** — l'accès
      est autonome, le compte-rendu ne l'est pas : il doit toujours savoir ce
      qui a tourné sur la prod, même a posteriori.
-   - Si `ssh gearbox-vps` échoue : c'est très probablement le réseau bureau
-     (port 22 bloqué), pas un problème de droits — dis-le explicitement, ne
-     réessaie pas en boucle, demande à Théo de basculer sur le hotspot 4G.
-5. **Supabase** : toute migration de schéma nécessite d'être sur le réseau qui
-   sort vers les ports 5432/6543 (voir contrainte réseau ci-dessous) — signale-le
-   explicitement si le prompt implique un changement de schéma.
+   - Si le SSH échoue : c'est très probablement le réseau bureau (port 22
+     bloqué), pas un problème de droits — dis-le explicitement, ne réessaie pas
+     en boucle, demande à Théo de basculer sur le hotspot 4G.
 
 ## Contrainte réseau (toujours active)
 
@@ -105,6 +134,41 @@ que de supposer que ça va passer.
 - Avant un chantier structurant (refonte, changement de modèle de données),
   vérifie l'existant réel dans le code (pas seulement la doc) et signale les
   divergences plutôt que de les corriger sans validation.
+- Commiter en **nommant les fichiers**, pas `git add -A` (il a déjà embarqué
+  `budget market 2026.xlsx` et `PRESENTATION-EQUIPE.html`, volontairement non suivis).
+
+## Pièges d'environnement (ceux qui font perdre du temps)
+
+- **Tailwind est en CDN Play** : pas de variantes `md:` / `hover:` sur les classes
+  custom `gx-*` / `glass-*`, pas de valeur arbitraire contenant `repeat(...)`, et
+  racines de pages en `h-full`, jamais `h-screen`.
+- **nodemon surveille `*.*`** : écrire un script de test dans `backend/` redémarre
+  l'API. Les scripts jetables vont hors de `backend/`.
+- **`prisma generate` échoue en EPERM si l'API tourne** (DLL verrouillée) : arrêter
+  `gearbox-api`, générer, **relancer**.
+- **`tsc --noEmit` : 9 erreurs de référence à la racine** (et non plus 12, chiffre
+  resté dans les vieilles entrées), **0 au backend**. On compare à ça, pas à zéro.
+  Et `strictNullChecks` est désactivé : `tsc` ne rattrape pas un prop oublié chez
+  un appelant, il faut relire les sites d'appel.
+- **L'horloge de ce poste a déjà semblé décalée** : vérifier la date avant de dater
+  une entrée de doc.
+
+## Leçons payées cher, à ne pas repayer
+
+- **Un test HTTP ne remplace pas un test dans l'interface avec le vrai rôle.** Deux
+  fois les 403 étaient exacts et l'écran mentait quand même.
+- **Mesurer, pas deviner.** Deux lots de suite refaits pour ça : les colonnes du
+  tableau des tâches (944 px de colonnes fixes pour un `min-width` de 920) et les
+  étiquettes du Gantt (largeur de texte estimée au lieu d'être mesurée au canvas,
+  puis crans ignorant la diagonale d'un losange). On mesure dans le navigateur.
+- **Un indicateur qui ne regarde que le « reste à faire » est aveugle sur un projet
+  avancé** : les KPI du mode Expert affichaient 0 € partout et masquaient les
+  95 700 € portés par une personne.
+- **Piège de vocabulaire : `Project.proPlus` ≠ `Project.expertMode`.** `proPlus`
+  (PRO+ B2B) est un marqueur MÉTIER qui change des chiffres dans Dashboard, Budget
+  et Export ; `expertMode` (mode Expert) est un marqueur d'INTERFACE qui ne change
+  aucun montant. Ils se suivent dans le schéma et n'ont aucun rapport — c'est pour
+  ça que le mode ne s'appelle pas « PRO ».
 
 ## Règles métier non négociables (rappel — source de vérité : `constants.ts`, `types.ts`)
 
@@ -232,6 +296,26 @@ Le fil "Déploiement VPS et configuration serveur" avec Bastien contient l'histo
 des décisions de déploiement (deploy key, Docker, correctifs post-déploiement). En
 cas de doute sur une décision passée, la réponse la plus fiable est dans le code et
 dans `ETAT-PROJET.md`/`ETAT-BACKEND.md`, pas dans ta mémoire de la conversation.
+
+## ECU (réseau graphify des projets Bony)
+
+gearbox est branché sur **ECU**, le graphe global des projets Bony (dépôt
+`C:\Users\Operateur\Documents\ECU`, mode d'emploi : `ECU\NOUVEAU-PROJET-BONY.md`).
+- **Pour travailler sur gearbox, interroge l'index LOCAL** (`graphify-out/`, section
+  suivante) : le hook `post-commit` le reconstruit à chaque commit, gratuitement. Le
+  graphe global (`graphify query … --graph ~/.graphify/global-graph.json`) sert aux
+  questions qui traversent plusieurs projets.
+- Les nœuds tirés des **documents** (`.md`, PDF) ne se rafraîchissent que par une
+  passe `/graphify .`, qui coûte des tokens (~20 000 par fichier) : le graphe peut
+  ignorer les derniers correctifs. Il ne remplace pas la lecture de l'en-tête
+  d'`ETAT-PROJET.md`. Ne lance jamais cette passe sans annoncer le coût à Théo.
+- **Après un push de gearbox : RIEN côté ECU.** Aucun commit dans le dépôt ECU
+  depuis une session gearbox (~5 Mo par commit, tout se régénère). Seule exception,
+  après une passe documents : `ECU.ps1 -Rafraichir` puis commit de
+  `global-graph.json`, seule sauvegarde des nœuds payés en tokens.
+- Au démarrage de session, vérifie le branchement : `graphify-out/graph.json`
+  daté du dernier commit, hook `post-commit` présent avec un interpréteur épinglé
+  qui existe, `graphify global list` qui liste `gearbox`.
 
 ## graphify
 
