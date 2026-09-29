@@ -67,7 +67,7 @@
   ];
 
   GX.css(`
-  .cht-side{display:flex;flex-direction:column;height:100%;min-height:0}
+  .cht-side{display:flex;flex-direction:column;height:100%;min-height:0;min-width:0;overflow:hidden}
   .cht-side > .app-head{padding:18px 16px 10px;background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;flex-wrap:nowrap}
   .cht-side > .app-head .ah-t h1{font-size:20px!important}
   .cht-lhead{padding:0 12px 8px;display:grid;gap:8px}
@@ -79,16 +79,26 @@
   .cht-exp span{display:block;font-size:12px;opacity:.8}
   .cht-time{font-size:11.5px;color:var(--text-2);margin:2px 6px 0}
   .cht-seen svg.i{width:13px;height:13px;vertical-align:-2px;margin-right:4px}
-  .cht-list{flex:1;min-height:0;padding:0 8px 14px}
+  .cht-list{flex:1;min-height:0;padding:0 10px 14px;overflow-x:hidden}
   .cht-sec{display:flex;align-items:center;gap:6px;padding:14px 8px 6px;font-family:var(--font-display);font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text)}
   .cht-sec span{font-family:var(--font-ui);letter-spacing:0;color:var(--text-2)}
-  .cht-row{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px;padding:8px 9px;border-radius:12px;cursor:pointer;position:relative;transition:background var(--t-fast)}
+  /* Ligne de conversation : avatar | bloc (nom + heure / aperçu + pastille), tout reste DANS la colonne */
+  .cht-row{display:flex;align-items:center;gap:10px;width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:8px 10px;border-radius:12px;cursor:pointer;position:relative;overflow:hidden;transition:background var(--t-fast)}
+  .cht-rb{flex:1 1 auto;min-width:0;display:grid;gap:2px}
+  .cht-l1,.cht-l2{display:flex;align-items:center;gap:6px;min-width:0}
+  .cht-l1 .nm{flex:0 1 auto;min-width:0}
+  .cht-l1 .sp{flex:1 1 0;min-width:4px}
+  .cht-l2 .cht-prev{flex:1 1 auto;min-width:0}
+  .cht-l2 .count{flex:none}
+  .cht-row .cht-ind{flex:none}
   .cht-row+.cht-row{margin-top:1px}
   .cht-row:hover{background:var(--surface-3)}
   .cht-row.sel{background:var(--bony-grad);color:#fff}
-  .cht-row.sel .cht-prev,.cht-row.sel .cht-when,.cht-row.sel .cht-ind{color:rgba(255,255,255,.82)}
+  .cht-row.sel .cht-prev,.cht-row.sel .cht-when,.cht-row.sel .cht-ind{color:rgba(255,255,255,.86)}
+  .cht-row.sel .cht-prev.typ{color:#fff}
+  .cht-row.sel .count{background:#fff;color:var(--bony-orange)}
   .cht-row .nm{font-weight:650;font-size:var(--fs-14)}.cht-row.unread .nm{font-weight:800}
-  .cht-row .cht-when{font-size:12px;color:var(--text-2);white-space:nowrap}
+  .cht-row .cht-when{flex:none;font-size:12px;color:var(--text-2);white-space:nowrap;font-variant-numeric:tabular-nums}
   .cht-prev{font-size:var(--fs-13);color:var(--text-2);line-height:1.35}
   .cht-row.unread .cht-prev{color:var(--text)}
   .cht-prev.typ{color:var(--accent);font-style:italic}
@@ -113,13 +123,16 @@
   .cht-head{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--line);flex:none;min-width:0;background:var(--surface-1)}
   .stack-head .cht-head{border:0;padding:0;flex:1;background:none;gap:8px}
   .cht-head .nm{font-weight:700;font-size:15px;display:flex;align-items:center;gap:4px;min-width:0}
+  .cht-head > .btn,.cht-head > .icon-btn,.cht-head > .av-stack,.cht-head > .cht-gbtn{flex:none}
+  .cht-head .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cht-head .sub{font-size:12.5px;color:var(--text-2)}
   .cht-rename{height:28px;font-weight:700;font-size:14px}
   .cht-pane{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;background:var(--surface-1)}
   .cht-wall{position:absolute;inset:0;pointer-events:none;transition:opacity var(--t-med)}
   .cht-wall::after{content:"";position:absolute;inset:0;background:color-mix(in srgb,var(--surface-1) 42%,transparent)}
-  .cht-scroll{position:relative;flex:1;min-height:0;padding:14px 16px 10px}
-  .cht-msgs{max-width:860px;margin:0 auto;display:flex;flex-direction:column}
+  .cht-scroll{position:relative;flex:1;min-height:0;padding:14px 20px 10px}
+  /* Pleine largeur du panneau, comme une vraie messagerie : les autres à gauche, moi à droite */
+  .cht-msgs{width:100%;display:flex;flex-direction:column}
   .cht-day{align-self:center;margin:14px 0 8px;font-size:12px;font-weight:700;color:var(--text-2)}
   .cht-day span{padding:3px 11px;border-radius:99px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line)}
   .cht-sys{align-self:center;margin:6px 0;font-size:12.5px;color:var(--text-2);text-align:center;padding:3px 11px;border-radius:99px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line)}
@@ -128,7 +141,7 @@
   .cht-msg.me{flex-direction:row-reverse}
   .cht-msg .av{--s:28px}
   .cht-avsp{width:28px;flex:none}
-  .cht-col{display:flex;flex-direction:column;align-items:flex-start;max-width:min(72%,560px);min-width:0}
+  .cht-col{display:flex;flex-direction:column;align-items:flex-start;max-width:68%;min-width:0}
   .cht-msg.me .cht-col{align-items:flex-end}
   .cht-author{font-size:12px;font-weight:700;margin:0 0 2px 12px;color:var(--text-2)}
   .cht-bwrap{position:relative;display:flex;max-width:100%}
@@ -204,18 +217,18 @@
 
   .cht-compose{position:relative;flex:none;padding:8px 12px 10px;border-top:1px solid var(--line);background:var(--surface-1)}
   .cht-banner{display:flex;align-items:center;gap:8px;margin:0 0 7px;padding:6px 8px 6px 10px;border-radius:10px;background:var(--surface-2);box-shadow:inset 3px 0 0 var(--accent);font-size:var(--fs-13);animation:ui-fade-up var(--t-med) var(--spring-snappy) both}
-  .cht-bar{display:flex;align-items:flex-end;gap:2px}
-  .cht-bar .icon-btn{height:34px}
+  .cht-bar{display:flex;align-items:flex-end;gap:2px;width:100%}
+  .cht-bar .icon-btn{height:36px;width:34px}
   .cht-giftxt{font-size:11.5px;font-weight:800;letter-spacing:.02em}
-  .cht-input{flex:1;min-width:0;display:flex;align-items:flex-end;margin-left:4px;border-radius:18px;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--line);transition:box-shadow var(--t-fast)}
+  .cht-input{flex:1;min-width:0;min-height:36px;display:flex;align-items:flex-end;margin-left:4px;border-radius:18px;background:var(--surface-3);box-shadow:inset 0 0 0 1px var(--line);transition:box-shadow var(--t-fast)}
   .cht-input:focus-within{box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px var(--focus)}
-  .cht-input textarea{flex:1;min-width:0;border:0;outline:0;background:transparent;resize:none;padding:8px 12px;line-height:1.4;max-height:130px;font:inherit;font-size:var(--fs-14);color:var(--text)}
+  .cht-input textarea{flex:1;min-width:0;border:0;outline:0;background:transparent;resize:none;padding:8px 12px;line-height:20px;max-height:130px;font:inherit;font-size:var(--fs-14);color:var(--text)}
   .cht-input textarea::placeholder{color:var(--text-3)}
-  .cht-send{width:34px;height:34px;margin-left:6px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--cht-me,var(--bony-grad));color:#fff;transition:transform var(--t-med) var(--spring-bouncy),opacity var(--t-fast)}
+  .cht-send{width:36px;height:36px;margin-left:6px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--cht-me,var(--bony-grad));color:#fff;transition:transform var(--t-med) var(--spring-bouncy),opacity var(--t-fast)}
   .cht-send[disabled]{opacity:.35;transform:scale(.85);pointer-events:none}
   .cht-send svg.i{stroke-width:2.4}
   .cht-plus{display:none}
-  .cht-rec{display:flex;align-items:center;gap:10px;height:34px}
+  .cht-rec{display:flex;align-items:center;gap:10px;height:36px}
   .cht-rec .dot{width:10px;height:10px;border-radius:50%;background:var(--danger);animation:cht-rec 1s infinite}
   @keyframes cht-rec{50%{opacity:.25}}
   .cht-recwave{flex:1;display:flex;align-items:center;gap:3px;height:28px;overflow:hidden;min-width:0}
@@ -245,7 +258,8 @@
   @container app (max-width:520px){
     .cht-bar .opt{display:none}.cht-plus{display:inline-grid}
     .cht-col{max-width:82%}.cht-scroll{padding:10px 10px 8px}
-    .cht-head .av-stack{display:none}
+    .cht-head .av-stack,.cht-hl{display:none}
+    .cht-scroll{padding:10px 10px 8px}
     .cht-compose{padding:7px 8px 9px}
   }
   `);
@@ -378,9 +392,9 @@
     const m = lastOf(c);
     return `<div class="cht-row ${sel ? 'sel' : ''} ${c.unread ? 'unread' : ''}" data-conv="${c.id}">
       <span class="cht-avw">${convAv(c)}${c.pinned ? `<span class="cht-pin">${GX.icon('star')}</span>` : ''}</span>
-      <div style="min-width:0;display:grid;gap:2px">
-        <div class="row" style="gap:5px"><span class="nm ellipsis">${GX.esc(title(c))}</span>${c.muted ? `<span class="cht-ind">${GX.icon('belloff')}</span>` : ''}<span class="grow"></span><span class="cht-when">${m ? when(m.at) : ''}</span></div>
-        <div class="row" style="gap:6px;align-items:flex-start"><span class="cht-prev ellipsis grow ${typingUid ? 'typ' : ''}">${typingUid ? `${GX.esc(first(typingUid))} écrit…` : GX.esc(preview(c, m))}</span>${c.unread ? `<span class="count ${c.muted ? 'muted' : ''}">${c.unread > 99 ? '99+' : c.unread}</span>` : ''}</div>
+      <div class="cht-rb">
+        <div class="cht-l1"><span class="nm ellipsis">${GX.esc(title(c))}</span>${c.muted ? `<span class="cht-ind">${GX.icon('belloff')}</span>` : ''}<span class="sp"></span><span class="cht-when">${m ? when(m.at) : ''}</span></div>
+        <div class="cht-l2"><span class="cht-prev ellipsis ${typingUid ? 'typ' : ''}">${typingUid ? `${GX.esc(first(typingUid))} écrit…` : GX.esc(preview(c, m))}</span>${c.unread ? `<span class="count ${c.muted ? 'muted' : ''}">${c.unread > 99 ? '99+' : c.unread}</span>` : ''}</div>
       </div>
       <div class="cht-racts"><button class="icon-btn sm ${c.muted ? 'on' : ''}" data-a="mute" data-tip="${c.muted ? 'Réactiver les notifications' : 'Mettre en sourdine'}">${GX.icon('belloff', 'sm')}</button><button class="icon-btn sm ${c.pinned ? 'on' : ''}" data-a="pin" data-tip="${c.pinned ? 'Désépingler (préférence de ce navigateur)' : 'Épingler (préférence de ce navigateur)'}">${GX.icon('star', 'sm')}</button></div>
     </div>`;
@@ -409,7 +423,7 @@
         if (selId && !auto) openCompact();
       } else {
         stack = null; root.classList.remove('stack');
-        root.innerHTML = `<div class="split" style="--side-w:320px"><div class="side" data-side></div><div class="main" data-main></div></div>`;
+        root.innerHTML = `<div class="split" style="--side-w:clamp(270px,28%,360px)"><div class="side" data-side></div><div class="main" data-main></div></div>`;
         listHost = root.querySelector('[data-side]'); convHost = root.querySelector('[data-main]');
         renderList(); renderConv();
         if (selId) markRead(conv());
@@ -454,7 +468,7 @@
       return `<div class="cht-head">${c.kind === 'group' ? `<button class="cht-gbtn" data-a="gphoto" data-tip="Changer la photo du groupe">${convAv(c, 'sm')}</button>` : convAv(c, 'sm')}
         <div class="grow" style="min-width:0"><div class="nm" data-name><span class="ellipsis">${GX.esc(title(c))}</span>${isAdmin(c) ? `<button class="icon-btn sm" data-a="rename" data-tip="Renommer le groupe">${GX.icon('edit', 'sm')}</button>` : ''}</div><div class="sub">${sub}</div></div>
         <span class="av-stack">${shown.map((u) => GX.r.av(u, 'sm')).join('')}${n > 5 ? `<span class="av sm" style="--c:var(--surface-4);color:var(--text-2)">+${n - 5}</span>` : ''}</span>
-        ${c.kind === 'group' ? `<button class="btn sm" data-a="members">${GX.icon('users', 'sm')}Membres</button>` : ''}
+        ${c.kind === 'group' ? `<button class="btn sm" data-a="members" data-tip="Membres du groupe">${GX.icon('users', 'sm')}<span class="cht-hl">Membres</span></button>` : ''}
         ${c.kind !== 'general' ? `<button class="icon-btn" data-a="palette" data-tip="Personnaliser la discussion">${GX.icon('sliders')}</button>` : ''}
         <button class="icon-btn" data-a="convmore" data-tip="Options">${GX.icon('more')}</button></div>`;
     }
@@ -516,6 +530,7 @@
       const m = { id: GX.uid('m'), u: ME, at: Date.now(), type: 'text', r: {}, seen: [], ...part };
       if (reply) { m.replyTo = reply.id; reply = null; renderBanner(); }
       msgs(c).push(m); renderMsgs(m.id); refreshList();
+      GX.emit('chat:message', { conv: c.id, msg: m, from: 'chat' });   // le widget « Chat » du bureau suit la conversation
       later(1400, () => { m.seen = membersOf(c).filter((u) => u !== ME && (c.kind !== 'general' || D.user(u).online)); if (isOpen(c.id)) updateSeen(); });
       scheduleReply(c, m);
     }
@@ -818,8 +833,18 @@
     const stopW = GX.ui.watchWidth(body, 760, (cp) => { saveDraft(); compact = cp; build(); });
     const off = [
       GX.on('ctx', () => build()),
-      GX.on('chat:message', ({ conv: id, msg }) => {
+      GX.on('chat:read', () => refreshList()),                         // lu depuis le widget du bureau
+      GX.on('chat:message', (det) => {
+        const { conv: id, msg, from } = det;
+        if (from === 'chat') return;                                   // mon propre envoi : déjà rendu
         const c = D.CONVS.find((x) => x.id === id); if (!c) return;
+        if (from === 'widget-react') { if (isOpen(id)) renderMsgs(); return; }   // réaction posée depuis le widget du bureau
+        /* Message écrit depuis le widget du bureau : l'app prend la suite (« Vu par », réponse simulée) */
+        if (from === 'widget' && msg.u === ME) {
+          det.handled = true;
+          later(1400, () => { msg.seen = membersOf(c).filter((u) => u !== ME && (c.kind !== 'general' || D.user(u).online)); if (isOpen(c.id)) updateSeen(); });
+          scheduleReply(c, msg);
+        }
         if (typing[id] === msg.u) delete typing[id];
         if (isOpen(id)) { if (c.unread) { c.unread = 0; GX.emit('badges'); } renderMsgs(msg.id); }
         refreshList();

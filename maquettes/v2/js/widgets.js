@@ -11,14 +11,74 @@
   const W = (GX.widgets = {});
   const D = GX.data, F = GX.fmt;
   const CELL = 84, GAP = 12, STEP = CELL + GAP;
-  const SIZES = { S: [2, 2], M: [4, 2], L: [4, 4], XL: [6, 2] };
-  const SIZE_L = { S: 'Petit', M: 'Moyen', L: 'Grand', XL: 'Bandeau' };
+  const SIZES = { S: [2, 2], M: [4, 2], L: [4, 4], XL: [6, 2], XXL: [6, 4] };
+  const SIZE_L = { S: 'Petit', M: 'Moyen', L: 'Grand', XL: 'Bandeau', XXL: 'Très grand' };
   const today = () => GX.iso(GX.today());
   const act = () => D.PROJECTS.filter((p) => p.status !== 'Draft');
   const planned = () => D.BUDGET_LINES.reduce((s, l) => s + Object.values(l.planned).flat().reduce((a, b) => a + b, 0), 0);
   const spent = () => act().filter((p) => !p.brands.includes('Holding')).reduce((s, p) => s + D.projectActual(p), 0) + D.EXPENSES.filter((e) => !e.brands.includes('Holding')).reduce((s, e) => s + e.amount, 0);
   const head = (icon, t, extra = '') => `<div class="wt">${GX.appGlyph ? GX.appGlyph(icon) : GX.icon(icon, 'sm')}<span class="ellipsis grow">${t}</span>${extra}</div>`;
   const row = (l, r, s = '') => `<div class="wr"><span class="ellipsis grow">${l}</span>${r ? `<b class="num">${r}</b>` : ''}${s}</div>`;
+
+  /* ---------------- Widget « Chat interactif » ----------------
+     Liste compacte (Général, groupes, privés) + fil de la conversation choisie + saisie.
+     Écrit réellement dans D.MESSAGES et prévient l'app Chat (GX.emit 'chat:message',
+     from:'widget') : si elle est ouverte, elle prend la suite (« Vu par », réponse simulée) ;
+     sinon le widget simule lui-même la réponse. Les clics dans le widget n'ouvrent PAS
+     l'app (écoute en capture) — sauf le bouton « Ouvrir » et le titre, qui ouvrent la
+     conversation dans l'app Chat (commande 'conv:<id>'). Rôles sans chat (Chef de site) :
+     widget indisponible via allowed(). External : pas de Chat Général, projet cité neutre. */
+  const CH_ME = 'me', CH_REACTS = ['👍', '❤️', '😂', '😮'], chDraft = {}, chPending = {};
+  const chVisible = () => D.CONVS.filter((c) => c.members.includes(CH_ME) && !(c.kind === 'general' && GX.ctx.role === 'External'));
+  const chMsgs = (c) => (D.MESSAGES[c.id] ||= []);
+  const chLast = (c) => { const a = chMsgs(c); return a[a.length - 1]; };
+  const chOther = (c) => c.members.find((u) => u !== CH_ME) || CH_ME;
+  const chTitle = (c) => (c.kind === 'dm' ? D.user(chOther(c)).name : c.name);
+  const chFirst = (u) => (u === CH_ME ? 'Vous' : D.user(u).name.split(' ')[0]);
+  const chOrder = () => { const v = chVisible(), s = (a) => a.sort((x, y) => (y.pinned ? 1 : 0) - (x.pinned ? 1 : 0) || (chLast(y)?.at || 0) - (chLast(x)?.at || 0)); return [...v.filter((c) => c.kind === 'general'), ...s(v.filter((c) => c.kind === 'group')), ...s(v.filter((c) => c.kind === 'dm'))]; };
+  const chConv = (cfg = {}) => { const v = chOrder(); return v.find((c) => c.id === cfg.conv) || v[0]; };
+  const chHhmm = (at) => new Date(at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const chText = (m) => (!m ? '' : m.deleted ? 'Message supprimé' : m.expired ? '📎 Pièce jointe expirée' : ({ image: '📷 Image', file: '📎 ' + String(m.file || 'Pièce jointe').split(' · ')[0], voice: '🎤 Message vocal' + (m.dur ? ` (${m.dur})` : ''), project: '📋 ' + (GX.ctx.role === 'External' ? 'Projet cité' : D.project(m.project)?.name || 'Projet cité'), gif: '🎞️ GIF' + (m.gif ? ' · ' + m.gif : '') }[m.type] ?? (m.t || '')));
+  const chPrev = (c, m) => (!m ? 'Aucun message' : m.type === 'sys' ? m.t : (m.u === CH_ME ? 'Vous : ' : c.kind !== 'dm' ? chFirst(m.u) + ' : ' : '') + chText(m));
+  function chAv(c, s) {
+    if (c.kind === 'dm') { const u = D.user(chOther(c)); return `<span class="av" style="--s:${s}px;--c:${u.color}">${u.initials}${u.online ? '<i class="pres"></i>' : ''}</span>`; }
+    if (c.kind === 'general') return `<span class="wch-gav" style="--s:${s}px;background:var(--bony-grad)">#</span>`;
+    if (c.photo) return `<span class="wch-gav" style="--s:${s}px;background:${c.photo}"></span>`;
+    const us = c.members.filter((u) => u !== CH_ME).slice(0, 2).map((u) => D.user(u));
+    return `<span class="wch-duo" style="--d:${s}px">${us.map((u) => `<span class="av" style="--c:${u.color}">${u.initials}</span>`).join('')}</span>`;
+  }
+  function chatLive(sz, cfg = {}, w) {
+    const all = chOrder(), c = chConv(cfg), n = all.reduce((s, x) => s + (x.unread || 0), 0);
+    if (!c) return `<div class="wch">${head('chat', 'Chat')}<div class="faint" style="margin:auto">Aucune conversation</div></div>`;
+    const wide = sz !== 'L';
+    const list = all.map((x) => `<button class="wch-it ${x.id === c.id ? 'on' : ''} ${x.unread ? 'unread' : ''}" data-wc="sel" data-conv-id="${x.id}"${wide ? '' : ` data-tip="${GX.esc(chTitle(x))}"`} aria-label="${GX.esc(chTitle(x))}">
+        <span class="wch-avw">${chAv(x, wide ? 28 : 32)}${x.unread ? `<i class="count">${x.unread > 99 ? '99+' : x.unread}</i>` : ''}</span>
+        ${wide ? `<span class="wch-itx"><b class="ellipsis">${GX.esc(chTitle(x))}</b>${sz === 'XXL' ? `<span class="ellipsis">${GX.esc(chPrev(x, chLast(x)))}</span>` : ''}</span>` : ''}</button>`).join('');
+    const arr = chMsgs(c).slice(sz === 'XL' ? -8 : -16);
+    const same = (a, b) => a && b && a.type !== 'sys' && b.type !== 'sys' && a.u === b.u && Math.abs(a.at - b.at) < 5 * 6e4;
+    const th = arr.map((m, i) => {
+      if (m.type === 'sys') return `<div class="wch-sys">${GX.esc(m.t)}</div>`;
+      const mine = m.u === CH_ME, u = D.user(m.u), f = !same(arr[i - 1], m), rs = Object.entries(m.r || {}).filter(([, us]) => us.length);
+      return `<div class="wch-m ${mine ? 'me' : ''} ${f ? 'first' : ''}" data-wmsg="${m.id}">
+        ${mine ? '' : f ? `<span class="av" style="--s:22px;--c:${u.color}" data-tip="${GX.esc(u.name)}">${u.initials}</span>` : '<span class="wch-sp"></span>'}
+        <div class="wch-mc">${f && !mine && c.kind !== 'dm' ? `<span class="wch-au" style="color:${u.color}">${GX.esc(chFirst(m.u))}</span>` : ''}
+          <div class="wch-b ${m.deleted || m.expired ? 'del' : ''}">${GX.esc(chText(m))}${m.edited ? ' <span class="wch-h">(modifié)</span>' : ''}<span class="wch-h">${chHhmm(m.at)}</span></div>
+          ${rs.length && !m.deleted ? `<div class="wch-rs">${rs.map(([e, us]) => `<button data-wc="react" data-e="${e}" class="${us.includes(CH_ME) ? 'mine' : ''}">${e}<span>${us.length}</span></button>`).join('')}</div>` : ''}
+        </div>
+        ${m.deleted ? '' : `<div class="wch-rx">${CH_REACTS.map((e) => `<button data-wc="react" data-e="${e}" aria-label="Réagir ${e}">${e}</button>`).join('')}</div>`}
+      </div>`;
+    }).join('') || '<div class="wch-empty">Aucun message — dites bonjour 👋</div>';
+    const to = c.kind === 'dm' ? 'à ' + chFirst(chOther(c)) : 'dans ' + chTitle(c);
+    return `<div class="wch sz-${sz}" data-wid="${w ? w.id : ''}">
+      <div class="wt wch-t">${GX.appGlyph ? GX.appGlyph('chat') : GX.icon('chat', 'sm')}<span class="ellipsis grow">Chat <span class="wch-ct">· ${GX.esc(chTitle(c))}</span></span>${n ? `<span class="count">${n > 99 ? '99+' : n}</span>` : ''}<button class="icon-btn sm" data-wc="open" data-tip="Ouvrir la conversation dans Chat">${GX.icon('maximize', 'sm')}</button></div>
+      <div class="wch-body" data-wc-zone>
+        <div class="wch-list scroll">${list}</div>
+        <div class="wch-conv">
+          <div class="wch-thread scroll"><div class="wch-inner">${th}</div></div>
+          <div class="wch-comp"><input class="wch-in" data-wc-in placeholder="Message ${GX.esc(to)}…" value="${GX.esc(chDraft[(w ? w.id : '') + c.id] || '')}" autocomplete="off" maxlength="2000" /><button class="wch-send" data-wc="send" data-tip="Envoyer (Entrée)" aria-label="Envoyer">${GX.icon('arrowup', 'sm')}</button></div>
+        </div>
+      </div></div>`;
+  }
 
   /* ---------------- Catalogue ---------------- */
   const CAT = {
@@ -79,6 +139,7 @@
       const last = D.CONVS.map((c) => ({ c, m: (D.MESSAGES[c.id] || []).slice(-1)[0] })).filter((x) => x.m).sort((a, b) => b.m.at - a.m.at).slice(0, 3);
       return `${head('chat', 'Derniers messages', n ? `<span class="count">${n}</span>` : '')}<div class="wl">${last.map(({ c, m }) => `<div class="wr" data-conv="${c.id}">${GX.r.av(m.u, 'sm')}<span class="ellipsis grow"><b>${GX.esc(c.name)}</b> <span class="muted">${GX.esc(m.t || (m.type === 'image' ? '📷 Photo' : '📎 Pièce jointe'))}</span></span></div>`).join('')}</div>`;
     } },
+    'chat-live': { app: 'chat', name: 'Chat interactif', sizes: ['L', 'XXL', 'XL'], live: true, render: (sz, c = {}, w) => chatLive(sz, c, w) },
     birthdays: { app: 'hello', name: 'Anniversaires', sizes: ['S', 'M'], render(sz) {
       const t = GX.today(), L = D.USERS.map((u) => { const b = new Date(u.birthdate); let n = new Date(t.getFullYear(), b.getMonth(), b.getDate()); if (n < t) n = new Date(t.getFullYear() + 1, b.getMonth(), b.getDate()); return { u, n, days: Math.round((n - t) / 864e5) }; }).sort((a, b) => a.days - b.days);
       if (sz === 'S') { const x = L[0]; return `${head('hello', 'Anniversaire')}<div style="margin-top:auto">${GX.r.av(x.u.id, 'lg')}</div><b style="margin-top:6px">${GX.esc(x.u.name.split(' ')[0])}</b><div class="faint" style="font-size:12px">${x.days === 0 ? "aujourd'hui 🎂" : x.days === 1 ? 'demain' : 'dans ' + x.days + ' j'}</div>`; }
@@ -140,7 +201,7 @@
   /* Accès pour la coque téléphone : même disposition, rendue en grille 2 colonnes */
   W.items = () => { if (!layout) load(); return layout.filter((w) => allowed(w.type)).sort((a, b) => a.y - b.y || a.x - b.x); };
   W.inner = (w) => { try { return CAT[w.type].render(w.size, w.cfg || {}, w); } catch (e) { return ''; } };
-  W.kind = (w) => (CAT[w.type].accent ? 'accent' : CAT[w.type].sky ? 'sky' : 'glass');
+  W.kind = (w) => (CAT[w.type].accent ? 'accent' : CAT[w.type].sky ? 'sky' : 'glass') + (CAT[w.type].live ? ' live' : '');
   W.app = (w) => CAT[w.type].app;
 
   /* ---------------- Disposition ---------------- */
@@ -148,9 +209,12 @@
   const DEFAULT = [
     { type: 'budget-ring', size: 'S', x: 0, y: 0 }, { type: 'late', size: 'S', x: 2, y: 0 }, { type: 'posts', size: 'M', x: 0, y: 2 },
     { type: 'conges-off', size: 'S', x: 0, y: 4 }, { type: 'chat', size: 'S', x: 2, y: 4 }, { type: 'weather', size: 'S', x: 0, y: 6 }, { type: 'clock', size: 'S', x: 2, y: 6 },
+    { type: 'chat-live', size: 'L', x: 4, y: 0 },   // n'affecte que les bureaux sans disposition sauvegardée (ou « Disposition par défaut »)
   ];
   let layout = null, box = null, editing = false;
-  const load = () => { layout = (GX.store.get(KEY()) || DEFAULT.map((w) => ({ ...w, id: GX.uid('wg') }))).filter((w) => CAT[w.type]); };
+  /* Disposition par défaut : un widget qui dépasserait d'un bureau étroit est replacé dans un emplacement libre */
+  const fresh = () => { layout = []; DEFAULT.forEach((d) => { const w = { ...d, id: GX.uid('wg') }; if (w.x + SIZES[w.size][0] > cols() || layout.some((o) => overlap(rectOf(w), rectOf(o)))) Object.assign(w, freeSpot(w.size, w)); layout.push(w); }); return layout; };
+  const load = () => { const saved = GX.store.get(KEY()); layout = (saved || fresh()).filter((w) => CAT[w.type]); };
   const save = () => GX.store.set(KEY(), layout);
   const rectOf = (w) => { const [cw, ch] = SIZES[w.size]; return { x: w.x, y: w.y, w: cw, h: ch }; };
   const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -179,12 +243,17 @@
     const vis = layout.filter((w) => allowed(w.type));
     const maxY = Math.max(0, ...vis.map((w) => w.y + SIZES[w.size][1]));
     box.style.width = cols() * STEP - GAP + 'px'; box.style.left = Math.round((innerWidth - (cols() * STEP - GAP)) / 2) + 'px'; { const A = area(); box.style.top = Math.round(A.top + (A.h - (rows() * STEP - GAP)) / 2) + 'px'; } box.style.height = maxY * STEP + 'px';
+    /* Le widget Chat se re-rend à chaque message : on garde le champ de saisie actif (focus + curseur) */
+    const ae = document.activeElement, keep = ae && box.contains(ae) && ae.matches('[data-wc-in]') ? { id: ae.closest('.wch')?.dataset.wid, pos: ae.selectionStart } : null;
     box.innerHTML = vis.map((w, i) => {
       const c = CAT[w.type], [cw, ch] = SIZES[w.size];
       let inner = ''; try { inner = c.render(w.size, w.cfg || {}, w); } catch (e) { inner = `<div class="faint">${GX.esc(e.message)}</div>`; }
-      return `<div class="wdg ${c.accent ? 'accent' : c.sky ? 'sky' : 'glass'} sz-${w.size}" data-id="${w.id}" data-app="${c.app || ''}" style="left:${w.x * STEP}px;top:${w.y * STEP}px;width:${cw * STEP - GAP}px;height:${ch * STEP - GAP}px;animation-delay:${i * 30}ms">
+      return `<div class="wdg ${c.accent ? 'accent' : c.sky ? 'sky' : 'glass'}${c.live ? ' live' : ''} sz-${w.size}" data-id="${w.id}" data-app="${c.app || ''}" style="left:${w.x * STEP}px;top:${w.y * STEP}px;width:${cw * STEP - GAP}px;height:${ch * STEP - GAP}px;animation-delay:${i * 30}ms">
         ${inner}${editing ? `<button class="wx" data-rm title="Retirer">${GX.icon('minus', 'sm')}</button><button class="wsz" data-size title="Taille">${w.size}</button>` : ''}</div>`;
     }).join('');
+    if (keep) { const i = box.querySelector(`.wch[data-wid="${keep.id}"] [data-wc-in]`); if (i) { i.focus({ preventScroll: true }); if (keep.pos != null) i.setSelectionRange(keep.pos, keep.pos); } }
+    /* L'entrée « pop » ne se joue qu'à l'apparition du bureau, pas à chaque re-rendu (pastilles, messages…) */
+    if (!box.classList.contains('settled')) { clearTimeout(W._st); W._st = setTimeout(() => box && box.classList.add('settled'), 900); }
     wire();
   };
   function wire() {
@@ -271,14 +340,107 @@
     gal.querySelector('[data-gtabs]').addEventListener('change', (e) => show(e.detail));
     list.addEventListener('click', (e) => { const b = e.target.closest('[data-add]'); if (!b) return; const t = b.dataset.add, size = CAT[t].sizes[0]; const w = { id: GX.uid('wg'), type: t, size, ...freeSpot(size) }; layout.push(w); save(); W.render(); const el = box.querySelector(`[data-id="${w.id}"]`); el && GX.animate(el, [{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { spring: 'bouncy' }); });
     gal.querySelector('[data-done]').onclick = () => W.edit(false);
-    gal.querySelector('[data-reset]').onclick = () => { layout = DEFAULT.map((w) => ({ ...w, id: GX.uid('wg') })); save(); W.render(); };
+    gal.querySelector('[data-reset]').onclick = () => { fresh(); save(); W.render(); };
     GX.animate(gal, [{ transform: 'translate(-50%, 110%)' }, { transform: 'translate(-50%, 0)' }], { spring: 'snappy' });
   }
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && editing) W.edit(false); });
-  GX.on('ctx', () => { layout = null; W.render(); });
+  GX.on('ctx', () => { layout = null; box?.classList.remove('settled'); W.render(); });
   GX.on('badges', () => W.render());
   GX.on('data:projects', () => !editing && W.render());
   setInterval(() => { if (box && !editing && box.querySelector('.wclock')) W.render(); }, 60000);
+
+  /* ---------------- Widget Chat : interactions (bureau ET coque téléphone) ---------------- */
+  const chItem = (el) => { const id = el?.closest('.wch')?.dataset.wid; if (!id) return null; if (!layout) load(); return layout.find((x) => x.id === id) || null; };
+  /* Re-rend en place chaque widget Chat présent (bureau ou accueil mobile), sans toucher aux autres widgets */
+  function chRefresh(focusId) {
+    if (!layout) return;
+    document.querySelectorAll('.wch[data-wid]').forEach((el) => {
+      const w = layout.find((x) => x.id === el.dataset.wid); if (!w || !CAT[w.type]?.live) return;
+      const ae = document.activeElement, had = ae && el.contains(ae) && ae.matches('[data-wc-in]'), pos = had ? ae.selectionStart : null;
+      const sc = el.querySelector('.wch-list')?.scrollTop || 0;
+      const tmp = document.createElement('div'); try { tmp.innerHTML = CAT[w.type].render(w.size, w.cfg || {}, w); } catch (e) { return; }
+      const nu = tmp.firstElementChild; if (!nu) return; el.replaceWith(nu);
+      const l = nu.querySelector('.wch-list'); if (l) l.scrollTop = sc;
+      if (had || focusId === w.id) { const i = nu.querySelector('[data-wc-in]'); if (i) { i.focus({ preventScroll: true }); const p = pos ?? i.value.length; i.setSelectionRange(p, p); } }
+    });
+  }
+  /* Un widget affiche-t-il cette conversation, visible (bureau non estompé par une fenêtre) ? */
+  const chShown = (convId) => [...document.querySelectorAll('.wch[data-wid]')].some((el) => { const w = layout?.find((x) => x.id === el.dataset.wid); return w && chConv(w.cfg)?.id === convId && el.offsetParent && !el.closest('.dim'); });
+  const chChatOpen = () => (GX.wm?.list?.() || []).some((x) => x.appId === 'chat' || x.app?.id === 'chat');
+  function chOpen(c, origin) {
+    if (!c) return;
+    if (origin?.closest('#widgets') && GX.wm.desktopShown?.()) GX.wm.showDesktop(false);
+    const win = GX.wm.open('chat', {}, { origin: origin?.closest('.wdg') || origin });
+    const go = () => (win || GX.wm.active?.())?.inst?.command?.('conv:' + c.id);
+    if (win?.inst?.command) go(); else setTimeout(go, 420);
+  }
+  function chSend(w, input) {
+    const c = chConv(w.cfg), t = input?.value.trim(); if (!c || !t) return;
+    const m = { id: GX.uid('m'), u: CH_ME, t, at: Date.now(), type: 'text', r: {}, seen: [] };
+    chMsgs(c).push(m); delete chDraft[w.id + c.id]; input.value = '';
+    w.cfg = { ...(w.cfg || {}), conv: c.id }; save();
+    const hadUnread = !!c.unread; c.unread = 0;
+    const det = { conv: c.id, msg: m, from: 'widget' };
+    GX.emit('chat:message', det);                 // l'app Chat, si ouverte, pose det.handled et simule la suite
+    if (!det.handled) chSimReply(c, m);
+    if (hadUnread) { GX.emit('chat:read'); GX.emit('badges'); }
+    chRefresh(w.id);
+  }
+  /* Réponse fictive quand l'app Chat est fermée (même logique que chat.js, en plus court) */
+  function chSimReply(c, m) {
+    if (c.kind === 'general' || chPending[c.id]) return;
+    const pool = c.members.filter((u) => u !== CH_ME && D.user(u).role !== 'Site Manager'); if (!pool.length) return;
+    const on = pool.filter((u) => D.user(u).online), src = on.length ? on : pool, who = c.kind === 'dm' ? pool[0] : src[Math.floor(Math.random() * src.length)];
+    const t = (m.t || '').toLowerCase(), pick = (a) => a[Math.floor(Math.random() * a.length)];
+    chPending[c.id] = true;
+    setTimeout(() => { m.seen = c.members.filter((u) => u !== CH_ME); }, 1400);
+    setTimeout(() => {
+      delete chPending[c.id];
+      const r = { id: GX.uid('m'), u: who, at: Date.now(), type: 'text', r: {}, t: t.includes('merci') ? pick(['Avec plaisir !', 'De rien 😊', 'Quand tu veux']) : t.includes('?') ? pick(['Oui, je regarde ça 👍', 'Je te dis ça dans l’heure', 'Bonne question, je vérifie avec la concession']) : pick(['Parfait, merci !', 'Ça marche 👌', 'Je m’en occupe', 'Noté ✅', 'Super, on en parle au point de jeudi']) };
+      chMsgs(c).push(r);
+      if (!chShown(c.id) && !chChatOpen()) c.unread = (c.unread || 0) + 1;
+      GX.emit('chat:message', { conv: c.id, msg: r, from: 'widget-sim' }); GX.emit('badges');
+    }, 2600 + Math.min(1800, t.length * 30));
+  }
+  /* Nouveau message (app, réponse simulée, autre widget) : le widget suit ; lu s'il est affiché */
+  GX.on('chat:message', ({ conv, msg } = {}) => {
+    if (!layout || !document.querySelector('.wch[data-wid]')) return;
+    const c = D.CONVS.find((x) => x.id === conv);
+    if (c && msg && msg.u !== CH_ME && c.unread && chShown(conv)) { c.unread = 0; setTimeout(() => GX.emit('chat:read')); }
+    chRefresh();
+  });
+  /* Capture : les clics dans le widget ne remontent pas jusqu'à l'ouverture de l'app */
+  document.addEventListener('click', (e) => {
+    const root = e.target.closest?.('.wch'); if (!root || document.body.classList.contains('desk-editing')) return;
+    const w = chItem(root); if (!w) return;
+    e.stopPropagation();
+    const b = e.target.closest('[data-wc]'), c = chConv(w.cfg);
+    if (!b) { if (!e.target.closest('[data-wc-zone]')) chOpen(c, root); return; }   // titre : ouvre la conversation
+    const a = b.dataset.wc;
+    if (a === 'open') return chOpen(c, b);
+    if (a === 'send') return chSend(w, root.querySelector('[data-wc-in]'));
+    if (a === 'sel') {
+      const x = D.CONVS.find((y) => y.id === b.dataset.convId); if (!x) return;
+      w.cfg = { ...(w.cfg || {}), conv: x.id }; save();
+      if (x.unread) { x.unread = 0; GX.emit('chat:read'); GX.emit('badges'); }
+      return chRefresh(w.id);
+    }
+    if (a === 'react') {
+      const m = chMsgs(c).find((x) => x.id === b.closest('[data-wmsg]')?.dataset.wmsg); if (!m) return;
+      const us = ((m.r ||= {})[b.dataset.e] ||= []), i = us.indexOf(CH_ME); i < 0 ? us.push(CH_ME) : us.splice(i, 1);
+      GX.emit('chat:message', { conv: c.id, msg: m, from: 'widget-react' });
+      chRefresh();
+    }
+  }, true);
+  document.addEventListener('keydown', (e) => {
+    const i = e.target.closest?.('.wch [data-wc-in]'); if (!i) return;
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); e.stopPropagation(); const w = chItem(i); if (w) chSend(w, i); }
+    else if (e.key === 'Escape') { e.stopPropagation(); i.blur(); }
+  });
+  document.addEventListener('input', (e) => {
+    const i = e.target.closest?.('.wch [data-wc-in]'); if (!i) return;
+    const w = chItem(i), c = w && chConv(w.cfg); if (c) chDraft[w.id + c.id] = i.value;
+  });
 
   GX.css(`
   #widgets{position:absolute;left:22px;top:calc(var(--menubar-h) + 22px);z-index:1;display:block;grid-template-columns:none;transition:filter var(--t-slow),opacity var(--t-slow)}
@@ -307,6 +469,70 @@
   .wsc{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;height:100%;align-items:center}.wsc.S{grid-template-columns:1fr 1fr}
   .wsc button{display:grid;justify-items:center;gap:5px;font-size:11px;font-weight:600}.wsc button span{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .wthumb{width:40px;height:40px;border-radius:10px;flex:none;display:grid;place-items:center;color:#fff;background:linear-gradient(140deg,var(--a),#1b1822)}
+  #widgets.settled:not(.editing) .wdg{animation:none}
+  /* Chat interactif */
+  .wdg.live{cursor:default}
+  #widgets .wdg.live:not(.drag):hover{transform:none}
+  .wch{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;gap:8px}
+  .wch-t{cursor:pointer;min-width:0}
+  .wch-t .wch-ct{color:var(--text)}
+  .wch-t .count{flex:none}
+  .wch-t .icon-btn{margin:-4px -6px -4px 0;color:var(--text-2)}
+  .wch-body{flex:1;min-height:0;display:flex;gap:8px}
+  .wch-list{flex:none;display:flex;flex-direction:column;gap:2px;padding:4px 3px;margin:-4px -3px;overflow-x:hidden}
+  .wch.sz-L .wch-list{width:50px}.wch.sz-XL .wch-list{width:170px}.wch.sz-XXL .wch-list{width:200px}
+  .wch-it{display:flex;align-items:center;gap:8px;width:100%;min-width:0;padding:4px 5px;border-radius:12px;text-align:left;color:var(--text);flex:none;transition:background var(--t-fast)}
+  .wch-it:hover{background:var(--line)}
+  .wch-it.on{background:color-mix(in srgb,var(--accent) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
+  .wch-avw{position:relative;flex:none;display:grid}
+  .wch-avw .count{position:absolute;right:-6px;top:-5px;min-width:16px;height:16px;padding:0 4px;font-size:10px;font-style:normal;box-shadow:0 0 0 2px var(--surface-1)}
+  .wch-itx{flex:1;min-width:0;display:grid;gap:1px;line-height:1.25}
+  .wch-itx b{font-size:12.5px;font-weight:650}.wch-it.unread .wch-itx b{font-weight:800}
+  .wch-itx span{font-size:11.5px;color:var(--text-2)}
+  .wch-gav{width:var(--s);height:var(--s);border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-weight:800;font-size:calc(var(--s) * .45)}
+  .wch-duo{position:relative;width:var(--d);height:var(--d);flex:none;display:block}
+  .wch-duo .av{position:absolute;--s:calc(var(--d) * .68)}
+  .wch-duo .av:first-child{left:0;top:0}.wch-duo .av:last-child{right:0;bottom:0;box-shadow:0 0 0 2px var(--surface-2)}
+  .wch-conv{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:14px;background:color-mix(in srgb,var(--surface-0) 55%,transparent);box-shadow:inset 0 0 0 1px var(--line)}
+  :root[data-theme="light"] .wch-conv{background:color-mix(in srgb,var(--surface-2) 70%,transparent)}
+  /* column-reverse : le fil reste ancré sur le dernier message, sans script */
+  .wch-thread{flex:1;min-height:0;display:flex;flex-direction:column-reverse;overflow-y:auto;overflow-x:hidden}
+  .wch-inner{display:flex;flex-direction:column;gap:2px;padding:10px 2px 2px}
+  .wch-m{position:relative;display:flex;align-items:flex-end;gap:6px;min-width:0}
+  .wch-m.first{margin-top:6px}
+  .wch-m.me{flex-direction:row-reverse}
+  .wch-sp{width:22px;flex:none}
+  .wch-mc{display:flex;flex-direction:column;align-items:flex-start;max-width:78%;min-width:0}
+  .wch-m.me .wch-mc{align-items:flex-end}
+  .wch-au{font-size:11px;font-weight:700;margin:0 0 1px 8px}
+  .wch-b{max-width:100%;padding:5px 10px;border-radius:14px;font-size:12.5px;line-height:1.38;background:var(--surface-3);color:var(--text);box-shadow:inset 0 0 0 1px var(--line);overflow-wrap:anywhere;white-space:pre-wrap}
+  :root[data-theme="light"] .wch-b{background:#fff;box-shadow:inset 0 0 0 1px var(--line-2)}
+  .wch-m.me .wch-b{background:var(--bony-grad);color:#fff;box-shadow:none}
+  .wch-b.del,.wch-m.me .wch-b.del{font-style:italic;color:var(--text-2);background:transparent;box-shadow:inset 0 0 0 1px var(--line-2)}
+  .wch-h{font-size:10.5px;opacity:.7;margin-left:6px;white-space:nowrap;font-variant-numeric:tabular-nums;font-style:normal}
+  .wch-rs{display:flex;flex-wrap:wrap;gap:3px;margin-top:2px}
+  .wch-rs button{display:inline-flex;align-items:center;gap:3px;height:20px;padding:0 6px;border-radius:99px;font-size:11.5px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line-2)}
+  .wch-rs button span{font-size:10.5px;font-weight:700;color:var(--text)}
+  .wch-rs button.mine{box-shadow:inset 0 0 0 1px var(--accent)}.wch-rs button.mine span{color:var(--accent)}
+  .wch-rx{position:absolute;top:-8px;z-index:2;display:flex;gap:1px;padding:2px;border-radius:99px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line-2),var(--shadow-2);opacity:0;pointer-events:none;transition:opacity var(--t-fast)}
+  .wch-m:not(.me) .wch-rx{right:0}.wch-m.me .wch-rx{left:0}
+  .wch-m:hover .wch-rx{opacity:1;pointer-events:auto;transition-delay:120ms}
+  .wch-rx button{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12.5px;transition:transform var(--t-fast)}
+  .wch-rx button:hover{background:var(--surface-4);transform:scale(1.15)}
+  .wch-sys,.wch-empty{align-self:center;margin:6px 0;font-size:11.5px;color:var(--text-2);text-align:center}
+  .wch-comp{flex:none;display:flex;align-items:center;gap:6px}
+  .wch-in{flex:1;min-width:0;height:32px;padding:0 12px;border:0;outline:0;border-radius:99px;background:var(--surface-3);color:var(--text);font:inherit;font-size:13px;box-shadow:inset 0 0 0 1px var(--line);transition:box-shadow var(--t-fast)}
+  .wch-in::placeholder{color:var(--text-3)}
+  :root[data-theme="light"] .wch-in{background:#fff;box-shadow:inset 0 0 0 1px var(--line-2)}
+  .wch-in:focus{box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px var(--focus)}
+  .wch-send{width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;background:var(--bony-grad);color:#fff;transition:transform var(--t-med) var(--spring-bouncy)}
+  .wch-send:active{transform:scale(.88)}.wch-send svg.i{stroke-width:2.4}
+  .wch.sz-XL{gap:6px}.wch.sz-XL .wch-conv{padding:4px 6px;gap:4px}.wch.sz-XL .wch-inner{padding-top:8px}
+  .wch.sz-XL .wch-in{height:28px}.wch.sz-XL .wch-send{width:28px;height:28px}
+  .m-wdg.live{aspect-ratio:auto;min-height:340px}
+  .m-wdg.live.msz-XL{min-height:220px}
+  .m-wdg.msz-XXL{grid-column:span 2}
+  .m-wdg.live .wch-rx{display:none}
   /* édition */
   #widgets.editing .wdg{cursor:grab;animation:w-jiggle .32s ease-in-out infinite alternate}
   #widgets.editing .wdg:nth-child(2n){animation-delay:-.16s}

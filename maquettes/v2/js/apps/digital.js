@@ -468,7 +468,7 @@
       }
       /* filtre de site du Planning : MONO — « Tous Sites », ★ plaque, sites (PLAQUES_STRUCTURE) */
       function openSitePick(b) {
-        const groups = [{ items: [{ v: '', l: 'Tous Sites' }] }, ...Object.entries(D.PLAQUES).map(([pl, ss]) => ({ label: pl, items: [{ v: pl, l: '★ ' + pl, hint: 'toute la plaque' }, ...ss.map((s) => ({ v: s, l: s }))] }))];
+        const groups = [{ items: [{ v: '', l: 'Tous Sites' }] }, ...Object.entries(D.PLAQUES).map(([pl, ss]) => ({ label: pl, collapsible: true, items: [{ v: pl, l: '★ ' + pl, hint: 'toute la plaque' }, ...ss.map((s) => ({ v: s, l: s }))] }))];
         GX.ui.pick(b, groups, { multi: false, selected: [plan.site], title: 'Sites', width: 280, onChange: ([v]) => { plan.site = v; renderPlan(); } });
       }
 

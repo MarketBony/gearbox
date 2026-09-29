@@ -89,6 +89,20 @@
   const fill = (r) => { const min = +r.min || 0, max = +r.max || 100; r.style.setProperty('--p', ((+r.value - min) / (max - min || 1)) * 100 + '%'); };
   document.addEventListener('input', (e) => { if (e.target.matches?.('input[type="range"]')) fill(e.target); }, true);
 
+  /* ---------------- Reflet qui suit la souris sur les contrôles en matière ---------------- */
+  const GLINT = '.btn, .picker-btn, .chip, .seg, .search, .input, .textarea';
+  let gRaf = 0, gEv = null, gEl = null;
+  addEventListener('pointermove', (e) => {
+    gEv = e; if (gRaf) return;
+    gRaf = requestAnimationFrame(() => {
+      gRaf = 0; const t = gEv.target.closest?.(GLINT);
+      if (gEl && gEl !== t) { gEl.style.removeProperty('--gx'); gEl.style.removeProperty('--gy'); }
+      gEl = t; if (!t) return;
+      const r = t.getBoundingClientRect();
+      t.style.setProperty('--gx', (gEv.clientX - r.left) + 'px'); t.style.setProperty('--gy', (gEv.clientY - r.top) + 'px');
+    });
+  }, { passive: true });
+
   /* ---------------- En-tête : la catégorie de la rubrique au-dessus du titre ---------------- */
   const CAT = { dashboard: 'Tableau de bord', projects: 'Gestion de projets', project: 'Gestion de projets', todo: 'Gestion de projets', digital: 'Com digitale', campaigns: 'Com digitale', hello: 'Communauté', conges: 'Communauté', chat: 'Communauté', budget: 'Outils', fixed: 'Outils', material: 'Outils', agenda: 'Outils', export: 'Outils', archives: 'Historique', games: 'Détente', settings: 'Système' };
   const decorate = (root) => {

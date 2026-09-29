@@ -3,6 +3,24 @@
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
+## Chantier en cours — refonte « Gearbox OS » (maquette 2.0) · au 29/09/2026
+- **Branche `feat/refonte-os-v2`** (poussée sur GitHub, JAMAIS déployée) — `master` et la prod ne sont pas touchés.
+- **Où** : `maquettes/v2/` (maquette vanilla HTML/JS/CSS, sans build ni backend : données fictives dans
+  `js/data.js`). Contrat d'une rubrique : `maquettes/v2/APPS.md`. Modèle UX validé par Théo : canevas
+  `maquettes/ux/project/*.dc.html` + brief `maquettes/ux/BRIEF-REFONTE.md`. Canevas DA : `maquettes/da/`.
+- **Lancer** : serveur `maquettes` de `.claude/launch.json` (`python -m http.server 4173 --directory maquettes`),
+  puis `http://localhost:4173/v2/`. Sous 760 px de large, c'est la coque mobile qui démarre.
+- **Principe** : Gearbox devient un « OS » de bureau (fenêtres, Dock, barre du haut escamotable, widgets,
+  fonds animés WebGL, Mission Control, espaces) ; les 16 rubriques reprennent **100 % des fonctionnalités
+  réelles** (inventaire fait sur les `pages/*.tsx`), au modèle UX validé (aéré, contrasté, filtres en carte).
+- **Décisions validées** : direction artistique unique **Signal** (sombre par défaut) ; matières Pixel /
+  **Liquid Glass (défaut)** / Opaque — la matière habille les contrôles et conteneurs, fenêtres façon Mica ;
+  icônes style iOS ; fond par défaut **Bony** (logo officiel, charte du brandbook) ; barre du haut escamotable ;
+  sélecteurs de sites en plaques repliables ; calendrier et menus chartés (plus aucun contrôle natif).
+- **Défauts du vrai Gearbox relevés pendant l'inventaire** : voir la fin de `BUGS-CONNUS.md` (29/09, non reproduits).
+- **Étape suivante** : stratégie de déploiement — comment la maquette devient le vrai front (React, rubrique
+  par rubrique, derrière un drapeau), sans casser la prod. Rien n'est décidé.
+
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
   51.83.75.181)

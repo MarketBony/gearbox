@@ -319,7 +319,7 @@
         $f.querySelector('[data-sites]')?.addEventListener('click', (e) => {
           const rm = e.target.closest('[data-rm]');
           if (rm) { e.stopPropagation(); f.sites = f.sites.filter((x) => x !== rm.dataset.rm); return upd(); }
-          GX.ui.pick(e.currentTarget, [...Object.entries(D.PLAQUES).map(([pl, ss]) => ({ label: '★ ' + pl, toggleAll: true, items: ss.map((s) => ({ v: s, l: s, hint: [D.ALPINE_SITES.includes(s) && 'Alpine', D.NISSAN_SITES.includes(s) && 'Nissan'].filter(Boolean).join(' · ') })) })),
+          GX.ui.pick(e.currentTarget, [...Object.entries(D.PLAQUES).map(([pl, ss]) => ({ label: pl, collapsible: true, toggleAll: true, items: ss.map((s) => ({ v: s, l: s, hint: [D.ALPINE_SITES.includes(s) && 'Alpine', D.NISSAN_SITES.includes(s) && 'Nissan'].filter(Boolean).join(' · ') })) })),
             { label: 'Entités spécifiques', items: [{ v: 'Nissan', l: 'Nissan', hint: 'enveloppe globale' }] }],
           { multi: true, search: true, selected: f.sites, allLabel: 'Tout le réseau', title: 'Périmètre', width: 310, onChange: (v) => { f.sites = v; upd(); } });
         });

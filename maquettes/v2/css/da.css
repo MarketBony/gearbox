@@ -49,8 +49,7 @@
 }
 :root[data-da="signal"] { --r-xs: 3px; --r-sm: 5px; --r-md: 6px; --r-lg: 8px; --r-xl: 10px; --r-2xl: 12px; --win-r: 8px; --da-title-ls: .18em; --da-title-size: 12px; }
 /* Boutons primaires et sélections « au trait lumineux » */
-:root[data-da="signal"]:not([data-theme="light"]) .btn.primary { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent), 0 0 18px -6px var(--accent); }
-:root[data-da="signal"]:not([data-theme="light"]) .chip[aria-pressed="true"] { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* (Signal au « trait lumineux » retiré : direction unique, le modèle validé utilise le dégradé Bony) */
 :root[data-da="signal"] .kpi-v, :root[data-da="signal"] .dsh-kpi .kpi-v { font-family: var(--font-display); font-size: 22px; letter-spacing: -.01em; }
 :root[data-da="signal"] .dock, :root[data-da="signal"] .menu, :root[data-da="signal"] .pick { border-radius: 10px; }
 
@@ -124,3 +123,64 @@
 .wp-carbone { background: radial-gradient(90% 70% at 85% 110%, rgba(247,86,50,.18), transparent 60%), radial-gradient(70% 60% at 0% 0%, rgba(255,255,255,.04), transparent 60%), #0c0c0e; }
 :root[data-theme="light"] .wp-carbone { background: radial-gradient(90% 70% at 85% 110%, rgba(247,86,50,.14), transparent 60%), #ecebe9; }
 :root[data-wallpaper="carbone"] { --tint: #1d1b1a; }
+
+/* =================== CONTRÔLES EN MATIÈRE (Liquid Glass / Pixel) ===================
+   Comme sur iOS / macOS : ce sont les CONTRÔLES (boutons, sélecteurs, puces, segments,
+   champs, recherche) et les CONTENEURS qui portent la matière — le contenu reste lisible.
+   Pas de backdrop-filter sur ces petits éléments (des dizaines par écran : trop coûteux
+   sur les PC du bureau, et le fond derrière est presque uni) : translucidité + liseré
+   lumineux + reflet qui suit la souris (--gx/--gy posés par controls.js). */
+:root[data-material="liquid"]:not([data-theme="light"]) {
+  --ctl-bg: rgba(255,255,255,.06); --ctl-bg-h: rgba(255,255,255,.11); --ctl-hi: rgba(255,255,255,.24); --ctl-lo: rgba(255,255,255,.075);
+  --ctl-sh: 0 1px 2px rgba(0,0,0,.28), 0 8px 18px -12px rgba(0,0,0,.7); --glint: rgba(255,255,255,.16);
+  --box-bg: rgba(255,255,255,.035); --box-hi: rgba(255,255,255,.13); --box-lo: rgba(255,255,255,.065);
+}
+:root[data-material="liquid"][data-theme="light"] {
+  --ctl-bg: rgba(255,255,255,.62); --ctl-bg-h: rgba(255,255,255,.9); --ctl-hi: rgba(255,255,255,1); --ctl-lo: rgba(20,16,30,.09);
+  --ctl-sh: 0 1px 2px rgba(20,16,30,.08), 0 8px 18px -12px rgba(20,16,30,.3); --glint: rgba(255,255,255,.8);
+  --box-bg: rgba(255,255,255,.58); --box-hi: rgba(255,255,255,1); --box-lo: rgba(20,16,30,.07);
+}
+:root[data-material="pixel"]:not([data-theme="light"]) {
+  --ctl-bg: color-mix(in srgb, var(--surface-3) 86%, var(--tint)); --ctl-bg-h: color-mix(in srgb, var(--surface-4) 86%, var(--tint)); --ctl-hi: transparent; --ctl-lo: rgba(255,255,255,.05);
+  --ctl-sh: none; --glint: rgba(255,255,255,.07);
+  --box-bg: color-mix(in srgb, var(--surface-2) 88%, var(--tint)); --box-hi: transparent; --box-lo: rgba(255,255,255,.05);
+}
+:root[data-material="pixel"][data-theme="light"] {
+  --ctl-bg: color-mix(in srgb, var(--surface-3) 88%, var(--tint)); --ctl-bg-h: color-mix(in srgb, var(--surface-4) 88%, var(--tint)); --ctl-hi: transparent; --ctl-lo: rgba(20,16,30,.06);
+  --ctl-sh: none; --glint: rgba(255,255,255,.4);
+  --box-bg: color-mix(in srgb, var(--surface-2) 90%, var(--tint)); --box-hi: transparent; --box-lo: rgba(20,16,30,.06);
+}
+:root:is([data-material="liquid"], [data-material="pixel"]):not([data-effects="eco"]) :is(.btn:not(.primary):not(.ghost), .picker-btn, .chip:not([aria-pressed="true"]), .seg, .search, .input, .textarea) {
+  background-color: var(--ctl-bg);
+  background-image: radial-gradient(140px 70px at var(--gx, 50%) var(--gy, -60%), var(--glint), transparent 70%);
+  box-shadow: inset 0 1px 0 var(--ctl-hi), inset 0 0 0 1px var(--ctl-lo), var(--ctl-sh);
+  transition: background-color .18s ease, box-shadow .18s ease, color .18s ease, transform .55s var(--spring-bouncy);
+}
+:root:is([data-material="liquid"], [data-material="pixel"]):not([data-effects="eco"]) :is(.select, select:not([multiple]), input[type="date"]:not(.input)) {
+  background-color: var(--ctl-bg); box-shadow: inset 0 1px 0 var(--ctl-hi), inset 0 0 0 1px var(--ctl-lo), var(--ctl-sh);
+}
+:root:is([data-material="liquid"], [data-material="pixel"]):not([data-effects="eco"]) :is(.btn:not(.primary):not(.ghost), .picker-btn, .chip:not([aria-pressed="true"]), .input, .textarea, .select, select:not([multiple]), input[type="date"]:not(.input)):hover {
+  background-color: var(--ctl-bg-h);
+}
+/* Icônes de barre d'outils : nues au repos, capsule de verre au survol (comme les barres iOS) */
+:root:is([data-material="liquid"], [data-material="pixel"]):not([data-effects="eco"]) .icon-btn:hover {
+  background-color: var(--ctl-bg-h); box-shadow: inset 0 1px 0 var(--ctl-hi), inset 0 0 0 1px var(--ctl-lo);
+}
+/* Pouce des segments : une pastille de verre qui glisse (ressort) */
+:root:is([data-material="liquid"], [data-material="pixel"]):not([data-effects="eco"]) .seg > .thumb {
+  background: var(--ctl-bg-h); box-shadow: inset 0 1px 0 var(--ctl-hi), inset 0 0 0 1px var(--ctl-lo), 0 2px 8px -2px rgba(0,0,0,.35);
+}
+/* Puces sélectionnées : le dégradé Bony du modèle validé (toutes matières) */
+.chip[aria-pressed="true"] { background: var(--bony-grad); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 6px 14px -8px rgba(247,86,50,.75); }
+.chip[aria-pressed="true"] .brand-dot { box-shadow: 0 0 0 1.5px rgba(255,255,255,.7); }
+/* Conteneurs : cartes et panneau de filtres en verre léger (le contenu dessus reste net) */
+:root:is([data-material="liquid"], [data-material="pixel"]):not([data-effects="eco"]) :is(.card, .app-head2) {
+  background: var(--box-bg);
+  box-shadow: inset 0 1px 0 var(--box-hi), inset 0 0 0 1px var(--box-lo), 0 18px 36px -28px rgba(0,0,0,.75);
+}
+/* Appui : léger enfoncement puis rebond (les ressorts de ui.css font le retour) */
+:root:is([data-material="liquid"], [data-material="pixel"]) :is(.btn, .picker-btn, .chip, .icon-btn):active { transform: scale(.95); }
+
+/* Signal, direction unique : arrondis alignés sur les maquettes validées (cartes 14 px, champs 10 px) */
+:root[data-da="signal"] { --r-xs: 4px; --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-xl: 16px; --r-2xl: 20px; --win-r: 14px; }
+:root[data-da="signal"] .dock, :root[data-da="signal"] .menu, :root[data-da="signal"] .pick { border-radius: 16px; }

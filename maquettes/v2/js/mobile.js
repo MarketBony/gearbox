@@ -16,7 +16,8 @@
   M.init = () => {
     const prefs = GX.shell.prefs;
     if (prefs.material === 'apple') prefs.material = 'liquid';
-    const R0 = document.documentElement; R0.dataset.theme = prefs.theme; R0.dataset.effects = prefs.effects; R0.dataset.material = prefs.material || 'pixel'; R0.dataset.icons = prefs.iconStyle || 'light'; R0.dataset.wallpaper = prefs.wallpaper; R0.dataset.da = prefs.da || 'nocturne';
+    if (['prisme', 'terminal', 'glitch'].includes(prefs.wallpaper)) prefs.wallpaper = 'bony';
+    const R0 = document.documentElement; R0.dataset.theme = prefs.theme; R0.dataset.effects = prefs.effects; R0.dataset.material = prefs.material || 'pixel'; R0.dataset.icons = prefs.iconStyle || 'light'; R0.dataset.wallpaper = prefs.wallpaper; R0.dataset.da = 'signal';
     document.body.insertAdjacentHTML('beforeend', `<div class="m-root" id="mroot">
       <div class="wallpaper wp-${prefs.wallpaper}" id="wp"></div>
       <div class="m-status"><button class="m-sl" id="mSL"><span id="mTime"></span><i class="ndot hide" id="mDot"></i></button><button class="m-sr" id="mSR">${GX.icon('wifi')}${GX.icon('battery')}</button></div>

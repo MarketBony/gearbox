@@ -198,7 +198,7 @@
         h.querySelector('[data-zone]').onclick = (e) => GX.ui.pick(e.currentTarget, [
           { items: [{ v: '', l: 'Tout le réseau' }] },
           { label: 'Plaques', items: Object.keys(D.PLAQUES).map((pl) => ({ v: pl, l: '★ ' + pl, hint: D.PLAQUES[pl].length + ' sites' })) },
-          ...Object.entries(D.PLAQUES).map(([pl, ss]) => ({ label: pl, items: ss.map((s) => ({ v: s, l: s })) })),
+          ...Object.entries(D.PLAQUES).map(([pl, ss]) => ({ label: pl, collapsible: true, items: ss.map((s) => ({ v: s, l: s })) })),
         ], { multi: false, selected: [fl.zone], title: 'Plaque / Site', width: 290, onChange: ([v]) => { fl.zone = v || ''; renderH2(); renderHead(); refresh(); } });
         h.querySelector('[data-brand]').onclick = (e) => GX.ui.pick(e.currentTarget, [{ items: [{ v: '', l: 'Toutes marques' }, ...BRANDS.map((b) => ({ v: b, l: b, color: D.brand(b).hex }))] }],
           { multi: false, selected: [fl.brand], title: 'Marque', onChange: ([v]) => { fl.brand = v || ''; renderH2(); renderHead(); refresh(); } });

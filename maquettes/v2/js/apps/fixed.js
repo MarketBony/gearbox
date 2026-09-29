@@ -183,7 +183,7 @@
         $f.querySelector('[data-q]').oninput = (e) => { const had = !!f.q; f.q = e.target.value; if (had !== !!f.q) { renderFilters(); const i = $f.querySelector('[data-q]'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } refresh(); };
         // Filtres MONO comme FixedExpenses.tsx : site (TOUS SITES, GROUPE BONY, sites des plaques) et service
         $f.querySelector('[data-site]').onclick = (e) => GX.ui.pick(e.currentTarget, [{ items: [{ v: 'All', l: 'Tous sites' }, { v: 'GROUPE BONY', l: 'GROUPE BONY' }] },
-          ...Object.entries(D.PLAQUES).map(([pl, ss]) => ({ label: pl, items: ss.map((s) => ({ v: s, l: s })) }))], { multi: false, search: true, selected: [f.site], title: 'Site', width: 280, onChange: ([v]) => { f.site = v || 'All'; renderFilters(); refresh(); } });
+          ...Object.entries(D.PLAQUES).map(([pl, ss]) => ({ label: pl, collapsible: true, items: ss.map((s) => ({ v: s, l: s })) }))], { multi: false, search: true, selected: [f.site], title: 'Site', width: 280, onChange: ([v]) => { f.site = v || 'All'; renderFilters(); refresh(); } });
         $f.querySelector('[data-svc]').onclick = (e) => GX.ui.pick(e.currentTarget, [{ items: [{ v: 'All', l: 'Tous services' }, ...SERVICES.map((s) => ({ v: s, l: s, color: SVC_HEX[s] }))] }], { multi: false, selected: [f.service], title: 'Service', onChange: ([v]) => { f.service = v || 'All'; renderFilters(); refresh(); } });
         $f.querySelector('[data-from]').onchange = (e) => { f.from = e.target.value; renderFilters(); refresh(); };
         $f.querySelector('[data-to]').onchange = (e) => { f.to = e.target.value; renderFilters(); refresh(); };

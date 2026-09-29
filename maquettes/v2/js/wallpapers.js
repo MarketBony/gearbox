@@ -204,33 +204,29 @@ void main(){
      → #7a368b ; iconographie « levers de soleil qui font écho au dégradé ». Le LOGO n'est pas dans le
      shader : c'est le SVG officiel (version blanche), posé net par-dessus, jamais déformé ni recoloré. */
   const BONY = LIB + `
-vec3 grad(float t){t=clamp(t,0.,1.);vec3 a=vec3(.914,.337,.220),b=vec3(.827,.310,.282),c=vec3(.576,.239,.471),d=vec3(.478,.212,.545);
-  return t<.17?mix(a,b,t/.17):t<.73?mix(b,c,(t-.17)/.56):mix(c,d,(t-.73)/.27);}
+/* Esprit fonds macOS récents : grandes vagues nettes superposées, ombres douces, dégradé officiel.
+   Aucun bruit, aucun grain, aucune fumée : des courbes analytiques lissées à la taille d'un pixel. */
+vec3 grad(float t){t=clamp(t,0.,1.);vec3 a=vec3(.969,.337,.196),b=vec3(.914,.337,.220),c=vec3(.576,.239,.471),d=vec3(.478,.212,.545);
+  return t<.2?mix(a,b,t/.2):t<.7?mix(b,c,(t-.2)/.5):mix(c,d,(t-.7)/.3);}
 void main(){
-  vec2 p=(FC-.5*R)/R.y;float ar=R.x/R.y;
-  vec3 nuit=vec3(.161,.247,.455);
-  vec3 col=mix(vec3(.004,.005,.011),nuit*.2,smoothstep(-.7,.75,p.y+.18*(fbm(p*1.1+T*.02)-.5)));
-  /* lever de soleil : la lueur monte de l'horizon et respire lentement */
-  float hz=-.52+.025*sin(T*.07);
-  float up=max(p.y-hz,0.);
-  float glow=exp(-pow(up*4.2,1.25))*smoothstep(hz-.22,hz,p.y);
-  col+=grad(.5+p.x/ar*.9)*glow*(.36+.06*sin(T*.11));
-  col+=vec3(1.,.72,.5)*exp(-pow(abs(p.y-hz)*28.,1.6))*exp(-pow(p.x*1.4,2.))*.18;
-  /* trois voiles de lumière, en dégradé officiel, qui ondulent comme de la soie */
-  for(int k=0;k<3;k++){float fk=float(k);
-    float y0=-.2+fk*.13+.08*sin(p.x*1.05+T*.11+fk*2.1)+.035*sin(p.x*2.6-T*.17+fk*1.3);
-    float w=.045+.025*sin(p.x*1.6+T*.13+fk*4.);
-    float d=(p.y-y0)/w;
-    float fold=.55+.45*sin(p.x*6.+T*.35+fk*3.+sin(p.x*2.6-T*.18)*2.2);
-    float edge=1.-smoothstep(.75,1.,abs(p.x)/(ar*.5));
-    float band=exp(-d*d)*fold*edge;
-    col+=grad(.5+p.x/ar*.95+.12*sin(T*.07+fk))*band*(.2-.05*fk);
-    col+=vec3(1.,.92,.88)*exp(-d*d*16.)*fold*edge*.045;}
-  /* poussière d'étoiles, discrète, dans le haut */
-  vec2 g=FC/4.;vec2 id=floor(g),f=fract(g)-.5;float h=h21(id+.5);
-  if(h>.992)col+=vec3(.82,.86,1.)*exp(-dot(f,f)*14.)*(h-.992)*90.*(.55+.45*sin(T*1.1+h*80.))*smoothstep(-.15,.35,p.y);
-  col*=1.-.32*dot(p*vec2(.75,1.),p*vec2(.75,1.));
-  gl_FragColor=vec4(tone(col*1.15)*L+grain(FC)*.012,1.);
+  vec2 p=(FC-.5*R)/R.y;float ar=R.x/R.y,px=1.5/R.y,t=T*.045;
+  /* ciel : noir profond qui remonte vers le bleu nuit #293f74 */
+  vec3 col=mix(vec3(.012,.014,.03),vec3(.07,.10,.2),smoothstep(-.55,.6,p.y));
+  col+=vec3(.16,.22,.45)*.22*exp(-pow(length(p-vec2(-.15,.45))*1.3,2.));
+  /* cinq vagues, du fond vers l'avant */
+  for(int k=0;k<5;k++){float fk=float(k);
+    float y0=.02-fk*.105, A=.055+.012*fk, f=1.05+.28*fk, ph=fk*1.7;
+    float y=y0+A*sin(p.x*f+t*(1.+.35*fk)+ph)+A*.45*sin(p.x*f*2.1-t*(.8+.2*fk)+ph*1.9);
+    float d=p.y-y;                                   /* > 0 au-dessus de la crête */
+    col*=1.-.42*exp(-max(d,0.)*16.)*step(0.,d);      /* ombre portée sur la vague de derrière */
+    float tc=clamp(.12+(p.x/ar+.5)*.78+fk*.05,0.,1.);
+    vec3 lc=grad(tc)*(.34+.15*fk);
+    lc*=1.-clamp(-d*1.6,0.,.55);                     /* plus sombre en profondeur */
+    lc+=vec3(1.,.86,.78)*exp(d*55.)*step(d,0.)*(.10+.03*fk); /* liseré de lumière sur la crête */
+    col=mix(col,lc,smoothstep(px,-px,d));
+  }
+  col*=1.-.22*dot(p*vec2(.7,1.),p*vec2(.7,1.));
+  gl_FragColor=vec4(col*L,1.);
 }`;
 
   /* ================================================================ SOIE BONY — plis de soie, dégradé de la charte */
@@ -284,26 +280,6 @@ void main(){vec2 px=FC;float cs=16.*R.y/900.;vec2 cell=floor(px/cs);vec2 f=fract
   c+=vec3(0.,.12,.05)*.25;
   gl_FragColor=vec4(tone(c)*L,1.);}`;
 
-  /* ================================================================ TERMINAL — écran CRT ambre, code qui défile */
-  const TERMINAL = LIB + `
-float glyph(vec2 f,float s){vec2 g=floor(f*vec2(5.,7.));if(g.x<0.||g.y<0.||g.x>4.||g.y>6.)return 0.;return step(.45,h21(g+s*7.31));}
-void main(){vec2 uv=FC/R.xy;vec2 cc=uv-.5;float bend=dot(cc,cc);vec2 q=.5+cc*(1.+bend*.12);
-  vec3 c=vec3(0.);
-  if(q.x>0.&&q.x<1.&&q.y>0.&&q.y<1.){
-    float rows=46.;float cols=rows*R.x/R.y*1.85;vec2 g=vec2(q.x*cols,(1.-q.y)*rows+T*1.6);vec2 id=floor(g),f=fract(g);
-    float line=id.y;float len=4.+floor(h11(line*1.7)*cols*.7);float indent=floor(h11(line*.37)*4.)*2.;
-    float on=step(indent,id.x)*step(id.x,indent+len)*step(.12,h11(line*9.1));
-    float sp=step(.82,h21(id*vec2(1.,.3)));
-    float gl=glyph(vec2(f.x*1.2-.1,f.y*1.15-.08),h21(id))*on*(1.-sp);
-    float cur=step(fract(T*1.4),.55)*step(abs(id.y-floor(T*1.6+rows-3.)),.1)*step(abs(id.x-(indent+len+1.)),.1);
-    vec3 amber=vec3(1.,.62,.12);
-    c=amber*(gl+cur)*(.85+.15*sin(T*60.+q.y*800.));
-    c+=amber*.05;
-    c*=.8+.2*sin(q.y*R.y*3.14);
-    c*=smoothstep(0.,.03,q.x)*smoothstep(1.,.97,q.x)*smoothstep(0.,.03,q.y)*smoothstep(1.,.97,q.y);}
-  c*=1.-bend*1.4;c+=vec3(1.,.6,.2)*.02*h21(uv*R+T);
-  gl_FragColor=vec4(tone(c*1.4)*L,1.);}`;
-
   /* ================================================================ OBSERVATOIRE — ciel qui tourne autour du pôle, Voie lactée,
      silhouette du puy de Dôme et de sa coupole */
   const OBSERVATOIRE = LIB + `
@@ -328,44 +304,6 @@ void main(){vec2 uv=FC/R.xy;vec2 p=(FC-vec2(.62*R.x,.98*R.y))/R.y;
   c+=vec3(1.,.4,.15)*smoothstep(.01,.0,abs(uv.y-hy+.001))*.08*mountain;
   float town=step(uv.y,hy*.35)*step(.992,h21(floor(FC/3.)));c+=vec3(1.,.6,.3)*town*.6;
   gl_FragColor=vec4(tone(c*1.3)*L+grain(FC)*.015,1.);}`;
-
-  /* ================================================================ PRISME — faisceau blanc, dispersion orange → violet */
-  const PRISME = LIB + `
-vec3 spec(float x){return clamp(vec3(1.5-abs(4.*x-1.),1.5-abs(4.*x-2.),1.5-abs(4.*x-3.)),0.,1.);}
-float sdTri(vec2 p,float r){const float k=1.7320508;p.x=abs(p.x)-r;p.y=p.y+r/k;if(p.x+k*p.y>0.)p=vec2(p.x-k*p.y,-k*p.x-p.y)/2.;p.x-=clamp(p.x,-2.*r,0.);return -length(p)*sign(p.y);}
-void main(){vec2 p=(FC-.5*R)/R.y;float t=T*.15;
-  float ang=sin(t)*.08;mat2 m=mat2(cos(ang),-sin(ang),sin(ang),cos(ang));
-  vec3 c=vec3(.012,.012,.02)+vec3(.04,.02,.06)*(1.-length(p));
-  float beam=smoothstep(.012,0.,abs(p.y-(p.x+.05)*.18-.02))*step(p.x,-.02);
-  c+=vec3(1.)*beam*1.4*(0.9+.1*sin(T*3.));
-  for(int k=0;k<24;k++){float fk=float(k)/23.;float sl=-.05-fk*.42+sin(t*.7)*.03;
-    float y=(p.x-.08)*sl;float d=abs(p.y-y+.01);float cone=step(.08,p.x);
-    vec3 sc=mix(vec3(1.,.36,.18),vec3(.56,.07,.8),fk);sc=mix(sc,spec(fk),.35);
-    c+=sc*smoothstep(.006+.02*(p.x-.08),0.,d)*cone*.12*(1.-smoothstep(.2,1.3,p.x));}
-  float tri=sdTri(m*(p-vec2(.03,.01)),.13);
-  c=mix(c,vec3(.06,.07,.1)+vec3(.15,.12,.2)*(1.-smoothstep(-.12,0.,tri)),smoothstep(.003,0.,tri)*.85);
-  c+=vec3(.8,.85,1.)*smoothstep(.006,0.,abs(tri))*.6;
-  c+=vec3(1.,.6,.4)*exp(-length(p-vec2(-.02,.01))*14.)*.35;
-  gl_FragColor=vec4(tone(c*1.1)*L+grain(FC)*.015,1.);}`;
-
-  /* ================================================================ GLITCH — le levier en H du logo, corrompu par rafales */
-  const GLITCH = LIB + `
-float sdSeg(vec2 p,vec2 a,vec2 b){vec2 pa=p-a,ba=b-a;float h=clamp(dot(pa,ba)/dot(ba,ba),0.,1.);return length(pa-ba*h);}
-float logo(vec2 p){float d=sdSeg(p,vec2(-.18,-.22),vec2(-.18,.22));d=min(d,sdSeg(p,vec2(0.,-.22),vec2(0.,.22)));d=min(d,sdSeg(p,vec2(.18,0.),vec2(.18,.22)));d=min(d,sdSeg(p,vec2(-.18,0.),vec2(.18,0.)));
-  d=min(d,length(p-vec2(.18,0.))-.035);return d;}
-vec3 scene(vec2 p){vec3 c=mix(vec3(.03,.02,.06),vec3(.1,.03,.12),p.y+.5);
-  c+=vec3(.97,.34,.2)*.05*(1.+sin(p.x*40.+T));
-  float d=logo(p*1.2);c+=mix(vec3(.97,.34,.2),vec3(.56,.07,.67),p.x+.5)*(smoothstep(.02,.0,d)*1.2+.02/max(d,.01)*.25);
-  return c;}
-void main(){vec2 uv=FC/R.xy;vec2 p=(FC-.5*R)/R.y;
-  float tb=floor(T*8.);float burst=step(.72,h11(floor(T*1.3)))*step(.35,h11(tb));
-  float band=floor(uv.y*(10.+30.*h11(tb)));float sh=(h11(band+tb)-.5)*.25*burst*step(.6,h11(band*1.3+tb));
-  vec2 q=p+vec2(sh,0.);float sp=.012*burst+.002;
-  vec3 c=vec3(scene(q+vec2(sp,0.)).r,scene(q).g,scene(q-vec2(sp,0.)).b);
-  c=mix(c,1.-c.bgr,step(.97,h21(floor(uv*vec2(12.,40.))+tb))*burst);
-  c*=.88+.12*sin(FC.y*1.7);
-  c+=(h21(FC+T)-.5)*.08*(burst+.3);
-  gl_FragColor=vec4(tone(c*1.2)*L,1.);}`;
 
   /* ================================================================ AURORE — rideaux boréaux, reflet dans le lac */
   const AURORE = LIB + `
@@ -418,18 +356,15 @@ void main(){vec2 uv=FC/R.xy;vec2 p=(FC-.5*R)/R.y;float hz=-.05;
 
   /* ------------------------------------------------ catalogue */
   W.catalog = [
-    { id: 'bony', name: 'Bony', note: 'Logo et dégradé officiels, lever de soleil', frag: BONY, scale: .6, taa: false, logo: 'logo-bony-white.svg', tint: '#1a1030', hero: true },
+    { id: 'bony', name: 'Bony', note: 'Logo et dégradé officiels, lever de soleil', frag: BONY, scale: .85, taa: false, logo: 'logo-bony-white.svg', tint: '#1a1030', hero: true },
     { id: 'gargantua', name: 'Gargantua', note: 'Trou noir, nébuleuse, amas d’étoiles et supernovae', frag: GARGANTUA, passes: [{ frag: GARG_NEB, scale: .33, every: 3, u: 'S' }, { frag: GARG_STARS, scale: 1, every: 3, u: 'S2' }], scale: .75, dprMax: 1, taa: false, tint: '#2a1233', hero: true },
     { id: 'soie', name: 'Soie Bony', note: 'Plis de soie aux couleurs de la charte', frag: SOIE, scale: .6, tint: '#2a1530' },
     { id: 'abysses', name: 'Abysses', note: 'Caustiques, rayons et bioluminescence', frag: ABYSSES, scale: .7, tint: '#0c2230' },
     { id: 'observatoire', name: 'Observatoire', note: 'Filé d’étoiles au-dessus du puy de Dôme', frag: OBSERVATOIRE, scale: .8, tint: '#171230' },
     { id: 'aurore', name: 'Aurore', note: 'Rideaux boréaux et reflet dans le lac', frag: AURORE, scale: .7, tint: '#0f1f2a' },
-    { id: 'prisme', name: 'Prisme', note: 'Dispersion de la lumière, orange → violet', frag: PRISME, scale: .85, tint: '#1a1420' },
     { id: 'magma', name: 'Magma', note: 'Lampe à lave, clin d’œil aux volcans', frag: MAGMA, scale: .6, tint: '#2a1420' },
     { id: 'retro', name: 'Rétro', note: 'Synthwave, soleil rayé Bony', frag: RETRO, scale: .85, tint: '#2a1030' },
     { id: 'matrice', name: 'Matrice', note: 'Pluie de glyphes', frag: MATRICE, scale: 1, taa: false, tint: '#0a1a10' },
-    { id: 'terminal', name: 'Terminal', note: 'Écran cathodique ambre, code qui défile', frag: TERMINAL, scale: 1, taa: false, tint: '#241808' },
-    { id: 'glitch', name: 'Glitch', note: 'Le levier du logo, corrompu par rafales', frag: GLITCH, scale: .8, taa: false, tint: '#1f1022' },
   ];
   W.ids = W.catalog.map((w) => w.id);
   W.is = (id) => W.ids.includes(id);

@@ -26,11 +26,13 @@
     const multi = opts.multi !== false;
     let sel = new Set(opts.selected || []);
     const all = groups.flatMap((g) => g.items);
+    // Groupes repliables (plaques) : repliés par défaut, sauf s'ils contiennent déjà une sélection partielle
+    const open = new Set(groups.map((g, i) => (g.collapsible && g.items.some((it) => sel.has(it.v)) && !g.items.every((it) => sel.has(it.v)) ? i : -1)).filter((i) => i >= 0));
     const useSearch = opts.search ?? all.length > 8;
     const el = document.createElement('div'); el.className = 'pick glass glass-strong';
     if (opts.width) el.style.width = opts.width + 'px';
     el.innerHTML = `${opts.title ? `<div class="pick-t">${GX.esc(opts.title)}</div>` : ''}${useSearch ? `<label class="search pick-s">${GX.icon('search', 'sm')}<input placeholder="Rechercher…" /></label>` : ''}
-      ${multi ? `<div class="pick-top"><button data-all>${GX.esc(opts.allLabel || 'Tout')}</button><button data-every>Tout cocher</button><span class="grow"></span><span class="faint pick-n"></span></div>` : ''}
+      ${multi ? `<div class="pick-top"><button data-all>${GX.esc(opts.allLabel || 'Tout')}</button><button data-every>Tout sélectionner</button></div><div class="faint pick-n"></div>` : ''}
       <div class="pick-list scroll"></div>`;
     document.body.append(el);
     const list = el.querySelector('.pick-list'), q = el.querySelector('.pick-s input');
@@ -40,14 +42,22 @@
         const items = g.items.filter((it) => !t || (it.l + ' ' + (g.label || '')).toLowerCase().includes(t));
         if (!items.length) return '';
         const allIn = items.every((it) => sel.has(it.v)), someIn = items.some((it) => sel.has(it.v));
+        if (g.collapsible) {
+          const isOpen = t || open.has(gi);
+          return `<div class="pick-g coll ${isOpen ? 'open' : ''}" data-x="${gi}"><span class="pick-chev">${GX.icon('chevron', 'sm')}</span><span class="grow">${GX.esc(g.label)}</span>${someIn ? `<span class="pick-gn">${items.filter((it) => sel.has(it.v)).length}/${items.length}</span>` : ''}${multi ? `<span class="pick-ck ${allIn ? 'on' : someIn ? 'part' : ''}" data-g="${gi}" role="checkbox" aria-label="Toute la plaque"></span>` : ''}</div>` +
+            (isOpen ? `<div class="pick-sub">${items.map((it) => `<div class="pick-it ${sel.has(it.v) ? 'on' : ''}" data-v="${GX.esc(it.v)}"><span class="ellipsis grow">${GX.esc(it.l)}</span>${it.hint ? `<span class="faint" style="font-size:11px">${GX.esc(it.hint)}</span>` : ''}${multi ? `<span class="pick-ck ${sel.has(it.v) ? 'on' : ''}"></span>` : `<span class="pick-rd">${sel.has(it.v) ? GX.icon('check', 'sm') : ''}</span>`}</div>`).join('')}</div>` : '');
+        }
         return `${g.label ? `<div class="pick-g ${g.toggleAll && multi ? 'tog' : ''}" data-g="${gi}">${g.toggleAll && multi ? `<span class="pick-ck ${allIn ? 'on' : someIn ? 'part' : ''}"></span>` : ''}${GX.esc(g.label)}</div>` : ''}` +
           items.map((it) => `<div class="pick-it ${sel.has(it.v) ? 'on' : ''}" data-v="${GX.esc(it.v)}">${multi ? `<span class="pick-ck ${sel.has(it.v) ? 'on' : ''}"></span>` : `<span class="pick-rd">${sel.has(it.v) ? GX.icon('check', 'sm') : ''}</span>`}${it.color ? `<i class="brand-dot" style="--c:${it.color}"></i>` : ''}<span class="ellipsis grow">${GX.esc(it.l)}</span>${it.hint ? `<span class="faint" style="font-size:11px">${GX.esc(it.hint)}</span>` : ''}</div>`).join('');
       }).join('') || `<div class="empty" style="padding:16px">Aucun résultat</div>`;
-      const n = el.querySelector('.pick-n'); if (n) n.textContent = sel.size ? `${sel.size} sélectionné${sel.size > 1 ? 's' : ''}` : (opts.allLabel || 'Tout');
+      const n = el.querySelector('.pick-n'); if (n) n.textContent = sel.size ? `${sel.size} sélectionné${sel.size > 1 ? 's' : ''}` : '';
+      el.querySelector('[data-all]')?.classList.toggle('on', !sel.size);
     };
     const emit = () => opts.onChange && opts.onChange([...sel]);
     list.addEventListener('click', (e) => {
-      const it = e.target.closest('.pick-it'), g = e.target.closest('.pick-g.tog');
+      const x = e.target.closest('.pick-g.coll'), ck = e.target.closest('.pick-g.coll [data-g]');
+      if (x && !ck) { const i = +x.dataset.x; open.has(i) ? open.delete(i) : open.add(i); return render(); }
+      const it = e.target.closest('.pick-it'), g = ck || e.target.closest('.pick-g.tog');
       if (it) {
         const v = all.find((x) => String(x.v) === it.dataset.v)?.v;
         if (!multi) { sel = new Set([v]); render(); emit(); return GX.ui.closePick(); }
@@ -81,7 +91,7 @@
     if (variant === 'digital') {
       // Concessions du Digital (DIGITAL_CONCESSIONS) : global, sites des plaques sauf Ricoux, sites Nissan, Yssingeaux
       groups.push({ label: 'Global', items: ['GROUPE BONY', 'FULL RENAULT', 'FULL DACIA', 'FULL NISSAN', 'FULL ALPINE'].map((v) => ({ v, l: v })) });
-      Object.entries(D.PLAQUES).forEach(([pl, sites]) => groups.push({ label: '★ ' + pl, toggleAll: true, items: sites.filter((x) => x !== 'Ricoux').map((x) => ({ v: x, l: x })) }));
+      Object.entries(D.PLAQUES).forEach(([pl, sites]) => groups.push({ label: pl, collapsible: true, toggleAll: true, items: sites.filter((x) => x !== 'Ricoux').map((x) => ({ v: x, l: x })) }));
       groups.push({ label: 'Autres', items: [...D.NISSAN_ONLY, 'Yssingeaux'].map((x) => ({ v: x, l: x })) });
       const known = new Set(groups.flatMap((g) => g.items.map((i) => i.v)));
       const legacy = (selected || []).filter((v) => !known.has(v));
@@ -89,7 +99,7 @@
       return GX.ui.pick(anchor, groups, { multi, selected, onChange, allLabel: 'Aucun', title: title || 'Sites', width: 310 });
     }
     if (variant === 'project') groups.push({ label: 'Périmètres groupés', items: [{ v: 'GROUPE BONY (GLOBAL)', l: 'GROUPE BONY (GLOBAL)', hint: 'répartition verrouillée' }, { v: 'GROUPE BONY (R/N)', l: 'GROUPE BONY (R/N)', hint: '16 sites' }] });
-    Object.entries(D.PLAQUES).forEach(([pl, sites]) => groups.push({ label: '★ ' + pl, toggleAll: true, items: sites.map((s) => ({ v: s, l: s, hint: [D.ALPINE_SITES.includes(s) && 'Alpine', D.NISSAN_SITES.includes(s) && 'Nissan'].filter(Boolean).join(' · ') })) }));
+    Object.entries(D.PLAQUES).forEach(([pl, sites]) => groups.push({ label: pl, collapsible: true, toggleAll: true, items: sites.map((s) => ({ v: s, l: s, hint: [D.ALPINE_SITES.includes(s) && 'Alpine', D.NISSAN_SITES.includes(s) && 'Nissan'].filter(Boolean).join(' · ') })) }));
     if (variant !== 'filter' || entities) groups.push({ label: variant === 'filter' ? 'Hors plaque' : 'Sites Nissan', items: D.NISSAN_ONLY.map((s) => ({ v: s, l: s, hint: 'Nissan' })) });
     if (variant === 'filter' && entities) groups.push({ label: 'Entités spécifiques', items: [{ v: 'Nissan', l: 'Nissan', hint: 'enveloppe globale' }] });
     return GX.ui.pick(anchor, groups, { multi, selected, onChange, allLabel: variant === 'filter' ? 'Tout le réseau' : 'Aucun', title: title || 'Périmètre', width: 310 });
@@ -137,9 +147,20 @@
   .pick{position:fixed;z-index:20500;width:260px;max-height:min(70vh,520px);display:flex;flex-direction:column;padding:8px;border-radius:16px;animation:ui-menu var(--t-med) var(--spring-snappy) both}
   .pick-t{font-weight:700;padding:4px 6px 8px}
   .pick-s{margin:0 2px 6px}
-  .pick-top{display:flex;gap:4px;align-items:center;padding:0 2px 6px;border-bottom:1px solid var(--line);margin-bottom:4px}
-  .pick-top button{height:24px;padding:0 9px;border-radius:7px;font-size:12px;font-weight:600;background:var(--surface-3)}
-  .pick-top button:hover{background:var(--surface-4)}
+  .pick-top{display:flex;gap:6px;align-items:center;padding:0 2px 6px}
+  .pick-top button{flex:1;height:32px;padding:0 10px;border-radius:9px;font-size:12.5px;font-weight:700;color:var(--text-2);background:transparent;box-shadow:inset 0 0 0 1px var(--line-2);transition:background var(--t-fast),color var(--t-fast)}
+  .pick-top button:hover{background:var(--surface-3);color:var(--text)}
+  .pick-top button.on{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 55%,transparent)}
+  .pick-n{font-size:11.5px;padding:0 6px 6px;min-height:0}.pick-n:empty{display:none}
+  .pick-top + .pick-n + .pick-list, .pick-top + .pick-n:empty + .pick-list{border-top:1px solid var(--line);padding-top:4px}
+  .pick-g.coll{cursor:pointer;border-radius:9px;padding:9px 8px;margin-top:1px;font-size:11.5px;letter-spacing:.08em;color:var(--text-2)}
+  .pick-g.coll:hover{background:var(--surface-3);color:var(--text)}
+  .pick-chev{display:grid;place-items:center;transition:transform var(--t-med) var(--spring-snappy)}
+  .pick-g.coll.open .pick-chev{transform:rotate(90deg)}
+  .pick-g.coll.open{color:var(--text)}
+  .pick-gn{font-size:11px;font-weight:700;letter-spacing:0;color:var(--accent);text-transform:none}
+  .pick-sub{padding:0 0 4px 20px;animation:ui-fade-up var(--t-med) var(--ease-out) both}
+  .pick-sub .pick-it{min-height:32px}
   .pick-list{flex:1;min-height:0}
   .pick-g{display:flex;align-items:center;gap:8px;padding:8px 8px 4px;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--text-3);text-transform:uppercase}
   .pick-g.tog{cursor:pointer;border-radius:8px}.pick-g.tog:hover{color:var(--text);background:var(--surface-3)}

@@ -23,8 +23,9 @@
 
   /* ======================= Démarrage ======================= */
   S.init = () => {
-    if (prefs.material === 'apple') prefs.material = 'liquid'; // « Verre Apple » est devenu « Liquid Glass »
-    const R0 = document.documentElement; R0.dataset.theme = prefs.theme; R0.dataset.effects = prefs.effects; R0.dataset.material = prefs.material; R0.dataset.icons = prefs.iconStyle; R0.dataset.wallpaper = prefs.wallpaper; R0.dataset.da = prefs.da; R0.toggleAttribute('data-mbauto', !!prefs.menubarAuto);
+    if (prefs.material === 'apple') prefs.material = 'liquid';
+    if (['prisme', 'terminal', 'glitch'].includes(prefs.wallpaper)) prefs.wallpaper = 'bony'; // fonds retirés // « Verre Apple » est devenu « Liquid Glass »
+    const R0 = document.documentElement; R0.dataset.theme = prefs.theme; R0.dataset.effects = prefs.effects; R0.dataset.material = prefs.material; R0.dataset.icons = prefs.iconStyle; R0.dataset.wallpaper = prefs.wallpaper; prefs.da = 'signal'; R0.dataset.da = 'signal'; // direction artistique unique (les deux autres ont été retirées) R0.toggleAttribute('data-mbauto', !!prefs.menubarAuto);
     document.body.insertAdjacentHTML('beforeend', `
       <div class="wallpaper wp-${prefs.wallpaper}" id="wp"></div>
       <header class="menubar glass glass-strong" id="menubar"></header>
@@ -161,11 +162,13 @@
   function perimetreMenu(anchor) {
     if (GX.ctx.site) { S.hud(`Périmètre verrouillé : ${GX.ctx.site} (chef de site)`); return; }
     const set = (p) => { GX.ctx.perimetre = p; buildMenubar(); GX.emit('ctx'); S.hud('Périmètre : ' + p); };
-    GX.menu.open([
-      { label: 'Tout le réseau', checked: GX.ctx.perimetre === 'Tout le réseau', action: () => set('Tout le réseau') }, '-',
-      ...Object.entries(D.PLAQUES).flatMap(([pl, sites]) => [{ header: '★ ' + pl }, ...sites.slice(0, 5).map((s) => ({ label: s, checked: GX.ctx.perimetre === s, action: () => set(s) }))]),
-      { header: 'Entités spécifiques' }, { label: 'Nissan', checked: GX.ctx.perimetre === 'Nissan', action: () => set('Nissan') },
-    ], anchor, { align: 'right' });
+    // Plaques en sous-listes repliables (comme le filtre Périmètre de Gearbox) + recherche : plus de liste à rallonge
+    GX.ui.pick(anchor, [
+      { items: [{ v: 'Tout le réseau', l: 'Tout le réseau' }] },
+      ...Object.entries(D.PLAQUES).map(([pl, sites]) => ({ label: pl, collapsible: true, items: sites.map((s) => ({ v: s, l: s })) })),
+      { label: 'Hors plaque', items: D.NISSAN_ONLY.map((s) => ({ v: s, l: s, hint: 'Nissan' })) },
+      { label: 'Entités spécifiques', items: [{ v: 'Nissan', l: 'Nissan', hint: 'enveloppe globale' }] },
+    ], { multi: false, search: true, title: 'Périmètre', width: 300, selected: [GX.ctx.perimetre || 'Tout le réseau'], onChange: ([v]) => set(v) });
   }
   function tick() { const c = $('#mbClock'); if (c) c.textContent = new Date().toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', ''); }
 
@@ -320,7 +323,6 @@
         <div class="cc-tile" data-k="desktop"><span class="ic">${GX.icon('desktop')}</span><div><b>Bureau</b><span>Ctrl Alt D</span></div></div>
         <div class="cc-tile cc-wide" style="display:block;cursor:default"><b style="font-size:12px">Voir comme</b><select class="select" id="ccRole" style="margin-top:8px">${Object.keys(D.ROLES).map((r) => `<option value="${r}" ${GX.ctx.role === r ? 'selected' : ''}>${D.ROLES[r].l}${r === 'Master' ? ' (moi)' : ''}</option>`).join('')}</select>
           <span style="display:block;margin-top:6px">Dock, rubriques et données se cloisonnent comme dans Gearbox.</span></div>
-        <div class="cc-tile cc-wide" style="display:block;cursor:default"><b style="font-size:12px">Direction artistique</b><div class="seg" style="margin-top:8px;display:flex" data-ccda>${[['nocturne', 'Nocturne'], ['carbone', 'Carbone'], ['signal', 'Signal']].map(([v, l]) => `<button data-v="${v}" aria-pressed="${(prefs.da || 'nocturne') === v}" style="flex:1">${l}</button>`).join('')}</div></div>
         <div class="cc-tile cc-wide" style="display:block;cursor:default"><b style="font-size:12px">Matière</b><div class="seg" style="margin-top:8px;display:flex" data-ccmat>${[['pixel', 'Pixel'], ['liquid', 'Liquid Glass'], ['solid', 'Opaque']].map(([v, l]) => `<button data-v="${v}" aria-pressed="${(prefs.material || 'pixel') === v}" style="flex:1">${l}</button>`).join('')}</div>
           <b style="font-size:12px;display:block;margin-top:10px">Style d’icônes</b><div class="seg" style="margin-top:8px;display:flex" data-ccico>${[['light', 'Claire'], ['dark', 'Sombre'], ['tinted', 'Teintée']].map(([v, l]) => `<button data-v="${v}" aria-pressed="${(prefs.iconStyle || 'light') === v}" style="flex:1">${l}</button>`).join('')}</div></div>
         <div class="cc-tile ${prefs.dockSmart ? 'on' : ''}" data-k="smart"><span class="ic">${GX.icon('sidebar')}</span><div><b>Dock intelligent</b><span>${prefs.dockSmart ? 'S’efface' : 'Toujours visible'}</span></div></div>
