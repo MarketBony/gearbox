@@ -163,3 +163,32 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [ ] **Digital : les filtres marque/service du Calendrier s'appliquent aussi au Planning**, où leur barre est masquée — filtrage invisible. Non reproduit.
 - [ ] **To-do : pour un rôle Guest, la page resterait bloquée sur « Chargement… »** — `getStandaloneTasks` reçoit un 403 non intercepté dans `loadTasks`, `setLoading(false)` n'est jamais appelé. Non reproduit (pas de compte Guest de test).
 - [ ] **To-do : Holding n'est pas exclusif dans le formulaire des tâches autonomes** (`StandaloneTaskForm`), contrairement à la règle métier appliquée partout ailleurs. Non reproduit.
+
+<!-- Relevés le 29/09/2026 (bis) pendant l'écriture des inventaires de parité (lot 0 de l'interface v2,
+     maquettes/ux/inventaires/<rubrique>.md, section 11), par LECTURE DU CODE seulement : aucun n'a été
+     reproduit. Revérifier avant de coder. Détail et autres écarts mineurs : section 11 de chaque inventaire. -->
+- [ ] **Matériel : les routes des réservations n'ont ni `requireRole` ni `siteScope`** (catalogue en GET compris).
+  Un chef de site, un External ou un Guest pourrait écrire par appel direct à l'API. Cf. `inventaires/materiel.md`.
+- [ ] **Chat : un chef de site peut lire le Général par l'API REST** — `routes/chat.ts` n'exclut que l'External,
+  seul le socket lui est fermé. Compteur non-lu et push du Général visent aussi les chefs de site (non vérifié
+  jusqu'à `resolvePushRecipients`). Cf. `inventaires/chat.md`.
+- [ ] **Dashboard : pour un chef de site, `GET /api/campaigns` part sans filtre de site** alors que la page n'en
+  fait rien — toutes les campagnes sont lisibles dans l'onglet Réseau. Cf. `inventaires/dashboard.md`.
+- [ ] **Hello Marketing : clé OpenWeather en clair dans le code client** (`pages/HelloMarketing.tsx`, en tête).
+- [ ] **Réglages : l'ancien mot de passe n'est jamais envoyé ni vérifié** au changement de mot de passe.
+- [ ] **Chat : « Modifier » est proposé sur les messages image / fichier / vocal / projet** — éditer remplacerait
+  l'adresse du fichier ou l'id du projet par du texte.
+- [ ] **Filtres de périmètre qui comparent le site EXACT** (même famille que la fiche Dépenses ci-dessus) :
+  Projets (`p.site === …` — un projet multi-sites ou GROUPE BONY ne sort sous aucun site ; entrées « Alpine » /
+  « Nissan » qui ne correspondent à aucun projet) et échéances du Dashboard.
+- [ ] **Sélecteurs de périmètre incomplets** : Montluçon et Saint-Etienne absents du Dashboard ; Montluçon,
+  Saint-Etienne et Yssingeaux absents du filtre Site du Planning Digital, où Ricoux reste proposé.
+- [ ] **Digital : Holding n'est pas exclusif dans le sélecteur Marques** (sans effet budgétaire) ; statut brut
+  « Programmed » en vue Semaine ; tri impossible sous `lg` ; date de création calculée en UTC (veille entre 0 h et 2 h).
+- [ ] **Projets : les deux curseurs s'affichent sur un projet Alpine + Nissan + RDM** alors que la règle ignore
+  `nissanShare` ; une marque Alpine/Nissan reste posée (et n'est plus retirable) quand on retire son dernier site
+  éligible ; clé `Groupe` (et non `Holding`) dans `BRAND_DOT`.
+- [ ] **Mobile, menu « Plus »** : « Projets Archivés » proposé au chef de site (renvoyé au Dashboard) ; bouton
+  « Actualités » non conditionné au rôle.
+- [ ] **Archives : restauration sans confirmation ni entrée au journal** ; options Brouillon/Actif/Terminé du
+  filtre Statut qui ne peuvent rien remonter.

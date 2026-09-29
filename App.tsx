@@ -29,12 +29,17 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AnimatePresence, motion } from 'framer-motion';
 import { pageVariants, pageTransition } from './lib/motion';
+import Ui2Gate from './ui2/Ui2Gate';
+import { useUi2Active, setUi2Beta } from './ui2/beta';
 
 // Inner App handles logic after provider is mounted
 const InnerApp: React.FC = () => {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dbReady, setDbReady] = useState(false);
+  // Interface v2 (Gearbox OS, bêta) : préférence du compte, lue ici pour rester au-dessus
+  // des retours anticipés (un hook ne peut pas être conditionnel).
+  const ui2Active = useUi2Active(user);
   // Interrupteurs de fonctionnalité : chargés une fois à l'ouverture de session,
   // puis suivis en temps réel — une extinction par le Master doit être immédiate
   // chez tout le monde, sans rechargement.
@@ -139,6 +144,12 @@ const InnerApp: React.FC = () => {
 
   if (!user) {
       return <Login />;
+  }
+
+  // Bêta v2 : la coque reçoit l'onglet DÉJÀ résolu par les gardes de rôle ci-dessus —
+  // elle n'a aucune logique de droits propre.
+  if (ui2Active) {
+    return <Ui2Gate tab={resolvedTab} onExit={() => setUi2Beta(user.id, false)} />;
   }
 
   const renderContent = (tab: string) => {

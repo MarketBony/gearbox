@@ -13,6 +13,7 @@ import DatePicker from '../components/DatePicker';
 import InstallAppModal from '../components/InstallAppModal';
 import NotificationsToggle from '../components/NotificationsToggle';
 import GamesToggle from '../components/GamesToggle';
+import BetaToggle from '../ui2/BetaToggle';
 import { SITES, isSiteManager } from '../constants';
 // `parseLocalDate` est exporté par DateRangePicker (et non par constants.ts).
 import { parseLocalDate } from '../components/DateRangePicker';
@@ -715,6 +716,12 @@ const Settings: React.FC = () => {
             <GamesToggle />
           </div>
         )}
+
+        {/* Interface v2 (Gearbox OS, bêta). `BetaToggle` ne s'affiche que pour les rôles
+            de `UI2_BETA_ROLES` (Master seul jusqu'au lot 1, puis tous). */}
+        {user && <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/5 empty:hidden">
+          <BetaToggle userId={user.id} role={user.role} />
+        </div>}
       </div>
 
       {/* SECTION 1ter : STOCKAGE — visible par TOUS les rôles (demande de Théo) :

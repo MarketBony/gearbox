@@ -1,0 +1,45 @@
+/* Coque v2 — lot 0 : coque vide. Uniquement des jetons de tokens.css, sous `.gx2`. */
+
+.gx2-bar {
+  position: absolute; top: 0; left: 0; right: 0; height: 40px;
+  display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  background: var(--chrome-bg, var(--glass-strong));
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+}
+.gx2-brand {
+  font-family: var(--font-display); font-weight: 700; text-transform: uppercase;
+  font-size: var(--da-title-size); letter-spacing: var(--da-title-ls);
+}
+.gx2-beta {
+  font-size: var(--fs-11); color: var(--accent);
+  border: 1px solid var(--accent); border-radius: var(--r-sm); padding: 1px 6px;
+}
+.gx2-grow { flex: 1; }
+.gx2-user { color: var(--text-2); font-size: var(--fs-12); }
+
+.gx2-btn {
+  font: inherit; font-size: var(--fs-12); color: var(--text); cursor: pointer;
+  background: var(--surface-3); border: 1px solid var(--line-2); border-radius: var(--r-md);
+  padding: 6px 12px; transition: background var(--t-fast) var(--ease-out);
+}
+.gx2-btn:hover { background: var(--surface-4); }
+.gx2-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.gx2-btn-primary { background: var(--bony-grad); border-color: transparent; color: #fff; }
+.gx2-btn-primary:hover { background: var(--bony-grad); filter: brightness(1.08); }
+
+.gx2-empty {
+  position: absolute; inset: 40px 0 0 0; display: grid; place-items: center; padding: 16px;
+}
+.gx2-card {
+  max-width: 460px; padding: 24px; border-radius: var(--r-lg);
+  background: var(--surface-2); border: 1px solid var(--line);
+}
+.gx2-card h1 {
+  margin: 0 0 12px; font-family: var(--font-display); font-weight: 700; text-transform: uppercase;
+  font-size: var(--fs-14); letter-spacing: .08em;
+}
+.gx2-card p { margin: 0 0 20px; color: var(--text-2); }
+
+@media (max-width: 520px) { .gx2-user { display: none; } }

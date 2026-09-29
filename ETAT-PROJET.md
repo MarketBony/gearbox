@@ -27,6 +27,24 @@
 - **Lot 0, étape a) — 29/09 : maquette et docs mergées sur `master`** (merge `--no-ff`, **aucun déploiement**, prod
   inchangée). Vérifié avant : `vite build` ne produit aucun fichier de `maquettes/`, `tsc` reste à 9 erreurs.
   `maquettes` ajouté à `.dockerignore` : le contexte de build de l'image `web` ne l'embarque plus.
+- **Lot 0, étapes b) et c) — 29/09, recetté par Théo, branche `feat/ui2-lot0` (NON mergée, jamais déployée)** :
+  - **Nouveau code dans `ui2/`** : `beta.ts` (préférence `localStorage` `gearbox_ui2_beta:<userId>`, liste
+    `UI2_BETA_ROLES`), `BetaToggle.tsx` (interrupteur des Paramètres, section Application), `Ui2Gate.tsx`
+    (chargement différé + filet `ErrorBoundary` qui coupe la bêta si la coque plante), `Ui2Root.tsx` (coque
+    VIDE), `styles/tokens.css` (jetons Signal / clair / matières Liquid·Pixel·Opaque / économe) et `styles/shell.css`.
+  - **⚠️ Interrupteur réservé au MASTER jusqu'au lot 1** (`UI2_BETA_ROLES = ['Master']`) : décision de Théo, pour
+    qu'un correctif déployé entre-temps n'embarque pas une coque vide chez tout le monde. À ouvrir à tous au lot 1.
+  - **Branchement `App.tsx`** : la coque est montée APRÈS les gardes de rôle et reçoit l'onglet déjà résolu
+    (aucune logique de droits dans `ui2/`). `?ui=classic` force l'ancienne interface.
+  - **Toute la CSS v2 est limitée à `.gx2`, jamais `:root`** : chargée en différé, elle reste dans la page après
+    un retour à l'ancienne interface — vérifié inerte (aucune variable sur `:root`, fond et police inchangés).
+  - Build : la coque sort dans son propre morceau (2,7 Ko JS + 5,5 Ko CSS), l'ancien bundle ne grossit pas.
+    `tsc` : 9 erreurs de référence, inchangé.
+  - **Inventaires de parité : `maquettes/ux/inventaires/`** — 16 rubriques + `_coque.md` (Sidebar, gardes, cloche,
+    présence), format commun `_FORMAT.md`. Tirés du code par lecture ; défauts relevés en section 11 de chaque
+    fichier (les principaux reportés dans `BUGS-CONNUS.md`, 29/09 bis).
+  - Arbitrage Théo (29/09) : les tags Digital `FULL RENAULT/DACIA/NISSAN/ALPINE` et `Yssingeaux` sont propres à
+    l'équipe digitale et n'entrent dans AUCUN périmètre de chef de site — **voulu, on n'y touche pas**.
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
