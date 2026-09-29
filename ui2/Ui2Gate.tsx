@@ -1,10 +1,11 @@
 import React, { Suspense, lazy } from 'react';
-import type { Ui2RootProps } from './Ui2Root';
+import type { OsHostProps as Ui2RootProps } from './os/OsHost';
 
 // Porte d'entrée de l'interface v2, chargée avec l'ancienne. Tout le reste (coque, CSS)
 // est en différé : l'ancien bundle ne grossit pas, et la feuille v2 n'est chargée que
 // par ceux qui ont activé la bêta.
-const Ui2Root = lazy(() => import('./Ui2Root'));
+// Hôte de la coque Gearbox OS (portage 1:1 de la maquette, Shadow DOM) — ui2/os/.
+const Ui2Root = lazy(() => import('./os/OsHost'));
 
 // Filet : si la coque plante (ou si son morceau de code ne se charge pas, par exemple
 // juste après un déploiement), on coupe la bêta et l'ancienne interface revient.

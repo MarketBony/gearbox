@@ -16,6 +16,13 @@ Décidé avec Théo le 29/09/2026. Référence pour toutes les sessions du chant
 - Le nouveau code a **sa propre feuille de style** (jetons de `maquettes/v2/css/*`, sans Tailwind) : aucun
   conflit avec les contraintes du Tailwind CDN Play.
 
+- **⚠️ Révisé le 29/09 (lot 1) : la COQUE n'est pas reconstruite en React.** Les premières réécritures étaient
+  lentes et infidèles. La coque (bureau, fenêtres, Dock, barre du haut, widgets, fonds, Centre de contrôle,
+  coque mobile) est le **moteur de la maquette converti tel quel en TypeScript** (`ui2/os/engine/`), dans une
+  racine fantôme, branché sur les vraies données et les vrais droits (`ui2/os/bridge.ts`, `ui2/os/data.ts`).
+  Seules les **rubriques** sont réécrites en React (lots 2 → 16), avec le balisage et la CSS de la maquette.
+  La règle « aucune seconde logique métier » tient : la logique simplifiée de `js/data.js` n'est pas reprise.
+
 ## Lots (chacun : branche dédiée → test localhost avec les vrais rôles → 🛑 recette Théo → .md → déploiement `web`)
 - **Lot 0 — préparation (aucun déploiement)** : interrupteur bêta (préférence utilisateur, localStorage
   d'abord), dossier du nouveau code (ex. `ui2/`), point d'entrée dans `App.tsx`, feuille de jetons,

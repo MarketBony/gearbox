@@ -69,6 +69,34 @@
   - Retirés de la maquette (décision Théo 29/09) : « Voir comme » et l'écran verrouillé.
   - Arbitrage Théo (29/09) : les tags Digital `FULL RENAULT/DACIA/NISSAN/ALPINE` et `Yssingeaux` sont propres à
     l'équipe digitale et n'entrent dans AUCUN périmètre de chef de site — **voulu, on n'y touche pas**.
+- **Lot 1 (complet) — 29/09, recetté par Théo, branche `feat/ui2-lot1` (NON mergée, jamais déployée).
+  ⚠️ CHANGEMENT DE MÉTHODE, décidé avec Théo** : les réécritures React de la coque du lot 1a (`ui2/wm.ts`,
+  `Window.tsx`, `Dock.tsx`, `MenuBar.tsx`, `Menu.tsx`, `AppIcon.tsx`, `appIcons.ts`, `styles/*.css`, `Ui2Root.tsx`)
+  étaient lentes et infidèles (tailles, disposition, animations) : **supprimées**. La coque est désormais le
+  **MOTEUR DE LA MAQUETTE converti tel quel en TypeScript**, monté dans une racine fantôme (Shadow DOM).
+  - **`ui2/os/engine/*.ts`** : `maquettes/v2/js/*` converti par `scripts/ui2-convert-engine.mjs` (conversion
+    initiale seulement — la relancer ÉCRASE les retouches). `// @ts-nocheck` pour l'instant (typage à faire au
+    fil des lots). **Chaque écart avec la maquette porte la balise `[GEARBOX]`** : `grep -n "\[GEARBOX\]"` les
+    liste tous. `engine/boot.ts` démarre les modules dans l'ordre de `maquettes/v2/index.html`.
+  - **CSS : `ui2/os/maquette.css` est GÉNÉRÉ** (`scripts/ui2-extract-css.mjs` puis `ui2-scope-css.mjs` : feuilles
+    de la maquette + tous ses `GX.css(...)`, `:root` → `:host`). Ne jamais l'éditer à la main. **La seule feuille
+    écrite à la main est `ui2/os/overrides.css`**, chaque règle y est justifiée.
+  - **`ui2/os/OsHost.tsx`** : publie le PONT (`ui2/os/bridge.ts` : compte, thème, droits `computeNav`, pastilles,
+    fil d'activité, `resolveTab` d'App.tsx) — le moteur ne calcule aucun droit. **`ui2/os/DataHub.tsx` +
+    `ui2/os/data.ts`** : vraies données (dataService) dans `GX.data`, même API que `maquettes/v2/js/data.js`.
+    **Montants uniquement via `services/dashboardStats.ts` (`computeDashboardStats`, extrait de
+    `pages/Dashboard.tsx`, qui l'utilise désormais)** ; congés via les portes de `constants.ts`. Aucune écriture
+    en base depuis la coque (cocher une tâche, envoyer un message → ouvre la rubrique).
+  - **Rubriques pas encore portées** : leur fenêtre projette la page actuelle par `<slot name="app-<id>">`
+    (elle garde Tailwind et les contextes React). `services/activityFeed.ts` = fil de la cloche partagé.
+  - Retirés de la maquette : « Voir comme », écran verrouillé, messages simulés. Interrupteur bêta toujours
+    **réservé au Master** (`UI2_BETA_ROLES`) : chef de site et External PAS vérifiés (décision Théo : plus tard).
+  - Mesuré : 60 i/s au survol du Dock et en réduire / restaurer / fermer, comme la maquette.
+  - Correctifs de recette : vignettes des fonds et curseurs des sélecteurs segmentés invisibles (le moteur
+    cherchait dans `document` au lieu de la racine fantôme) ; ouvrir/réduire saccadé (voir Pièges) ; contrastes
+    du thème clair (défaut de la maquette, `BUGS-CONNUS.md`).
+  - **Suite : lots 2 → 16**, une rubrique par lot, réécrite en React avec le balisage et la CSS de la maquette
+    (To-do puis Agenda d'abord pour figer la méthode). Chaque rubrique portée retire sa page actuelle des fenêtres.
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
@@ -3530,6 +3558,16 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Interface v2 (Shadow DOM) — `document` ne voit RIEN de la coque.** Tout `document.querySelector`,
+  `document.head.append` ou `MutationObserver` sur l'hôte du moteur rate la racine fantôme : passer par
+  `GX.root` (vignettes des fonds et curseurs des sélecteurs invisibles au lot 1 pour cette raison). Les
+  écouteurs `window`/`document` du moteur passent par `GX.win()`, qui rend la vraie cible (`composedPath()`).
+- **Interface v2 : ne jamais faire re-rendre les pages projetées.** `setTab` à chaque changement de fenêtre
+  active re-rendait TOUTES les pages ouvertes (tâche longue de 542 ms, en pleine animation) : elles sont figées
+  par `LegacyPage` (`React.memo`) dans `OsHost.tsx`. Une fenêtre réduite de page actuelle est masquée par
+  `visibility`, pas `display: none` (sinon les graphiques du Dashboard se recalculent au réaffichage).
+- **Interface v2 : pas de `:has()` dans la CSS de la coque** — mesuré 32 i/s contre 60. Classes posées par
+  `engine/boot.ts` (`.gx-legacy`, `.gx-has-legacy`) à la place.
 - **⚠️ `strictNullChecks` est DÉSACTIVÉ dans `tsconfig.json` : un prop requis manquant
   n'est PAS une erreur de compilation.** Découvert le 09/09/2026 : un `React.memo` typé via
   `React.FC<Props>` **sur la const** perd en plus la vérification des props à l'appel, et un

@@ -87,7 +87,7 @@ interface RssArticle {
   thumbnail: string;
 }
 
-interface WeatherData {
+export interface WeatherData {
   city: string;
   temp: number;
   feelsLike: number;
@@ -98,7 +98,7 @@ interface WeatherData {
   pressure: number;
 }
 
-interface ForecastDay {
+export interface ForecastDay {
   day: string;
   icon: string;
   tempMax: number;
@@ -113,7 +113,7 @@ interface DeezerTrack {
   album: { title: string; cover_medium: string };
 }
 
-interface BirthdayEntry {
+export interface BirthdayEntry {
   user: User;
   daysUntil: number;
   age: number;
@@ -525,7 +525,8 @@ const MarketingNewsSection: React.FC = () => {
 
 // ─── 2. Météo — hook + deux composants d'affichage ───────────────────────────
 
-const useWeatherData = (userId: string) => {
+// Exporté : le widget Météo de l'interface v2 lit la MÊME source (ville du profil, cache 30 min).
+export const useWeatherData = (userId: string) => {
   const [current,  setCurrent]  = useState<WeatherData | null>(null);
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -823,34 +824,41 @@ const MusicSection: React.FC = () => {
 
 // ─── 4. Anniversaires ─────────────────────────────────────────────────────────
 
+/** Prochains anniversaires, triés du plus proche. Exporté : partagé avec le widget
+ *  « Anniversaires » de l'interface v2 (une seule règle de calcul). */
+export const computeBirthdays = (users: User[]): BirthdayEntry[] => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const result: BirthdayEntry[] = [];
+  for (const u of users) {
+    // ⚠️ Corrigé le 04/08/2026 : cette boucle lisait le `localStorage` du POSTE
+    // pour chaque utilisateur. Comme l'anniversaire n'était saisi que sur la
+    // machine de celui qui le renseignait, personne ne voyait ceux des autres —
+    // le symptôme signalé par Théo. C'est désormais un champ du serveur.
+    const birthdate = u.birthdate || '';
+    if (!birthdate) continue;
+    // `parseLocalDate` et non `new Date` : sur 'YYYY-MM-DD' le second parse en UTC
+    // et rend la veille dès qu'on est à l'est de Greenwich, ce qui décalerait la
+    // date affichée et le décompte de jours.
+    const bday = parseLocalDate(birthdate);
+    const next = new Date(today.getFullYear(), bday.getMonth(), bday.getDate());
+    if (next < today) next.setFullYear(today.getFullYear() + 1);
+    const daysUntil = Math.ceil((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    result.push({ user: u, daysUntil, age: next.getFullYear() - bday.getFullYear() });
+  }
+
+  result.sort((a, b) => a.daysUntil - b.daysUntil);
+  return result;
+};
+
 const BirthdaysSection: React.FC = () => {
   const [entries, setEntries] = useState<BirthdayEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
       const users = await db.getUsers();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const result: BirthdayEntry[] = [];
-      for (const u of users) {
-        // ⚠️ Corrigé le 04/08/2026 : cette boucle lisait le `localStorage` du POSTE
-        // pour chaque utilisateur. Comme l'anniversaire n'était saisi que sur la
-        // machine de celui qui le renseignait, personne ne voyait ceux des autres —
-        // le symptôme signalé par Théo. C'est désormais un champ du serveur.
-        const birthdate = u.birthdate || '';
-        if (!birthdate) continue;
-        // `parseLocalDate` et non `new Date` : sur 'YYYY-MM-DD' le second parse en UTC
-        // et rend la veille dès qu'on est à l'est de Greenwich, ce qui décalerait la
-        // date affichée et le décompte de jours.
-        const bday = parseLocalDate(birthdate);
-        const next = new Date(today.getFullYear(), bday.getMonth(), bday.getDate());
-        if (next < today) next.setFullYear(today.getFullYear() + 1);
-        const daysUntil = Math.ceil((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        result.push({ user: u, daysUntil, age: next.getFullYear() - bday.getFullYear() });
-      }
-
-      result.sort((a, b) => a.daysUntil - b.daysUntil);
+      const result = computeBirthdays(users);
       setEntries(result);
       setLoading(false);
   }, []);

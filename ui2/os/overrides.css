@@ -1,0 +1,31 @@
+/* =====================================================================
+   DÉROGATIONS au CSS de la maquette — la SEULE feuille écrite à la main.
+   Temporaires : chaque règle disparaît avec sa cause (portage de la rubrique).
+
+   Fenêtres (bureau) et écrans (téléphone) qui hébergent une page ACTUELLE de Gearbox,
+   projetée par <slot> : ses modales sont en `position: fixed` et doivent couvrir l'écran.
+   `contain: paint`, `backdrop-filter` (Mica) et `will-change: transform` font de leur
+   ancêtre le bloc conteneur des éléments fixes — la modale resterait coincée dans la
+   fenêtre. On les neutralise UNIQUEMENT pour ces fenêtres.
+   ⚠️ Pas de `:has(slot)` ici : mesuré le 29/09/2026, il divisait la fluidité par deux
+   (32 i/s au survol du Dock contre 60) en forçant le navigateur à réévaluer tout l'arbre.
+   Classes posées par engine/boot.ts : `.gx-legacy` sur la fenêtre / l'écran, et
+   `.gx-has-legacy` sur l'hôte tant qu'une page actuelle est ouverte.
+   ===================================================================== */
+.win.gx-legacy { contain: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+/* La matière Liquid/Pixel rend le corps des fenêtres transparent (Mica) : une page actuelle,
+   dessinée pour un fond opaque, laisserait voir le fond d'écran derrière ses cartes.
+   Couleurs = fond de l'ancienne interface (meta theme-color). */
+:host .win.gx-legacy .win-body { background: #121212 !important; }
+:host([data-theme="light"]) .win.gx-legacy .win-body { background: #f1f5f9 !important; }
+:host(.gx-has-legacy) .space { will-change: auto !important; }
+.m-app.gx-legacy, :host(.gx-has-legacy) .m-home { will-change: auto !important; }
+
+/* Défaut hérité de la MAQUETTE (29/09/2026) : en thème clair + Liquid Glass sur un fond animé,
+   elle force le texte des widgets et du Dock en blanc (fond sombre derrière le verre). Deux
+   éléments ont pourtant leur propre fond CLAIR et devenaient blanc sur blanc : le panneau de
+   conversation du widget Chat (bulles, saisie) et l'infobulle du Dock. On leur rend les
+   couleurs de texte du thème clair (valeurs de la maquette, :host[data-theme=light]). */
+:host([data-theme="light"]) :is(.wch-conv, .wch-in, .dock .tip) {
+  --text: #120f19; --text-2: #4a4556; --text-3: #746f84; color: var(--text);
+}

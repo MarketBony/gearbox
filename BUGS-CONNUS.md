@@ -192,3 +192,14 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   « Actualités » non conditionné au rôle.
 - [ ] **Archives : restauration sans confirmation ni entrée au journal** ; options Brouillon/Actif/Terminé du
   filtre Statut qui ne peuvent rien remonter.
+
+<!-- Interface v2 (Gearbox OS), lot 1 — 29/09/2026 -->
+- [x] **Maquette v2 : texte blanc sur fond clair en thème clair + Liquid Glass sur un fond animé** — la maquette
+  force `--text: #fff` sur les widgets et le Dock ; le panneau de conversation du widget Chat et l'infobulle du
+  Dock ont pourtant un fond clair (contraste mesuré 1,0). Corrigé dans `ui2/os/overrides.css` (la maquette
+  elle-même n'est pas modifiée).
+- [ ] **Interface v2 : les pages actuelles projetées dans une fenêtre gardent leur thème clair d'origine**
+  (anciens contrastes Tailwind). Pas retouchées : elles disparaissent au portage de chaque rubrique.
+- [ ] **Interface v2 : chef de site et External non vérifiés dans la coque** (interrupteur réservé au Master).
+  À faire avant d'ouvrir la bêta à tous.
+

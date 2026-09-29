@@ -16,6 +16,7 @@ import { canSeeGames, SITE_MANAGER_SECTIONS, isSiteManager, hasSocialFeatures } 
 import { useAppSettings } from '../services/appSettings';
 import { computeNav } from '../services/navigation';
 import { useNavBadges } from '../services/navBadges';
+import { useActivityFeed, openActivityEntry, relativeTime } from '../services/activityFeed';
 import {
   LayoutDashboard,
   FolderKanban,
@@ -41,16 +42,6 @@ import {
   Palmtree
 } from 'lucide-react';
 
-const relativeTime = (iso: string): string => {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "à l'instant";
-  if (m < 60) return `il y a ${m} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `il y a ${h}h`;
-  return `il y a ${Math.floor(h / 24)}j`;
-};
-
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
@@ -65,80 +56,24 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const { gamesEnabled } = useAppSettings();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
-  const [activityLog, setActivityLog] = useState<ActivityLog[]>([]);
-  const [lastReadTs, setLastReadTs] = useState<string | null>(null);
+  // Fil d'activité (cloche) : source unique partagée avec la coque v2.
+  const { entries: activityLog, isUnread, unreadCount, markAllRead } = useActivityFeed();
   // Pastilles Chat / Jeux (+ badge de l'icône PWA) : source unique partagée avec la coque v2.
   const { chatUnread: chatUnreadCount, gamesChallenges: gamesChallengeCount } = useNavBadges(user, gamesEnabled);
-
-  const loadActivity = () => {
-    // GET /api/activity-log — best-effort : la cloche reste vide si l'API est injoignable.
-    db.getActivityLog().then(setActivityLog).catch(() => { /* ignore */ });
-    setLastReadTs(localStorage.getItem('gearbox_activity_last_read'));
-  };
-
-  useEffect(() => {
-    loadActivity();
-    const actHandler = () => loadActivity();
-    window.addEventListener('gearbox-activity-updated', actHandler);
-    return () => window.removeEventListener('gearbox-activity-updated', actHandler);
-  }, []);
-
-  // Temps réel du journal d'activité : 'gearbox-activity-updated' ci-dessus est
-  // un événement window, donc limité à l'onglet qui a écrit. La cloche ne
-  // montrait l'activité des autres utilisateurs qu'après un rechargement.
-  useRealtimeSync(RT_EVENTS.activity, loadActivity);
 
   const openActivity = () => {
     setShowActivity(true);
   };
 
   const closeActivity = () => {
-    const now = new Date().toISOString();
-    localStorage.setItem('gearbox_activity_last_read', now);
-    setLastReadTs(now);
+    markAllRead();
     setShowActivity(false);
   };
 
   const handleEntryClick = (entry: ActivityLog) => {
     closeActivity();
-    const detail: Record<string, string> = {};
-    switch (entry.entity) {
-      case 'project':
-        detail.tab = 'projects';
-        if (entry.entityId) {
-          window.sessionStorage.setItem('pendingProjectId', entry.entityId);
-          detail.projectId = entry.entityId;
-        }
-        break;
-      case 'post':
-        detail.tab = 'digital';
-        break;
-      case 'task':
-        detail.tab = 'campaigns';
-        if (entry.entityId) {
-          window.sessionStorage.setItem('pendingProjectId', entry.entityId);
-          detail.projectId = entry.entityId;
-        }
-        break;
-      case 'fixed-expense':
-        detail.tab = 'fixed-expenses';
-        break;
-      case 'equipment':
-      case 'booking':
-        detail.tab = 'material';
-        break;
-      case 'user':
-        detail.tab = 'settings';
-        break;
-      default:
-        detail.tab = 'dashboard';
-    }
-    window.dispatchEvent(new CustomEvent('gearbox-navigate', { detail }));
+    openActivityEntry(entry);
   };
-
-  const unreadCount = activityLog.filter(e =>
-    lastReadTs ? new Date(e.timestamp) > new Date(lastReadTs) : true
-  ).length;
 
   // Présence des AUTRES utilisateurs par rubrique (soi-même exclu : on sait
   // déjà où on est, et ça économise une place précieuse sur mobile).
@@ -536,12 +471,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                 </div>
               ) : (
                 activityLog.map(entry => {
-                  const isUnread = lastReadTs ? new Date(entry.timestamp) > new Date(lastReadTs) : true;
                   return (
                     <div
                       key={entry.id}
                       onClick={() => handleEntryClick(entry)}
-                      className={`flex items-start gap-3 p-3 transition-colors cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 ${isUnread ? 'bg-bony-orange/5' : ''}`}
+                      className={`flex items-start gap-3 p-3 transition-colors cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 ${isUnread(entry) ? 'bg-bony-orange/5' : ''}`}
                     >
                       <div className="shrink-0 mt-0.5">
                         <Avatar userId={entry.userId} name={entry.userName} color={entry.userColor} size={30} />
@@ -554,7 +488,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
                         </p>
                         <p className="text-[10px] text-bony-muted mt-0.5">{relativeTime(entry.timestamp)}</p>
                       </div>
-                      {isUnread && (
+                      {isUnread(entry) && (
                         <div className="w-1.5 h-1.5 rounded-full bg-bony-orange shrink-0 mt-1.5" />
                       )}
                     </div>
