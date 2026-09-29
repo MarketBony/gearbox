@@ -24,6 +24,9 @@
   pendant le chantier (l'ancienne UI reste par défaut jusqu'à la bascule). Lot 0 (préparation + inventaires
   en fichiers) → lot 1 (socle / coque) → 15 lots rubriques → bascule → nettoyage. Estimation ≈ 18 M tokens.
 - **Maquette v2 : état final validé au 29/09** (commits sur `feat/refonte-os-v2` : 25891fc, 9875d1e, bdf3662).
+- **Lot 0, étape a) — 29/09 : maquette et docs mergées sur `master`** (merge `--no-ff`, **aucun déploiement**, prod
+  inchangée). Vérifié avant : `vite build` ne produit aucun fichier de `maquettes/`, `tsc` reste à 9 erreurs.
+  `maquettes` ajouté à `.dockerignore` : le contexte de build de l'image `web` ne l'embarque plus.
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
