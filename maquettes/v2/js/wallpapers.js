@@ -209,7 +209,7 @@ void main(){
 vec3 grad(float t){t=clamp(t,0.,1.);vec3 a=vec3(.969,.337,.196),b=vec3(.914,.337,.220),c=vec3(.576,.239,.471),d=vec3(.478,.212,.545);
   return t<.2?mix(a,b,t/.2):t<.7?mix(b,c,(t-.2)/.5):mix(c,d,(t-.7)/.3);}
 void main(){
-  vec2 p=(FC-.5*R)/R.y;float ar=R.x/R.y,px=1.5/R.y,t=T*.045;
+  vec2 p=(FC-.5*R)/R.y;float ar=R.x/R.y,px=1.25/R.y,t=T*.045;
   /* ciel : noir profond qui remonte vers le bleu nuit #293f74 */
   vec3 col=mix(vec3(.012,.014,.03),vec3(.07,.10,.2),smoothstep(-.55,.6,p.y));
   col+=vec3(.16,.22,.45)*.22*exp(-pow(length(p-vec2(-.15,.45))*1.3,2.));
@@ -218,12 +218,12 @@ void main(){
     float y0=.02-fk*.105, A=.055+.012*fk, f=1.05+.28*fk, ph=fk*1.7;
     float y=y0+A*sin(p.x*f+t*(1.+.35*fk)+ph)+A*.45*sin(p.x*f*2.1-t*(.8+.2*fk)+ph*1.9);
     float d=p.y-y;                                   /* > 0 au-dessus de la crête */
-    col*=1.-.42*exp(-max(d,0.)*16.)*step(0.,d);      /* ombre portée sur la vague de derrière */
+    col*=1.-.42*exp(-max(d,0.)*16.)*smoothstep(-px,px,d); /* ombre portée sur la vague de derrière (sans bord franc) */
     float tc=clamp(.12+(p.x/ar+.5)*.78+fk*.05,0.,1.);
     vec3 lc=grad(tc)*(.34+.15*fk);
     lc*=1.-clamp(-d*1.6,0.,.55);                     /* plus sombre en profondeur */
-    lc+=vec3(1.,.86,.78)*exp(d*55.)*step(d,0.)*(.10+.03*fk); /* liseré de lumière sur la crête */
-    col=mix(col,lc,smoothstep(px,-px,d));
+    lc+=vec3(1.,.86,.78)*exp(min(d,0.)*55.)*(.10+.03*fk); /* liseré de lumière sur la crête */
+    col=mix(col,lc,smoothstep(1.6*px,-1.6*px,d));
   }
   col*=1.-.22*dot(p*vec2(.7,1.),p*vec2(.7,1.));
   gl_FragColor=vec4(col*L,1.);
@@ -356,7 +356,7 @@ void main(){vec2 uv=FC/R.xy;vec2 p=(FC-.5*R)/R.y;float hz=-.05;
 
   /* ------------------------------------------------ catalogue */
   W.catalog = [
-    { id: 'bony', name: 'Bony', note: 'Logo et dégradé officiels, lever de soleil', frag: BONY, scale: .85, taa: false, logo: 'logo-bony-white.svg', tint: '#1a1030', hero: true },
+    { id: 'bony', name: 'Bony', note: 'Logo et dégradé officiels, lever de soleil', frag: BONY, scale: 1, dprMax: 1.5, taa: false, logo: 'logo-bony-white.svg', tint: '#1a1030', hero: true },
     { id: 'gargantua', name: 'Gargantua', note: 'Trou noir, nébuleuse, amas d’étoiles et supernovae', frag: GARGANTUA, passes: [{ frag: GARG_NEB, scale: .33, every: 3, u: 'S' }, { frag: GARG_STARS, scale: 1, every: 3, u: 'S2' }], scale: .75, dprMax: 1, taa: false, tint: '#2a1233', hero: true },
     { id: 'soie', name: 'Soie Bony', note: 'Plis de soie aux couleurs de la charte', frag: SOIE, scale: .6, tint: '#2a1530' },
     { id: 'abysses', name: 'Abysses', note: 'Caustiques, rayons et bioluminescence', frag: ABYSSES, scale: .7, tint: '#0c2230' },
