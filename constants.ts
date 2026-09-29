@@ -701,6 +701,15 @@ export const MARKETING_TEAM_ROLES: string[] = [
 export const isMarketingRole = (role?: string): boolean =>
   !!role && MARKETING_TEAM_ROLES.includes(role);
 
+// Rôles qui ÉCRIVENT les projets, leurs tâches et fichiers, et les tâches libres : miroir
+// d'`EDIT_ROLES` de backend/src/routes/projects.ts, tasks.ts et projectFiles.ts (le refus
+// réel est côté serveur). Même valeur que MARKETING_TEAM_ROLES ce jour, règle DIFFÉRENTE
+// (« qui écrit » ≠ « qui peut être rattaché ») : ne pas les aliaser. Ajouté le 29/09/2026
+// pour l'interface v2 ; `pages/Projects.tsx` et `pages/TodoList.tsx` gardent leur copie
+// locale jusqu'à leur retrait.
+export const PROJECT_EDIT_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+export const canEditProjects = (role?: string): boolean => !!role && PROJECT_EDIT_ROLES.includes(role);
+
 // ============================================================================
 // RÔLE « CHEF DE SITE » (Site Manager) — 05/08/2026
 //

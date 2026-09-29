@@ -6,6 +6,7 @@ import { chatStore } from '../../services/chatStore';
 import { usePresence } from '../../services/presenceStore';
 import { useRealtimeSync, RT_EVENTS } from '../../services/realtime';
 import { computeDashboardStats } from '../../services/dashboardStats';
+import { useWorkspace, startWorkspace } from '../store/workspace';
 import { useWeatherData } from '../../pages/HelloMarketing';
 import { canSeeGames } from '../../constants';
 import type { Project, BudgetLine, SocialPost, FixedExpense, User, Equipment, EquipmentBooking } from '../../types';
@@ -22,12 +23,27 @@ const gx = () => (window as any).GX;
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+// Le pont est publié par OsHost AVANT le montage de DataHub ; ce garde ne sert qu'aux cas limites
+// (rechargement à chaud du module du pont) — sans lui, la bêta se coupait sur un `null`.
 export default function DataHub() {
+  return useBridge() ? <DataHubInner /> : null;
+}
+
+function DataHubInner() {
   const b = useBridge();
   const uid = b.user.id, role = b.user.role;
   const presence = usePresence(uid);
-  const [core, setCore] = useState<{ projects: Project[]; budgets: BudgetLine[]; socialPosts: SocialPost[]; fixedExpenses: FixedExpense[] } | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
+  // Projets et utilisateurs : l'espace de travail partagé (ui2/store/workspace.ts), le même que
+  // les rubriques portées — un seul chargement, mises à jour entrée par entrée.
+  useEffect(() => {
+    startWorkspace({ id: b.user.id, name: b.user.name, role: b.user.role, avatarColor: b.user.avatarColor },
+      (msg) => { const GX = gx(); GX?.shell?.notify ? GX.shell.notify({ app: 'projects', title: 'Sauvegarde', body: msg }) : console.warn(msg); });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const projects = useWorkspace(s => s.projects);
+  const projectsReady = useWorkspace(s => s.ready);
+  const users = useWorkspace(s => s.users);
+  const [rest, setRest] = useState<{ budgets: BudgetLine[]; socialPosts: SocialPost[]; fixedExpenses: FixedExpense[] } | null>(null);
+  const core = useMemo(() => (rest && projectsReady ? { ...rest, projects } : null), [rest, projects, projectsReady]);
   const [equip, setEquip] = useState<{ eq: Equipment[]; bk: EquipmentBooking[] } | null>(null);
   const [conges, setConges] = useState<Awaited<ReturnType<typeof db.getConges>> | null>(null);
   const [lobby, setLobby] = useState<any>(null);
@@ -35,11 +51,10 @@ export default function DataHub() {
 
   const allowed = b.nav.allowedIds;
   const loadCore = () => {
-    Promise.all([db.getProjects(), db.getBudgets(), db.getSocialPosts(), db.getFixedExpenses()])
-      .then(([projects, budgets, socialPosts, fixedExpenses]) => setCore({ projects, budgets, socialPosts, fixedExpenses }))
+    Promise.all([db.getBudgets(), db.getSocialPosts(), db.getFixedExpenses()])
+      .then(([budgets, socialPosts, fixedExpenses]) => setRest({ budgets, socialPosts, fixedExpenses }))
       .catch(() => { /* best-effort : les widgets restent vides */ });
   };
-  const loadUsers = () => { db.getUsers().then(setUsers).catch(() => {}); };
   const loadEquip = () => { if (!allowed.has('material')) return; Promise.all([db.getEquipment(), db.getEquipmentBookings()]).then(([eq, bk]) => setEquip({ eq, bk })).catch(() => {}); };
   const loadConges = () => {
     if (!allowed.has('conges')) { setConges(null); return; }
@@ -49,9 +64,8 @@ export default function DataHub() {
   };
   const loadLobby = () => { if (!canSeeGames(role, allowed.has('games'))) return; db.getGamesLobby().then(setLobby).catch(() => {}); };
 
-  useEffect(() => { loadCore(); loadUsers(); loadEquip(); loadConges(); loadLobby(); }, [uid, role, allowed.has('conges'), allowed.has('material'), allowed.has('games')]); // eslint-disable-line react-hooks/exhaustive-deps
-  useRealtimeSync([...RT_EVENTS.projects, ...RT_EVENTS.budget, ...RT_EVENTS.social, ...RT_EVENTS.fixedExpenses], loadCore);
-  useRealtimeSync(RT_EVENTS.users, loadUsers);
+  useEffect(() => { loadCore(); loadEquip(); loadConges(); loadLobby(); }, [uid, role, allowed.has('conges'), allowed.has('material'), allowed.has('games')]); // eslint-disable-line react-hooks/exhaustive-deps
+  useRealtimeSync([...RT_EVENTS.budget, ...RT_EVENTS.social, ...RT_EVENTS.fixedExpenses], loadCore);
   useRealtimeSync(RT_EVENTS.conges, loadConges);
   useRealtimeSync(RT_EVENTS.games, loadLobby);
 

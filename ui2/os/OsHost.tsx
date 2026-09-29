@@ -4,7 +4,8 @@ import css from './maquette.css?inline';
 import overridesCss from './overrides.css?inline';
 import { boot } from './engine/boot';
 import DataHub from './DataHub';
-import { bridgeStore, useLegacyIds, tabOf } from './bridge';
+import { bridgeStore, useLegacyIds, usePortedMounts, tabOf } from './bridge';
+import { PORTED_APPS } from '../apps/registry';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAppSettings } from '../../services/appSettings';
@@ -104,12 +105,14 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
 
   // Premier rendu d'une page à l'ouverture de sa fenêtre : en TRANSITION, pour que React le
   // découpe au lieu de bloquer l'animation d'ouverture (tâches de ~100 ms mesurées sinon).
+  const ported = usePortedMounts();
   const legacyIds = useLegacyIds();
   const [legacy, setLegacy] = useState(legacyIds);
   useEffect(() => { startTransition(() => setLegacy(legacyIds)); }, [legacyIds]);
   return (
     <div ref={slotRef}>
       {booted && <DataHub />}
+      {booted && ported.map(m => { const App = PORTED_APPS[m.appId]; return App ? createPortal(<App win={m.win} inst={m.inst} />, m.host, m.key) : null; })}
       {booted && legacy.map(id => createPortal(
         <div key={id} slot={`app-${id}`} className="gx2-legacy text-bony-text font-sans" style={{ height: '100%', overflow: 'hidden' }}>
           <LegacyPage id={id} render={renderPage} />

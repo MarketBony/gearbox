@@ -102,7 +102,8 @@ async function apiFetchText(path: string): Promise<string> {
 // 'yyyy-MM-dd' partout (DatePicker, comparaisons de chaînes) — on normalise
 // à la réception, sans toucher les pages.
 const toDay = (v: any): string => (typeof v === 'string' && v.length > 10 ? v.slice(0, 10) : v);
-const normalizeProject = (p: any): Project => ({
+// Exportée pour l'interface v2 : les projets reçus par le temps réel passent par la même porte.
+export const normalizeProject = (p: any): Project => ({
   ...p,
   startDate: toDay(p.startDate),
   endDate: toDay(p.endDate)

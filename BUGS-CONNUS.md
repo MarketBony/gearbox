@@ -210,4 +210,10 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [x] **Interface v2 : écran noir quand la coque est remontée** — hôte recréé, moteur déjà démarré. Hôte persistant.
 - [ ] **Interface v2 : première ouverture d'une page actuelle lourde (Projets, Dashboard, Budget) : 100 à 200 ms
   de blocage** — coût des anciennes pages, disparaît à leur portage.
+- [x] **Interface v2 : catégorie au-dessus du titre des rubriques absente, curseurs non remplis** — `engine/controls.ts`
+  observait l'hôte au lieu de la racine fantôme. Corrigé.
+- [x] **Interface v2 : glisser une fenêtre vers la bande de dispositions / un bureau de Mission Control sans effet** —
+  `document.elementFromPoint` rendait l'hôte. Corrigé (`GX.root.elementFromPoint`, `engine/wm.ts`).
+- [ ] **Interface v2 : première ouverture d'une rubrique portée légèrement saccadée** (To-do : une tâche de 59 ms en
+  build de prod, la maquette n'en a aucune). Relevé par Théo à la recette 2a : « un vrai sujet à gratter ».
 

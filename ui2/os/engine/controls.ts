@@ -61,9 +61,12 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   };
 
   const fire = (inp) => { inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); };
+  /* [GEARBOX] Valeur posée par le SETTER NATIF : React suit la valeur de ses champs et ignore un
+     `inp.value = v` direct (son onChange ne partirait pas). Sans effet pour le code vanilla. */
+  const setVal = (inp, v) => { const d = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(inp), 'value'); d?.set ? d.set.call(inp, v) : (inp.value = v); };
 
   /* ---------------- <input type="date"> → calendrier Gearbox ---------------- */
-  const openDate = (inp) => GX.ui.calendar(inp, inp.value, (v) => { inp.value = v; fire(inp); }, { min: inp.min, max: inp.max });
+  const openDate = (inp) => GX.ui.calendar(inp, inp.value, (v) => { setVal(inp, v); fire(inp); }, { min: inp.min, max: inp.max });
   GX.win(document, 'pointerdown', (e) => {
     const inp = e.target.closest?.('input[type="date"]'); if (!inp || inp.disabled || inp.readOnly) return;
     e.preventDefault(); inp.focus({ preventScroll: true });
@@ -87,7 +90,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     if (loose.length) groups.push({ items: loose });
     groups.forEach((g) => (g.items = g.items.filter((i) => !i.dis)));
     const n = groups.reduce((a, g) => a + g.items.length, 0);
-    GX.ui.pick(s, groups, { multi: false, selected: [s.value], width: Math.max(s.offsetWidth, 190), search: n > 10, onChange: ([v]) => { s.value = v; fire(s); } });
+    GX.ui.pick(s, groups, { multi: false, selected: [s.value], width: Math.max(s.offsetWidth, 190), search: n > 10, onChange: ([v]) => { setVal(s, v); fire(s); } });
   }, true);
 
   /* ---------------- Curseurs : remplissage en dégradé jusqu'au pouce ---------------- */
@@ -104,7 +107,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       t.insertAdjacentHTML('afterbegin', `<span class="ah-eye">${c}</span>`);
     });
   };
-  new MutationObserver((ms) => { for (const m of ms) m.addedNodes.forEach((n) => n.nodeType === 1 && decorate(n.parentElement || n)); }).observe(GX.host, { childList: true, subtree: true });
+  new MutationObserver((ms) => { for (const m of ms) m.addedNodes.forEach((n) => n.nodeType === 1 && decorate(n.parentElement || n)); }).observe(GX.root, { childList: true, subtree: true }); /* [GEARBOX] la racine fantôme, pas l'hôte */
 
   GX.css(`
   /* Calendrier */

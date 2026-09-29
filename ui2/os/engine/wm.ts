@@ -367,11 +367,11 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       zone = zoneAt(ev.clientX, ev.clientY);
       if (zone === 'layouts') {
         if (!layStrip) layStrip = showLayouts(win, { left: innerWidth / 2 - 130, bottom: MB() + 4 }, () => {});
-        const hit = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('.lay button');
+        const hit = GX.root.elementFromPoint(ev.clientX, ev.clientY) /* [GEARBOX] racine fantôme */?.closest?.('.lay button');
         layStrip.querySelectorAll('button').forEach((b) => (b.style.background = b === hit ? 'var(--bony-grad)' : ''));
         layPick = hit ? { z: hit.dataset.z, L: WM.LAYOUTS[+hit.dataset.l] } : null; showPreview(layPick ? zoneRect(layPick.z) : null);
       } else {
-        if (layStrip) { const hit = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('.lay button'); if (!hit) { hideLayouts(); layStrip = null; layPick = null; } else { layPick = { z: hit.dataset.z, L: WM.LAYOUTS[+hit.dataset.l] }; showPreview(zoneRect(layPick.z)); return; } }
+        if (layStrip) { const hit = GX.root.elementFromPoint(ev.clientX, ev.clientY) /* [GEARBOX] racine fantôme */?.closest?.('.lay button'); if (!hit) { hideLayouts(); layStrip = null; layPick = null; } else { layPick = { z: hit.dataset.z, L: WM.LAYOUTS[+hit.dataset.l] }; showPreview(zoneRect(layPick.z)); return; } }
         showPreview(zone ? zoneRect(zone) : null);
       }
     };
@@ -541,7 +541,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
         }
         if (!ghost) return;
         Object.assign(ghost.style, { left: ev.clientX - 90 + 'px', top: ev.clientY - 20 + 'px', width: '200px' });
-        const t = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('.mc-sp'); bar.querySelectorAll('.mc-sp').forEach((s) => s.classList.toggle('drop', s === t && !s.classList.contains('cur')));
+        const t = GX.root.elementFromPoint(ev.clientX, ev.clientY) /* [GEARBOX] racine fantôme */?.closest?.('.mc-sp'); bar.querySelectorAll('.mc-sp').forEach((s) => s.classList.toggle('drop', s === t && !s.classList.contains('cur')));
         over = t;
       };
       const up = () => {

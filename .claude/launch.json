@@ -4,20 +4,48 @@
     {
       "name": "gearbox-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000
     },
     {
       "name": "gearbox-api",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "backend"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "backend"
+      ],
       "port": 3001
     },
     {
       "name": "maquettes",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "4173", "--bind", "127.0.0.1", "--directory", "maquettes"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4173",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "maquettes"
+      ],
       "port": 4173
+    },
+    {
+      "name": "gearbox-web-prod",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--port",
+        "3000",
+        "--strictPort"
+      ],
+      "port": 3000
     }
   ]
 }

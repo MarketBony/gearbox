@@ -21,7 +21,8 @@ import { install as mobile } from './mobile';
 import { install as system } from './apps/system';
 import { install as r } from './r';
 import { createData } from '../data';
-import { bridgeStore, legacyStore, tabOf, appOf, APP_META } from '../bridge';
+import { bridgeStore, legacyStore, portedStore, tabOf, appOf, APP_META } from '../bridge';
+import { PORTED_IDS } from '../../apps/ids';
 import { openActivityEntry } from '../../../services/activityFeed';
 
 export type ShellMode = 'desktop' | 'mobile';
@@ -56,6 +57,28 @@ export function boot(host: HTMLElement, root: ShadowRoot, body: HTMLElement): Sh
   r();
 
   charts(); pickers(); controls(); icons(); wallpapers(); widgets(); wm(); shell(); mobile(); system();
+
+  // --- Rubriques PORTÉES (React, ui2/apps/*) : le moteur fournit la fenêtre, React la remplit par
+  //     portail (OsHost). Un conteneur dédié en `display: contents` : React ne partage pas son nœud
+  //     avec ce que le moteur ajoute au corps de la fenêtre (volets `win.sheet`, etc.).
+  let seq = 0;
+  for (const id of PORTED_IDS) {
+    const m = APP_META.find((x) => x.id === id); if (!m) continue;
+    GX.registerApp({
+      ...m,
+      mount(bodyEl: HTMLElement, win: any) {
+        const host = document.createElement('div'); host.className = 'gx-react'; host.style.display = 'contents';
+        bodyEl.append(host);
+        const key = `${id}-${++seq}`, inst: any = {};
+        portedStore.set([...portedStore.get(), { key, appId: id, host, win, inst }]);
+        return {
+          command: (c: string) => inst.command?.(c),
+          menus: () => inst.menus?.(),
+          destroy() { portedStore.set(portedStore.get().filter((x) => x.key !== key)); },
+        };
+      },
+    });
+  }
 
   // --- Rubriques pas encore portées : la fenêtre projette la page actuelle ---
   for (const m of APP_META) {

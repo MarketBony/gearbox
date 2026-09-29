@@ -102,6 +102,31 @@
     restauration plus saccadée, aucun gain au repos (0 requête en 30 s avec 7 fenêtres ouvertes).
   - **Suite : lots 2 → 16**, une rubrique par lot, réécrite en React avec le balisage et la CSS de la maquette
     (To-do puis Agenda d'abord pour figer la méthode). Chaque rubrique portée retire sa page actuelle des fenêtres.
+- **Lot 2a — 29/09, recetté par Théo, branche `feat/ui2-lot2` (NON mergée, jamais déployée) : To-do portée.**
+  ⚠️ **Décision Théo : les RUBRIQUES sont écrites en React** (la coque reste le moteur de la maquette).
+  - **Mécanisme** : `ui2/apps/ids.ts` (rubriques portées) → `engine/boot.ts` leur fournit une fenêtre et un
+    conteneur `.gx-react` ; `OsHost.tsx` y rend le composant (`ui2/apps/registry.tsx`) PAR PORTAIL, DANS la
+    racine fantôme : CSS de la maquette et contextes de l'appli (compte, thème). Vérifié : clics, saisie, volets.
+  - **`ui2/apps/ui/kit.tsx`** : primitives de la maquette en React, MÊME balisage (puces sans `data-multi`,
+    segmenté avec son curseur, bouton de sélecteur, icônes, badges, volets `win.sheet` à contenu React).
+    Sélecteurs, calendrier, menus, animations : ceux du MOTEUR, appelés impérativement.
+  - **`ui2/store/workspace.ts` (Zustand)** : SOURCE UNIQUE des projets, tâches libres et utilisateurs (coque +
+    rubriques + widgets). Chargement unique, mise à jour entrée par entrée (le serveur envoie le projet complet
+    avec `projects:updated` ; `null` pour un client cloisonné → rechargement), écriture optimiste par
+    `fileSauvegardeProjet` + `recalculerProjet`, messages d'erreur repris de Projects.tsx, **écho local** des
+    événements (le serveur n'envoie rien à l'onglet émetteur : les pages actuelles ouvertes à côté ne verraient
+    pas l'écriture). `/api/tasks` n'est appelé que pour les rôles d'écriture (Guest ne bloque plus).
+  - **`ui2/apps/todo/TodoApp.tsx`** : transposition de `maquettes/v2/js/apps/todo.js` (glisser-déposer, flèches,
+    clavier, clic droit, filtres, urgence, tâches libres, mobile) sur les vraies données.
+  - Ajouts hors `ui2/` : `PROJECT_EDIT_ROLES` / `canEditProjects` (`constants.ts`), `export` de
+    `normalizeProject` (`dataService.ts`), dépendance `zustand`. Config `gearbox-web-prod` (`.claude/launch.json`) :
+    build de prod servi sur le port 3000 pour MESURER (React en dev est plusieurs fois plus lent).
+  - Mesuré (build de prod) : déplacement de carte et filtre à 60 i/s ; ouverture : une tâche de 59 ms (maquette : 0) ;
+    une sauvegarde fait recharger les pages actuelles montées (120-188 ms), coût qui disparaît au portage.
+  - Correctifs du lot 1 trouvés en route : catégorie au-dessus des titres absente et curseurs non remplis
+    (`controls.ts` observait l'hôte), glisser vers les dispositions / Mission Control impossible
+    (`document.elementFromPoint` dans `wm.ts`), menus et calendrier du moteur sans effet sur un champ React
+    (setter natif).
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
@@ -3571,6 +3596,10 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
   active re-rendait TOUTES les pages ouvertes (tâche longue de 542 ms, en pleine animation) : elles sont figées
   par `LegacyPage` (`React.memo`) dans `OsHost.tsx`. Une fenêtre réduite de page actuelle est masquée par
   `visibility`, pas `display: none` (sinon les graphiques du Dashboard se recalculent au réaffichage).
+- **Interface v2 : React et les champs remplis par le moteur** — le calendrier et les menus du moteur posent la
+  valeur par le SETTER NATIF (`engine/controls.ts` `setVal`) : un `input.value = v` direct est ignoré par React.
+- **Interface v2 : ne JAMAIS mesurer la fluidité en dev** — lancer `gearbox-web-prod` (après `npx vite build`),
+  onglet AU PREMIER PLAN (un onglet en arrière-plan est ralenti par le navigateur : mesures fausses).
 - **Interface v2 : l'hôte de la coque est PERSISTANT** (`window.__gxHost`, `OsHost.tsx`) : le moteur ne
   s'installe qu'une fois par page. Recréer l'élément à chaque montage = écran noir dès qu'App démonte la coque.
 - **Interface v2 : écouteur posé dans un `setTimeout` = vérifier que l'objet n'a pas été refermé entre-temps**

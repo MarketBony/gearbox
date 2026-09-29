@@ -23,6 +23,9 @@ Décidé avec Théo le 29/09/2026. Référence pour toutes les sessions du chant
   Seules les **rubriques** sont réécrites en React (lots 2 → 16), avec le balisage et la CSS de la maquette.
   La règle « aucune seconde logique métier » tient : la logique simplifiée de `js/data.js` n'est pas reprise.
 
+- **⚠️ 29/09 (lot 2) : rubriques en React (décision Théo)**, rendues par portail dans la fenêtre du moteur, balisage
+  et CSS de la maquette, données par `ui2/store/workspace.ts` (Zustand). Modèle : `ui2/apps/todo/TodoApp.tsx`.
+
 ## Lots (chacun : branche dédiée → test localhost avec les vrais rôles → 🛑 recette Théo → .md → déploiement `web`)
 - **Lot 0 — préparation (aucun déploiement)** : interrupteur bêta (préférence utilisateur, localStorage
   d'abord), dossier du nouveau code (ex. `ui2/`), point d'entrée dans `App.tsx`, feuille de jetons,

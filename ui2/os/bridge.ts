@@ -38,6 +38,15 @@ function store<T>(initial: T) {
 export const bridgeStore = store<Bridge | null>(null);
 export const useBridge = () => useSyncExternalStore(bridgeStore.subscribe, bridgeStore.get) as Bridge;
 
+/** Poignée qu'une rubrique PORTÉE (React) remplit pour le moteur : menus de la barre du haut,
+ *  commandes (Spotlight, raccourcis). Même contrat que l'objet rendu par `mount` dans la maquette. */
+export interface PortedInst { command?: (c: string) => void; menus?: () => Record<string, unknown[]> | undefined }
+/** Fenêtre (ou écran mobile) montée d'une rubrique PORTÉE : React y rend la rubrique par portail,
+ *  DANS la racine fantôme — elle hérite donc de la CSS de la maquette et des contextes de l'appli. */
+export interface PortedMount { key: string; appId: string; host: HTMLElement; win: any; inst: PortedInst }
+export const portedStore = store<PortedMount[]>([]);
+export const usePortedMounts = () => useSyncExternalStore(portedStore.subscribe, portedStore.get);
+
 /** Rubriques ACTUELLES à projeter dans les fenêtres (ids d'app de la maquette). */
 export const legacyStore = store<string[]>([]);
 export const useLegacyIds = () => useSyncExternalStore(legacyStore.subscribe, legacyStore.get);
