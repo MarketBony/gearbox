@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gearbox · Accueil</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&family=Syncopate:wght@700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="commun.css" />
+<style>
+/* ============ C · ACCUEIL (widgets iOS + barre de commande façon Linear) ============ */
+body { overflow: hidden; }
+.topbar { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; align-items: center; gap: 10px;
+  height: 52px; padding: 0 8px 0 14px; border-radius: 999px; width: min(920px, calc(100vw - 24px)); }
+.topbar img { width: 24px; }
+.crumbs { display: flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+.crumbs a { color: var(--text-2); text-decoration: none; }
+.crumbs a:hover { color: var(--text); }
+.crumbs .cur { view-transition-name: crumb; }
+.cmd { flex: 1; display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 14px; border-radius: 999px; background: var(--surface-3); color: var(--text-3); cursor: text; margin-left: 8px; }
+.cmd .kbd { margin-left: auto; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--bony-grad); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 12px; }
+
+#view { position: fixed; inset: 0; padding: 88px 0 24px; overflow: auto; }
+.wrap { width: min(1120px, calc(100vw - 40px)); margin: 0 auto; }
+
+/* ---------------- Accueil : grille de widgets ---------------- */
+.hello { margin: 18px 4px 22px; }
+.hello h1 { font-size: 34px; margin: 6px 0 0; font-weight: 700; letter-spacing: -.03em; }
+.widgets { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 168px; gap: 16px; }
+.w { position: relative; padding: 18px; border-radius: 26px; background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-1);
+  cursor: pointer; overflow: hidden; text-align: left; display: flex; flex-direction: column;
+  transition: transform var(--t-med) var(--spring-bouncy), box-shadow var(--t-fast);
+  animation: pop var(--t-slow) var(--spring-bouncy) both; }
+.w:hover { transform: translateY(-3px) scale(1.01); box-shadow: inset 0 0 0 1px var(--line-2), var(--shadow-2); }
+.w:active { transform: scale(.98); }
+.w.m { grid-column: span 2; } .w.l { grid-column: span 2; grid-row: span 2; }
+.w .wh { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.w .big { font-size: 34px; font-weight: 700; letter-spacing: -.03em; margin-top: auto; }
+.w.accent { background: var(--bony-grad); color: #fff; box-shadow: 0 16px 40px -14px rgba(247,86,50,.6); }
+.w.accent .faint, .w.accent .muted { color: rgba(255,255,255,.78); }
+@keyframes pop { from { opacity: 0; transform: scale(.92) translateY(10px); } }
+.ring { --p: 70; width: 104px; height: 104px; border-radius: 50%; background: conic-gradient(var(--bony-orange), var(--bony-violet) calc(var(--p) * 1%), var(--surface-3) 0);
+  -webkit-mask: radial-gradient(circle, transparent 60%, #000 61%); mask: radial-gradient(circle, transparent 60%, #000 61%); }
+.launch { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 8px; margin-top: 14px; }
+.launch button { display: grid; justify-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text-2); }
+.launch button:hover .app-ico { transform: scale(1.08); }
+.launch .app-ico { transition: transform var(--t-med) var(--spring-bouncy); }
+.mini-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+
+/* ---------------- Pages ---------------- */
+.page { border-radius: 28px; background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-2); min-height: calc(100vh - 120px); }
+.phead { display: flex; align-items: flex-end; justify-content: space-between; padding: 28px 30px 18px; }
+.phead h1 { margin: 6px 0 0; font-size: 30px; }
+.pbody { padding: 0 30px 30px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.kpi { padding: 18px; animation: fade-up var(--t-med) var(--spring-soft) both; }
+.kpi .v { font-size: 26px; font-weight: 700; margin: 8px 0 4px; letter-spacing: -.02em; }
+.row2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; margin-top: 14px; }
+.row2 > .card { padding: 18px; }
+
+/* Tableau des projets : navigation clavier (↑ ↓ Entrée), feuille latérale */
+table { width: 100%; border-collapse: separate; border-spacing: 0; }
+th { text-align: left; padding: 10px 12px; position: sticky; top: 0; background: var(--surface-1); }
+td { padding: 0 12px; height: 48px; border-top: 1px solid var(--line); white-space: nowrap; }
+tbody tr { cursor: pointer; transition: background var(--t-fast); animation: fade-up var(--t-med) var(--spring-soft) both; }
+tbody tr:hover { background: var(--surface-2); }
+tbody tr.kb { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--bony-orange); }
+td .bar { width: 90px; display: inline-block; vertical-align: middle; margin-right: 8px; }
+.side-veil { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.3); opacity: 0; pointer-events: none; transition: opacity var(--t-med); }
+.side-veil.on { opacity: 1; pointer-events: auto; }
+.side { position: fixed; z-index: 61; top: 12px; right: 12px; bottom: 12px; width: min(460px, 94vw); border-radius: 26px; padding: 22px 24px; overflow: auto;
+  transform: translateX(calc(100% + 24px)); transition: transform var(--t-slow) var(--spring-snappy); }
+.side.on { transform: none; }
+.placeholder { display: grid; place-items: center; text-align: center; min-height: 50vh; }
+.placeholder h3 { margin: 16px 0 6px; font-size: 20px; }
+
+/* Morphing widget → page : même view-transition-name des deux côtés */
+::view-transition-group(*) { animation-duration: 560ms; animation-timing-function: var(--spring-soft); }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 220ms; }
+::view-transition-new(morph), ::view-transition-old(morph) { height: 100%; object-fit: cover; object-position: top; }
+</style>
+</head>
+<body>
+<div class="wallpaper"></div>
+<header class="topbar glass">
+  <img src="icon-mark.svg" alt="" />
+  <nav class="crumbs" id="crumbs"></nav>
+  <div class="cmd" onclick="G.spotlight.open()"></div>
+  <button class="icon-btn" id="bell"></button>
+  <span class="avatar">TL</span>
+</header>
+<main id="view"></main>
+<div class="side-veil" id="sveil"></div>
+<aside class="side glass" id="side"></aside>
+
+<script src="commun.js"></script>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+$('.cmd').innerHTML = `${G.icon('search')}<span>Rechercher, ouvrir une rubrique, un projet…</span><span class="kbd">Ctrl K</span>`;
+$('#bell').innerHTML = G.icon('bell');
+
+/* ---------- Routage par URL (#/projets) : liens directs + bouton Retour ----------
+   Gearbox n'a aujourd'hui qu'un état React : ni l'un ni l'autre ne marche. */
+const slug = { dashboard: 'cockpit', projects: 'projets' };
+const idFromHash = () => { const h = location.hash.replace('#/', ''); return Object.keys(slug).find((k) => slug[k] === h) || G.apps.find((a) => a.id === h)?.id || null; };
+let lastWidget = null;
+function navigate(id, fromEl) {
+  lastWidget = fromEl || document.querySelector(`[data-open="${id}"]`);
+  location.hash = id ? '#/' + (slug[id] || id) : '#/';
+}
+addEventListener('hashchange', () => render(true));
+
+function vt(fn) {
+  if (!document.startViewTransition || document.documentElement.dataset.effects === 'eco') return fn();
+  const t = document.startViewTransition(fn); t.ready.catch(() => {}); return t; // un abandon (onglet masqué) retombe sur un simple remplacement
+}
+function render(animated) {
+  const id = idFromHash();
+  const swap = () => {
+    document.querySelectorAll('[style*="view-transition-name: morph"]').forEach((e) => e.style.viewTransitionName = '');
+    $('#view').innerHTML = id ? pageHTML(id) : homeHTML();
+    $('#crumbs').innerHTML = id ? `<a href="#/">Accueil</a>${G.icon('chevron')}<span class="cur">${G.app(id).name}</span>` : `<span class="cur">Accueil</span>`;
+    if (id) { $('.page').style.viewTransitionName = 'morph'; wirePage(id); }
+    else { const w = document.querySelector(`[data-open="${prev}"]`); if (w) { w.style.viewTransitionName = 'morph'; w.style.animation = 'none'; } document.querySelectorAll('.w').forEach((x) => x.style.animation = 'none'); }
+    prev = id || prev;
+  };
+  // L'élément de départ prend le nom « morph » AVANT la capture : il deviendra la page
+  if (animated) {
+    const src = id ? (lastWidget?.isConnected ? lastWidget : document.querySelector(`[data-open="${id}"]`) || $('.page')) : $('.page');
+    // Un seul porteur du nom : le widget du dernier retour le garde sinon, et la transition avorte
+    document.querySelectorAll('#view [style*="view-transition-name"]').forEach((e) => e.style.viewTransitionName = '');
+    if (src) src.style.viewTransitionName = 'morph';
+    vt(swap);
+  } else swap();
+}
+let prev = null;
+
+/* ---------------- Accueil ---------------- */
+function homeHTML() {
+  const late = G.projects.filter((p) => p.status === 'En retard');
+  const up = G.projects.filter((p) => p.status !== 'Terminé').sort((a, b) => a.due.localeCompare(b.due)).slice(0, 3);
+  let i = 0; const d = () => `animation-delay:${(i++) * 35}ms`;
+  return `<div class="wrap">
+  <div class="hello"><div class="label">${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div><h1>Bonjour, voici votre réseau.</h1></div>
+  <div class="widgets">
+    <button class="w m" data-open="dashboard" style="${d()}"><div class="wh">${G.appIcon(G.app('dashboard'), 22)}Budget 2026</div>
+      <div style="display:flex;align-items:center;gap:20px;margin-top:auto"><div class="ring" style="--p:70"></div><div><div class="big num" style="margin:0">70 %</div><div class="faint">1 041 540 € sur 1 480 800 €</div></div></div></button>
+    <button class="w accent" data-open="projects" style="${d()}"><div class="wh">${G.icon('alert')}En retard</div><div class="big num">${late.length}</div><div class="muted">projets à reprendre</div></button>
+    <button class="w" data-open="chat" style="${d()}"><div class="wh">${G.appIcon(G.app('chat'), 22)}Chat</div><div class="big num">5</div><div class="faint">messages non lus</div></button>
+    <div class="w l" style="${d()};cursor:default"><div class="wh">${G.icon('grid')}Rubriques</div>
+      <div class="launch">${['projects', 'digital', 'campaigns', 'agenda', 'budget', 'fixed', 'material', 'conges', 'todo', 'export', 'games', 'settings'].map((a) => `<button data-open="${a}">${G.appIcon(G.app(a), 46)}${G.app(a).name}</button>`).join('')}</div></div>
+    <button class="w m" data-open="agenda" style="${d()}"><div class="wh">${G.appIcon(G.app('agenda'), 22)}À venir</div><div style="margin-top:8px">${up.map((p) => `<div class="mini-row"><b class="num" style="width:54px">${G.date(p.due)}</b><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span></div>`).join('')}</div></button>
+    <button class="w" data-open="digital" style="${d()}"><div class="wh">${G.appIcon(G.app('digital'), 22)}Digital</div><div class="big num">18</div><div class="faint">posts planifiés</div></button>
+    <button class="w" data-open="conges" style="${d()}"><div class="wh">${G.appIcon(G.app('conges'), 22)}Congés</div><div class="big num">3</div><div class="faint">absents cette semaine</div></button>
+  </div></div>`;
+}
+document.addEventListener('click', (e) => {
+  const o = e.target.closest('[data-open]'); if (!o || $('.page')) return;
+  e.stopPropagation(); navigate(o.dataset.open, o);
+});
+
+/* ---------------- Pages ---------------- */
+function pageHTML(id) {
+  const a = G.app(id);
+  const head = (t, right = '') => `<div class="phead"><div><div class="label">Tout le réseau · 2026</div><h1 class="display">${t}</h1></div>${right}</div>`;
+  if (id === 'dashboard') return `<div class="wrap"><div class="page">${head('Cockpit', `<div class="seg" data-seg><span class="thumb"></span><button aria-pressed="true">Année</button><button>Trimestre</button><button>Mois</button></div>`)}<div class="pbody">
+    <div class="kpis">${G.kpis().map((k, i) => `<div class="card kpi" style="animation-delay:${120 + i * 45}ms"><div class="label">${k.k}</div><div class="v num">${k.v}</div><div class="${k.tone ? '' : 'faint'}" style="${k.tone ? 'color:var(--warn)' : ''}">${k.sub}</div>${k.bar ? `<div class="bar" style="margin-top:12px"><i style="width:${k.bar}%"></i></div>` : ''}</div>`).join('')}</div>
+    <div class="row2"><div class="card"><b>Trajectoire mensuelle</b><div style="margin-top:16px">${G.renderChart()}</div></div><div class="card"><b>Mix d’activité</b><div style="margin-top:18px">${G.renderDonut()}</div></div></div>
+    <div class="card" style="padding:16px 18px 8px;margin-top:14px"><b>Prochaines échéances</b><div style="margin-top:8px">${G.renderUpcoming()}</div></div></div></div></div>`;
+  if (id === 'projects') return `<div class="wrap"><div class="page">${head('Projets', `<div style="display:flex;gap:8px"><span class="faint" style="align-self:center">↑ ↓ puis Entrée</span><button class="btn btn-primary">${G.icon('plus')}Nouveau</button></div>`)}<div class="pbody">
+    <table><thead><tr><th class="label">Projet</th><th class="label">Site</th><th class="label">Statut</th><th class="label">Avancement</th><th class="label" style="text-align:right">Budget</th><th class="label">Échéance</th></tr></thead>
+    <tbody>${G.projects.map((p, i) => `<tr data-id="${p.id}" style="animation-delay:${140 + i * 25}ms"><td><b>${p.name}</b></td><td class="muted">${p.site}</td><td>${G.statusBadge(p.status)}</td><td><span class="bar"><i style="width:${p.progress}%"></i></span><span class="num faint">${p.progress} %</span></td><td class="num" style="text-align:right">${G.eur(p.budget)}</td><td class="num muted">${G.date(p.due)}</td></tr>`).join('')}</tbody></table></div></div></div>`;
+  return `<div class="wrap"><div class="page">${head(a.name)}<div class="placeholder"><div>${G.appIcon(a, 72)}<h3>${a.name}</h3><div class="muted">Rubrique non maquettée. Le bouton Retour du navigateur<br/>(ou Échap) ramène à l’accueil par le même morphing.</div></div></div></div></div>`;
+}
+function wirePage(id) {
+  if (id !== 'projects') return;
+  const rows = [...document.querySelectorAll('tbody tr')]; let k = -1;
+  const mark = (i) => { k = i; rows.forEach((r, j) => r.classList.toggle('kb', j === i)); rows[i]?.scrollIntoView({ block: 'nearest' }); };
+  rows.forEach((r, i) => r.onclick = () => { mark(i); openSide(r.dataset.id); });
+  document.onkeydown = (e) => {
+    if ($('.spot.open')) return;
+    if (e.key === 'ArrowDown') { mark(Math.min(k + 1, rows.length - 1)); e.preventDefault(); }
+    if (e.key === 'ArrowUp') { mark(Math.max(k - 1, 0)); e.preventDefault(); }
+    if (e.key === 'Enter' && k >= 0) openSide(rows[k].dataset.id);
+  };
+}
+function openSide(pid) {
+  const p = G.projects.find((x) => x.id === pid);
+  $('#side').innerHTML = `<div style="display:flex;justify-content:flex-end"><button class="icon-btn" id="sclose">${G.icon('close')}</button></div>${G.renderProjectDetail(p)}`;
+  $('#side').classList.add('on'); $('#sveil').classList.add('on');
+  $('#sclose').onclick = closeSide;
+}
+function closeSide() { $('#side').classList.remove('on'); $('#sveil').classList.remove('on'); }
+$('#sveil').onclick = closeSide;
+addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || $('.spot.open')) return;
+  if ($('#side.on')) return closeSide();
+  if (idFromHash()) history.back();
+});
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-seg] button'); if (!b) return;
+  b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); placeThumb(b.parentElement);
+});
+function placeThumb(seg) { const b = seg.querySelector('[aria-pressed=true]'), t = seg.querySelector('.thumb'); t.style.left = b.offsetLeft + 'px'; t.style.width = b.offsetWidth + 'px'; }
+new MutationObserver(() => document.querySelectorAll('[data-seg]').forEach((s) => { if (!s.dataset.ok) { s.dataset.ok = 1; requestAnimationFrame(() => placeThumb(s)); } })).observe($('#view'), { childList: true, subtree: true });
+
+G.onOpenApp = (id) => navigate(id);
+G.onOpenProject = (pid) => { if (idFromHash() !== 'projects') navigate('projects'); setTimeout(() => openSide(pid), 600); };
+render(false);
+</script>
+</body>
+</html>

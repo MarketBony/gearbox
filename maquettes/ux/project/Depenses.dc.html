@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Dépenses — liste et saisie</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&amp;family=Syncopate:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#09090d}
+.gx{font-family:"Albert Sans",system-ui,sans-serif;color:#ededf2;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#ff7a52}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9494aa}
+.card{background:rgba(20,20,28,.72);border:1px solid rgba(255,255,255,.09);border-radius:14px;backdrop-filter:blur(18px);box-shadow:0 20px 40px -28px rgba(0,0,0,.8)}
+.field{height:40px;padding:0 13px;border-radius:10px;border:1px solid rgba(255,255,255,.13);background:rgba(8,8,12,.55);color:#ededf2;font:600 14px "Albert Sans",sans-serif;display:flex;align-items:center;gap:8px;cursor:pointer;box-sizing:border-box}
+.chip{height:32px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.02);color:#dcdce6;font:600 13px "Albert Sans",sans-serif;display:inline-flex;align-items:center;cursor:pointer}
+.seg{display:inline-flex;padding:3px;border-radius:10px;background:rgba(8,8,12,.55);border:1px solid rgba(255,255,255,.12)}
+.seg button{height:32px;padding:0 14px;border:0;border-radius:7px;background:transparent;color:#b8b8c8;font:600 13px "Albert Sans",sans-serif;cursor:pointer}
+.seg button.on{background:linear-gradient(135deg,#ff5a2e,#b43bff);color:#fff}
+.btn{height:40px;padding:0 16px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);color:#ededf2;font:600 14px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.btn.primary{background:linear-gradient(135deg,#ff5a2e,#b43bff);border-color:transparent;color:#fff;box-shadow:0 10px 24px -12px rgba(255,90,46,.8)}
+.row{display:flex;align-items:center}
+.muted{color:#b8b8c8}
+.scr{overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.22) transparent}
+.scr::-webkit-scrollbar{width:12px}.scr::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
+.t{width:100%;border-collapse:separate;border-spacing:0;font-size:14px}
+.t th{position:sticky;top:0;z-index:1;background:rgba(18,18,26,.96);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9494aa;text-align:left;padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.1);cursor:pointer;white-space:nowrap}
+.t td{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:middle}
+.b{height:22px;padding:0 8px;border-radius:6px;font:700 11.5px "Albert Sans",sans-serif;display:inline-flex;align-items:center}
+.ib{width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.04);color:#d0d0dc;display:inline-grid;place-items:center;cursor:pointer;padding:0}
+a{color:#ff7a52}
+</style>
+</helmet>
+<div class="gx" style="width: 1920px; height: 1080px; box-sizing: border-box; background: radial-gradient(1100px 700px at 0% 100%, rgba(255,90,46,.16), transparent 70%), radial-gradient(1100px 800px at 100% 0%, rgba(180,59,255,.18), transparent 70%), #09090d; overflow: hidden; display: flex">
+
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; padding: 32px 40px 28px 48px; gap: 18px">
+<header style="display: flex; align-items: flex-end; gap: 20px; flex-shrink: 0">
+<div><div class="eyebrow">Outils</div><h1 style="margin: 6px 0 0; font-family: Syncopate, sans-serif; font-weight: 700; font-size: 30px; letter-spacing: .02em; text-transform: uppercase; line-height: 1.1">Dépenses</h1><p style="margin: 7px 0 0; font-size: 14px; color: #b8b8c8">Dépenses fixes ponctuelles ou annuelles, imputées au budget</p></div>
+<span style="flex-grow: 1"></span>
+<div class="card" style="padding: 10px 18px; text-align: right"><div class="lbl">Total période</div><div style="font-family: Syncopate, sans-serif; font-weight: 700; font-size: 22px; margin-top: 4px">38 215 €</div></div>
+<button class="btn primary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Nouvelle dépense</button>
+</header>
+
+<section class="card" style="padding: 14px 18px; display: flex; align-items: center; gap: 14px; flex-shrink: 0">
+<label style="width: 300px; height: 40px; border-radius: 10px; background: rgba(8,8,12,.55); border: 1px solid rgba(255,255,255,.13); display: flex; align-items: center; gap: 10px; padding: 0 12px; box-sizing: border-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9494aa" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg><input placeholder="Rechercher…" aria-label="Rechercher" style="flex-grow: 1; border: 0; outline: 0; background: transparent; color: #ededf2; font: 500 14px 'Albert Sans', sans-serif"></label>
+<button class="field" style="width: 190px">Tous sites<span style="flex-grow: 1"></span>▾</button>
+<button class="field" style="width: 170px">Tous services<span style="flex-grow: 1"></span>▾</button>
+<span class="lbl">Du</span><button class="field" style="width: 140px; color: #9494aa">jj/mm/aaaa</button><span class="lbl">Au</span><button class="field" style="width: 140px; color: #9494aa">jj/mm/aaaa</button>
+<span style="flex-grow: 1"></span><span style="font-size: 13px; color: #b8b8c8">14 dépenses</span>
+</section>
+
+<section class="card" style="flex-grow: 1; min-height: 0; padding: 6px 0 0; display: flex; flex-direction: column">
+<div class="scr" style="flex-grow: 1; min-height: 0; padding: 0 8px 8px">
+<table class="t">
+<thead><tr><th>Date ↓</th><th>Site / plaque ↕</th><th>Service ↕</th><th>Commentaire ↕</th><th style="text-align: right">Montant (€) ↕</th><th style="text-align: right; width: 90px">Actions</th></tr></thead>
+<tbody>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="12">
+<tr style="background: {{r.bg}}">
+<td style="white-space: nowrap"><b style="font-weight: 600">{{r.d}}</b><sc-if value="{{r.an}}" hint-placeholder-val="{{r.an}}"><span class="b" style="margin-left: 8px; background: rgba(180,59,255,.2); color: #dcb2ff">Annuelle</span></sc-if></td>
+<td><span class="b" style="background: rgba(255,255,255,.08); color: #e0e0ea; text-transform: uppercase; max-width: 220px; overflow: hidden; white-space: nowrap">{{r.s}}</span></td>
+<td><span class="b" style="background: {{r.sc}}; color: #fff">{{r.sv}}</span></td>
+<td><sc-if value="{{r.pro}}" hint-placeholder-val="{{r.pro}}"><span class="b" style="margin-right: 8px; background: linear-gradient(135deg,#ff5a2e,#b43bff); color: #fff">PRO+</span></sc-if>{{r.c}}</td>
+<td style="text-align: right; font-weight: 700">{{r.m}}</td>
+<td style="text-align: right; white-space: nowrap"><button class="ib" aria-label="Modifier">✎</button> <button class="ib" aria-label="Supprimer" style="color: #ff7070"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+
+<aside class="scr" style="width: 520px; flex-shrink: 0; height: 100%; box-sizing: border-box; background: rgba(14,14,20,.92); border-left: 1px solid rgba(255,255,255,.1); box-shadow: -30px 0 60px -30px rgba(0,0,0,.8); padding: 28px 28px 24px; display: flex; flex-direction: column; gap: 18px">
+<div class="row" style="gap: 10px"><span style="width: 34px; height: 34px; border-radius: 9px; background: rgba(91,140,255,.18); color: #9dbaff; display: grid; place-items: center">✎</span><div style="font-family: Syncopate, sans-serif; font-weight: 700; font-size: 16px; letter-spacing: .04em; text-transform: uppercase">Modifier la dépense</div><span style="flex-grow: 1"></span><button class="ib" aria-label="Fermer">✕</button></div>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Date *</span><button class="field" style="opacity: .45">01/01/2026</button></div>
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Imputation</span><div class="seg"><button title="Montant imputé sur le seul mois de la date choisie.">Ponctuelle</button><button class="on" title="Montant total réparti sur les 12 mois de l'année (calcul au Budget uniquement).">Annuelle</button></div></div>
+</div>
+<span style="font-size: 12.5px; color: #dcb2ff; margin-top: -8px">Réparti sur toute l'année 2026 (montant total ci-contre).</span>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Montant *</span><div class="field" style="font-size: 16px; font-weight: 700">12 000<span style="flex-grow: 1"></span><span class="muted">€</span></div></div>
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Service *</span><button class="field">Tous Services<span style="flex-grow: 1"></span>▾</button></div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Site / plaque *</span><button class="field">Clermont, Vichy, Le Puy-en-Velay<span style="flex-grow: 1"></span>▾</button><span style="font-size: 12px; color: #9494aa">GROUPE BONY (global) · GROUPE BONY (R/N) · sites par plaque · sites Nissan</span></div>
+
+<div style="display: flex; flex-direction: column; gap: 8px"><span class="lbl">Marque(s) — routage budgétaire</span><div class="row" style="gap: 6px; flex-wrap: wrap"><button class="chip" style="background: #f5c518; color: #1a1400; border-color: transparent">Renault</button><button class="chip" style="background: #6f7d4f; color: #fff; border-color: transparent">Dacia</button><button class="chip" style="background: #2f6fe4; color: #fff; border-color: transparent">Alpine</button><button class="chip">Nissan</button><button class="chip">Mobilize</button><button class="chip">Holding</button></div></div>
+
+<div style="padding: 12px 14px; border-radius: 10px; background: rgba(8,8,12,.5); border: 1px solid rgba(255,255,255,.08); display: flex; flex-direction: column; gap: 8px"><div class="row" style="justify-content: space-between"><span class="lbl">Part Alpine (%)</span><b style="font-size: 13px">100 % → Alpine · 0 % → compte RDM</b></div><span style="height: 6px; border-radius: 3px; background: #2f6fe4; position: relative; display: block"><span style="position: absolute; right: -8px; top: -5px; width: 16px; height: 16px; border-radius: 50%; background: #fff"></span></span></div>
+
+<div style="display: flex; flex-direction: column; gap: 8px"><div class="row" style="justify-content: space-between"><span class="lbl">Répartition budgétaire</span><div class="seg"><button class="on" style="height: 26px">%</button><button style="height: 26px">€</button></div></div>
+<sc-for list="{{split}}" as="s" hint-placeholder-count="3"><div class="row" style="gap: 10px; padding: 7px 10px; border-radius: 9px; background: rgba(8,8,12,.5); border: 1px solid rgba(255,255,255,.08)"><span style="flex-grow: 1; font-size: 13.5px; font-weight: 600">{{s.n}}</span><span class="field" style="height: 32px; width: 80px; justify-content: flex-end">{{s.p}}</span><span style="width: 80px; text-align: right; font-size: 13px; color: #b8b8c8">{{s.e}}</span></div></sc-for>
+<span style="font-size: 13px; font-weight: 700; color: #4be0a0; text-align: right">Total : 100 %</span></div>
+
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Commentaire</span><div style="min-height: 60px; padding: 10px 12px; border-radius: 10px; background: rgba(8,8,12,.55); border: 1px solid rgba(255,255,255,.13); font-size: 14px; color: #d0d0dc">Abonnement annuel écrans dynamiques showroom</div></div>
+<label class="row" style="gap: 10px; font-size: 14px; font-weight: 600"><input type="checkbox" style="width: 18px; height: 18px; accent-color: #ff5a2e">Type client : PRO+ (B2B)</label>
+
+<div class="row" style="gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.08)"><span style="flex-grow: 1"></span><button class="btn">Annuler</button><button class="btn primary">Enregistrer</button></div>
+</aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const SV = { VN: '#2a4fb8', VO: '#d9661f', APV: '#8b3cf0', PR: '#1a9fb5', 'Tous Services': '#4a4a5c' };
+    const raw = [
+      ['28/09/2026', 'Clermont', 'VN', 'Location plateau essais R5', '1 850', false, false],
+      ['22/09/2026', 'GROUPE BONY', 'Tous Services', 'Campagne radio Chérie FM septembre', '4 200', false, false],
+      ['15/09/2026', 'Vichy', 'APV', 'Flyers entretien hiver', '640', false, true],
+      ['10/09/2026', 'Le Puy-en-Velay', 'VO', 'Bâches façade VO', '1 120', false, false],
+      ['01/09/2026', 'Rodez, Albi', 'VN', 'Salon Aveyr’Auto — stand', '3 900', false, false],
+      ['01/01/2026', 'Clermont, Vichy, Le Puy-en-Velay', 'Tous Services', 'Abonnement annuel écrans dynamiques showroom', '12 000', true, false],
+      ['01/01/2026', 'GROUPE BONY (R/N)', 'Tous Services', 'Licence outil avis clients', '6 800', true, false],
+      ['01/01/2026', 'Moulins', 'PR', 'Partenariat club de rugby', '2 500', true, false],
+      ['28/08/2026', 'Aurillac', 'VN', 'Presse locale — portes ouvertes', '780', false, false],
+      ['14/08/2026', 'Mozac', 'APV', 'Kakémonos atelier', '430', false, true],
+      ['30/07/2026', 'Millau', 'VO', 'Street marketing VO', '1 350', false, false],
+      ['12/07/2026', 'Issoire', 'VN', 'Goodies inauguration', '945', false, false],
+      ['03/07/2026', 'Ussel', 'APV', 'SMS campagne pneus', '310', false, false],
+      ['20/06/2026', 'Brioude', 'PR', 'Sponsoring comice agricole', '1 390', false, false]
+    ];
+    const rows = raw.map(([d, s, sv, c, m, an, pro], i) => ({ d, s, sv, sc: SV[sv], c, m, an, pro, bg: i === 5 ? 'rgba(255,90,46,.1)' : 'transparent' }));
+    const split = [{ n: 'Clermont', p: '33,3 %', e: '4 000 €' }, { n: 'Vichy', p: '33,3 %', e: '4 000 €' }, { n: 'Le Puy-en-Velay', p: '33,4 %', e: '4 000 €' }];
+    return { rows, split };
+  }
+}
+</script>
+</body>
+</html>

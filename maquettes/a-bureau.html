@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gearbox · Bureau</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&family=Syncopate:wght@700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="commun.css" />
+<style>
+/* ======================= A · BUREAU (façon macOS) ======================= */
+.menubar {
+  position: fixed; top: 0; left: 0; right: 0; height: 34px; z-index: 5000;
+  display: flex; align-items: center; gap: 4px; padding: 0 10px;
+  border-radius: 0; font-size: var(--fs-13);
+}
+.menubar .mark { width: 22px; height: 22px; margin: 0 8px 0 2px; }
+.menubar .app-name { font-weight: 700; min-width: 90px; display: inline-block; }
+.menubar .menu { height: 24px; padding: 0 9px; border-radius: 6px; color: var(--text); opacity: .85; }
+.menubar .menu:hover { background: var(--surface-3); opacity: 1; }
+.menubar .right { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+.menubar .icon-btn { width: 28px; height: 26px; border-radius: 7px; }
+.menubar .icon-btn svg { width: 16px; height: 16px; }
+.menubar .clock { padding: 0 8px; font-weight: 600; }
+.perimetre { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; background: var(--surface-3); font-weight: 600; font-size: var(--fs-12); }
+.perimetre .dot { color: var(--bony-orange); }
+
+.devbar { bottom: auto; top: 44px; left: auto; right: 12px; }
+
+/* ---------- Fenêtres : surfaces OPAQUES (le verre coûte, le plein non) ---------- */
+#desk { position: fixed; inset: 34px 0 0 0; z-index: 10; }
+.win {
+  position: absolute; display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 14px; background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--line-2), var(--shadow-3);
+  transform-origin: 0 0; will-change: transform;
+}
+.win.inactive { box-shadow: inset 0 0 0 1px var(--line), var(--shadow-2); }
+.win.inactive .titlebar { opacity: .7; }
+.titlebar { height: 46px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 14px; cursor: default; border-bottom: 1px solid var(--line); transition: opacity var(--t-fast); }
+.lights { display: flex; gap: 8px; }
+.lights button { width: 12px; height: 12px; border-radius: 50%; display: grid; place-items: center; }
+.lights button svg { width: 8px; height: 8px; stroke-width: 3; opacity: 0; stroke: rgba(0,0,0,.6); }
+.lights:hover button svg { opacity: 1; }
+.lights .c { background: #ff5f57; } .lights .m { background: #febc2e; } .lights .f { background: #28c840; }
+.win.inactive .lights button { background: var(--surface-3); }
+.titlebar .t { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.titlebar .tools { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.win .body { flex: 1; min-height: 0; }
+.win.maxi { border-radius: 0; }
+
+/* ---------- Dock : le seul grand élément en verre, et il est PETIT ---------- */
+.dock-wrap { position: fixed; left: 0; right: 0; bottom: 10px; z-index: 4000; display: flex; justify-content: center; pointer-events: none; }
+.dock { pointer-events: auto; display: flex; align-items: flex-end; gap: 6px; padding: 8px 10px; border-radius: 24px; height: 68px; }
+.dock .sep { width: 1px; align-self: stretch; margin: 4px 4px; background: var(--line-2); }
+.dock-item { position: relative; width: calc(48px * var(--m, 1)); height: calc(48px * var(--m, 1)); flex: none; transition: width var(--t-med) var(--spring-snappy), height var(--t-med) var(--spring-snappy); }
+.dock.live .dock-item { transition: none; }
+.dock-item .app-ico { width: 100%; height: 100%; border-radius: 26%; }
+.dock-item .app-ico svg { width: 50%; height: 50%; }
+.dock-item .run { position: absolute; left: 50%; bottom: -7px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--text); opacity: 0; transition: opacity var(--t-med); }
+.dock-item.running .run { opacity: .8; }
+.dock-item .tip { position: absolute; left: 50%; bottom: calc(100% + 14px); transform: translateX(-50%) translateY(4px); white-space: nowrap; padding: 5px 10px; border-radius: 8px; font-weight: 600; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity var(--t-fast), transform var(--t-fast) var(--ease-out); }
+.dock-item:hover .tip { opacity: 1; transform: translateX(-50%); }
+.dock-item.bounce .app-ico { animation: bounce 700ms var(--ease-io) 1; }
+@keyframes bounce { 0%,100% { transform: translateY(0) } 30% { transform: translateY(-22px) } 55% { transform: translateY(0) } 72% { transform: translateY(-8px) } }
+
+/* ---------- Exposé (vue d'ensemble) ---------- */
+#desk.expose .win { cursor: pointer; transition: transform var(--t-slow) var(--spring-snappy), box-shadow var(--t-fast); }
+#desk.expose .win:hover { box-shadow: 0 0 0 3px var(--bony-orange), var(--shadow-3); }
+#desk.expose-anim .win { transition: transform var(--t-slow) var(--spring-snappy); }
+.expose-veil { position: fixed; inset: 0; z-index: 9; background: rgba(0,0,0,.35); opacity: 0; pointer-events: none; transition: opacity var(--t-med); }
+.expose-veil.on { opacity: 1; }
+.expose-label { position: absolute; left: 50%; transform: translateX(-50%); bottom: -34px; font-weight: 600; white-space: nowrap; padding: 4px 10px; border-radius: 8px; }
+
+/* ---------- Contenus ---------- */
+.dash { padding: 22px 24px 28px; display: grid; gap: 14px; }
+.dash-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.kpi { padding: 16px; animation: fade-up var(--t-med) var(--spring-soft) both; }
+.kpi .v { font-size: 26px; font-weight: 700; margin: 8px 0 4px; letter-spacing: -.02em; }
+.row2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; }
+.row2 > .card { padding: 16px; }
+.proj { display: grid; grid-template-columns: 300px 1fr; height: 100%; }
+.plist { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.plist .search { margin: 12px; height: 34px; border-radius: 10px; background: var(--surface-3); display: flex; align-items: center; gap: 8px; padding: 0 10px; color: var(--text-3); }
+.plist .search input { flex: 1; border: 0; outline: 0; background: transparent; }
+.prow { position: relative; margin: 0 8px; padding: 10px 12px; border-radius: 10px; cursor: pointer; }
+.prow + .prow { margin-top: 2px; }
+.prow .n { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prow .s { display: flex; justify-content: space-between; margin-top: 3px; color: var(--text-3); font-size: 12px; }
+.prow:hover { background: var(--surface-2); }
+.prow.sel { color: #fff; }
+.prow.sel .s { color: rgba(255,255,255,.75); }
+.prow .hl { position: absolute; inset: 0; border-radius: inherit; background: var(--bony-grad); z-index: -1; }
+.plist .items { position: relative; z-index: 0; flex: 1; }
+.pdetail { padding: 26px 30px; min-height: 0; }
+.placeholder { height: 100%; display: grid; place-items: center; text-align: center; gap: 0; padding: 30px; }
+.placeholder h3 { margin: 16px 0 6px; font-size: 20px; }
+</style>
+</head>
+<body>
+<div class="wallpaper"></div>
+
+<header class="menubar glass">
+  <img class="mark" src="icon-mark.svg" alt="" />
+  <span class="app-name" id="appName">Dashboard</span>
+  <button class="menu">Fichier</button><button class="menu">Édition</button><button class="menu">Affichage</button><button class="menu" id="exposeBtn">Fenêtres</button>
+  <div class="right">
+    <span class="perimetre"><i class="dot"></i>Tout le réseau · 2026</span>
+    <button class="icon-btn" title="Rechercher (Ctrl K)" onclick="G.spotlight.open()"></button>
+    <button class="icon-btn" title="Notifications"></button>
+    <span class="clock num" id="clock"></span>
+  </div>
+</header>
+
+<div class="expose-veil" id="veil"></div>
+<main id="desk"></main>
+<div class="dock-wrap"><nav class="dock glass" id="dock"></nav></div>
+
+<script src="commun.js"></script>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const menuIcons = document.querySelectorAll('.menubar .right .icon-btn');
+menuIcons[0].innerHTML = G.icon('search'); menuIcons[1].innerHTML = G.icon('bell');
+const tick = () => $('#clock').textContent = new Date().toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+tick(); setInterval(tick, 20000);
+
+/* ------------------------------ DOCK ------------------------------ */
+const dockApps = ['dashboard', 'projects', 'todo', 'digital', 'chat', 'campaigns', 'hello', 'agenda', 'budget', 'conges', '|', 'settings', 'archives'];
+const dock = $('#dock');
+dock.innerHTML = dockApps.map((id) => id === '|' ? '<span class="sep"></span>' :
+  `<button class="dock-item" data-app="${id}">${G.appIcon(G.app(id), 48)}<span class="run"></span><span class="tip glass">${G.app(id).name}</span></button>`).join('');
+const items = [...dock.querySelectorAll('.dock-item')];
+// Agrandissement façon macOS : taille selon la distance au curseur (cosinus)
+dock.addEventListener('pointermove', (e) => {
+  dock.classList.add('live');
+  for (const it of items) {
+    const r = it.getBoundingClientRect(); const d = Math.abs(e.clientX - (r.left + r.width / 2));
+    const k = Math.max(0, 1 - d / 150); it.style.setProperty('--m', (1 + 0.55 * Math.sin(k * Math.PI / 2) ** 2).toFixed(3));
+  }
+});
+dock.addEventListener('pointerleave', () => { dock.classList.remove('live'); items.forEach((it) => it.style.setProperty('--m', 1)); });
+dock.addEventListener('click', (e) => { const it = e.target.closest('.dock-item'); if (it) openApp(it.dataset.app); });
+
+/* ------------------------- GESTION DES FENÊTRES ------------------------- */
+const desk = $('#desk'); const wins = new Map(); let z = 10, cascade = 0;
+const S = G.springs;
+const iconRect = (id) => { const it = dock.querySelector(`[data-app="${id}"]`); return it ? it.getBoundingClientRect() : { left: innerWidth / 2, top: innerHeight, width: 48, height: 48 }; };
+const sizes = { dashboard: [1060, 680], projects: [1000, 640] };
+
+function openApp(id) {
+  const w = wins.get(id);
+  if (w && w.min) return restore(id);
+  if (w) return focus(id);
+  const [W0, H0] = sizes[id] || [720, 480];
+  const W = Math.min(W0, innerWidth - 60), H = Math.min(H0, innerHeight - 34 - 110);
+  const x = Math.max(12, Math.round((innerWidth - W) / 2 + (cascade % 5) * 28 - 56)), y = Math.round(20 + (cascade % 5) * 24); cascade++;
+  const el = document.createElement('section');
+  el.className = 'win'; el.dataset.app = id;
+  Object.assign(el.style, { left: x + 'px', top: y + 'px', width: W + 'px', height: H + 'px' });
+  el.innerHTML = `<div class="titlebar"><div class="lights"><button class="c">${G.icon('close')}</button><button class="m"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button><button class="f"><svg class="i" viewBox="0 0 24 24"><path d="M6 6h6M6 6v6M18 18h-6M18 18v-6"/></svg></button></div>
+    <div class="t">${G.appIcon(G.app(id), 20)}${G.app(id).name}</div><div class="tools">${toolsFor(id)}</div></div><div class="body scroll">${contentFor(id)}</div>`;
+  desk.append(el);
+  wins.set(id, { el, min: false });
+  wire(el, id);
+  const it = dock.querySelector(`[data-app="${id}"]`);
+  if (it) { it.classList.add('running', 'bounce'); setTimeout(() => it.classList.remove('bounce'), 700); }
+  // Zoom depuis l'icône du Dock : un seul transform, animé par un vrai ressort
+  const r = iconRect(id);
+  el.animate([
+    { transform: `translate(${r.left - x}px, ${r.top - 34 - y}px) scale(${r.width / W}, ${r.height / H})`, opacity: 0, borderRadius: '40px' },
+    { opacity: 1, offset: .25 },
+    { transform: 'none', opacity: 1, borderRadius: '14px' },
+  ], { duration: S.snappy.ms * 1.3, easing: S.snappy.css.startsWith('linear') ? S.snappy.css : 'cubic-bezier(.22,1,.36,1)' });
+  focus(id);
+}
+function toFromIcon(id, el, reverse, done) {
+  const r = iconRect(id), b = el.getBoundingClientRect();
+  const kf = [{ transform: 'none', opacity: 1 }, { transform: `translate(${r.left - b.left}px, ${r.top - b.top}px) scale(${r.width / b.width}, ${r.height / b.height})`, opacity: 0 }];
+  const a = el.animate(reverse ? kf.reverse() : kf, { duration: reverse ? S.snappy.ms * 1.2 : 320, easing: reverse ? S.snappy.css : 'cubic-bezier(.55,0,.75,.2)', fill: 'both' });
+  a.onfinish = () => { done && done(); a.cancel(); };
+}
+function closeApp(id) {
+  const w = wins.get(id); if (!w) return;
+  w.el.animate([{ transform: 'none', opacity: 1 }, { transform: 'scale(.94)', opacity: 0 }], { duration: 180, easing: 'ease-in', fill: 'both' }).onfinish = () => w.el.remove();
+  wins.delete(id); dock.querySelector(`[data-app="${id}"]`)?.classList.remove('running');
+  const next = [...wins.entries()].filter(([, v]) => !v.min).sort((a, b) => b[1].el.style.zIndex - a[1].el.style.zIndex)[0];
+  if (next) focus(next[0]); else setName('Bureau');
+}
+function minimize(id) { const w = wins.get(id); toFromIcon(id, w.el, false, () => { w.el.style.display = 'none'; }); w.min = true; }
+function restore(id) { const w = wins.get(id); w.min = false; w.el.style.display = ''; toFromIcon(id, w.el, true); focus(id); }
+function maximize(id) {
+  const el = wins.get(id).el; const first = el.getBoundingClientRect();
+  if (el.classList.toggle('maxi')) { el.dataset.prev = el.style.cssText; Object.assign(el.style, { left: 0, top: 0, width: innerWidth + 'px', height: innerHeight - 34 + 'px' }); }
+  else { el.style.cssText = el.dataset.prev; }
+  const last = el.getBoundingClientRect(); // FLIP : on anime l'écart, pas la mise en page
+  el.animate([{ transform: `translate(${first.left - last.left}px, ${first.top - last.top}px) scale(${first.width / last.width}, ${first.height / last.height})` }, { transform: 'none' }], { duration: S.snappy.ms, easing: S.snappy.css });
+}
+function focus(id) {
+  const w = wins.get(id); if (!w) return;
+  w.el.style.zIndex = ++z;
+  wins.forEach((v, k) => v.el.classList.toggle('inactive', k !== id));
+  setName(G.app(id).name);
+}
+function setName(n) {
+  const el = $('#appName'); if (el.textContent === n) return;
+  el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-4px)' }], { duration: 90 }).onfinish = () => {
+    el.textContent = n; el.animate([{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }], { duration: 160, easing: 'cubic-bezier(.22,1,.36,1)' });
+  };
+}
+function wire(el, id) {
+  el.addEventListener('pointerdown', () => focus(id), true);
+  el.querySelector('.c').onclick = (e) => { e.stopPropagation(); closeApp(id); };
+  el.querySelector('.m').onclick = (e) => { e.stopPropagation(); minimize(id); };
+  el.querySelector('.f').onclick = (e) => { e.stopPropagation(); maximize(id); };
+  const tb = el.querySelector('.titlebar');
+  tb.addEventListener('dblclick', (e) => { if (!e.target.closest('button')) maximize(id); });
+  // Déplacement : transform pendant le geste (composite seul), left/top au lâcher
+  tb.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button') || el.classList.contains('maxi') || desk.classList.contains('expose')) return;
+    const sx = e.clientX, sy = e.clientY; let dx = 0, dy = 0; tb.setPointerCapture(e.pointerId);
+    const move = (ev) => { dx = ev.clientX - sx; dy = Math.max(-parseFloat(el.style.top), ev.clientY - sy); el.style.transform = `translate(${dx}px, ${dy}px)`; };
+    const up = () => { tb.removeEventListener('pointermove', move); el.style.transform = ''; el.style.left = parseFloat(el.style.left) + dx + 'px'; el.style.top = parseFloat(el.style.top) + dy + 'px'; };
+    tb.addEventListener('pointermove', move); tb.addEventListener('pointerup', up, { once: true });
+  });
+  if (id === 'projects') wireProjects(el);
+}
+
+/* ------------------------------ EXPOSÉ ------------------------------ */
+function expose(on) {
+  const list = [...wins.values()].filter((w) => !w.min);
+  if (on === undefined) on = !desk.classList.contains('expose');
+  if (!list.length) return;
+  desk.classList.toggle('expose', on); $('#veil').classList.toggle('on', on);
+  if (!on) { list.forEach((w) => { w.el.style.transform = ''; w.el.querySelector('.expose-label')?.remove(); }); return; }
+  const n = list.length, cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols);
+  const cw = (innerWidth - 80) / cols, ch = (innerHeight - 34 - 160) / rows;
+  list.forEach((w, i) => {
+    const el = w.el, W = el.offsetWidth, H = el.offsetHeight;
+    const s = Math.min((cw - 40) / W, (ch - 60) / H, .9);
+    const cx = 40 + (i % cols) * cw + cw / 2, cy = 30 + Math.floor(i / cols) * ch + ch / 2;
+    el.style.transform = `translate(${cx - W * s / 2 - parseFloat(el.style.left)}px, ${cy - H * s / 2 - parseFloat(el.style.top)}px) scale(${s})`;
+    el.insertAdjacentHTML('beforeend', `<span class="expose-label glass" style="transform:translateX(-50%) scale(${1 / s})">${G.app(el.dataset.app).name}</span>`);
+  });
+}
+$('#exposeBtn').onclick = () => expose();
+$('#veil').onclick = () => expose(false);
+desk.addEventListener('click', (e) => { if (!desk.classList.contains('expose')) return; const w = e.target.closest('.win'); if (w) { e.stopPropagation(); expose(false); focus(w.dataset.app); } }, true);
+addEventListener('keydown', (e) => { if (e.key === 'F3' || (e.ctrlKey && e.key === 'ArrowUp')) { e.preventDefault(); expose(); } if (e.key === 'Escape' && desk.classList.contains('expose')) expose(false); });
+
+/* ------------------------------ CONTENUS ------------------------------ */
+function toolsFor(id) {
+  if (id === 'projects') return `<button class="btn btn-primary">${G.icon('plus')}Nouveau</button>`;
+  if (id === 'dashboard') return `<div class="seg" data-seg><span class="thumb"></span><button aria-pressed="true">Année</button><button>Trimestre</button><button>Mois</button></div>`;
+  return '';
+}
+function contentFor(id) {
+  if (id === 'dashboard') return `<div class="dash">
+    <div class="dash-head"><div><div class="label">Vue consolidée · Tout le réseau</div><h1 class="display" style="font-size:28px;margin:6px 0 0">Cockpit</h1></div></div>
+    <div class="kpis">${G.kpis().map((k, i) => `<div class="card kpi" style="animation-delay:${i * 45}ms"><div class="label">${k.k}</div><div class="v num">${k.v}</div><div class="${k.tone ? '' : 'faint'}" style="${k.tone ? 'color:var(--warn)' : ''}">${k.sub}</div>${k.bar ? `<div class="bar" style="margin-top:12px"><i style="width:${k.bar}%"></i></div>` : ''}</div>`).join('')}</div>
+    <div class="row2"><div class="card"><div style="display:flex;justify-content:space-between;margin-bottom:14px"><b>Trajectoire mensuelle</b><span class="faint">Budget · Réalisé</span></div>${G.renderChart()}</div>
+    <div class="card"><b>Mix d’activité</b><div style="margin-top:18px">${G.renderDonut()}</div></div></div>
+    <div class="card" style="padding:14px 16px 6px"><b>Prochaines échéances</b><div style="margin-top:8px">${G.renderUpcoming()}</div></div></div>`;
+  if (id === 'projects') return `<div class="proj"><div class="plist"><label class="search">${G.icon('search')}<input placeholder="Filtrer" /></label><div class="items scroll">
+    ${G.projects.map((p) => `<div class="prow" data-id="${p.id}"><div class="n">${p.name}</div><div class="s"><span>${p.site} · ${p.service}</span><span class="num">${p.progress} %</span></div></div>`).join('')}</div></div>
+    <div class="pdetail scroll"></div></div>`;
+  const a = G.app(id);
+  return `<div class="placeholder"><div>${G.appIcon(a, 72)}<h3>${a.name}</h3><div class="muted">Rubrique non maquettée : seules Dashboard et Projets le sont.<br/>Ouvre-en plusieurs, déplace-les, puis essaie « Fenêtres » (F3).</div></div></div>`;
+}
+// Liste → détail : la surbrillance GLISSE d'une ligne à l'autre, le détail se remplace en fondu décalé
+function wireProjects(el) {
+  const list = el.querySelector('.items'), detail = el.querySelector('.pdetail');
+  const hl = document.createElement('span'); hl.className = 'hl';
+  const select = (id, animate = true) => {
+    const row = list.querySelector(`[data-id="${id}"]`); if (!row) return;
+    const prev = list.querySelector('.prow.sel'); if (prev === row) return;
+    const from = hl.isConnected ? hl.getBoundingClientRect() : null;
+    list.querySelectorAll('.prow').forEach((r) => r.classList.toggle('sel', r === row));
+    row.append(hl);
+    if (from && animate) { const to = hl.getBoundingClientRect(); hl.animate([{ transform: `translateY(${from.top - to.top}px)` }, { transform: 'none' }], { duration: S.snappy.ms, easing: S.snappy.css }); }
+    const p = G.projects.find((x) => x.id === id);
+    const swap = () => { detail.innerHTML = G.renderProjectDetail(p); detail.firstElementChild.animate([{ opacity: 0, transform: 'translateX(14px)' }, { opacity: 1, transform: 'none' }], { duration: S.soft.ms, easing: S.soft.css }); };
+    if (animate && detail.firstElementChild) detail.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 90 }).onfinish = swap; else swap();
+  };
+  list.addEventListener('click', (e) => { const r = e.target.closest('.prow'); if (r) select(r.dataset.id); });
+  el.addEventListener('keydown', (e) => {
+    const rows = [...list.querySelectorAll('.prow')], i = rows.findIndex((r) => r.classList.contains('sel'));
+    if (e.key === 'ArrowDown') { select(rows[Math.min(i + 1, rows.length - 1)].dataset.id); e.preventDefault(); }
+    if (e.key === 'ArrowUp') { select(rows[Math.max(i - 1, 0)].dataset.id); e.preventDefault(); }
+  });
+  el.tabIndex = -1; select(G.projects[0].id, false);
+  el.selectProject = select;
+}
+// Segmented control : le curseur glisse en ressort
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-seg] button'); if (!b) return;
+  const seg = b.parentElement; seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+  placeThumb(seg);
+});
+function placeThumb(seg) { const b = seg.querySelector('[aria-pressed=true]'), t = seg.querySelector('.thumb'); t.style.left = b.offsetLeft + 'px'; t.style.width = b.offsetWidth + 'px'; }
+new MutationObserver(() => document.querySelectorAll('[data-seg]').forEach((s) => { if (!s.dataset.ok) { s.dataset.ok = 1; requestAnimationFrame(() => placeThumb(s)); } })).observe(desk, { childList: true, subtree: true });
+
+G.onOpenApp = openApp;
+G.onOpenProject = (pid) => { openApp('projects'); setTimeout(() => wins.get('projects')?.el.selectProject?.(pid), 60); };
+setTimeout(() => openApp('dashboard'), 250);
+</script>
+</body>
+</html>

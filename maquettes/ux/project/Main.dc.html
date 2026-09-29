@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Dashboard — Cockpit général</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&amp;family=Syncopate:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#08080a}
+.gx{font-family:"Albert Sans",system-ui,sans-serif;color:#ededf2;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#ff7a52}
+.h1{margin:6px 0 0;font-family:Syncopate,sans-serif;font-weight:700;font-size:30px;letter-spacing:.02em;text-transform:uppercase;line-height:1.1}
+.sub{margin:8px 0 0;font-size:14px;color:#b4b4c4}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8e8ea4}
+.card{background:rgba(20,20,28,.72);border:1px solid rgba(255,255,255,.09);border-radius:14px;backdrop-filter:blur(18px);box-shadow:0 20px 40px -28px rgba(0,0,0,.8)}
+.scr{height:100%;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.22) transparent}
+.scr::-webkit-scrollbar{width:12px}.scr::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
+.h2{margin:0;font-family:Syncopate,sans-serif;font-weight:700;font-size:14px;letter-spacing:.08em;text-transform:uppercase}
+.chip{height:32px;padding:0 14px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:transparent;color:#d4d4e0;font:600 13px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+.chip.on{background:linear-gradient(135deg,#ff5a2e,#b43bff);border-color:transparent;color:#fff}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.field{height:40px;padding:0 14px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#16161c;color:#ededf2;font:600 14px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:10px;cursor:pointer}
+.seg{display:inline-flex;padding:3px;border-radius:10px;background:#16161c;border:1px solid rgba(255,255,255,.1)}
+.seg button{height:32px;padding:0 14px;border:0;border-radius:7px;background:transparent;color:#b4b4c4;font:600 13px "Albert Sans",sans-serif;cursor:pointer}
+.seg button.on{background:#2a2a34;color:#fff}
+.btn{height:40px;padding:0 16px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:#16161c;color:#ededf2;font:600 14px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.btn.primary{background:linear-gradient(135deg,#ff5a2e,#b43bff);border-color:transparent;color:#fff}
+.kv{font-family:Syncopate,sans-serif;font-weight:700;font-size:30px;letter-spacing:-.01em;line-height:1}
+.ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center}
+.muted{color:#b4b4c4}
+.row{display:flex;align-items:center}
+a{color:#ff7a52}a:hover{color:#ffa07f}
+</style>
+</helmet>
+<div class="gx" style="width: 1920px; height: 1080px; box-sizing: border-box; background: radial-gradient(1100px 700px at 0% 100%, rgba(255,90,46,.16), transparent 70%), radial-gradient(1100px 800px at 100% 0%, rgba(180,59,255,.18), transparent 70%), #09090d; overflow: hidden">
+<div class="scr">
+<div style="padding: 40px 56px 56px; display: flex; flex-direction: column; gap: 28px">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px">
+<div>
+<div class="eyebrow">Tableau de bord</div>
+<h1 class="h1">Cockpit général</h1>
+<p class="sub">Vue consolidée et analyse de la performance · mise à jour il y a 2 min</p>
+</div>
+<div style="display: flex; gap: 10px">
+<button class="btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>Exporter</button>
+<button class="btn primary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Nouveau projet</button>
+</div>
+</header>
+
+<section class="card" style="padding: 20px 24px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; align-items: flex-end; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span class="lbl">Période</span>
+<button class="field"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a52" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>1 janv. 2026<span class="muted">→</span>31 déc. 2026</button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span class="lbl">Périmètre</span>
+<button class="field"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a52" stroke-width="2" stroke-linecap="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>Tout le réseau<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8e8ea4" stroke-width="2.2" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span class="lbl">Client B2B (PRO+)</span>
+<div class="seg"><button class="on">Tout</button><button>Sans PRO+</button><button>PRO+ uniquement</button></div>
+</div>
+<div style="flex-grow: 1"></div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; padding-bottom: 4px">
+<span style="font-size: 13px; color: #b4b4c4">Aucun filtre actif</span>
+<a href="#" style="font-size: 13px; font-weight: 600; text-decoration: none">Réinitialiser</a>
+</div>
+</div>
+<div style="height: 1px; background: rgba(255,255,255,.07)"></div>
+<div style="display: flex; gap: 40px; align-items: flex-start">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span class="lbl">Marque</span>
+<div style="display: flex; gap: 8px; flex-wrap: wrap">
+<button class="chip on">Toutes</button>
+<button class="chip"><span class="dot" style="background: #f5c518"></span>Renault</button>
+<button class="chip"><span class="dot" style="background: #7c8c5a"></span>Dacia</button>
+<button class="chip"><span class="dot" style="background: #2f6fe4"></span>Alpine</button>
+<button class="chip"><span class="dot" style="background: #d0103a"></span>Nissan</button>
+<button class="chip"><span class="dot" style="background: #8b5cf6"></span>Mobilize</button>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span class="lbl">Service</span>
+<div style="display: flex; gap: 8px">
+<button class="chip on">Tous</button><button class="chip">VN</button><button class="chip">VO</button><button class="chip">APV</button><button class="chip">PR</button>
+</div>
+</div>
+</div>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+<sc-for list="{{kpis}}" as="k" hint-placeholder-count="6">
+<article class="card" style="padding: 24px; min-height: 176px; display: flex; flex-direction: column; gap: 14px; position: relative; overflow: hidden">
+<div style="position: absolute; left: 0; top: 24px; bottom: 24px; width: 3px; border-radius: 0 3px 3px 0; background: {{k.color}}"></div>
+<div style="display: flex; align-items: flex-start; justify-content: space-between">
+<span class="lbl">{{k.label}}</span>
+<span class="ico" style="background: {{k.tint}}; color: {{k.color}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{k.icon}}"></path></svg></span>
+</div>
+<div class="kv" style="color: {{k.vcolor}}">{{k.value}}<span style="font-size: 16px; margin-left: 8px; color: #b4b4c4">{{k.unit}}</span></div>
+<sc-if value="{{k.bar}}" hint-placeholder-val="{{false}}">
+<div style="height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden"><div style="height: 100%; width: {{k.pct}}; background: linear-gradient(90deg,#ff5a2e,#b43bff); border-radius: 3px"></div></div>
+</sc-if>
+<p style="margin: auto 0 0; font-size: 14px; line-height: 1.45; color: #c4c4d2">{{k.foot}}</p>
+</article>
+</sc-for>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+<article class="card" style="grid-column: span 2; padding: 24px 28px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; align-items: flex-start; justify-content: space-between">
+<div><h2 class="h2">Trajectoire mensuelle 2026</h2><p style="margin: 6px 0 0; font-size: 13px; color: #b4b4c4">Réalisé ventilé des projets et dépenses, face à l'enveloppe du périmètre.</p></div>
+<div style="display: flex; gap: 18px; font-size: 13px; font-weight: 600; color: #c4c4d2">
+<span class="row" style="gap: 7px"><span style="width: 18px; border-top: 2px dashed #9aa4ff"></span>Budget mensuel</span>
+<span class="row" style="gap: 7px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #ff5a2e"></span>Réalisé</span>
+</div>
+</div>
+<svg width="100%" viewBox="0 0 860 300" style="display: block">
+<g stroke="rgba(255,255,255,.07)" stroke-width="1"><line x1="44" y1="20" x2="860" y2="20"></line><line x1="44" y1="100" x2="860" y2="100"></line><line x1="44" y1="180" x2="860" y2="180"></line><line x1="44" y1="260" x2="860" y2="260"></line></g>
+<g fill="#8e8ea4" font-size="12" font-family="Albert Sans"><text x="0" y="24">120 k</text><text x="0" y="104">80 k</text><text x="0" y="184">40 k</text><text x="14" y="264">0</text></g>
+<defs><linearGradient id="bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff5a2e"></stop><stop offset="1" stop-color="#b43bff"></stop></linearGradient></defs>
+<sc-for list="{{bars}}" as="b" hint-placeholder-count="12">
+<rect x="{{b.x}}" y="{{b.y}}" width="36" height="{{b.h}}" rx="5" fill="url(#bar)"></rect>
+<text x="{{b.tx}}" y="288" fill="#8e8ea4" font-size="12" font-family="Albert Sans" text-anchor="middle">{{b.m}}</text>
+</sc-for>
+<polyline points="64,150 132,152 200,149 268,151 336,150 404,152 472,148 540,150 608,151 676,149 744,150 812,150" fill="none" stroke="#9aa4ff" stroke-width="2" stroke-dasharray="6 6"></polyline>
+</svg>
+</article>
+<article class="card" style="padding: 24px 28px; display: flex; flex-direction: column; gap: 18px">
+<div><h2 class="h2">Mix activité</h2><p style="margin: 6px 0 0; font-size: 13px; color: #b4b4c4">Réalisé de la période, par service.</p></div>
+<div style="display: flex; justify-content: center; padding: 6px 0">
+<svg width="190" height="190" viewBox="0 0 42 42">
+<circle cx="21" cy="21" r="15.9" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="4.6"></circle>
+<circle cx="21" cy="21" r="15.9" fill="none" stroke="#ff5a2e" stroke-width="4.6" stroke-dasharray="43 57" stroke-dashoffset="25"></circle>
+<circle cx="21" cy="21" r="15.9" fill="none" stroke="#5b8cff" stroke-width="4.6" stroke-dasharray="22 78" stroke-dashoffset="-18"></circle>
+<circle cx="21" cy="21" r="15.9" fill="none" stroke="#b43bff" stroke-width="4.6" stroke-dasharray="21 79" stroke-dashoffset="-40"></circle>
+<circle cx="21" cy="21" r="15.9" fill="none" stroke="#2cc2d8" stroke-width="4.6" stroke-dasharray="14 86" stroke-dashoffset="-61"></circle>
+<text x="21" y="21" text-anchor="middle" fill="#ededf2" font-size="5.2" font-weight="700" font-family="Albert Sans">377,3 k€</text>
+<text x="21" y="26.5" text-anchor="middle" fill="#8e8ea4" font-size="2.8" font-family="Albert Sans">engagés</text>
+</svg>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<sc-for list="{{mix}}" as="m" hint-placeholder-count="4">
+<div class="row" style="gap: 10px; font-size: 14px"><span class="dot" style="background: {{m.c}}; width: 10px; height: 10px"></span><b style="font-weight: 700">{{m.l}}</b><span style="flex-grow: 1"></span><span class="muted">{{m.v}}</span><span style="width: 44px; text-align: right; font-weight: 700">{{m.p}}</span></div>
+</sc-for>
+</div>
+</article>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px">
+<article class="card" style="padding: 24px 28px; display: flex; flex-direction: column; gap: 16px">
+<div class="row" style="justify-content: space-between"><h2 class="h2">Prochaines échéances</h2><a href="#" style="font-size: 13px; font-weight: 600; text-decoration: none">Tous les projets →</a></div>
+<sc-for list="{{dues}}" as="d" hint-placeholder-count="4">
+<div class="row" style="gap: 16px; padding: 14px 16px; border-radius: 12px; background: #16161c; border: 1px solid rgba(255,255,255,.06)">
+<div style="width: 48px; height: 48px; border-radius: 10px; background: #ededf2; color: #111; display: grid; place-content: center; text-align: center"><span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #d0103a">{{d.mo}}</span><span style="font-size: 18px; font-weight: 700; line-height: 1">{{d.da}}</span></div>
+<div style="flex-grow: 1; min-width: 0"><div style="font-size: 15px; font-weight: 700">{{d.t}}</div><div style="margin-top: 4px; font-size: 13px; color: #b4b4c4">{{d.s}}</div></div>
+<span style="font-size: 13px; font-weight: 700; color: {{d.c}}">{{d.in}}</span>
+</div>
+</sc-for>
+</article>
+<article class="card" style="padding: 24px 28px; display: flex; flex-direction: column; gap: 16px">
+<div class="row" style="justify-content: space-between"><h2 class="h2">Prochaines publications</h2><a href="#" style="font-size: 13px; font-weight: 600; text-decoration: none">Calendrier éditorial →</a></div>
+<sc-for list="{{posts}}" as="p" hint-placeholder-count="4">
+<div class="row" style="gap: 16px; padding: 14px 16px; border-radius: 12px; background: #16161c; border: 1px solid rgba(255,255,255,.06)">
+<div style="width: 48px; height: 48px; border-radius: 10px; background: #ededf2; color: #111; display: grid; place-content: center; text-align: center"><span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #d0103a">{{p.mo}}</span><span style="font-size: 18px; font-weight: 700; line-height: 1">{{p.da}}</span></div>
+<div style="flex-grow: 1; min-width: 0"><div style="font-size: 15px; font-weight: 700">{{p.t}}</div><div style="margin-top: 4px; font-size: 13px; color: #b4b4c4">{{p.s}}</div></div>
+<span style="height: 26px; padding: 0 10px; border-radius: 7px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; background: {{p.bg}}; color: {{p.fg}}">{{p.st}}</span>
+</div>
+</sc-for>
+</article>
+</section>
+
+<section class="card" style="padding: 24px 28px; display: flex; flex-direction: column; gap: 18px">
+<div class="row" style="justify-content: space-between"><div><h2 class="h2">Écart prévu / réalisé</h2><p style="margin: 6px 0 0; font-size: 13px; color: #b4b4c4">Projets avec un budget prévisionnel · avancement moyen des projets actifs : 39 %</p></div><div class="row" style="gap: 18px; font-size: 13px; font-weight: 600; color: #c4c4d2"><span class="row" style="gap: 7px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #4a4a58"></span>Prévu</span><span class="row" style="gap: 7px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #ff5a5a"></span>Dépassement</span><span class="row" style="gap: 7px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #3ecf8e"></span>Sous budget</span></div></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; row-gap: 18px">
+<sc-for list="{{gaps}}" as="g" hint-placeholder-count="6">
+<div style="display: flex; flex-direction: column; gap: 7px">
+<div class="row" style="justify-content: space-between; font-size: 14px"><b>{{g.t}}</b><span style="font-weight: 700; color: {{g.c}}">{{g.d}}</span></div>
+<div style="height: 6px; border-radius: 3px; background: rgba(255,255,255,.07)"><div style="height: 100%; width: {{g.pw}}; background: #4a4a58; border-radius: 3px"></div></div>
+<div style="height: 6px; border-radius: 3px; background: rgba(255,255,255,.07)"><div style="height: 100%; width: {{g.rw}}; background: {{g.c}}; border-radius: 3px"></div></div>
+<div class="row" style="justify-content: space-between; font-size: 12px; color: #8e8ea4"><span>Prévu {{g.p}}</span><span>Réalisé {{g.r}}</span></div>
+</div>
+</sc-for>
+</div>
+</section>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const I = {
+      wallet: 'M3 7a2 2 0 0 1 2-2h13v4M3 7v10a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2zM16 14h.01',
+      target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01',
+      layers: 'm12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5',
+      mega: 'M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM16 9a4 4 0 0 1 0 6',
+      alert: 'M12 3 2 20h20L12 3zM12 10v4M12 17h.01',
+      gauge: 'M12 14l4-4M4 18a9 9 0 1 1 16 0'
+    };
+    const kpis = [
+      { label: 'Budget consommé', value: '377 269', unit: '€', icon: I.wallet, color: '#ff5a2e', tint: 'rgba(255,90,46,.14)', vcolor: '#ededf2', bar: true, pct: '59%', foot: 'Sur 638 100 € prévus sur la période · 59,1 %' },
+      { label: 'Reste à engager', value: '260 831', unit: '€', icon: I.target, color: '#5b8cff', tint: 'rgba(91,140,255,.14)', vcolor: '#ededf2', bar: false, pct: '0', foot: 'Disponible pour de nouveaux projets.' },
+      { label: 'Projets actifs', value: '12', unit: '', icon: I.layers, color: '#3ecf8e', tint: 'rgba(62,207,142,.14)', vcolor: '#ededf2', bar: false, pct: '0', foot: 'En cours de réalisation sur le périmètre.' },
+      { label: 'Campagnes programmées', value: '2', unit: '', icon: I.mega, color: '#b43bff', tint: 'rgba(180,59,255,.14)', vcolor: '#ededf2', bar: false, pct: '0', foot: 'Envois SMS / e-mail au statut « programmé ».' },
+      { label: 'Projets en retard', value: '2', unit: '', icon: I.alert, color: '#ff5a5a', tint: 'rgba(255,90,90,.14)', vcolor: '#ff6b6b', bar: false, pct: '0', foot: 'Échéance dépassée, avancement inférieur à 100 %.' },
+      { label: 'Avance / retard de budget', value: '−33', unit: 'points', icon: I.gauge, color: '#f5a524', tint: 'rgba(245,165,36,.14)', vcolor: '#f5b544', bar: false, pct: '0', foot: 'Engagé 41 % pour 74 % de la période écoulée : le budget risque de rester non engagé.' }
+    ];
+    const vals = [2, 5, 12, 10, 1, 2, 38, 92, 104, 82, 30, 1];
+    const months = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
+    const bars = vals.map((v, i) => { const h = Math.max(3, v * 2); return { x: 46 + i * 68, y: 260 - h, h, tx: 64 + i * 68, m: months[i] }; });
+    const mix = [
+      { l: 'VN', c: '#ff5a2e', v: '163,4 k€', p: '43 %' }, { l: 'APV', c: '#5b8cff', v: '82,9 k€', p: '22 %' },
+      { l: 'VO', c: '#b43bff', v: '78,1 k€', p: '21 %' }, { l: 'PR', c: '#2cc2d8', v: '53 k€', p: '14 %' }
+    ];
+    const dues = [
+      { mo: 'oct', da: '3', t: 'Salon VO Saint-Étienne', s: 'Saint-Étienne · Expo / Salon', in: 'dans 5 j', c: '#f5b544' },
+      { mo: 'oct', da: '7', t: 'Soirée clients Alpine A290', s: 'Vichy · Animation commerciale', in: 'dans 9 j', c: '#c4c4d2' },
+      { mo: 'oct', da: '15', t: 'Street marketing Millau', s: 'Millau · Animation commerciale', in: 'dans 17 j', c: '#c4c4d2' },
+      { mo: 'nov', da: '30', t: 'Portes ouvertes R5 E-Tech', s: 'Clermont · OP clients', in: 'dans 63 j', c: '#c4c4d2' }
+    ];
+    const posts = [
+      { mo: 'sept', da: '28', t: 'Portes ouvertes ce week-end', s: 'Facebook · Instagram · Renault, Nissan', st: 'En attente', bg: 'rgba(245,165,36,.16)', fg: '#f5b544' },
+      { mo: 'sept', da: '28', t: 'Recrutement : technicien APV', s: 'LinkedIn · Indeed · Nissan', st: 'En attente', bg: 'rgba(245,165,36,.16)', fg: '#f5b544' },
+      { mo: 'sept', da: '28', t: 'Offre pneus hiver', s: 'Facebook · Instagram · Toutes marques', st: 'Validé', bg: 'rgba(62,207,142,.16)', fg: '#3ecf8e' },
+      { mo: 'oct', da: '2', t: 'Nouvelle R5 : réservez votre essai', s: 'Instagram · TikTok · Renault', st: 'Programmé', bg: 'rgba(91,140,255,.16)', fg: '#8fb0ff' }
+    ];
+    const gaps = [
+      { t: 'Forum Pièces 2026', d: '+38 %', c: '#ff5a5a', pw: '72%', rw: '100%', p: '70 000 €', r: '96 575 €' },
+      { t: 'Track Day Mornay', d: '−87 %', c: '#3ecf8e', pw: '100%', rw: '13%', p: '8 000 €', r: '1 036 €' },
+      { t: 'Lancement Clio Clermont', d: '+22 %', c: '#ff5a5a', pw: '82%', rw: '100%', p: '20 000 €', r: '24 319 €' },
+      { t: 'Partenariat GT4 Servol', d: '−37 %', c: '#3ecf8e', pw: '100%', rw: '63%', p: '8 000 €', r: '5 000 €' },
+      { t: 'Lancement Clio BSO', d: '+10 %', c: '#ff5a5a', pw: '91%', rw: '100%', p: '25 000 €', r: '27 566 €' },
+      { t: 'Portes ouvertes R5 E-Tech', d: '−18 %', c: '#3ecf8e', pw: '100%', rw: '82%', p: '10 900 €', r: '8 900 €' }
+    ];
+    return { kpis, bars, mix, dues, posts, gaps, false: false };
+  }
+}
+</script>
+</body>
+</html>

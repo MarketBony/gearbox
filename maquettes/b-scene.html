@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gearbox · Scène</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&family=Syncopate:wght@700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="commun.css" />
+<style>
+/* =================== B · SCÈNE (visionOS + Stage Manager) =================== */
+:root { --nav-w: 64px; --strip-w: 190px; --gap: 22px; }
+
+/* Ornement de navigation : pilule flottante, s'élargit au survol */
+.orn-nav { position: fixed; left: 16px; top: 50%; z-index: 50; transform: translateY(-50%);
+  width: var(--nav-w); padding: 8px; border-radius: 32px; display: flex; flex-direction: column; gap: 2px;
+  transition: width var(--t-med) var(--spring-snappy); overflow: hidden; }
+.orn-nav:hover { width: 212px; }
+.orn-nav .mark { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 10px; margin-bottom: 4px; white-space: nowrap; }
+.orn-nav .mark img { width: 26px; }
+.orn-nav .mark span { opacity: 0; transition: opacity var(--t-fast); }
+.orn-nav:hover .mark span { opacity: 1; }
+.orn-nav .items { position: relative; display: flex; flex-direction: column; gap: 2px; }
+.nav-it { position: relative; z-index: 1; display: flex; align-items: center; gap: 14px; height: 44px; padding: 0 13px; border-radius: 22px; white-space: nowrap; color: var(--text-2); font-weight: 600; transition: color var(--t-fast), background var(--t-fast); }
+.nav-it:hover { background: var(--surface-3); color: var(--text); }
+.nav-it.on { color: #fff; }
+.nav-it .lbl { opacity: 0; transform: translateX(-6px); transition: opacity var(--t-fast), transform var(--t-med) var(--spring-snappy); }
+.orn-nav:hover .nav-it .lbl { opacity: 1; transform: none; }
+.nav-pill { position: absolute; left: 0; right: 0; height: 44px; border-radius: 22px; background: var(--bony-grad); box-shadow: 0 8px 22px -8px rgba(247,86,50,.6);
+  transition: transform var(--t-med) var(--spring-snappy); }
+
+/* La scène : fenêtre principale + miniatures vivantes à gauche */
+#stage { position: fixed; inset: 0; perspective: 1400px; }
+.scene { position: absolute; border-radius: var(--r-xl); overflow: hidden; background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--line-2), var(--shadow-3);
+  transform-origin: 0 0; will-change: transform;
+  transition: transform var(--t-slow) var(--spring-soft), opacity var(--t-med) var(--ease-out), filter var(--t-med); }
+.scene.thumb { cursor: pointer; }
+.scene.thumb > * { pointer-events: none; }
+.scene.thumb:hover { box-shadow: 0 0 0 3px var(--bony-orange), var(--shadow-2); }
+.scene .inner { position: absolute; inset: 0; display: flex; flex-direction: column; transition: transform var(--t-slow) var(--spring-soft), filter var(--t-slow); }
+.scene.recede .inner { transform: scale(.94); filter: brightness(.55); border-radius: var(--r-xl); }
+.scene-label { position: absolute; left: 0; right: 0; bottom: -26px; text-align: center; font-weight: 600; font-size: 12px; color: var(--text-2); }
+
+/* Ornement supérieur : onglets de la rubrique, flotte au-dessus du bord */
+.orn-top { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 8px; padding: 5px; border-radius: 999px; }
+.orn-top .seg { background: transparent; }
+
+.head { padding: 70px 34px 0; display: flex; align-items: flex-end; justify-content: space-between; }
+.content { flex: 1; min-height: 0; padding: 22px 34px 34px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.kpi { padding: 18px; animation: fade-up var(--t-med) var(--spring-soft) both; }
+.kpi .v { font-size: 26px; font-weight: 700; margin: 8px 0 4px; letter-spacing: -.02em; }
+.row2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; margin-top: 14px; }
+.row2 > .card { padding: 18px; }
+
+/* Projets : cartes → détail par transition d'élément partagé (View Transitions) */
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.pcard { padding: 16px; cursor: pointer; text-align: left; display: grid; gap: 10px; transition: transform var(--t-fast) var(--ease-out), box-shadow var(--t-fast); animation: fade-up var(--t-med) var(--spring-soft) both; }
+.pcard:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--line-2), var(--shadow-1); }
+.pcard .n { font-weight: 700; font-size: 15px; }
+.back { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-weight: 600; margin-bottom: 18px; }
+.back:hover { color: var(--text); }
+.detail-hero { padding: 22px; border-radius: var(--r-lg); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+::view-transition-group(*) { animation-duration: 520ms; animation-timing-function: var(--spring-soft); }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 200ms; }
+
+/* Feuille (sheet) façon iOS */
+.sheet-veil { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.25); opacity: 0; pointer-events: none; transition: opacity var(--t-med); }
+.sheet-veil.on { opacity: 1; pointer-events: auto; }
+.sheet { position: fixed; z-index: 81; left: 50%; bottom: 0; width: min(560px, 92vw); padding: 22px 24px 28px; border-radius: 28px 28px 0 0;
+  transform: translate(-50%, 105%); transition: transform var(--t-slow) var(--spring-snappy); }
+.sheet.on { transform: translate(-50%, 0); }
+.sheet .grab { width: 40px; height: 5px; border-radius: 99px; background: var(--line-2); margin: -8px auto 16px; }
+.field { display: grid; gap: 6px; margin-top: 12px; }
+.field input { height: 40px; border-radius: 12px; border: 0; outline: 0; padding: 0 14px; background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow var(--t-fast); }
+.field input:focus { box-shadow: inset 0 0 0 2px var(--bony-orange); }
+.placeholder { height: 100%; display: grid; place-items: center; text-align: center; }
+.placeholder h3 { margin: 16px 0 6px; font-size: 20px; }
+</style>
+</head>
+<body>
+<div class="wallpaper"></div>
+<nav class="orn-nav glass" id="nav">
+  <div class="mark"><img src="icon-mark.svg" alt="" /><span class="display" style="font-size:12px">Gearbox</span></div>
+  <div class="items" id="navItems"><span class="nav-pill" id="pill"></span></div>
+</nav>
+<div id="stage"></div>
+<div class="sheet-veil" id="sveil"></div>
+<div class="sheet glass" id="sheet">
+  <div class="grab"></div>
+  <h3 style="margin:0 0 4px;font-size:20px">Nouveau projet</h3>
+  <div class="muted">La fenêtre recule derrière la feuille : on garde le contexte.</div>
+  <label class="field"><span class="label">Nom</span><input placeholder="Ex. Portes ouvertes Mégane" /></label>
+  <label class="field"><span class="label">Site</span><input placeholder="Clermont" /></label>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px"><button class="btn" data-close>Annuler</button><button class="btn btn-primary" data-close>Créer</button></div>
+</div>
+
+<script src="commun.js"></script>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const NAV = ['dashboard', 'projects', 'digital', 'chat', 'agenda', 'budget', 'conges', 'settings'];
+const navItems = $('#navItems');
+navItems.insertAdjacentHTML('beforeend', NAV.map((id) => `<button class="nav-it" data-app="${id}">${G.icon(id)}<span class="lbl">${G.app(id).name}</span></button>`).join(''));
+navItems.addEventListener('click', (e) => { const b = e.target.closest('.nav-it'); if (b) go(b.dataset.app); });
+function movePill(id) {
+  const b = navItems.querySelector(`[data-app="${id}"]`); navItems.querySelectorAll('.nav-it').forEach((x) => x.classList.toggle('on', x === b));
+  $('#pill').style.transform = b ? `translateY(${b.offsetTop}px)` : 'scale(0)';
+}
+
+/* ------------- Scène : 1 fenêtre principale + 3 miniatures VIVANTES -------------
+   Toutes les scènes ont la même taille réelle ; une miniature n'est qu'un
+   transform (échelle + rotation 3D). Passer de l'une à l'autre = une transition
+   de transform, calculée par le compositeur : c'est ce qui la rend fluide. */
+const stage = $('#stage'); let order = []; // order[0] = principale
+function mainRect() {
+  const left = 16 + 64 + 24 + 190 + 22, top = 22;
+  return { left, top, width: innerWidth - left - 26, height: innerHeight - top - 22 };
+}
+function layout() {
+  const m = mainRect();
+  order.forEach((id, i) => {
+    const el = stage.querySelector(`[data-scene="${id}"]`);
+    Object.assign(el.style, { left: m.left + 'px', top: m.top + 'px', width: m.width + 'px', height: m.height + 'px' });
+    el.classList.toggle('thumb', i > 0);
+    el.querySelector('.scene-label')?.remove();
+    if (i === 0) { el.style.transform = 'none'; el.style.opacity = 1; el.style.zIndex = 10; return; }
+    const n = Math.min(order.length - 1, 3), gap = 40;
+    const s = Math.min(170 / m.width, ((innerHeight - 80) / 3 - gap) / m.height), th = m.height * s;
+    const slotY = innerHeight / 2 - (n * th + (n - 1) * gap) / 2 + (i - 1) * (th + gap);
+    const x = 16 + 64 + 24 + 10 - m.left, y = slotY - m.top;
+    el.style.transform = `translate(${x}px, ${y}px) scale(${s}) rotateY(22deg)`;
+    el.style.opacity = i > 3 ? 0 : 1; el.style.zIndex = 5 - i;
+    el.insertAdjacentHTML('beforeend', `<div class="scene-label" style="transform:scale(${1 / s});transform-origin:top center;bottom:auto;top:calc(100% + 8px)">${G.app(id).name}</div>`);
+  });
+}
+function go(id) {
+  if (order[0] === id) return;
+  let el = stage.querySelector(`[data-scene="${id}"]`);
+  if (!el) {
+    el = document.createElement('section'); el.className = 'scene'; el.dataset.scene = id;
+    el.innerHTML = `<div class="inner">${sceneContent(id)}</div>`;
+    const m = mainRect();
+    Object.assign(el.style, { left: m.left + 'px', top: m.top + 'px', width: m.width + 'px', height: m.height + 'px', transform: 'translateY(40px) scale(.92)', opacity: 0 });
+    stage.append(el); wireScene(el, id); el.getBoundingClientRect();
+  }
+  order = [id, ...order.filter((x) => x !== id)];
+  const gone = order.slice(4); order = order.slice(0, 4);
+  gone.forEach((g) => { const d = stage.querySelector(`[data-scene="${g}"]`); d.style.opacity = 0; setTimeout(() => d.remove(), 400); });
+  layout(); movePill(id);
+}
+stage.addEventListener('click', (e) => { const t = e.target.closest('.scene.thumb'); if (t) go(t.dataset.scene); });
+addEventListener('resize', layout);
+
+function sceneContent(id) {
+  const a = G.app(id);
+  const top = `<div class="orn-top glass"><div class="seg" data-seg><span class="thumb"></span>${(id === 'projects' ? ['En cours', 'Planifiés', 'Terminés'] : ['Année', 'Trimestre', 'Mois']).map((t, i) => `<button aria-pressed="${i === 0}">${t}</button>`).join('')}</div><button class="icon-btn" onclick="G.spotlight.open()" title="Ctrl K">${G.icon('search')}</button></div>`;
+  if (id === 'dashboard') return `${top}<div class="head"><div><div class="label">Tout le réseau · 2026</div><h1 class="display" style="font-size:30px;margin:8px 0 0">Cockpit</h1></div></div>
+    <div class="content scroll"><div class="kpis">${G.kpis().map((k, i) => `<div class="card kpi" style="animation-delay:${i * 45}ms"><div class="label">${k.k}</div><div class="v num">${k.v}</div><div class="${k.tone ? '' : 'faint'}" style="${k.tone ? 'color:var(--warn)' : ''}">${k.sub}</div>${k.bar ? `<div class="bar" style="margin-top:12px"><i style="width:${k.bar}%"></i></div>` : ''}</div>`).join('')}</div>
+    <div class="row2"><div class="card"><b>Trajectoire mensuelle</b><div style="margin-top:16px">${G.renderChart()}</div></div><div class="card"><b>Mix d’activité</b><div style="margin-top:18px">${G.renderDonut()}</div></div></div>
+    <div class="card" style="padding:16px 18px 8px;margin-top:14px"><b>Prochaines échéances</b><div style="margin-top:8px">${G.renderUpcoming()}</div></div></div>`;
+  if (id === 'projects') return `${top}<div class="head"><div><div class="label">${G.projects.length} projets</div><h1 class="display" style="font-size:30px;margin:8px 0 0">Projets</h1></div><button class="btn btn-primary" data-new>${G.icon('plus')}Nouveau</button></div>
+    <div class="content scroll" data-pview>${projectGrid()}</div>`;
+  return `${top}<div class="placeholder"><div>${G.appIcon(a, 72)}<h3>${a.name}</h3><div class="muted">Rubrique non maquettée. Change de rubrique puis clique<br/>une miniature à gauche : elle reprend sa place, vivante.</div></div></div>`;
+}
+const projectGrid = () => `<div class="pgrid">${G.projects.map((p, i) => `<button class="card pcard" data-id="${p.id}" style="animation-delay:${i * 30}ms;view-transition-name:pc-${p.id}">
+  <div style="display:flex;justify-content:space-between;align-items:center"><span class="label">${p.site} · ${p.service}</span>${G.statusBadge(p.status)}</div>
+  <div class="n" style="view-transition-name:pt-${p.id}">${p.name}</div>
+  <div class="bar"><i style="width:${p.progress}%"></i></div>
+  <div style="display:flex;justify-content:space-between" class="faint"><span>${p.owner}</span><span class="num">${G.eur(p.spent)} / ${G.eur(p.budget)}</span></div></button>`).join('')}</div>`;
+
+function wireScene(el, id) {
+  if (id !== 'projects') return;
+  const view = el.querySelector('[data-pview]');
+  const vt = (fn) => { if (!document.startViewTransition || document.documentElement.dataset.effects === 'eco') return fn(); document.startViewTransition(fn).ready.catch(() => {}); };
+  view.addEventListener('click', (e) => {
+    const c = e.target.closest('.pcard');
+    if (c) { const p = G.projects.find((x) => x.id === c.dataset.id); openDetail(p); }
+    if (e.target.closest('[data-back]')) vt(() => { view.innerHTML = projectGrid(); view.querySelectorAll('.pcard').forEach((x) => x.style.animation = 'none'); });
+  });
+  const openDetail = (p) => vt(() => {
+    view.innerHTML = `<button class="back" data-back>${G.icon('back')}Tous les projets</button>
+      <div class="detail-hero" style="view-transition-name:pc-${p.id}">${G.renderProjectDetail(p).replace('class="pd-title"', `class="pd-title" style="view-transition-name:pt-${p.id}"`)}</div>`;
+  });
+  el.openDetail = openDetail;
+  el.querySelector('[data-new]').onclick = () => sheet(true, el);
+}
+function sheet(on, el) {
+  const main = el || stage.querySelector(`[data-scene="${order[0]}"]`);
+  $('#sheet').classList.toggle('on', on); $('#sveil').classList.toggle('on', on); main.classList.toggle('recede', on);
+}
+$('#sveil').onclick = () => sheet(false);
+document.querySelectorAll('[data-close]').forEach((b) => b.onclick = () => sheet(false));
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-seg] button'); if (!b) return;
+  b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); placeThumb(b.parentElement);
+});
+function placeThumb(seg) { const b = seg.querySelector('[aria-pressed=true]'), t = seg.querySelector('.thumb'); t.style.left = b.offsetLeft + 'px'; t.style.width = b.offsetWidth + 'px'; }
+new MutationObserver(() => document.querySelectorAll('[data-seg]').forEach((s) => { if (!s.dataset.ok) { s.dataset.ok = 1; requestAnimationFrame(() => placeThumb(s)); } })).observe(stage, { childList: true, subtree: true });
+
+G.onOpenApp = go;
+G.onOpenProject = (pid) => { go('projects'); setTimeout(() => stage.querySelector('[data-scene=projects]').openDetail(G.projects.find((p) => p.id === pid)), 450); };
+// Démarrage : trois rubriques déjà ouvertes pour montrer la scène
+go('agenda'); go('projects'); go('dashboard');
+</script>
+</body>
+</html>

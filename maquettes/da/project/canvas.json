@@ -1,0 +1,120 @@
+{
+ "v": 3,
+ "attachments": {},
+ "boards": {
+  "A-Telephone.dc.html": {
+   "h": 844,
+   "radius": 44,
+   "title": "A · Carbone — téléphone",
+   "w": 390,
+   "x": 525,
+   "y": 1320
+  },
+  "B-Nocturne.dc.html": {
+   "h": 900,
+   "title": "B · Nocturne — bureau",
+   "w": 1440,
+   "x": 1520,
+   "y": 0
+  },
+  "B-Telephone.dc.html": {
+   "h": 844,
+   "radius": 44,
+   "title": "B · Nocturne — téléphone",
+   "w": 390,
+   "x": 2045,
+   "y": 1320
+  },
+  "C-Signal.dc.html": {
+   "h": 900,
+   "title": "C · Signal — bureau",
+   "w": 1440,
+   "x": 3040,
+   "y": 0
+  },
+  "C-Telephone.dc.html": {
+   "h": 844,
+   "radius": 44,
+   "title": "C · Signal — téléphone",
+   "w": 390,
+   "x": 3565,
+   "y": 1320
+  },
+  "Fondations.dc.html": {
+   "h": 1120,
+   "title": "Fondations comparées",
+   "w": 1440,
+   "x": 0,
+   "y": 2510
+  },
+  "Main.dc.html": {
+   "h": 900,
+   "title": "A · Carbone — bureau",
+   "w": 1440,
+   "x": 0,
+   "y": 0
+  },
+  "Mouvement.dc.html": {
+   "h": 900,
+   "is_interactive": true,
+   "title": "Mouvement — banc d’essai",
+   "w": 1440,
+   "x": 1520,
+   "y": 2510
+  },
+  "Icones.dc.html": {
+   "x": 3040,
+   "y": 2510,
+   "w": 1440,
+   "h": 640,
+   "title": "Icônes façon iOS"
+  }
+ },
+ "createdOnFiles": {
+  "at": "2026-09-28T07:13:41Z",
+  "v": 1
+ },
+ "designSystems": [],
+ "launch": {
+  "view": "canvas"
+ },
+ "notes": {
+  "t1": {
+   "kind": "title1",
+   "maxW": 4480,
+   "text": "Trois directions · thème sombre",
+   "w": 240,
+   "x": 0,
+   "y": -300
+  },
+  "t2": {
+   "kind": "title1",
+   "maxW": 4480,
+   "text": "Sur téléphone",
+   "w": 240,
+   "x": 0,
+   "y": 1060
+  },
+  "t3": {
+   "kind": "title1",
+   "maxW": 4480,
+   "text": "Fondations, mouvement et icônes",
+   "w": 240,
+   "x": 0,
+   "y": 2250
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "B-Nocturne.dc.html",
+  "C-Signal.dc.html",
+  "A-Telephone.dc.html",
+  "B-Telephone.dc.html",
+  "C-Telephone.dc.html",
+  "Fondations.dc.html",
+  "Mouvement.dc.html",
+  "Icones.dc.html"
+ ],
+ "pages": [],
+ "title": "Gearbox OS — Direction artistique"
+}

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Projets — liste et fiche complète</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&amp;family=Syncopate:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#09090d}
+.gx{font-family:"Albert Sans",system-ui,sans-serif;color:#ededf2;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#ff7a52}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9494aa}
+.card{background:rgba(20,20,28,.72);border:1px solid rgba(255,255,255,.09);border-radius:14px;backdrop-filter:blur(18px);box-shadow:0 20px 40px -28px rgba(0,0,0,.8)}
+.h2{margin:0;font-family:Syncopate,sans-serif;font-weight:700;font-size:14px;letter-spacing:.08em;text-transform:uppercase}
+.chip{height:32px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.02);color:#dcdce6;font:600 13px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.chip.on{background:linear-gradient(135deg,#ff5a2e,#b43bff);border-color:transparent;color:#fff;box-shadow:0 6px 16px -8px rgba(255,90,46,.7)}
+.field{height:40px;padding:0 13px;border-radius:10px;border:1px solid rgba(255,255,255,.13);background:rgba(8,8,12,.55);color:#ededf2;font:600 14px "Albert Sans",sans-serif;display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;box-sizing:border-box}
+.cell{height:34px;padding:0 10px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:rgba(8,8,12,.5);color:#ededf2;font:600 13.5px "Albert Sans",sans-serif;display:flex;align-items:center;gap:7px;box-sizing:border-box;white-space:nowrap;overflow:hidden}
+.seg{display:inline-flex;padding:3px;border-radius:10px;background:rgba(8,8,12,.55);border:1px solid rgba(255,255,255,.12)}
+.seg button{height:32px;padding:0 15px;border:0;border-radius:7px;background:transparent;color:#b8b8c8;font:600 13px "Albert Sans",sans-serif;cursor:pointer}
+.seg button.on{background:linear-gradient(135deg,#ff5a2e,#b43bff);color:#fff}
+.btn{height:40px;padding:0 15px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);color:#ededf2;font:600 14px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.btn.primary{background:linear-gradient(135deg,#ff5a2e,#b43bff);border-color:transparent;color:#fff;box-shadow:0 10px 24px -12px rgba(255,90,46,.8)}
+.muted{color:#b8b8c8}
+.row{display:flex;align-items:center}
+.th{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9494aa;display:flex;align-items:center;gap:4px}
+.scr{overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.22) transparent}
+.scr::-webkit-scrollbar{width:12px}.scr::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
+a{color:#ff7a52}a:hover{color:#ffa07f}
+</style>
+</helmet>
+<div class="gx" style="width: 1920px; height: 1080px; box-sizing: border-box; background: radial-gradient(1100px 700px at 0% 100%, rgba(255,90,46,.16), transparent 70%), radial-gradient(1100px 800px at 100% 0%, rgba(180,59,255,.18), transparent 70%), #09090d; display: flex; overflow: hidden">
+
+<aside class="scr" style="width: 440px; flex-shrink: 0; height: 100%; border-right: 1px solid rgba(255,255,255,.08); background: rgba(10,10,14,.6); display: flex; flex-direction: column">
+<div style="padding: 30px 24px 16px; display: flex; flex-direction: column; gap: 16px">
+<div class="row" style="justify-content: space-between">
+<div><div class="eyebrow">Gestion de projets</div><div style="margin-top: 6px; font-family: Syncopate, sans-serif; font-weight: 700; font-size: 24px; letter-spacing: .03em; text-transform: uppercase">Projets</div></div>
+<button class="btn primary"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Nouveau</button>
+</div>
+<div class="row" style="gap: 8px">
+<label style="flex-grow: 1; height: 42px; border-radius: 10px; background: rgba(8,8,12,.55); border: 1px solid rgba(255,255,255,.13); display: flex; align-items: center; gap: 10px; padding: 0 12px; box-sizing: border-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9494aa" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg><input placeholder="Rechercher un projet…" aria-label="Rechercher un projet" style="flex-grow: 1; border: 0; outline: 0; background: transparent; color: #ededf2; font: 500 14px 'Albert Sans', sans-serif"></label>
+<button class="btn" aria-label="Masquer les filtres" style="width: 42px; height: 42px; padding: 0; justify-content: center; border-color: #ff5a2e; color: #ff7a52"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4 2v-8L3 5z"></path></svg></button>
+</div>
+</div>
+
+<div class="card" style="margin: 0 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+<div class="row" style="justify-content: space-between"><span class="lbl">Trier par date</span><button class="btn" style="height: 30px; font-size: 12.5px">Plus récents ↓</button></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Périmètre</span><button class="field">Tout le réseau<span style="flex-grow: 1"></span>▾</button></div>
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Utilisateurs</span><button class="field">Tous<span style="flex-grow: 1"></span>▾</button></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Marques</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px"><button class="chip on">Toutes</button><button class="chip">Renault</button><button class="chip">Dacia</button><button class="chip">Alpine</button><button class="chip">Nissan</button><button class="chip">Mobilize</button><button class="chip">Holding</button></div></div>
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Services</span>
+<div style="display: flex; gap: 6px"><button class="chip on">Tous</button><button class="chip">VN</button><button class="chip">VO</button><button class="chip">APV</button><button class="chip">PR</button></div></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Objet (type)</span><button class="field">Tous types<span style="flex-grow: 1"></span>▾</button></div>
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Statut</span><button class="field">Tous statuts<span style="flex-grow: 1"></span>▾</button></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">PRO+ (B2B)</span><div class="seg"><button class="on">Tout</button><button>Sans PRO+</button><button>PRO+ uniquement</button></div></div>
+<div style="display: flex; flex-direction: column; gap: 7px"><span class="lbl">Période (date de début)</span>
+<div class="row" style="gap: 8px"><button class="field" style="color: #9494aa">Du…</button><span class="muted">→</span><button class="field" style="color: #9494aa">Au…</button></div></div>
+<div class="row" style="justify-content: space-between; padding-top: 2px"><a href="#" style="font-size: 13px; font-weight: 600; text-decoration: none">Réinitialiser</a><span style="font-size: 13px; font-weight: 700; color: #ff7a52">116 résultats</span></div>
+</div>
+
+<div style="padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{projects}}" as="p" hint-placeholder-count="8">
+<article style="padding: 15px 16px; border-radius: 12px; background: {{p.bg}}; border: 1px solid {{p.bd}}; display: flex; flex-direction: column; gap: 9px">
+<div class="row" style="gap: 8px"><span style="flex-grow: 1; min-width: 0; font-family: Syncopate, sans-serif; font-weight: 700; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: {{p.tc}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{p.t}}</span>
+<sc-if value="{{p.pro}}" hint-placeholder-val="{{p.pro}}"><span style="height: 20px; padding: 0 7px; border-radius: 99px; background: linear-gradient(135deg,#ff5a2e,#b43bff); font-size: 10.5px; font-weight: 700; display: inline-flex; align-items: center">PRO+</span></sc-if>
+<span style="height: 20px; padding: 0 8px; border-radius: 99px; background: {{p.sb}}; color: {{p.sc}}; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center">{{p.st}}</span></div>
+<div style="font-size: 13.5px; color: #c0c0ce">{{p.s}}</div>
+<div class="row" style="gap: 8px; font-size: 12.5px; color: #c8c8d4"><span class="row" style="gap: 5px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #f5c518"></span><span style="width: 8px; height: 8px; border-radius: 50%; background: #7c8c5a"></span></span>{{p.meta}}<span style="flex-grow: 1"></span><span style="width: 64px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.1)"><span style="display: block; height: 100%; width: {{p.pw}}; border-radius: 3px; background: linear-gradient(90deg,#ff5a2e,#b43bff)"></span></span><span style="width: 32px; text-align: right; color: #c0c0ce">{{p.pw}}</span></div>
+</article>
+</sc-for>
+</div>
+</aside>
+
+<main class="scr" style="flex-grow: 1; height: 100%; min-width: 0">
+<div style="padding: 30px 48px 56px; display: flex; flex-direction: column; gap: 24px">
+<div class="row" style="justify-content: space-between">
+<span style="font-size: 13px; color: #9494aa">Projets <span style="margin: 0 6px">/</span> <span style="color: #d0d0dc">VP Le Puy</span> <span style="margin-left: 14px">ID : du1hkirq6</span></span>
+<div class="row" style="gap: 8px"><button class="btn">Ouvrir dans une fenêtre</button><button class="btn" style="color: #ff6b6b">Supprimer</button></div>
+</div>
+<div class="row" style="justify-content: space-between; align-items: flex-end; gap: 24px">
+<div><div class="eyebrow">Titre du projet</div><h1 style="margin: 8px 0 0; font-family: Syncopate, sans-serif; font-weight: 700; font-size: 38px; letter-spacing: .02em; text-transform: uppercase; line-height: 1.1">VP Le Puy</h1></div>
+<button class="btn" style="border-color: rgba(180,59,255,.55); color: #dcb2ff">⚡ Activer le mode Expert</button>
+</div>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 24px; align-items: stretch">
+<section class="card" style="padding: 26px 30px; display: flex; flex-direction: column; gap: 22px">
+<div style="display: grid; grid-template-columns: auto auto auto minmax(0, 1fr); gap: 32px; align-items: end">
+<div style="display: flex; flex-direction: column; gap: 8px"><span class="lbl">Statut du projet</span><div class="row" style="gap: 8px"><div class="seg"><button>Brouillon</button><button class="on">Actif</button><button>Terminé</button></div><button class="btn" aria-label="Archiver" style="width: 40px; padding: 0; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="5" rx="1"></rect><path d="M5 9v10h14V9M10 13h4"></path></svg></button></div></div>
+<div style="display: flex; flex-direction: column; gap: 8px"><span class="lbl">Période</span><button class="field" style="width: auto">14 déc. 2025 <span class="muted">→</span> 31 déc. 2026</button></div>
+<div style="display: flex; flex-direction: column; gap: 8px"><span class="lbl">Client B2B</span><label class="row" style="gap: 10px; height: 40px; font-size: 14px; font-weight: 600"><input type="checkbox" style="width: 18px; height: 18px; accent-color: #ff5a2e">PRO+</label></div>
+<span></span>
+</div>
+<div style="height: 1px; background: rgba(255,255,255,.08)"></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px">
+<div style="display: flex; flex-direction: column; gap: 8px"><span class="lbl">Site / plaque</span><button class="field">GROUPE BONY<span style="flex-grow: 1"></span>▾</button></div>
+<div style="display: flex; flex-direction: column; gap: 8px"><span class="lbl">Type de projet</span><button class="field">Animation Co<span style="flex-grow: 1"></span>▾</button></div>
+<div style="display: flex; flex-direction: column; gap: 8px"><span class="lbl">Équipe projet</span><div class="row" style="gap: 8px; height: 40px"><span style="width: 36px; height: 36px; border-radius: 50%; background: #ff5a2e; display: grid; place-items: center; font-size: 12px; font-weight: 700">TL</span><span style="width: 36px; height: 36px; border-radius: 50%; background: #1f9d55; display: grid; place-items: center; font-size: 12px; font-weight: 700">ML</span><button class="btn" aria-label="Ajouter un membre" style="width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 50%">+</button></div></div>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 22px">
+<div style="display: flex; flex-direction: column; gap: 10px"><span class="lbl">Services</span><div class="row" style="gap: 8px; flex-wrap: wrap"><button class="chip on">VN</button><button class="chip on">VO</button><button class="chip">APV</button><button class="chip">PR</button><button class="chip">Tous services</button></div></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><span class="lbl">Marques</span><div class="row" style="gap: 8px; flex-wrap: wrap"><button class="chip" style="background: #f5c518; color: #1a1400; border-color: transparent">Renault</button><button class="chip" style="background: #6f7d4f; color: #fff; border-color: transparent">Dacia</button><button class="chip" style="background: #2f6fe4; color: #fff; border-color: transparent">Alpine</button><button class="chip">Nissan</button><button class="chip">Mobilize</button><button class="chip">Holding</button></div></div>
+</div>
+<div style="padding: 14px 16px; border-radius: 10px; background: rgba(8,8,12,.5); border: 1px solid rgba(255,255,255,.08); display: flex; align-items: center; gap: 16px"><span style="font-size: 13.5px; font-weight: 700; width: 170px">Part Alpine / RDM</span><span style="flex-grow: 1; height: 6px; border-radius: 3px; background: #2f6fe4; position: relative"><span style="position: absolute; right: -8px; top: -5px; width: 16px; height: 16px; border-radius: 50%; background: #fff"></span></span><span style="font-size: 13.5px; font-weight: 700; width: 110px; text-align: right">100 % · 0 %</span><span style="font-size: 12.5px; color: #9d9db2; width: 380px">Alpine seulement avec un site Alpine, Nissan avec un site Nissan. Holding : exclusif, imputé à aucun budget.</span></div>
+<div style="display: flex; flex-direction: column; gap: 8px"><span class="lbl">Description globale</span><div style="min-height: 56px; padding: 12px 14px; border-radius: 10px; background: rgba(8,8,12,.5); border: 1px solid rgba(255,255,255,.1); font-size: 14px; line-height: 1.55; color: #d0d0dc">Opération VP groupe au Puy-en-Velay : animation commerciale VN / VO sur deux week-ends, relais digital et presse locale.</div></div>
+</section>
+
+<aside style="display: flex; flex-direction: column; gap: 24px">
+<section class="card" style="padding: 24px 26px; display: flex; flex-direction: column; gap: 18px; flex-grow: 1">
+<div><h2 class="h2">Budget</h2><div style="margin-top: 5px; font-size: 12.5px; color: #9494aa">Pilotage financier en temps réel</div></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 8px"><span class="lbl">Budget prévu</span><div class="field" style="height: 48px; font-size: 20px; font-weight: 700">9 000<span style="flex-grow: 1"></span><span class="muted">€</span></div></div>
+<div style="display: flex; flex-direction: column; gap: 8px"><span class="lbl">Réel (auto)</span><div style="height: 48px; display: flex; align-items: center; font-family: Syncopate, sans-serif; font-weight: 700; font-size: 22px">7 150 €</div></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px"><div class="row" style="justify-content: space-between"><span class="lbl">Avancement tâches</span><b style="font-size: 13.5px">40 % · 2 / 5</b></div><div style="height: 7px; border-radius: 4px; background: rgba(255,255,255,.08)"><div style="height: 100%; width: 40%; border-radius: 4px; background: linear-gradient(90deg,#ff5a2e,#b43bff)"></div></div></div>
+<div style="padding: 14px 16px; border-radius: 10px; background: rgba(62,207,142,.1); border: 1px solid rgba(62,207,142,.3)"><div class="lbl" style="color: #3ecf8e">Gain estimé</div><div style="margin-top: 6px; font-size: 20px; font-weight: 700; color: #4be0a0">1 850 € <span style="font-size: 13px; font-weight: 600">(20,6 %)</span></div></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><div class="row" style="justify-content: space-between"><span class="lbl">Répartition budgétaire</span><div class="seg"><button class="on" style="height: 26px">%</button><button style="height: 26px">€</button></div></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{split}}" as="s" hint-placeholder-count="8"><div class="row" style="gap: 8px; padding: 7px 10px; border-radius: 9px; background: rgba(8,8,12,.5); border: 1px solid rgba(255,255,255,.08)"><span style="flex-grow: 1; font-size: 13px; font-weight: 600">{{s.n}}</span><span style="font-size: 13px; font-weight: 700">{{s.p}}</span></div></sc-for>
+</div></div>
+</section>
+</aside>
+</div>
+
+<section class="card" style="padding: 24px 28px; display: flex; flex-direction: column; gap: 12px">
+<div class="row" style="justify-content: space-between"><h2 class="h2">Tâches &amp; coûts <span style="color: #9494aa">5</span></h2><button class="btn" style="height: 36px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Ajouter une tâche</button></div>
+<div style="display: grid; grid-template-columns: 32px minmax(0, 2fr) minmax(0, 1.2fr) 150px 140px 190px 120px 150px 40px; gap: 10px; padding: 0 4px 10px; border-bottom: 1px solid rgba(255,255,255,.08)">
+<span class="th" style="justify-content: center">#</span><span class="th">Nom de la tâche ↕</span><span class="th">Prestataire ↕</span><span class="th">Canal ↕</span><span class="th">Statut ↕</span><span class="th">Assigné ↕</span><span class="th" style="justify-content: flex-end">Coût (€) ↕</span><span class="th">Échéance ↓</span><span></span>
+</div>
+<sc-for list="{{tasks}}" as="t" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: 32px minmax(0, 2fr) minmax(0, 1.2fr) 150px 140px 190px 120px 150px 40px; gap: 10px; align-items: center; padding: 3px 4px">
+<span style="font-size: 12.5px; color: #9494aa; text-align: center">{{t.n}}</span>
+<span class="cell" style="font-weight: 600">{{t.t}}</span>
+<span class="cell" style="color: {{t.pc}}">{{t.p}}</span>
+<span class="cell">{{t.c}}<span style="flex-grow: 1"></span>▾</span>
+<span class="cell" style="background: {{t.sb}}; color: {{t.sc}}; border-color: transparent">{{t.s}}<span style="flex-grow: 1"></span>▾</span>
+<span class="cell"><span style="width: 22px; height: 22px; border-radius: 50%; background: {{t.ac}}; display: grid; place-items: center; font-size: 9.5px; font-weight: 700; color: #fff; flex-shrink: 0">{{t.ai}}</span>{{t.a}}</span>
+<span class="cell" style="justify-content: flex-end">{{t.cost}}</span>
+<span class="cell" style="color: {{t.dc}}">{{t.d}}</span>
+<button class="btn" aria-label="Supprimer la tâche" style="width: 34px; height: 34px; padding: 0; justify-content: center; color: #9494aa">✕</button>
+</div>
+</sc-for>
+<div class="row" style="justify-content: flex-end; gap: 24px; padding: 12px 4px 0; border-top: 1px solid rgba(255,255,255,.08); font-size: 14px"><span class="muted">Total des tâches</span><b style="font-size: 17px">7 150 €</b></div>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const base = { bg: 'rgba(20,20,28,.6)', bd: 'rgba(255,255,255,.07)', tc: '#ededf2', pro: false, st: 'Actif', sb: 'rgba(62,207,142,.15)', sc: '#4be0a0' };
+    const projects = [
+      { ...base, bg: 'rgba(255,90,46,.12)', bd: 'rgba(255,90,46,.55)', tc: '#ff8a66', t: 'VP Le Puy', s: 'GROUPE BONY · Animation Co', meta: 'VN · VO', pw: '40%' },
+      { ...base, t: 'VP Thiers', s: 'Thiers · OP clients', meta: 'VN · VO', pw: '0%' },
+      { ...base, pro: true, t: 'OP Rouchy', s: 'Clermont · OP clients', meta: 'VN', pw: '25%' },
+      { ...base, t: 'Trailer sticker — Clermont', s: 'Clermont · OP clients', meta: 'VN', pw: '60%' },
+      { ...base, t: 'Dacia Striker — Le Puy', s: 'Le Puy-en-Velay · OP clients', meta: 'VN', pw: '10%' },
+      { ...base, t: 'Dacia Striker — Vichy', s: 'Vichy · OP clients', meta: 'VN', pw: '0%' },
+      { ...base, t: 'VP Vichy', s: 'Vichy · Animation Co', meta: 'VN · VO', pw: '20%' },
+      { ...base, st: 'Brouillon', sb: 'rgba(255,255,255,.08)', sc: '#b8b8c8', t: 'Test-drive & CE Limagrain', s: 'Clermont · Partenariat', meta: 'VN · APV', pw: '0%' }
+    ];
+    const split = [
+      { n: 'Clermont', p: '30 %' }, { n: 'Mozac', p: '10 %' }, { n: 'Vichy', p: '15 %' }, { n: 'Le Puy', p: '20 %' },
+      { n: 'Thiers', p: '5 %' }, { n: 'Montluçon', p: '10 %' }, { n: 'Rodez', p: '5 %' }, { n: 'Aurillac', p: '5 %' }
+    ];
+    const S = {
+      Todo: { s: 'À faire', sb: 'rgba(91,140,255,.18)', sc: '#9dbaff' }, InProgress: { s: 'En cours', sb: 'rgba(245,165,36,.18)', sc: '#f7bd52' },
+      Done: { s: 'Terminé', sb: 'rgba(62,207,142,.18)', sc: '#4be0a0' }, Programmed: { s: 'Programmé', sb: 'rgba(180,59,255,.2)', sc: '#dcb2ff' }
+    };
+    const tasks = [
+      { n: 1, t: 'Location chapiteau 6×12', p: 'Loc’Events 43', pc: '#ededf2', c: 'Lieu', ...S.Done, a: 'Théo L.', ai: 'TL', ac: '#ff5a2e', cost: '2 400', d: '12 oct. 2026', dc: '#ededf2' },
+      { n: 2, t: 'Traiteur week-end 1', p: 'Maison Rival', pc: '#ededf2', c: 'Traiteur', ...S.Programmed, a: 'Marie L.', ai: 'ML', ac: '#1f9d55', cost: '1 850', d: '17 oct. 2026', dc: '#ededf2' },
+      { n: 3, t: 'Affichage 4×3 rocade', p: 'Prestataire…', pc: '#74748a', c: 'Affichage', ...S.InProgress, a: 'Théo L.', ai: 'TL', ac: '#ff5a2e', cost: '1 600', d: '20 oct. 2026', dc: '#ededf2' },
+      { n: 4, t: 'SMS base clients VO', p: 'Prestataire…', pc: '#74748a', c: 'SMS', ...S.Todo, a: '— Non assigné —', ai: '?', ac: '#3a3a48', cost: '300', d: 'Dépassée · 2 j', dc: '#ff7070' },
+      { n: 5, t: 'PLV & kakémonos', p: 'Imprim’Plus', pc: '#ededf2', c: 'PLV', ...S.Done, a: 'Marie L.', ai: 'ML', ac: '#1f9d55', cost: '1 000', d: '9 oct. 2026', dc: '#ededf2' }
+    ];
+    return { projects, split, tasks };
+  }
+}
+</script>
+</body>
+</html>
