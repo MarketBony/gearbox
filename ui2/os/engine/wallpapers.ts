@@ -208,31 +208,44 @@ void main(){
      Charte (brandbook sept. 2024) : noir, bleu nuit #293f74, dégradé du logo #e95638 → #d34f48 → #933d78
      → #7a368b ; iconographie « levers de soleil qui font écho au dégradé ». Le LOGO n'est pas dans le
      shader : c'est le SVG officiel (version blanche), posé net par-dessus, jamais déformé ni recoloré. */
-  const BONY = LIB + `
-/* Esprit fonds macOS récents : grandes vagues nettes superposées, ombres douces, dégradé officiel.
-   Aucun bruit, aucun grain, aucune fumée : des courbes analytiques lissées à la taille d'un pixel. */
-vec3 grad(float t){t=clamp(t,0.,1.);vec3 a=vec3(.969,.337,.196),b=vec3(.914,.337,.220),c=vec3(.576,.239,.471),d=vec3(.478,.212,.545);
-  return t<.2?mix(a,b,t/.2):t<.7?mix(b,c,(t-.2)/.5):mix(c,d,(t-.7)/.3);}
-void main(){
-  vec2 p=(FC-.5*R)/R.y;float ar=R.x/R.y,px=1.25/R.y,t=T*.045;
-  /* ciel : noir profond qui remonte vers le bleu nuit #293f74 */
-  vec3 col=mix(vec3(.012,.014,.03),vec3(.07,.10,.2),smoothstep(-.55,.6,p.y));
-  col+=vec3(.16,.22,.45)*.22*exp(-pow(length(p-vec2(-.15,.45))*1.3,2.));
-  /* cinq vagues, du fond vers l'avant */
-  for(int k=0;k<5;k++){float fk=float(k);
-    float y0=.02-fk*.105, A=.055+.012*fk, f=1.05+.28*fk, ph=fk*1.7;
-    float y=y0+A*sin(p.x*f+t*(1.+.35*fk)+ph)+A*.45*sin(p.x*f*2.1-t*(.8+.2*fk)+ph*1.9);
-    float d=p.y-y;                                   /* > 0 au-dessus de la crête */
-    col*=1.-.42*exp(-max(d,0.)*16.)*smoothstep(-px,px,d); /* ombre portée sur la vague de derrière (sans bord franc) */
-    float tc=clamp(.12+(p.x/ar+.5)*.78+fk*.05,0.,1.);
-    vec3 lc=grad(tc)*(.34+.15*fk);
-    lc*=1.-clamp(-d*1.6,0.,.55);                     /* plus sombre en profondeur */
-    lc+=vec3(1.,.86,.78)*exp(min(d,0.)*55.)*(.10+.03*fk); /* liseré de lumière sur la crête */
-    col=mix(col,lc,smoothstep(1.6*px,-1.6*px,d));
-  }
-  col*=1.-.22*dot(p*vec2(.7,1.),p*vec2(.7,1.));
-  gl_FragColor=vec4(col*L,1.);
-}`;
+  /* [GEARBOX] Fonds Bony REFAITS le 30/09/2026 (Théo : « ces vagues en 3D font vintage, ce bleu est moche »,
+     puis refus d'une aura floue et du grain) : trois fonds NETS sur noir profond, sans grain — voir BONY_A/B/C. */
+
+  /* [GEARBOX] Trois fonds Bony retenus par Théo le 30/09/2026 : TRAIT (trait de lumière, fond par défaut, id
+     historique `bony`), TRAME (grille de points révélée par un faisceau), TRACÉS (lignes arrondies façon « B »). */
+  const BONY_A = LIB + `
+vec3 g(float t){t=clamp(t,0.,1.);return t<.5?mix(vec3(.969,.337,.196),vec3(.576,.239,.471),t*2.):mix(vec3(.576,.239,.471),vec3(.478,.212,.545),(t-.5)*2.);}
+void main(){vec2 p=(FC-.5*R)/R.y;float ar=R.x/R.y,t=T*.05,px=1./R.y;
+  vec3 col=vec3(.006,.005,.009);
+  float y=-.28+.16*sin(p.x*1.25+t)+.05*sin(p.x*3.1-t*1.4)+.1*p.x;float d=abs(p.y-y);
+  vec3 c=g(p.x/ar+.5);
+  col+=c*(smoothstep(1.8*px,0.,d)*1.1+exp(-d*90.)*.35+exp(-d*14.)*.1);
+  float y2=y-.035+.01*sin(p.x*5.+t*2.);float d2=abs(p.y-y2);col+=c*(smoothstep(1.2*px,0.,d2)*.35+exp(-d2*120.)*.12);
+  col*=smoothstep(.98*ar,.35*ar,abs(p.x));
+  gl_FragColor=vec4(tone(col)*L,1.);}`;
+  const BONY_B = LIB + `
+vec3 g(float t){t=clamp(t,0.,1.);return t<.5?mix(vec3(.969,.337,.196),vec3(.576,.239,.471),t*2.):mix(vec3(.576,.239,.471),vec3(.478,.212,.545),(t-.5)*2.);}
+void main(){vec2 p=(FC-.5*R)/R.y;float ar=R.x/R.y,t=T*.05;
+  vec3 col=vec3(.008,.007,.011);
+  float sp=R.y/48.;vec2 cell=fract(FC/sp)-.5;float dot_=smoothstep(.09,.05,length(cell));
+  vec2 c=vec2(.38*ar*sin(t*.8),.24*cos(t*.6)-.04);float l=exp(-dot(p-c,p-c)*2.4);
+  vec3 tint=g(.5+.5*sin(t*.7+p.x));
+  col+=dot_*(.06+l*.9)*mix(vec3(1.),tint,.85);
+  col+=tint*l*.06;
+  gl_FragColor=vec4(tone(col)*L,1.);}`;
+  const BONY_C = LIB + `
+vec3 g(float t){t=clamp(t,0.,1.);return t<.5?mix(vec3(.969,.337,.196),vec3(.576,.239,.471),t*2.):mix(vec3(.576,.239,.471),vec3(.478,.212,.545),(t-.5)*2.);}
+float sdRB(vec2 p,vec2 b,float r){vec2 q=abs(p)-b+r;return length(max(q,0.))+min(max(q.x,q.y),0.)-r;}
+void main(){vec2 p=(FC-.5*R)/R.y;float ar=R.x/R.y,t=T*.04,px=1.3/R.y;
+  vec3 col=vec3(.006,.005,.009);
+  vec2 o=p-vec2(.55*ar,-.35);
+  float d=sdRB(o,vec2(.3,.3),.3);
+  float rings=abs(fract(d*9.-t)-.5)/9.;
+  float line=smoothstep(px,0.,rings-.0006);
+  float fade=smoothstep(1.4,.0,d)*smoothstep(-.35,.05,d);
+  vec3 c=g(clamp(.5+d*.6+.2*sin(t),0.,1.));
+  col+=c*line*fade*.95;
+  gl_FragColor=vec4(tone(col)*L,1.);}`;
 
   /* ================================================================ SOIE BONY — plis de soie, dégradé de la charte */
   const SOIE = LIB + `
@@ -361,7 +374,9 @@ void main(){vec2 uv=FC/R.xy;vec2 p=(FC-.5*R)/R.y;float hz=-.05;
 
   /* ------------------------------------------------ catalogue */
   W.catalog = [
-    { id: 'bony', name: 'Bony', note: 'Logo et dégradé officiels, lever de soleil', frag: BONY, scale: 1, dprMax: 1.5, taa: false, logo: 'logo-bony-white.svg', tint: '#1a1030', hero: true },
+    { id: 'bony', name: 'Bony · Trait', note: 'Logo officiel, trait de lumière au dégradé du logo', frag: BONY_A, scale: 1, dprMax: 1.5, taa: false, logo: 'logo-bony-white.svg', tint: '#1a1030', hero: true },
+    { id: 'bony-trame', name: 'Bony · Trame', note: 'Grille de points révélée par un faisceau aux couleurs du logo', frag: BONY_B, scale: 1, dprMax: 1.5, taa: false, logo: 'logo-bony-white.svg', tint: '#1a1030' },
+    { id: 'bony-traces', name: 'Bony · Tracés', note: 'Lignes arrondies dans l’esprit du « B », en dégradé', frag: BONY_C, scale: 1, dprMax: 1.5, taa: false, logo: 'logo-bony-white.svg', tint: '#1a1030' },
     { id: 'gargantua', name: 'Gargantua', note: 'Trou noir, nébuleuse, amas d’étoiles et supernovae', frag: GARGANTUA, passes: [{ frag: GARG_NEB, scale: .33, every: 3, u: 'S' }, { frag: GARG_STARS, scale: 1, every: 3, u: 'S2' }], scale: .75, dprMax: 1, taa: false, tint: '#2a1233', hero: true },
     { id: 'soie', name: 'Soie Bony', note: 'Plis de soie aux couleurs de la charte', frag: SOIE, scale: .6, tint: '#2a1530' },
     { id: 'abysses', name: 'Abysses', note: 'Caustiques, rayons et bioluminescence', frag: ABYSSES, scale: .7, tint: '#0c2230' },

@@ -39,7 +39,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   /* ======================= Démarrage ======================= */
   S.init = () => {
     if (prefs.material === 'apple') prefs.material = 'liquid';
-    if (['prisme', 'terminal', 'glitch'].includes(prefs.wallpaper)) prefs.wallpaper = 'bony'; // fonds retirés // « Verre Apple » est devenu « Liquid Glass »
+    if (['prisme', 'terminal', 'glitch'].includes(prefs.wallpaper)) prefs.wallpaper = 'bony'; /* [GEARBOX] identifiants d'essai du 30/09/2026 → définitifs */ prefs.wallpaper = ({ 'bony-a': 'bony', 'bony-b': 'bony-trame', 'bony-c': 'bony-traces' } as any)[prefs.wallpaper] || prefs.wallpaper; // fonds retirés // « Verre Apple » est devenu « Liquid Glass »
     prefs.theme = GX.bridge().theme; /* [GEARBOX] thème de l'appli */
     const R0 = GX.host; R0.dataset.theme = prefs.theme; R0.dataset.effects = prefs.effects; R0.dataset.material = prefs.material; R0.dataset.icons = prefs.iconStyle; R0.dataset.wallpaper = prefs.wallpaper; prefs.da = 'signal'; R0.dataset.da = 'signal'; // direction artistique unique (les deux autres ont été retirées) R0.toggleAttribute('data-mbauto', !!prefs.menubarAuto);
     GX.body.insertAdjacentHTML('beforeend', `

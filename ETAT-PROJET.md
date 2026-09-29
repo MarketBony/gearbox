@@ -145,7 +145,8 @@
   - Recette : contraste du thème clair en Liquid Glass renforcé (`overrides.css`), marge du bureau
     proportionnelle à l'écran (1,6 %, 10–28 px) widgets de taille FIXE, reste de la division réparti entre les colonnes (grille pleine largeur, même marge
     à gauche et à droite, widget du dernier rang aligné sur le bord droit), calée en haut (`engine/widgets.ts`,
-    `[GEARBOX]`). ⚠️ Un premier essai étirait les cases : en plein écran les widgets se déformaient et débordaient sur le Dock.
+    `[GEARBOX]`). Fonds Bony refaits (Théo) : « Bony · Trait » (défaut, id historique `bony`), « Bony · Trame »,
+    « Bony · Tracés » — nets, sur noir, SANS grain (refusé), aucune aura floue (refusée). ⚠️ Un premier essai étirait les cases : en plein écran les widgets se déformaient et débordaient sur le Dock.
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,

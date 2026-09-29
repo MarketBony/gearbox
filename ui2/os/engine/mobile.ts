@@ -21,7 +21,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   M.init = () => {
     const prefs = GX.shell.prefs;
     if (prefs.material === 'apple') prefs.material = 'liquid';
-    if (['prisme', 'terminal', 'glitch'].includes(prefs.wallpaper)) prefs.wallpaper = 'bony';
+    if (['prisme', 'terminal', 'glitch'].includes(prefs.wallpaper)) prefs.wallpaper = 'bony'; /* [GEARBOX] identifiants d'essai du 30/09/2026 → définitifs */ prefs.wallpaper = ({ 'bony-a': 'bony', 'bony-b': 'bony-trame', 'bony-c': 'bony-traces' } as any)[prefs.wallpaper] || prefs.wallpaper;
     const R0 = GX.host; R0.dataset.theme = prefs.theme; R0.dataset.effects = prefs.effects; R0.dataset.material = prefs.material || 'pixel'; R0.dataset.icons = prefs.iconStyle || 'light'; R0.dataset.wallpaper = prefs.wallpaper; R0.dataset.da = 'signal';
     GX.body.insertAdjacentHTML('beforeend', `<div class="m-root" id="mroot">
       <div class="wallpaper wp-${prefs.wallpaper}" id="wp"></div>
