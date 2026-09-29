@@ -127,6 +127,23 @@
     (`controls.ts` observait l'hôte), glisser vers les dispositions / Mission Control impossible
     (`document.elementFromPoint` dans `wm.ts`), menus et calendrier du moteur sans effet sur un champ React
     (setter natif).
+- **Lot 2b — 30/09, recetté par Théo, branche `feat/ui2-lot2` (NON mergée, jamais déployée) : Projets, Archives,
+  fenêtre projet et mode Expert portés** (`ui2/apps/projects/` : `ProjectsApp.tsx` liste + conteneur,
+  `ProjectDetail.tsx` fiche + tableau des tâches + détail de tâche, `ExpertPanel.tsx` pilotage / planning /
+  fichiers, `common.ts` filtres et tris). Présentation : maquette ; règles : les vraies (inventaires § 12).
+  - **Règles d'édition sorties de `Projects.tsx` vers `utils/projet.ts`** (source unique) : `poserSites`
+    (GROUPE BONY / R/N, sites à parts égales, libellé `site`, marques sans site éligible retirées),
+    `basculerService`, `basculerMarque` (Holding exclusif), `marqueAutorisee`, `nouveauProjet` (date LOCALE),
+    `nouvelleTache`. `Projects.tsx` garde ses copies jusqu'à son retrait.
+  - Défauts d'origine corrigés par le modèle : filtre Périmètre sur les vrais sites, projet archivé ouvert depuis
+    ailleurs → Archives, onglet Expert réinitialisé au changement de projet, planning qui liste les tâches sans
+    date même sans tâche plaçable. Duplication (maquette) : copie PROPRE des tâches (`projectId` refusé par Prisma).
+  - Pas de `confirm()` / `alert()` natifs (bloquants, hors charte) : confirmation en deux clics, messages de coque.
+  - **Premier rendu des rubriques portées en TRANSITION** (`OsHost.tsx` `DeferredApp`) + filtres différés
+    (`useDeferredValue`) : mesuré en build de prod, ouverture To-do 59 → 0 ms de tâche longue, Projets 125-183 →
+    ~53 ms, recherche et changement de projet à 60 i/s.
+  - Recette : contraste du thème clair en Liquid Glass renforcé (`overrides.css`), marge du bureau
+    proportionnelle à l'écran et grille des widgets étirée pour remplir la zone (`engine/widgets.ts`, `[GEARBOX]`).
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
@@ -3598,6 +3615,8 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
   `visibility`, pas `display: none` (sinon les graphiques du Dashboard se recalculent au réaffichage).
 - **Interface v2 : React et les champs remplis par le moteur** — le calendrier et les menus du moteur posent la
   valeur par le SETTER NATIF (`engine/controls.ts` `setVal`) : un `input.value = v` direct est ignoré par React.
+- **Interface v2 : tester un champ à brouillon par script** — la fenêtre de test n'a pas le focus système :
+  `el.blur()` n'émet AUCUN événement. Émettre `focusin` / `focusout` à la main (React écoute `focusout`).
 - **Interface v2 : ne JAMAIS mesurer la fluidité en dev** — lancer `gearbox-web-prod` (après `npx vite build`),
   onglet AU PREMIER PLAN (un onglet en arrière-plan est ralenti par le navigateur : mesures fausses).
 - **Interface v2 : l'hôte de la coque est PERSISTANT** (`window.__gxHost`, `OsHost.tsx`) : le moteur ne

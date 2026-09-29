@@ -242,12 +242,20 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   const save = () => GX.store.set(KEY(), layout);
   const rectOf = (w) => { const [cw, ch] = dim(w.size); return { x: w.x, y: w.y, w: cw, h: ch }; };
   const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-  const cols = () => Math.max(4, Math.floor((innerWidth - 44 + GAP) / STEP));
+  /* [GEARBOX] Marge du bureau PROPORTIONNELLE à l'écran (1,6 % de la largeur, bornée 10–28 px) au lieu
+     de 22 px fixes, et grille ÉTIRÉE pour remplir exactement la zone : avant, la largeur se comptait en
+     cases entières et le reste (jusqu'à 48 px par côté) s'ajoutait à la marge — sur un écran réduit, les
+     widgets du bord semblaient loin du bord (retour de Théo, 30/09/2026). Pas horizontal SX() et vertical
+     SY() = pas nominal (96 px) + la part du reste ; les tailles internes des widgets ne changent pas. */
+  const M = () => Math.round(Math.max(10, Math.min(28, innerWidth * 0.016)));
+  const cols = () => Math.max(4, Math.floor((innerWidth - 2 * M() + GAP) / STEP));
+  const SX = () => (innerWidth - 2 * M() + GAP) / cols();
   /* Zone du bureau : entre la barre du haut (0 si escamotable) et le haut du Dock. La grille y est
      CENTRÉE : même marge en haut qu'en bas (au-dessus du Dock), même marge à gauche qu'à droite. */
   const cssPx = (n) => parseFloat(getComputedStyle(GX.host).getPropertyValue(n)) || 0;
   const area = () => { const top = cssPx('--mb-space'), bottom = (cssPx('--dock-icon') || 50) + 26 + 8; return { top, h: innerHeight - top - bottom }; };
-  const rows = () => Math.max(4, Math.floor((area().h - 44 + GAP) / STEP));
+  const rows = () => Math.max(4, Math.floor((area().h - 2 * M() + GAP) / STEP));
+  const SY = () => (area().h - 2 * M() + GAP) / rows();
   function freeSpot(size, ignore, near) {
     const [cw, ch] = dim(size), C = cols(), R = rows() + 20, cands = [];
     for (let y = 0; y < R; y++) for (let x = 0; x + cw <= C; x++) { const r = { x, y, w: cw, h: ch }; if (!layout.some((o) => o !== ignore && overlap(r, rectOf(o)))) cands.push(r); }
@@ -288,12 +296,12 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   }
   /* Aperçu en direct : les voisins glissent (transition ressort sur left/top, cf. CSS) */
   function preview(out, skipId) {
-    box.querySelectorAll('.wdg').forEach((el) => { const r = out[el.dataset.id]; if (!r || el.dataset.id === skipId) return; el.style.left = r.x * STEP + 'px'; el.style.top = r.y * STEP + 'px'; });
+    box.querySelectorAll('.wdg').forEach((el) => { const r = out[el.dataset.id]; if (!r || el.dataset.id === skipId) return; el.style.left = r.x * SX() + 'px'; el.style.top = r.y * SY() + 'px'; });
     const vis = layout.filter((w) => allowed(w.type)).map((w) => out[w.id]).filter(Boolean);
-    box.style.height = Math.max(0, ...vis.map((r) => r.y + r.h)) * STEP + 'px';
+    box.style.height = Math.max(0, ...vis.map((r) => r.y + r.h)) * SY() + 'px';
   }
   function mkGhost(r, over) { const g = document.createElement('div'); g.className = 'wghost' + (over ? ' over' : ''); placeGhost(g, r); box.append(g); return g; }
-  function placeGhost(g, r) { Object.assign(g.style, { left: r.x * STEP + 'px', top: r.y * STEP + 'px', width: r.w * STEP - GAP + 'px', height: r.h * STEP - GAP + 'px' }); }
+  function placeGhost(g, r) { Object.assign(g.style, { left: r.x * SX() + 'px', top: r.y * SY() + 'px', width: r.w * SX() - GAP + 'px', height: r.h * SY() - GAP + 'px' }); }
   const rects = () => Object.fromEntries([...(box?.querySelectorAll('.wdg') || [])].map((el) => [el.dataset.id, el.getBoundingClientRect()]));
   /* Après un re-rendu : chaque widget part de son ancienne boîte et rejoint la nouvelle en ressort
      (FLIP en translation si la taille n'a pas changé, sinon animation de la boîte elle-même) */
@@ -345,13 +353,13 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     box.classList.toggle('editing', editing);
     const vis = layout.filter((w) => allowed(w.type));
     const maxY = Math.max(0, ...vis.map((w) => w.y + dim(w.size)[1]));
-    box.style.width = cols() * STEP - GAP + 'px'; box.style.left = Math.round((innerWidth - (cols() * STEP - GAP)) / 2) + 'px'; { const A = area(); box.style.top = Math.round(A.top + (A.h - (rows() * STEP - GAP)) / 2) + 'px'; } box.style.height = maxY * STEP + 'px';
+    const sx = SX(), sy = SY(); box.style.width = cols() * sx - GAP + 'px'; box.style.left = M() + 'px'; box.style.top = Math.round(area().top + M()) + 'px'; box.style.height = maxY * sy + 'px'; /* [GEARBOX] marge proportionnelle */
     /* Le widget Chat se re-rend à chaque message : on garde le champ de saisie actif (focus + curseur) */
     const ae = GX.root.activeElement, keep = ae && box.contains(ae) && ae.matches('[data-wc-in]') ? { id: ae.closest('.wch')?.dataset.wid, pos: ae.selectionStart } : null;
     box.innerHTML = vis.map((w, i) => {
       const c = CAT[w.type], [cw, ch] = dim(w.size);
       let inner = ''; try { inner = c.render(w.size, w.cfg || {}, w); } catch (e) { inner = `<div class="faint">${GX.esc(e.message)}</div>`; }
-      return `<div class="wdg ${c.accent ? 'accent' : c.sky ? 'sky' : 'glass'}${c.live ? ' live' : ''} sz-${w.size}" data-id="${w.id}" data-app="${c.app || ''}" style="left:${w.x * STEP}px;top:${w.y * STEP}px;width:${cw * STEP - GAP}px;height:${ch * STEP - GAP}px;animation-delay:${i * 30}ms">
+      return `<div class="wdg ${c.accent ? 'accent' : c.sky ? 'sky' : 'glass'}${c.live ? ' live' : ''} sz-${w.size}" data-id="${w.id}" data-app="${c.app || ''}" style="left:${w.x * sx}px;top:${w.y * sy}px;width:${cw * sx - GAP}px;height:${ch * sy - GAP}px;animation-delay:${i * 30}ms">
         ${inner}${editing ? `<button class="wx" data-rm title="Retirer">${GX.icon('minus', 'sm')}</button><button class="wsz" data-size title="Taille suivante">${dimL(w.size).replace(' × ', '×')}</button>` : ''}${c.sizes.length > 1 ? '<button class="wrz" data-rz tabindex="-1" aria-label="Redimensionner" title="Tirer pour redimensionner"></button>' : ''}</div>`;
     }).join('');
     if (keep) { const i = box.querySelector(`.wch[data-wid="${keep.id}"] [data-wc-in]`); if (i) { i.focus({ preventScroll: true }); if (keep.pos != null) i.setSelectionRange(keep.pos, keep.pos); } }
@@ -416,7 +424,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     moveStart(e, el, w);
   }
   function moveStart(e, el, w) {
-    const sx = e.clientX, sy = e.clientY, pid = e.pointerId, thr = editing ? 3 : 6, x0 = w.x * STEP, y0 = w.y * STEP, [cw, ch] = dim(w.size);
+    const sx = e.clientX, sy = e.clientY, pid = e.pointerId, thr = editing ? 3 : 6, x0 = w.x * SX(), y0 = w.y * SY(), [cw, ch] = dim(w.size);
     let lifted = false, ghost = null, base = null, key = '', out = null, lx = sx, ly = sy, raf = 0;
     const timer = setTimeout(() => lift(), 350);
     function lift() {
@@ -432,7 +440,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     function track() {
       const dx = lx - sx, dy = ly - sy;
       el.style.translate = `${dx}px ${dy}px`;
-      const nx = clamp(Math.round((x0 + dx) / STEP), 0, Math.max(0, cols() - cw)), ny = clamp(Math.round((y0 + dy) / STEP), 0, Math.max(0, rows() - ch, w.y));
+      const nx = clamp(Math.round((x0 + dx) / SX()), 0, Math.max(0, cols() - cw)), ny = clamp(Math.round((y0 + dy) / SY()), 0, Math.max(0, rows() - ch, w.y));
       const k = nx + ',' + ny; if (k === key) return; key = k;
       out = arrange(base, w.id, { x: nx, y: ny, w: cw, h: ch });
       placeGhost(ghost, out[w.id]); preview(out, w.id);
@@ -466,10 +474,10 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     el.insertAdjacentHTML('beforeend', '<span class="wtip"></span>');
     const tip = el.querySelector('.wtip'), ghost = mkGhost(base[w.id], true);
     function track() {
-      const C = cols(), maxW = C * STEP - GAP;   // au-delà du bord droit, l'aimantation décale le widget vers la gauche
-      const fw = clamp(W0 + lx - sx, CELL * 1.2, Math.max(maxW, W0)), fh = clamp(H0 + ly - sy, CELL * 1.2, 8 * STEP);
+      const C = cols(), maxW = C * SX() - GAP;   // au-delà du bord droit, l'aimantation décale le widget vers la gauche
+      const fw = clamp(W0 + lx - sx, CELL * 1.2, Math.max(maxW, W0)), fh = clamp(H0 + ly - sy, CELL * 1.2, 8 * SY());
       el.style.width = fw + 'px'; el.style.height = fh + 'px';
-      const tw = (fw + GAP) / STEP, th = (fh + GAP) / STEP, cand = c.sizes.filter((s) => dim(s)[0] <= C);
+      const tw = (fw + GAP) / SX(), th = (fh + GAP) / SY(), cand = c.sizes.filter((s) => dim(s)[0] <= C);
       const best = (cand.length ? cand : c.sizes).reduce((a, s) => { const [cw, ch] = dim(s), d = Math.hypot(cw - tw, ch - th); return d < a.d ? { s, d } : a; }, { s: w.size, d: Infinity }).s;
       if (best === cur) return; cur = best;
       const [cw, ch] = dim(best), nx = Math.min(base[w.id].x, Math.max(0, C - cw));

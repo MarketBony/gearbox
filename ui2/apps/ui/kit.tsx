@@ -140,3 +140,86 @@ export function useSheets(win: EngineWin) {
   const portals = list.map((s) => createPortal(<>{s.render(s.close)}</>, s.host, `sheet-${s.id}`));
   return { open, portals };
 }
+
+// ---------------------------------------------------------------- champs à brouillon
+/**
+ * Champ texte / nombre à BROUILLON LOCAL : écrit au départ du champ (blur) ou sur Entrée, jamais
+ * à la frappe — même règle que `components/ChampDiffere.tsx` (un PUT par frappe saturait le
+ * pooler, correctif 48). Tant que le champ a le focus, une mise à jour venue du serveur ne
+ * l'écrase pas ; il se resynchronise dès qu'il le perd.
+ */
+export function DraftInput({ value, onCommit, type = 'text', empty = 'zero', multiline, ...rest }: {
+  value: string | number | null | undefined; onCommit: (v: any) => void; type?: 'text' | 'number';
+  /** Nombre vidé : `zero` → 0, `null` → null (curseurs de part : vide = 100 % marque). */
+  empty?: 'zero' | 'null'; multiline?: boolean;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement> & React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange' | 'type'>) {
+  const shown = value === null || value === undefined ? '' : String(value);
+  const [draft, setDraft] = useState(shown);
+  const focused = useRef(false);
+  useEffect(() => { if (!focused.current) setDraft(shown); }, [shown]);
+  // Valeur lue DANS LE CHAMP, pas dans l'état : une frappe suivie d'un départ immédiat du champ
+  // (avant le rendu suivant) serait sinon perdue.
+  const commit = (raw: string) => {
+    if (raw === shown) return;
+    if (type === 'number') { const t = raw.trim(); onCommit(t === '' ? (empty === 'null' ? null : 0) : Number(t.replace(',', '.')) || 0); }
+    else onCommit(raw);
+  };
+  const common = {
+    ...rest, value: draft,
+    onFocus: (e: any) => { focused.current = true; (rest as any).onFocus?.(e); },
+    onBlur: (e: any) => { focused.current = false; commit(e.target.value); (rest as any).onBlur?.(e); },
+    onChange: (e: any) => setDraft(e.target.value),
+  };
+  if (multiline) return <textarea {...(common as any)} />;
+  return <input {...(common as any)} type={type} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); (rest as any).onKeyDown?.(e); }} />;
+}
+
+// ---------------------------------------------------------------- pile liste → détail
+/**
+ * `GX.ui.stack` du moteur en React (fenêtre étroite, téléphone) : même balisage (`.stack`,
+ * `.page`, `.stack-head`, `.back`), mêmes ressorts à l'empilement / dépilement.
+ */
+export function Stack({ pages, onBack }: { pages: { key: string; title: string; noHead?: boolean; content: React.ReactNode }[]; onBack: () => void }) {
+  const ref = useRef<HTMLDivElement>(null), depth = useRef(pages.length);
+  useLayoutEffect(() => {
+    const host = ref.current; if (!host) return;
+    const els = [...host.querySelectorAll<HTMLElement>(':scope > .page')];
+    if (pages.length > depth.current && els.length > 1) {
+      const p = els[els.length - 1], prev = els[els.length - 2];
+      gx().animate(p, [{ transform: 'translateX(100%)' }, { transform: 'none' }], { spring: 'snappy' });
+      gx().animate(prev, [{ transform: 'none', filter: 'brightness(1)' }, { transform: 'translateX(-28%)', filter: 'brightness(.7)' }], { spring: 'snappy', fill: 'forwards' });
+    } else if (pages.length < depth.current && els.length) {
+      const prev = els[els.length - 1]; prev.getAnimations().forEach((a) => a.cancel());
+      gx().animate(prev, [{ transform: 'translateX(-28%)', filter: 'brightness(.7)' }, { transform: 'none', filter: 'brightness(1)' }], { spring: 'snappy' });
+    }
+    depth.current = pages.length;
+  }, [pages.length]);
+  const edge = (e: React.PointerEvent<HTMLDivElement>) => {
+    const p = e.currentTarget, r = p.getBoundingClientRect(); if (pages.length < 2 || e.clientX - r.left > 24 || e.pointerType === 'mouse') return;
+    const sx = e.clientX; let dx = 0; p.setPointerCapture(e.pointerId);
+    const mv = (ev: PointerEvent) => { dx = Math.max(0, ev.clientX - sx); p.style.transform = `translateX(${dx}px)`; };
+    const up = () => { p.removeEventListener('pointermove', mv); if (dx > r.width * .33) { p.style.transform = ''; onBack(); } else { gx().animate(p, [{ transform: `translateX(${dx}px)` }, { transform: 'none' }]); p.style.transform = ''; } };
+    p.addEventListener('pointermove', mv); p.addEventListener('pointerup', up, { once: true });
+  };
+  return (
+    <div ref={ref} className="app-body stack">
+      {pages.map((pg, i) => (
+        <div key={pg.key} className="page" onPointerDown={i > 0 ? edge : undefined}>
+          {pg.noHead && i === 0 ? null : <div className="stack-head">{i > 0 ? <button className="back" onClick={onBack}><Icon name="back" size="lg" />{pages[i - 1].title}</button> : null}<span className="t ellipsis">{pg.title}</span></div>}
+          <div className="scroll" style={{ flex: 1, minHeight: 0 }}>{pg.content}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** `GX.ui.watchWidth` : vrai sous le seuil de largeur du conteneur. */
+export function useCompact(ref: React.RefObject<HTMLElement>, threshold: number) {
+  const [c, setC] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    const ro = new ResizeObserver(([e]) => setC(e.contentRect.width < threshold)); ro.observe(el);
+    return () => ro.disconnect();
+  }, [threshold]);
+  return c;
+}

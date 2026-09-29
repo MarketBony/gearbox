@@ -214,6 +214,9 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   observait l'hôte au lieu de la racine fantôme. Corrigé.
 - [x] **Interface v2 : glisser une fenêtre vers la bande de dispositions / un bureau de Mission Control sans effet** —
   `document.elementFromPoint` rendait l'hôte. Corrigé (`GX.root.elementFromPoint`, `engine/wm.ts`).
-- [ ] **Interface v2 : première ouverture d'une rubrique portée légèrement saccadée** (To-do : une tâche de 59 ms en
+- [x] **Interface v2 : première ouverture d'une rubrique portée légèrement saccadée** (To-do : une tâche de 59 ms en
   build de prod, la maquette n'en a aucune). Relevé par Théo à la recette 2a : « un vrai sujet à gratter ».
+  → Corrigé le 30/09 (lot 2b) : premier rendu en transition (To-do 0 ms, Projets ~53 ms de tâche longue).
+- [ ] **Interface v2 (moteur de la maquette) : un widget posé sur un écran plus large déborde à droite sur un écran
+  plus étroit** — la disposition n'est pas recalculée (comportement d'origine de la maquette).
 

@@ -29,3 +29,13 @@
 :host([data-theme="light"]) :is(.wch-conv, .wch-in, .dock .tip) {
   --text: #120f19; --text-2: #4a4556; --text-3: #746f84; color: var(--text);
 }
+
+/* Contraste du thème clair en Liquid Glass (demande de Théo, 30/09/2026) : la maquette y est trop
+   pâle (textes secondaires gris clair, contours à peine visibles, champs presque transparents sur
+   des cartes blanches). Mêmes teintes, un cran plus dense. Sombre, Pixel et Opaque : inchangés. */
+:host([data-material="liquid"][data-theme="light"]) {
+  --text-2: #3b3647; --text-3: #5f5a70;
+  --line: rgba(20,16,30,.14); --line-2: rgba(20,16,30,.22); --line-3: rgba(20,16,30,.32);
+  --ctl-bg: rgba(255,255,255,.74); --ctl-bg-h: rgba(255,255,255,.92); --ctl-line: rgba(20,16,30,.16); --ctl-line-h: rgba(20,16,30,.26);
+  --box-bg: rgba(255,255,255,.68); --box-line: rgba(20,16,30,.12);
+}

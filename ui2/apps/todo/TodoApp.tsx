@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppProps } from '../types';
 import type { Project, Task, TaskStatus } from '../../../types';
 import { BRANDS, SERVICES, TASK_CHANNELS, canEditProjects } from '../../../constants';
@@ -118,7 +118,8 @@ export default function TodoApp({ win, inst }: AppProps) {
   useEngineEvent('ctx', () => setTick((n) => n + 1));
 
   const items = useMemo(() => buildItems(projects, standalone, uid), [projects, standalone, uid]);
-  const filtered = useMemo(() => items.filter((it) => matches(it, f)), [items, f]);
+  const fd = useDeferredValue(f);   // saisie instantanée, tableau recalculé juste derrière
+  const filtered = useMemo(() => items.filter((it) => matches(it, fd)), [items, fd]);
   const active = (f.q.trim() ? 1 : 0) + (f.sites.length ? 1 : 0) + (f.brands.length ? 1 : 0) + (f.services.length ? 1 : 0) + (f.from || f.to ? 1 : 0);
   const cols = COLS.filter((c) => !(hideDone && c[0] === 'Done'));
   const byCol = useMemo(() => Object.fromEntries(COLS.map(([k]) => [k, filtered.filter((it) => it.t.status === k).sort(sortIt)])) as Record<ColKey, Item[]>, [filtered]);
@@ -141,7 +142,7 @@ export default function TodoApp({ win, inst }: AppProps) {
       if (c && F.pulse === 'Done') gx().animate(c, [{ boxShadow: '0 0 0 0 var(--ok)' }, { boxShadow: '0 0 0 6px transparent' }], { duration: 700, easing: 'ease-out' });
       const cnt = F.pulse && boardRef.current.querySelector(`[data-col="${F.pulse}"] .n`); if (cnt) gx().animate(cnt, [{ transform: 'scale(1.5)' }, { transform: 'none' }], { spring: 'bouncy' });
     }
-  });
+  }, [byCol, cols.length]);   // seulement quand le tableau change (le filtre est différé)
 
   // --- changer de colonne
   const setStatus = useCallback((it: Item | undefined, st: ColKey, from?: DOMRect, focus?: boolean) => {
@@ -152,7 +153,7 @@ export default function TodoApp({ win, inst }: AppProps) {
     else {
       setSavingFree((n) => n + 1);
       updateStandalone(it.t.id, { status: st as TaskStatus })
-        .catch(() => window.alert('Échec de la sauvegarde (serveur injoignable ?).'))
+        .catch(() => hud('Échec de la sauvegarde (serveur injoignable ?).'))
         .finally(() => setSavingFree((n) => n - 1));
     }
   }, [ro, hideDone]);
@@ -222,7 +223,7 @@ export default function TodoApp({ win, inst }: AppProps) {
   // --- tâche libre : création / modification / suppression
   const delFree = (t: Task) => {
     if (ro) return; capture(); setSavingFree((n) => n + 1);
-    deleteStandalone(t.id).then(() => hud('Tâche supprimée')).catch((e) => window.alert(e.message)).finally(() => setSavingFree((n) => n - 1));
+    deleteStandalone(t.id).then(() => hud('Tâche supprimée')).catch((e) => hud(e.message)).finally(() => setSavingFree((n) => n - 1));
   };
   const taskSheet = (t: Task | null) => {
     if (t ? ro : !canCreate) { if (t) hud('Lecture seule'); return; }

@@ -22,7 +22,7 @@ import { install as system } from './apps/system';
 import { install as r } from './r';
 import { createData } from '../data';
 import { bridgeStore, legacyStore, portedStore, tabOf, appOf, APP_META } from '../bridge';
-import { PORTED_IDS } from '../../apps/ids';
+import { PORTED_IDS, PORTED_EXTRA_META } from '../../apps/ids';
 import { openActivityEntry } from '../../../services/activityFeed';
 
 export type ShellMode = 'desktop' | 'mobile';
@@ -63,7 +63,7 @@ export function boot(host: HTMLElement, root: ShadowRoot, body: HTMLElement): Sh
   //     avec ce que le moteur ajoute au corps de la fenêtre (volets `win.sheet`, etc.).
   let seq = 0;
   for (const id of PORTED_IDS) {
-    const m = APP_META.find((x) => x.id === id); if (!m) continue;
+    const m = APP_META.find((x) => x.id === id) || PORTED_EXTRA_META[id]; if (!m) continue;
     GX.registerApp({
       ...m,
       mount(bodyEl: HTMLElement, win: any) {

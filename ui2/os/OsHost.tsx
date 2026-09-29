@@ -34,6 +34,17 @@ export interface OsHostProps {
   onExit: () => void;
 }
 
+// Rubrique PORTÉE : premier rendu en TRANSITION. La fenêtre s'ouvre tout de suite (animation du
+// moteur) et React construit la rubrique par tranches de quelques ms au lieu de bloquer l'écran
+// d'un seul tenant — mesuré le 30/09/2026 (build de prod) : 125 à 183 ms de script à l'ouverture de
+// Projets (117 projets + fiche), 59 ms pour la To-do. Les nœuds DOM sont créés pendant le rendu :
+// la validation finale ne fait qu'insérer l'arbre déjà prêt.
+const DeferredApp: React.FC<{ App: React.ComponentType<any>; win: any; inst: any }> = ({ App, win, inst }) => {
+  const [go, setGo] = useState(false);
+  useEffect(() => { startTransition(() => setGo(true)); }, []);
+  return go ? <App win={win} inst={inst} /> : null;
+};
+
 // Page actuelle projetée dans une fenêtre. Figée par rubrique : les pages ne prennent aucun
 // prop et se mettent à jour par leurs contextes et leurs données. Sans ce gel, chaque
 // changement de fenêtre active (setTab → rendu d'App) re-rendait TOUTES les pages ouvertes :
@@ -112,7 +123,7 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
   return (
     <div ref={slotRef}>
       {booted && <DataHub />}
-      {booted && ported.map(m => { const App = PORTED_APPS[m.appId]; return App ? createPortal(<App win={m.win} inst={m.inst} />, m.host, m.key) : null; })}
+      {booted && ported.map(m => { const App = PORTED_APPS[m.appId]; return App ? createPortal(<DeferredApp App={App} win={m.win} inst={m.inst} />, m.host, m.key) : null; })}
       {booted && legacy.map(id => createPortal(
         <div key={id} slot={`app-${id}`} className="gx2-legacy text-bony-text font-sans" style={{ height: '100%', overflow: 'hidden' }}>
           <LegacyPage id={id} render={renderPage} />
