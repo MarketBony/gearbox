@@ -95,6 +95,11 @@
   - Correctifs de recette : vignettes des fonds et curseurs des sélecteurs segmentés invisibles (le moteur
     cherchait dans `document` au lieu de la racine fantôme) ; ouvrir/réduire saccadé (voir Pièges) ; contrastes
     du thème clair (défaut de la maquette, `BUGS-CONNUS.md`).
+  - Recette 2 (29/09, avec deux agents testeurs Haiku — rapports à revérifier : un vrai bug, deux faux) :
+    fenêtres restaurées qui laissaient passer les clics au bureau (régression du correctif précédent),
+    Échap avalé par des écouteurs orphelins (défaut de la maquette, 4 endroits), écran noir si la coque est
+    remontée (hôte désormais persistant). Essai de mise en sommeil des pages réduites (`<Activity>`) ANNULÉ :
+    restauration plus saccadée, aucun gain au repos (0 requête en 30 s avec 7 fenêtres ouvertes).
   - **Suite : lots 2 → 16**, une rubrique par lot, réécrite en React avec le balisage et la CSS de la maquette
     (To-do puis Agenda d'abord pour figer la méthode). Chaque rubrique portée retire sa page actuelle des fenêtres.
 
@@ -3566,6 +3571,12 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
   active re-rendait TOUTES les pages ouvertes (tâche longue de 542 ms, en pleine animation) : elles sont figées
   par `LegacyPage` (`React.memo`) dans `OsHost.tsx`. Une fenêtre réduite de page actuelle est masquée par
   `visibility`, pas `display: none` (sinon les graphiques du Dashboard se recalculent au réaffichage).
+- **Interface v2 : l'hôte de la coque est PERSISTANT** (`window.__gxHost`, `OsHost.tsx`) : le moteur ne
+  s'installe qu'une fois par page. Recréer l'élément à chaque montage = écran noir dès qu'App démonte la coque.
+- **Interface v2 : écouteur posé dans un `setTimeout` = vérifier que l'objet n'a pas été refermé entre-temps**
+  (menus, calendrier, sélecteurs, aperçu rapide de la maquette) — sinon écouteur orphelin qui avale Échap.
+- **Interface v2 : `pointer-events` des fenêtres = `auto` explicite** (l'espace parent est à `none`) ; ne
+  jamais le remettre à `''`.
 - **Interface v2 : pas de `:has()` dans la CSS de la coque** — mesuré 32 i/s contre 60. Classes posées par
   `engine/boot.ts` (`.gx-legacy`, `.gx-has-legacy`) à la place.
 - **⚠️ `strictNullChecks` est DÉSACTIVÉ dans `tsconfig.json` : un prop requis manquant

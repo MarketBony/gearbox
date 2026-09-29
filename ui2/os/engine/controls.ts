@@ -55,7 +55,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     el.addEventListener('wheel', (e) => { e.preventDefault(); view = new Date(view.getFullYear(), view.getMonth() + (e.deltaY > 0 ? 1 : -1), 1); render(); }, { passive: false });
     const away = (e) => { if (!el.contains(e.target) && !anchor.contains(e.target)) closeCal(); };
     const key = (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeCal(); } };
-    setTimeout(() => { GX.win(window, 'pointerdown', away, true); GX.win(window, 'keydown', key, true); });
+    setTimeout(() => { if (cal?.el !== el) return; /* [GEARBOX] déjà refermé avant ce tic : sinon écouteurs orphelins (Échap avalé pour toujours) — défaut de la maquette */ GX.win(window, 'pointerdown', away, true); GX.win(window, 'keydown', key, true); });
     cal = { el, cleanup: () => { GX.unwin(window, 'pointerdown', away, true); GX.unwin(window, 'keydown', key, true); } };
     return el;
   };

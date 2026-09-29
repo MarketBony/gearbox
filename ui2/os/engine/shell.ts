@@ -537,9 +537,10 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     GX.body.append(el);
     const r = origin?.getBoundingClientRect?.() || origin; const b = el.getBoundingClientRect();
     if (r) GX.animate(el, [{ transform: `translate(${r.left - b.left - b.width / 2}px, ${r.top - b.top - b.height / 2}px) scale(${r.width / b.width}, ${r.height / b.height})`, opacity: .4 }, { transform: 'translate(-50%,-50%)', opacity: 1 }], { spring: 'snappy' });
-    const close = () => { GX.unwin(window, 'keydown', kd, true); GX.animate(el, [{ opacity: 1, transform: 'translate(-50%,-50%)' }, { opacity: 0, transform: 'translate(-50%,-50%) scale(.94)' }], { duration: 140, fill: 'forwards' }).onfinish = () => el.remove(); };
+    let closed = false; /* [GEARBOX] pas d'écouteur orphelin si on ferme avant le tic */
+    const close = () => { closed = true; GX.unwin(window, 'keydown', kd, true); GX.animate(el, [{ opacity: 1, transform: 'translate(-50%,-50%)' }, { opacity: 0, transform: 'translate(-50%,-50%) scale(.94)' }], { duration: 140, fill: 'forwards' }).onfinish = () => el.remove(); };
     const kd = (e) => { if (e.key === 'Escape' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); close(); } };
-    el.querySelector('.icon-btn').onclick = close; setTimeout(() => GX.win(window, 'keydown', kd, true), 10);
+    el.querySelector('.icon-btn').onclick = close; setTimeout(() => { if (!closed) GX.win(window, 'keydown', kd, true); }, 10);
     return { close };
   };
 

@@ -293,7 +293,7 @@ GX.menu = {
     };
     m.addEventListener('click', (e) => { const mi = e.target.closest('.mi'); if (!mi) return; const it = items[+mi.dataset.i]; GX.menu.close(); it.action && it.action(); });
     const away = (e) => { if (!m.contains(e.target)) GX.menu.close(); };
-    setTimeout(() => { GX.win(window, 'pointerdown', away, true); GX.win(window, 'keydown', key, true); });
+    setTimeout(() => { if (openMenu?.m !== m) return; /* [GEARBOX] déjà refermé avant ce tic : sinon écouteurs orphelins (Échap avalé pour toujours) — défaut de la maquette */ GX.win(window, 'pointerdown', away, true); GX.win(window, 'keydown', key, true); });
     openMenu = { m, cleanup: () => { GX.unwin(window, 'pointerdown', away, true); GX.unwin(window, 'keydown', key, true); onClose && onClose(); } };
     return m;
   },

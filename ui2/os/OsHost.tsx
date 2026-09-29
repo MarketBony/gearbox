@@ -50,7 +50,8 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
   const nav = computeNav({ role: user?.role, gamesEnabled, voitConges });
   const { chatUnread, gamesChallenges } = useNavBadges(user, gamesEnabled);
   const feed = useActivityFeed();
-  const hostRef = useRef<HTMLDivElement>(null);
+  const slotRef = useRef<HTMLDivElement>(null);
+  const hostRef = useRef<HTMLDivElement | null>(null);
   const [booted, setBooted] = useState(false);
 
   // Le pont est republié à chaque rendu (le moteur lit toujours la valeur à jour).
@@ -75,17 +76,30 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
     const GX = (window as any).GX; if (GX?.shell?.prefs) GX.shell.prefs.theme = h.dataset.theme;
   }, [theme, booted]);
 
-  useEffect(() => {
-    const host = hostRef.current!;
-    if (host.shadowRoot) { setBooted(true); return; }     // React.StrictMode : l'effet est rejoué
-    const shadow = host.attachShadow({ mode: 'open' });
-    const style = document.createElement('style');
-    style.textContent = `${css}\n${overridesCss}`;
-    const body = document.createElement('div');
-    body.className = 'gx-body';
-    shadow.append(style, body);
-    boot(host, shadow, body);
+  // L'hôte est PERSISTANT : le moteur s'installe une seule fois par page (écouteurs globaux), il ne
+  // peut pas redémarrer dans un nouvel élément. Si ce composant est démonté puis remonté (App repasse
+  // par « INITIALISATION… », rechargement à chaud…), on raccroche le MÊME hôte — sa racine fantôme et
+  // tout le bureau voyagent avec lui. Sans ça : écran noir (constaté le 29/09/2026).
+  useLayoutEffect(() => {
+    const w = window as any;
+    let host: HTMLDivElement = w.__gxHost;
+    const fresh = !host;
+    if (fresh) {
+      host = w.__gxHost = document.createElement('div');
+      host.className = 'gx2-host';
+      Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '0' });
+      const shadow = host.attachShadow({ mode: 'open' });
+      const style = document.createElement('style');
+      style.textContent = `${css}\n${overridesCss}`;
+      const body = document.createElement('div');
+      body.className = 'gx-body';
+      shadow.append(style, body);
+    }
+    slotRef.current!.appendChild(host);
+    if (fresh) boot(host, host.shadowRoot!, host.shadowRoot!.querySelector('.gx-body') as HTMLElement);
+    hostRef.current = host;
     setBooted(true);
+    return () => { host.remove(); };
   }, []);
 
   // Premier rendu d'une page à l'ouverture de sa fenêtre : en TRANSITION, pour que React le
@@ -94,7 +108,7 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
   const [legacy, setLegacy] = useState(legacyIds);
   useEffect(() => { startTransition(() => setLegacy(legacyIds)); }, [legacyIds]);
   return (
-    <div ref={hostRef} className="gx2-host" style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
+    <div ref={slotRef}>
       {booted && <DataHub />}
       {booted && legacy.map(id => createPortal(
         <div key={id} slot={`app-${id}`} className="gx2-legacy text-bony-text font-sans" style={{ height: '100%', overflow: 'hidden' }}>

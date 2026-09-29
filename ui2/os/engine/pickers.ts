@@ -78,7 +78,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     setTimeout(() => q?.focus(), 30);
     const away = (e) => { if (e.target.closest?.('.gx-datecal')) return; if (!el.contains(e.target) && !(anchor.contains && anchor.contains(e.target))) GX.ui.closePick(); };
     const key = (e) => { if (e.key === 'Escape') { e.stopPropagation(); GX.ui.closePick(); } };
-    setTimeout(() => { GX.win(window, 'pointerdown', away, true); GX.win(window, 'keydown', key, true); });
+    setTimeout(() => { if (openPick?.el !== el) return; /* [GEARBOX] déjà refermé avant ce tic : sinon écouteurs orphelins (Échap avalé pour toujours) — défaut de la maquette */ GX.win(window, 'pointerdown', away, true); GX.win(window, 'keydown', key, true); });
     openPick = { el, cleanup: () => { GX.unwin(window, 'pointerdown', away, true); GX.unwin(window, 'keydown', key, true); opts.onClose && opts.onClose([...sel]); } };
     return el;
   };
@@ -126,7 +126,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     el.addEventListener('change', () => done(el.querySelector('[data-f]').value, el.querySelector('[data-t]').value));
     place(el, anchor);
     const away = (e) => { if (e.target.closest?.('.gx-datecal')) return; if (!el.contains(e.target) && !(anchor.contains && anchor.contains(e.target))) GX.ui.closePick(); };
-    setTimeout(() => GX.win(window, 'pointerdown', away, true));
+    setTimeout(() => { if (openPick?.el === el) GX.win(window, 'pointerdown', away, true); }); /* [GEARBOX] pas d'écouteur orphelin */
     openPick = { el, cleanup: () => GX.unwin(window, 'pointerdown', away, true) };
     return el;
   };

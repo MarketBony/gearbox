@@ -129,7 +129,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
      `display: none` — sinon elle perd sa taille, ses graphiques se recalculent au réaffichage
      (tâche longue de 180 ms mesurée sur le Dashboard, en pleine animation de restauration). */
   function hideWin(el, on) {
-    if (el.classList.contains('gx-legacy')) { el.style.visibility = on ? 'hidden' : ''; el.style.pointerEvents = on ? 'none' : ''; }
+    if (el.classList.contains('gx-legacy')) { el.style.visibility = on ? 'hidden' : ''; el.style.pointerEvents = on ? 'none' : 'auto'; } /* 'auto' comme à la création : l'espace parent est à 'none' */
     else el.style.display = on ? 'none' : '';
   }
   function zoomFrom(win, r) {

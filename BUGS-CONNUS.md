@@ -202,4 +202,12 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   (anciens contrastes Tailwind). Pas retouchées : elles disparaissent au portage de chaque rubrique.
 - [ ] **Interface v2 : chef de site et External non vérifiés dans la coque** (interrupteur réservé au Master).
   À faire avant d'ouvrir la bêta à tous.
+- [x] **Interface v2 : une fenêtre réduite puis restaurée laissait passer les clics au bureau** (widgets cliqués
+  à travers) — `pointer-events` remis à `''` au lieu de `auto`. Corrigé (`engine/wm.ts`, `hideWin`).
+- [x] **Maquette v2 : Échap ne fermait plus rien après un menu ouvert/fermé très vite** — écouteurs posés dans
+  un `setTimeout` après la fermeture, jamais retirés. Corrigé à 4 endroits (`core.ts`, `controls.ts`,
+  `pickers.ts`, `shell.ts`).
+- [x] **Interface v2 : écran noir quand la coque est remontée** — hôte recréé, moteur déjà démarré. Hôte persistant.
+- [ ] **Interface v2 : première ouverture d'une page actuelle lourde (Projets, Dashboard, Budget) : 100 à 200 ms
+  de blocage** — coût des anciennes pages, disparaît à leur portage.
 
