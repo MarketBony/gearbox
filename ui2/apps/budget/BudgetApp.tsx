@@ -1,12 +1,12 @@
 import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppProps } from '../types';
 import type { BrandType, BudgetLine, ServiceType } from '../../../types';
-import { PLAQUES_STRUCTURE, ALPINE_SITES, NISSAN_SITES, allowedSitesFor } from '../../../constants';
+import { PLAQUES_STRUCTURE, ALPINE_SITES, NISSAN_SITES, allowedSitesFor, BUDGET_PROVISION_EDIT_ROLES } from '../../../constants';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useWorkspace } from '../../store/workspace';
 import { useBudgets, useFixedExpenses, upsertBudget } from '../../store/collections';
 import { gx, Icon, Seg, useEngineStore, useEngineEvent } from '../ui/kit';
-import { MONTHS, prepareBudgetLines, computeBudgetStats, groupProvisions, getPlaqueForSite, type BudgetMatrixRow } from './budgetStats';
+import { MONTHS, prepareBudgetLines, computeBudgetStats, groupProvisions, getPlaqueForSite, type BudgetMatrixRow } from '../../../services/budgetStats';
 
 // =====================================================================
 // Rubrique « Budget » — transposition de maquettes/v2/js/apps/budget.js (même balisage, mêmes
@@ -28,7 +28,7 @@ const SVC: Svc[] = ['VN', 'VO', 'PR', 'APV'];                                  /
 const SVC_CHIPS = ['VN', 'VO', 'APV', 'PR'];                                   // BUDGET_SERVICE_CHIPS
 const BRAND_CHIPS = ['Renault', 'Dacia', 'Alpine', 'Nissan', 'Mobilize'];      // BUDGET_BRAND_CHIPS (pas de Holding)
 const SVC_HEX: Record<string, string> = { VN: '#3a5fc8', VO: '#f75632', APV: '#8f12ab', PR: '#1aa9bd' };
-const EDIT_PROV = ['Master', 'Administrator', 'Director'];                     // BESOIN: constante partagée (canEditProvisions = routes/budget.ts EDIT_ROLES)
+const EDIT_PROV = BUDGET_PROVISION_EDIT_ROLES;                                 // constants.ts (miroir de routes/budget.ts)
 const PRO_LABEL: Record<Pro, string> = { all: 'Tout', standard: 'Sans PRO+', pro: 'PRO+ uniquement' };
 const Y = new Date().getFullYear(), YEARS = [Y - 2, Y - 1, Y];                  // l'original codait [2024, 2025, 2026] en dur
 const ICO_COINS = '<ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v5c0 1.7 2.7 3 6 3s6-1.3 6-3V7M3 12v5c0 1.7 2.7 3 6 3 1.3 0 2.5-.2 3.5-.6M15 10.5c3.3 0 6 1.3 6 3s-2.7 3-6 3-6-1.3-6-3"/>';

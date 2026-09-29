@@ -188,16 +188,18 @@ export function mutateProject(id: string, change: (p: Project) => Project) {
 export const mutateTask = (projectId: string, taskId: string, patch: Partial<Task>) =>
   mutateProject(projectId, (p) => ({ ...p, tasks: p.tasks.map((t) => (t.id === taskId ? { ...t, ...patch } : t)) }));
 
-function logActivity(action: string, p: { id: string; name: string }) {
+/** Entrée du journal d'activité (même forme que les pages actuelles), au nom du compte connecté. */
+export function logActivity(entity: string, action: string, name: string, id?: string) {
   if (!me) return;
-  db.logActivity({ id: `act-${Date.now()}`, userId: me.id, userName: me.name, userColor: me.avatarColor || '#f75632', action, entity: 'project', entityName: p.name, entityId: p.id, timestamp: new Date().toISOString() } as any);
+  db.logActivity({ id: `act-${Date.now()}`, userId: me.id, userName: me.name, userColor: me.avatarColor || '#f75632', action, entity, entityName: name, ...(id ? { entityId: id } : {}), timestamp: new Date().toISOString() } as any);
 }
+const logProject = (action: string, p: { id: string; name: string }) => logActivity('project', action, p.name, p.id);
 
 export async function createProject(p: Project): Promise<Project | null> {
   if (!canEditProjects(me?.role)) return null;
   try {
     const srv = await db.createProject(recalculerProjet(p));
-    putProject(srv); echo('projects:updated', srv); logActivity('a créé le projet', srv);
+    putProject(srv); echo('projects:updated', srv); logProject('a créé le projet', srv);
     return srv;
   } catch {
     say('Échec de la création du projet (serveur injoignable ?).');
@@ -211,7 +213,7 @@ export async function deleteProject(id: string): Promise<boolean> {
   dropProject(id);
   try {
     await db.deleteProject(id);
-    echo('projects:deleted', id); logActivity('a supprimé le projet', p);
+    echo('projects:deleted', id); logProject('a supprimé le projet', p);
     return true;
   } catch {
     say('Une erreur est survenue lors de la suppression.');
@@ -224,7 +226,7 @@ export async function deleteProject(id: string): Promise<boolean> {
 export function archiveProject(id: string) {
   const p = workspace.getState().byId[id]; if (!p) return;
   mutateProject(id, (x) => ({ ...x, status: 'Archived' }));
-  logActivity('a archivé le projet', p);
+  logProject('a archivé le projet', p);
 }
 
 // ---------------------------------------------------------------- écritures : tâches libres

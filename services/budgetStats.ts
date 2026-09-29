@@ -1,5 +1,6 @@
 // =====================================================================
-// ⚠️ À DÉPLACER DANS `services/budgetStats.ts` À L'INTÉGRATION (voir ./BESOINS.md).
+// ⚠️ SOURCE UNIQUE des montants du Budget depuis le 30/09/2026 : appelée par pages/Budget.tsx ET par
+// la rubrique v2 (ui2/apps/budget). Vérifiée identique au centime à l'ancienne logique inline avant bascule.
 //
 // Moteur d'agrégation de la page Budget, extrait TEL QUEL de pages/Budget.tsx :
 //  - `prepareBudgetLines` = le bloc « Migration silencieuse » de `loadData` (l.261-308),
@@ -11,14 +12,14 @@
 // Fonctions PURES : aucun état React, aucune lecture hors des arguments. Le routage passe
 // exclusivement par constants.ts (`resolveBudgetLine`, `isDestinationInScope`,
 // `splitShareToBuckets`, `isHoldingBrand`) — rien n'est réimplémenté ici.
-// Une fois déplacé dans services/, pages/Budget.tsx doit l'appeler à son tour (comme
-// Dashboard.tsx avec `computeDashboardStats`), sinon les deux copies divergeront.
+// Même doctrine que services/dashboardStats.ts : ne JAMAIS recopier ce calcul dans un écran.
+// (`prepareBudgetLines` : la page garde sa propre migration, qui ÉCRIT les buckets manquants.)
 // =====================================================================
-import type { BudgetLine, BrandType, FixedExpense, Project, ServiceType } from '../../../types';
+import type { BudgetLine, BrandType, FixedExpense, Project, ServiceType } from '../types';
 import {
   PLAQUES_STRUCTURE, ALPINE_BUCKETS, NISSAN_BUCKET, isHoldingBrand, resolveBudgetLine,
   isDestinationInScope, splitShareToBuckets,
-} from '../../../constants';
+} from '../constants';
 
 export const MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 export const SPECIFIC_ENTITIES = 'ENTITÉS SPÉCIFIQUES';

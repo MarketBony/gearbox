@@ -1,10 +1,10 @@
 import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppProps } from '../types';
 import type { BrandType, FixedExpense, ServiceType } from '../../../types';
-import { PLAQUES_STRUCTURE, SERVICES, BRANDS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, HOLDING_BRAND, RDM_BRANDS, isSiteManager } from '../../../constants';
+import { PLAQUES_STRUCTURE, SERVICES, BRANDS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, HOLDING_BRAND, RDM_BRANDS, FIXED_EXPENSE_EDIT_ROLES, isSiteManager } from '../../../constants';
 import { useAuth } from '../../../contexts/AuthContext';
 import { fixedExpenses as fixedRes, createFixedExpense, updateFixedExpense, deleteFixedExpense } from '../../store/collections';
-import { db } from '../../../services/dataService';
+import { logActivity as logFeed } from '../../store/workspace';
 import { gx, hud, Icon, Seg, PickerBtn, useSheets, useEngineEvent } from '../ui/kit';
 
 // =====================================================================
@@ -23,8 +23,8 @@ type Sort = { k: 'date' | 'site' | 'service' | 'comment' | 'amount'; dir: 'asc' 
 interface Filters { q: string; site: string; service: string; from: string; to: string }
 const F0: Filters = { q: '', site: 'All', service: 'All', from: '', to: '' };
 
-// Écritures : liste de la page (= EDIT_ROLES de backend/src/routes/fixedExpenses.ts). BESOIN: constante partagée.
-const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+// Écritures : FIXED_EXPENSE_EDIT_ROLES (constants.ts, miroir de backend/src/routes/fixedExpenses.ts).
+const EDIT_ROLES = FIXED_EXPENSE_EDIT_ROLES;
 const BRAND_BG: Record<string, [string, string]> = { Renault: ['#ffcc33', '#1a1400'], Dacia: ['#6a7551', '#fff'], Alpine: ['#0055a4', '#fff'], Nissan: ['#c3002f', '#fff'], Mobilize: ['#7b3fe4', '#fff'], Holding: ['#475569', '#fff'] };
 const SVC_HEX: Record<string, string> = { VN: '#3a5fc8', VO: '#f75632', APV: '#8f12ab', PR: '#1aa9bd', 'Tous Services': '#6b6880' };
 const DIST: Record<string, Record<string, number>> = { 'GROUPE BONY': DISTRIBUTION_GROUPE_BONY, 'GROUPE BONY (R/N)': DISTRIBUTION_GROUPE_BONY_RN };
@@ -62,11 +62,8 @@ function listOf(all: FixedExpense[], f: Filters, sort: Sort) {
     });
 }
 
-// BESOIN: `logActivity(action, entity, name, id?)` exporté par ui2/store/workspace.ts (même entrée que la page).
-function logActivity(user: { id: string; name: string; avatarColor?: string } | null | undefined, action: string, name: string) {
-  if (!user) return;
-  db.logActivity({ id: `act-${Date.now()}`, userId: user.id, userName: user.name, userColor: user.avatarColor || '#f75632', action, entity: 'fixed-expense', entityName: name, timestamp: new Date().toISOString() });
-}
+// Journal d'activité : porte commune (ui2/store/workspace.ts), même entrée que la page.
+const logActivity = (_user: unknown, action: string, name: string) => logFeed('fixed-expense', action, name);
 const nameOf = (e: Partial<FixedExpense>) => e.comment || e.site || 'Dépense fixe';
 
 // ---------------------------------------------------------------- lignes

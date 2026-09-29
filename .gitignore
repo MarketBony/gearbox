@@ -53,3 +53,6 @@ PRESENTATION-EQUIPE.html
 # vigilance. Il contient aussi .graphify_python et .graphify_root, qui portent
 # des chemins absolus propres a cette machine.
 graphify-out/
+
+# Copies de travail isolées des agents (Claude Code)
+.claude/worktrees/

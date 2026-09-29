@@ -709,6 +709,11 @@ export const isMarketingRole = (role?: string): boolean =>
 // locale jusqu'à leur retrait.
 export const PROJECT_EDIT_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
 export const canEditProjects = (role?: string): boolean => !!role && PROJECT_EDIT_ROLES.includes(role);
+// Dépenses fixes : miroir d'`EDIT_ROLES` de backend/src/routes/fixedExpenses.ts. Provisions du Budget
+// (lignes prévisionnelles) : miroir de backend/src/routes/budget.ts. Ajoutés le 30/09/2026 (interface v2) ;
+// pages/FixedExpenses.tsx et pages/Budget.tsx gardent leur copie locale jusqu'à leur retrait.
+export const FIXED_EXPENSE_EDIT_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+export const BUDGET_PROVISION_EDIT_ROLES: string[] = ['Master', 'Administrator', 'Director'];
 
 // ============================================================================
 // RÔLE « CHEF DE SITE » (Site Manager) — 05/08/2026
