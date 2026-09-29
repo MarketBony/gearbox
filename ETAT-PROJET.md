@@ -143,7 +143,8 @@
     (`useDeferredValue`) : mesuré en build de prod, ouverture To-do 59 → 0 ms de tâche longue, Projets 125-183 →
     ~53 ms, recherche et changement de projet à 60 i/s.
   - Recette : contraste du thème clair en Liquid Glass renforcé (`overrides.css`), marge du bureau
-    proportionnelle à l'écran (1,6 %, 10–28 px) et grille ANCRÉE en haut à gauche, cases de taille fixe (`engine/widgets.ts`,
+    proportionnelle à l'écran (1,6 %, 10–28 px) widgets de taille FIXE, reste de la division réparti entre les colonnes (grille pleine largeur, même marge
+    à gauche et à droite, widget du dernier rang aligné sur le bord droit), calée en haut (`engine/widgets.ts`,
     `[GEARBOX]`). ⚠️ Un premier essai étirait les cases : en plein écran les widgets se déformaient et débordaient sur le Dock.
 
 ## Déploiement
