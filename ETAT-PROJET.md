@@ -18,8 +18,12 @@
   icônes style iOS ; fond par défaut **Bony** (logo officiel, charte du brandbook) ; barre du haut escamotable ;
   sélecteurs de sites en plaques repliables ; calendrier et menus chartés (plus aucun contrôle natif).
 - **Défauts du vrai Gearbox relevés pendant l'inventaire** : voir la fin de `BUGS-CONNUS.md` (29/09, non reproduits).
-- **Étape suivante** : stratégie de déploiement — comment la maquette devient le vrai front (React, rubrique
-  par rubrique, derrière un drapeau), sans casser la prod. Rien n'est décidé.
+- **Décidé le 29/09 — plan de déploiement : `maquettes/ux/PLAN-DEPLOIEMENT-V2.md`** (à lire avant tout lot).
+  Reconstruction DANS l'appli React, rubrique par rubrique ; données, temps réel, auth, `constants.ts` et backend
+  inchangés ; interrupteur « Nouvelle interface (bêta) » dans les Réglages, ouvert à TOUS les utilisateurs
+  pendant le chantier (l'ancienne UI reste par défaut jusqu'à la bascule). Lot 0 (préparation + inventaires
+  en fichiers) → lot 1 (socle / coque) → 15 lots rubriques → bascule → nettoyage. Estimation ≈ 18 M tokens.
+- **Maquette v2 : état final validé au 29/09** (commits sur `feat/refonte-os-v2` : 25891fc, 9875d1e, bdf3662).
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
