@@ -7,6 +7,7 @@ import { usePresence } from '../../services/presenceStore';
 import { useRealtimeSync, RT_EVENTS } from '../../services/realtime';
 import { computeDashboardStats } from '../../services/dashboardStats';
 import { useWorkspace, startWorkspace } from '../store/workspace';
+import { budgets as rBudgets, socialPosts as rSocial, fixedExpenses as rFixed, equipment as rEquip, bookings as rBookings, conges as rConges } from '../store/collections';
 import { useWeatherData } from '../../pages/HelloMarketing';
 import { canSeeGames } from '../../constants';
 import type { Project, BudgetLine, SocialPost, FixedExpense, User, Equipment, EquipmentBooking } from '../../types';
@@ -42,31 +43,20 @@ function DataHubInner() {
   const projects = useWorkspace(s => s.projects);
   const projectsReady = useWorkspace(s => s.ready);
   const users = useWorkspace(s => s.users);
-  const [rest, setRest] = useState<{ budgets: BudgetLine[]; socialPosts: SocialPost[]; fixedExpenses: FixedExpense[] } | null>(null);
-  const core = useMemo(() => (rest && projectsReady ? { ...rest, projects } : null), [rest, projects, projectsReady]);
-  const [equip, setEquip] = useState<{ eq: Equipment[]; bk: EquipmentBooking[] } | null>(null);
-  const [conges, setConges] = useState<Awaited<ReturnType<typeof db.getConges>> | null>(null);
+  // Budgets, publications, dépenses, matériel, congés : ressources PARTAGÉES (ui2/store/collections.ts),
+  // les mêmes que les rubriques portées — chargées une fois, rechargées sur leurs événements.
+  const allowed = b.nav.allowedIds;
+  const budgetsL = rBudgets.use(), socialL = rSocial.use(), fixedL = rFixed.use();
+  const core = useMemo(() => (budgetsL && socialL && fixedL && projectsReady ? { budgets: budgetsL, socialPosts: socialL, fixedExpenses: fixedL, projects } : null), [budgetsL, socialL, fixedL, projects, projectsReady]);
+  const eqL = rEquip.useWhen(allowed.has('material')), bkL = rBookings.useWhen(allowed.has('material'));
+  const equip = useMemo(() => (eqL && bkL ? { eq: eqL, bk: bkL } : null), [eqL, bkL]);
+  // Congés : période de référence en cours (juin → mai) jusqu'à J+60, comme avant.
+  const [cDebut, cFin] = useMemo(() => { const t = new Date(), fin = new Date(t); fin.setDate(t.getDate() + 60); return [iso(new Date(t.getMonth() >= 5 ? t.getFullYear() : t.getFullYear() - 1, 5, 1)), iso(fin)]; }, []);
+  const conges = rConges.useWhen(allowed.has('conges'), cDebut, cFin) ?? null;
   const [lobby, setLobby] = useState<any>(null);
   const weather = useWeatherData(uid);
-
-  const allowed = b.nav.allowedIds;
-  const loadCore = () => {
-    Promise.all([db.getBudgets(), db.getSocialPosts(), db.getFixedExpenses()])
-      .then(([budgets, socialPosts, fixedExpenses]) => setRest({ budgets, socialPosts, fixedExpenses }))
-      .catch(() => { /* best-effort : les widgets restent vides */ });
-  };
-  const loadEquip = () => { if (!allowed.has('material')) return; Promise.all([db.getEquipment(), db.getEquipmentBookings()]).then(([eq, bk]) => setEquip({ eq, bk })).catch(() => {}); };
-  const loadConges = () => {
-    if (!allowed.has('conges')) { setConges(null); return; }
-    const t = new Date(), fin = new Date(t); fin.setDate(t.getDate() + 60);
-    const debut = new Date(t.getMonth() >= 5 ? t.getFullYear() : t.getFullYear() - 1, 5, 1);
-    db.getConges(iso(debut), iso(fin)).then(setConges).catch(() => setConges(null));
-  };
   const loadLobby = () => { if (!canSeeGames(role, allowed.has('games'))) return; db.getGamesLobby().then(setLobby).catch(() => {}); };
-
-  useEffect(() => { loadCore(); loadEquip(); loadConges(); loadLobby(); }, [uid, role, allowed.has('conges'), allowed.has('material'), allowed.has('games')]); // eslint-disable-line react-hooks/exhaustive-deps
-  useRealtimeSync([...RT_EVENTS.budget, ...RT_EVENTS.social, ...RT_EVENTS.fixedExpenses], loadCore);
-  useRealtimeSync(RT_EVENTS.conges, loadConges);
+  useEffect(() => { loadLobby(); }, [uid, role, allowed.has('games')]); // eslint-disable-line react-hooks/exhaustive-deps
   useRealtimeSync(RT_EVENTS.games, loadLobby);
 
   // Chat : le store temps réel de l'appli (le même que la Sidebar).

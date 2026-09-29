@@ -52,6 +52,10 @@ let me: Me | null = null;
 let started = false;
 /** Message à l'utilisateur (erreurs de sauvegarde) : branché sur la coque par l'appelant. */
 let say: (msg: string) => void = (m) => console.warn('[workspace]', m);
+/** Message à l'utilisateur (même canal pour toutes les écritures de l'interface v2). */
+export const notify = (msg: string) => say(msg);
+/** Rôle du compte connecté (posé par `startWorkspace`). */
+export const currentRole = () => me?.role;
 
 const index = (list: Project[]) => Object.fromEntries(list.map((p) => [p.id, p]));
 const setProjects = (projects: Project[]) => workspace.setState({ projects, byId: index(projects), ready: true });
@@ -91,7 +95,9 @@ const later = (k: string, f: () => Promise<void>) => {
 // ---------------------------------------------------------------- temps réel
 let echoing = false;
 /** Rejoue un événement sur les écouteurs LOCAUX du socket (pages actuelles ouvertes). */
-function echo(event: string, payload: unknown) {
+/** Vrai pendant un écho local : les abonnés de l'interface v2 l'ignorent (ils ont déjà l'état). */
+export const isEchoing = () => echoing;
+export function echo(event: string, payload: unknown) {
   const s: any = getSocket(); if (!s?.listeners) return;
   echoing = true;
   try { for (const l of s.listeners(event)) { try { l(payload); } catch (e) { console.error(e); } } } finally { echoing = false; }

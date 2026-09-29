@@ -243,19 +243,20 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   const rectOf = (w) => { const [cw, ch] = dim(w.size); return { x: w.x, y: w.y, w: cw, h: ch }; };
   const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
   /* [GEARBOX] Marge du bureau PROPORTIONNELLE à l'écran (1,6 % de la largeur, bornée 10–28 px) au lieu
-     de 22 px fixes, et grille ÉTIRÉE pour remplir exactement la zone : avant, la largeur se comptait en
-     cases entières et le reste (jusqu'à 48 px par côté) s'ajoutait à la marge — sur un écran réduit, les
-     widgets du bord semblaient loin du bord (retour de Théo, 30/09/2026). Pas horizontal SX() et vertical
-     SY() = pas nominal (96 px) + la part du reste ; les tailles internes des widgets ne changent pas. */
+     de 22 px fixes, et grille ANCRÉE en haut à gauche au lieu d'être centrée : centrée, le reste de la
+     division en cases (jusqu'à 48 px par côté) s'ajoutait à la marge et les widgets du bord semblaient
+     loin du bord sur un écran réduit (retour de Théo, 30/09/2026). Cases de taille FIXE (96 px) : un
+     premier essai les étirait pour remplir la zone — en plein écran les widgets se déformaient et
+     débordaient sur le Dock (retour de Théo, même jour). SX()/SY() gardés comme points d'appel uniques. */
   const M = () => Math.round(Math.max(10, Math.min(28, innerWidth * 0.016)));
   const cols = () => Math.max(4, Math.floor((innerWidth - 2 * M() + GAP) / STEP));
-  const SX = () => (innerWidth - 2 * M() + GAP) / cols();
+  const SX = () => STEP;
   /* Zone du bureau : entre la barre du haut (0 si escamotable) et le haut du Dock. La grille y est
      CENTRÉE : même marge en haut qu'en bas (au-dessus du Dock), même marge à gauche qu'à droite. */
   const cssPx = (n) => parseFloat(getComputedStyle(GX.host).getPropertyValue(n)) || 0;
   const area = () => { const top = cssPx('--mb-space'), bottom = (cssPx('--dock-icon') || 50) + 26 + 8; return { top, h: innerHeight - top - bottom }; };
   const rows = () => Math.max(4, Math.floor((area().h - 2 * M() + GAP) / STEP));
-  const SY = () => (area().h - 2 * M() + GAP) / rows();
+  const SY = () => STEP;
   function freeSpot(size, ignore, near) {
     const [cw, ch] = dim(size), C = cols(), R = rows() + 20, cands = [];
     for (let y = 0; y < R; y++) for (let x = 0; x + cw <= C; x++) { const r = { x, y, w: cw, h: ch }; if (!layout.some((o) => o !== ignore && overlap(r, rectOf(o)))) cands.push(r); }

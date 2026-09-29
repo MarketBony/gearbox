@@ -143,7 +143,8 @@
     (`useDeferredValue`) : mesuré en build de prod, ouverture To-do 59 → 0 ms de tâche longue, Projets 125-183 →
     ~53 ms, recherche et changement de projet à 60 i/s.
   - Recette : contraste du thème clair en Liquid Glass renforcé (`overrides.css`), marge du bureau
-    proportionnelle à l'écran et grille des widgets étirée pour remplir la zone (`engine/widgets.ts`, `[GEARBOX]`).
+    proportionnelle à l'écran (1,6 %, 10–28 px) et grille ANCRÉE en haut à gauche, cases de taille fixe (`engine/widgets.ts`,
+    `[GEARBOX]`). ⚠️ Un premier essai étirait les cases : en plein écran les widgets se déformaient et débordaient sur le Dock.
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
