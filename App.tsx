@@ -92,21 +92,28 @@ const InnerApp: React.FC = () => {
   const canExport = EXPORT_ALLOWED_ROLES.includes(user?.role ?? '');
   // Congés : visible pour les membres du périmètre et ceux qui le gèrent.
   const { visible: voitConges } = useCongesAcces();
-  let resolvedTab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(activeTab)) ? 'digital' : activeTab;
-  if (resolvedTab === 'games' && !canAccessGames) resolvedTab = 'dashboard';
-  if (resolvedTab === 'export' && !canExport) resolvedTab = 'dashboard';
-  // ⚠️ Même raison que pour les autres gardes : l'onglet actif est mémorisé en session,
-  // une rubrique retirée du menu reste ATTEIGNABLE sans ceci. Le refus réel est de toute
-  // façon côté serveur (`routes/conges.ts` rend 403, même sur le GET).
-  if (resolvedTab === 'conges' && !voitConges) resolvedTab = 'dashboard';
-  // ⚠️ Chef de site : liste FERMÉE de rubriques. Masquer la navigation ne suffit pas —
-  // l'onglet actif est mémorisé en session et un événement `gearbox-navigate` peut
-  // pointer n'importe où. Sans cette garde, une rubrique interdite restait
-  // ATTEIGNABLE même une fois retirée du menu. `settings` est autorisé en plus des
-  // 6 rubriques : chacun accède à son propre profil.
-  if (isSiteManager(user?.role) && ![...SITE_MANAGER_SECTIONS, 'settings'].includes(resolvedTab)) {
-    resolvedTab = 'dashboard';
-  }
+  // Cascade de gardes en FONCTION : l'interface v2 l'applique à chaque fenêtre, pas
+  // seulement à l'onglet actif (une fenêtre restaurée d'une session précédente passe
+  // par les mêmes gardes).
+  const resolveTab = (tab: string): string => {
+    let resolvedTab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(tab)) ? 'digital' : tab;
+    if (resolvedTab === 'games' && !canAccessGames) resolvedTab = 'dashboard';
+    if (resolvedTab === 'export' && !canExport) resolvedTab = 'dashboard';
+    // ⚠️ Même raison que pour les autres gardes : l'onglet actif est mémorisé en session,
+    // une rubrique retirée du menu reste ATTEIGNABLE sans ceci. Le refus réel est de toute
+    // façon côté serveur (`routes/conges.ts` rend 403, même sur le GET).
+    if (resolvedTab === 'conges' && !voitConges) resolvedTab = 'dashboard';
+    // ⚠️ Chef de site : liste FERMÉE de rubriques. Masquer la navigation ne suffit pas —
+    // l'onglet actif est mémorisé en session et un événement `gearbox-navigate` peut
+    // pointer n'importe où. Sans cette garde, une rubrique interdite restait
+    // ATTEIGNABLE même une fois retirée du menu. `settings` est autorisé en plus des
+    // 6 rubriques : chacun accède à son propre profil.
+    if (isSiteManager(user?.role) && ![...SITE_MANAGER_SECTIONS, 'settings'].includes(resolvedTab)) {
+      resolvedTab = 'dashboard';
+    }
+    return resolvedTab;
+  };
+  const resolvedTab = resolveTab(activeTab);
 
   // Présence : on annonce la rubrique RÉELLEMENT affichée (`resolvedTab`), pas
   // `activeTab` brut qui peut être redirigé par les droits — sinon un External
@@ -146,11 +153,6 @@ const InnerApp: React.FC = () => {
       return <Login />;
   }
 
-  // Bêta v2 : la coque reçoit l'onglet DÉJÀ résolu par les gardes de rôle ci-dessus —
-  // elle n'a aucune logique de droits propre.
-  if (ui2Active) {
-    return <Ui2Gate tab={resolvedTab} onExit={() => setUi2Beta(user.id, false)} />;
-  }
 
   const renderContent = (tab: string) => {
     switch (tab) {
@@ -173,6 +175,20 @@ const InnerApp: React.FC = () => {
       default: return isExternal ? <Digital /> : <Dashboard />;
     }
   };
+
+  // Bêta v2 : la coque reçoit l'onglet DÉJÀ résolu par les gardes de rôle ci-dessus —
+  // elle n'a aucune logique de droits propre.
+  if (ui2Active) {
+    return (
+      <Ui2Gate
+        tab={resolvedTab}
+        setTab={setActiveTab}
+        resolveTab={resolveTab}
+        renderPage={renderContent}
+        onExit={() => setUi2Beta(user.id, false)}
+      />
+    );
+  }
 
   return (
     <div className="flex h-screen text-bony-text font-sans selection:bg-blue-500/30 transition-colors duration-300">

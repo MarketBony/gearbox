@@ -17,11 +17,26 @@ function read(userId: string | undefined): boolean {
   try { return localStorage.getItem(KEY(userId)) === '1'; } catch { return false; }
 }
 
+// Filet de secours : `?ui=classic` force l'ancienne interface, quelle que soit la préférence.
+let forcedClassic = (() => {
+  try { return new URLSearchParams(window.location.search).get('ui') === 'classic'; } catch { return false; }
+})();
+
 export function canUseUi2(role: string | undefined): boolean {
   return !!role && UI2_BETA_ROLES.includes(role);
 }
 
 export function setUi2Beta(userId: string, on: boolean): void {
+  // Activer la bêta lève le filet `?ui=classic` : sinon l'interrupteur s'allumait et
+  // rien ne se passait (constaté en recette le 29/09/2026).
+  if (on && forcedClassic) {
+    forcedClassic = false;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('ui');
+      window.history.replaceState(window.history.state, '', url);
+    } catch { /* adresse non modifiable : la bêta s'active quand même */ }
+  }
   try {
     if (on) localStorage.setItem(KEY(userId), '1');
     else localStorage.removeItem(KEY(userId));
@@ -37,18 +52,15 @@ function subscribe(cb: () => void) {
   return () => { listeners.delete(cb); window.removeEventListener('storage', onStorage); };
 }
 
-/** Préférence brute (ce que l'interrupteur des Réglages affiche). */
+/** Préférence EFFECTIVE (ce que l'interrupteur affiche) : éteinte tant que `?ui=classic`
+ *  force l'ancienne interface — sinon l'interrupteur s'affichait allumé sans effet. */
 export function useUi2BetaPref(userId: string | undefined): boolean {
-  return useSyncExternalStore(subscribe, () => read(userId));
+  return useSyncExternalStore(subscribe, () => !forcedClassic && read(userId));
 }
 
-// Filet de secours : `?ui=classic` force l'ancienne interface, quelle que soit la préférence.
-const forcedClassic = (() => {
-  try { return new URLSearchParams(window.location.search).get('ui') === 'classic'; } catch { return false; }
-})();
 
 /** La nouvelle interface doit-elle être montée ? */
 export function useUi2Active(user: { id: string; role: string } | null): boolean {
   const pref = useUi2BetaPref(user?.id);
-  return !forcedClassic && pref && canUseUi2(user?.role);
+  return pref && canUseUi2(user?.role);
 }

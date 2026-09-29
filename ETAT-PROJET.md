@@ -43,6 +43,30 @@
   - **Inventaires de parité : `maquettes/ux/inventaires/`** — 16 rubriques + `_coque.md` (Sidebar, gardes, cloche,
     présence), format commun `_FORMAT.md`. Tirés du code par lecture ; défauts relevés en section 11 de chaque
     fichier (les principaux reportés dans `BUGS-CONNUS.md`, 29/09 bis).
+- **Lot 1a — 29/09, recetté par Théo, branche `feat/ui2-lot1` (partie de `feat/ui2-lot0`, NON mergée, jamais
+  déployée)** : bureau, fenêtres, Dock, barre du haut.
+  - `ui2/wm.ts` (une fenêtre PAR RUBRIQUE — une page ne se monte jamais deux fois ; session des fenêtres en
+    localStorage `gearbox_ui2_session:<userId>`), `ui2/Window.tsx` (déplacer, 8 bords, ancrage gauche/droite/haut,
+    double-clic), `ui2/MenuBar.tsx` (escamotable par défaut, feux fusionnés si agrandie), `ui2/Dock.tsx`,
+    `ui2/Menu.tsx`, `ui2/AppIcon.tsx` + `ui2/appIcons.ts` (tracés repris tels quels de la maquette).
+  - **Les rubriques non portées s'ouvrent dans une fenêtre, telles qu'aujourd'hui** (`renderPage` = le
+    `renderContent` d'App.tsx), agrandies par défaut. Chaque fenêtre passe par `resolveTab` (la cascade de gardes
+    d'App.tsx, extraite en fonction) ; une fenêtre qui ne passe plus les gardes se ferme.
+  - **⚠️ Le conteneur d'une fenêtre ne porte ni transform, ni filter, ni backdrop-filter, ni `contain: paint`** :
+    sinon les modales `fixed inset-0` des pages actuelles restent coincées dans la fenêtre (mesuré : elles couvrent
+    bien l'écran). L'effet Mica vit sur un calque frère.
+  - **⚠️ Synchronisation App ⇄ coque** : la fenêtre active remonte dans `setActiveTab` (présence, notifications),
+    une navigation extérieure ouvre la fenêtre. Sans la garde `pushed` d'`Ui2Root.tsx`, les deux sens se
+    renvoyaient la balle jusqu'au plantage (trouvé en test ; le filet `ErrorBoundary` a bien coupé la bêta).
+  - **Deux sources uniques extraites de `Sidebar.tsx`** (partagées Sidebar / Dock) : `services/navigation.ts`
+    (`computeNav` : rubriques, groupes, règles de rôle) et `services/navBadges.ts` (pastilles Chat / Jeux + badge
+    de l'icône PWA — la Sidebar n'est pas montée en v2). Nav groupée vérifiée identique en Master ; chef de site
+    et External NON vérifiés (comptes de Théo).
+  - Correctif de recette : l'interrupteur bêta restait allumé sans effet sous `?ui=classic` ; l'activer lève
+    désormais le filet (retire le paramètre de l'adresse).
+  - Limites connues : le Dock passe devant les modales des pages actuelles ; les pages actuelles gardent leurs
+    points de rupture d'ÉCRAN dans une fenêtre étroite ; pas de coque mobile avant 1c ; fond Bony fixe (WebGL en 1c).
+  - Retirés de la maquette (décision Théo 29/09) : « Voir comme » et l'écran verrouillé.
   - Arbitrage Théo (29/09) : les tags Digital `FULL RENAULT/DACIA/NISSAN/ALPINE` et `Yssingeaux` sont propres à
     l'équipe digitale et n'entrent dans AUCUN périmètre de chef de site — **voulu, on n'y touche pas**.
 

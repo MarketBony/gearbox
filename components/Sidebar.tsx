@@ -14,6 +14,8 @@ import { ActivityLog } from '../types';
 // Source unique des rôles ayant accès aux Jeux (Director en est exclu, règle métier).
 import { canSeeGames, SITE_MANAGER_SECTIONS, isSiteManager, hasSocialFeatures } from '../constants';
 import { useAppSettings } from '../services/appSettings';
+import { computeNav } from '../services/navigation';
+import { useNavBadges } from '../services/navBadges';
 import {
   LayoutDashboard,
   FolderKanban,
@@ -65,8 +67,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const [showActivity, setShowActivity] = useState(false);
   const [activityLog, setActivityLog] = useState<ActivityLog[]>([]);
   const [lastReadTs, setLastReadTs] = useState<string | null>(null);
-  const [chatUnreadCount, setChatUnreadCount] = useState(0);
-  const [gamesChallengeCount, setGamesChallengeCount] = useState(0);
+  // Pastilles Chat / Jeux (+ badge de l'icône PWA) : source unique partagée avec la coque v2.
+  const { chatUnread: chatUnreadCount, gamesChallenges: gamesChallengeCount } = useNavBadges(user, gamesEnabled);
 
   const loadActivity = () => {
     // GET /api/activity-log — best-effort : la cloche reste vide si l'API est injoignable.
@@ -74,52 +76,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
     setLastReadTs(localStorage.getItem('gearbox_activity_last_read'));
   };
 
-  const loadChatUnread = () => {
-    if (!user) return;
-    // Source unique : le store chat alimenté par le socket (temps réel), plus de localStorage.
-    const total = chatStore.getUnreadTotal(user.id);
-    setChatUnreadCount(total);
-    // PWA : même compteur sur l'icône de l'application installée (façon
-    // Messenger). Posé ici parce que le total y est déjà calculé — le dupliquer
-    // ailleurs, c'est prendre le risque que les deux divergent.
-    setAppBadge(total);
-  };
-
-  // ⚠️ Lisait `localStorage.gearbox_game_challenges` avec un polling 3 s jusqu'au
-  // 05/08/2026 : la pastille ne pouvait donc JAMAIS montrer un défi reçu, puisque le
-  // défi était écrit dans le navigateur de l'émetteur. Oubli résiduel de la refonte
-  // des Jeux — le reste du module était passé au serveur, pas ce compteur.
-  // Désormais serveur, et rafraîchi par l'événement socket (voir plus bas), donc
-  // sans polling.
-  const loadGamesChallenges = () => {
-    if (!canSeeGames(user?.role, gamesEnabled)) {
-      setGamesChallengeCount(0);
-      return;
-    }
-    db.getGamesLobby()
-      .then(d => setGamesChallengeCount(
-        d.challenges.filter(c => c.toUserId === user.id && c.status === 'pending').length
-      ))
-      .catch(() => { /* réseau : on garde la valeur précédente */ });
-  };
-
   useEffect(() => {
     loadActivity();
-    loadChatUnread();
-    loadGamesChallenges();
     const actHandler = () => loadActivity();
-    const chatHandler = () => loadChatUnread();
     window.addEventListener('gearbox-activity-updated', actHandler);
-    window.addEventListener('gearbox-chat-unread-updated', chatHandler);
-    return () => {
-      window.removeEventListener('gearbox-activity-updated', actHandler);
-      window.removeEventListener('gearbox-chat-unread-updated', chatHandler);
-    };
+    return () => window.removeEventListener('gearbox-activity-updated', actHandler);
   }, []);
-
-  // Défis reçus : le socket remplace le polling 3 s supprimé ci-dessus. La pastille
-  // apparaît donc dès qu'un collègue lance un défi, sans rechargement.
-  useRealtimeSync(RT_EVENTS.games, loadGamesChallenges);
 
   // Temps réel du journal d'activité : 'gearbox-activity-updated' ci-dessus est
   // un événement window, donc limité à l'onglet qui a écrit. La cloche ne
@@ -199,38 +161,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   // l'import affirmait s'appuyer sur la constante partagée : la constante ne pilotait
   // donc NI le menu latéral NI la nav groupée. Test unique désormais, qui intègre
   // l'interrupteur général piloté par le Master.
-  const canAccessGames = canSeeGames(user?.role, gamesEnabled);
-  const canExport = user?.role === 'Master' || user?.role === 'Administrator' || user?.role === 'Director' || user?.role === 'Coordinator';
   // ⚠️ Congés : la rubrique n'est visible que pour les MEMBRES du périmètre et ceux qui
   // le gèrent — tous les comptes Gearbox ne sont pas du marketing. Défaut prudent à
   // `false` tant que la lecture n'a pas abouti (voir services/congesAcces.ts).
   const { visible: voitConges } = useCongesAcces();
 
-  const allMainItems = [
-    { id: 'hello-marketing', icon: Sparkles, label: 'Hello Marketing' },
-    ...(canAccessGames ? [{ id: 'games', icon: Gamepad2, label: 'Jeux' }] : []),
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'projects', icon: FolderKanban, label: 'Projets' },
-    ...(!isExternal ? [{ id: 'todo', icon: CheckSquare, label: 'To-do' }] : []),
-    { id: 'digital', icon: Globe, label: 'Digital' },
-    { id: 'chat', icon: MessageSquare, label: 'Chat' },
-    { id: 'campaigns', icon: Megaphone, label: 'Campagnes' },
-    { id: 'material', icon: Package, label: 'Matériel' },
-    { id: 'agenda', icon: CalendarDays, label: 'Agenda' },
-    { id: 'budget', icon: PiggyBank, label: 'Budget' },
-    { id: 'fixed-expenses', icon: Euro, label: 'Dépenses' },
-    ...(canExport ? [{ id: 'export', icon: FileSpreadsheet, label: 'Export' }] : []),
-    ...(voitConges ? [{ id: 'conges', icon: Palmtree, label: 'Congés' }] : []),
-  ];
-
-  // Chef de site : liste FERMÉE de rubriques (Dashboard, Projets, Digital, Hello
-  // Marketing, Budget, Agenda). Tout le reste lui est refusé — et pas seulement
-  // masqué : les routes correspondantes le rejettent côté serveur.
-  const mainItems = isSiteManagerUser
-    ? allMainItems.filter(i => SITE_MANAGER_SECTIONS.includes(i.id))
-    : isExternal
-      ? allMainItems.filter(i => ['digital', 'chat', 'hello-marketing'].includes(i.id))
-      : allMainItems;
+  // Rubriques visibles, règles de rôle comprises : SOURCE UNIQUE `services/navigation.ts`
+  // (partagée avec le Dock de l'interface v2). Chef de site : liste FERMÉE ; External :
+  // Digital, Chat, Hello Marketing ; Jeux, Export, Congés selon droits.
+  const { mainItems, groups: navGroups, canAccessGames } = computeNav({ role: user?.role, gamesEnabled, voitConges });
 
   // ============================================================================
   // BARRE DU BAS (mobile) — liste EXPLICITE, demandée par Théo le 05/08/2026
@@ -306,69 +245,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
 
         {/* ── DESKTOP (lg+) — grouped nav ── */}
         {(() => {
-          const groups = isExternal
-            ? [{ label: '', items: mainItems }]
-            : [
-                {
-                  label: '',
-                  items: [{ id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' }],
-                },
-                {
-                  label: 'GESTION DE PROJETS',
-                  items: [
-                    { id: 'projects', icon: FolderKanban, label: 'Projets' },
-                    { id: 'todo', icon: CheckSquare, label: 'To-do' },
-                  ],
-                },
-                {
-                  label: 'COM DIGITALE',
-                  items: [
-                    { id: 'digital', icon: Globe, label: 'Digital' },
-                    { id: 'campaigns', icon: Megaphone, label: 'Campagnes' },
-                  ],
-                },
-                {
-                  label: 'COMMUNAUTÉ',
-                  items: [
-                    { id: 'hello-marketing', icon: Sparkles, label: 'Hello Marketing' },
-                    // ⚠️ Cette liste est ÉCRITE EN DUR : une rubrique ajoutée au seul
-                    // `allMainItems` serait invisible ICI, c'est-à-dire sur l'écran
-                    // desktop principal — piège n°1 de ce fichier. Le filtrage par rôle,
-                    // lui, s'applique bien : `idsAutorises` dérive de `mainItems`.
-                    { id: 'conges', icon: Palmtree, label: 'Congés' },
-                    ...(canAccessGames ? [{ id: 'games', icon: Gamepad2, label: 'Jeux' }] : []),
-                    { id: 'chat', icon: MessageSquare, label: 'Chat' },
-                  ],
-                },
-                {
-                  label: 'OUTILS',
-                  items: [
-                    { id: 'budget', icon: PiggyBank, label: 'Budget' },
-                    { id: 'fixed-expenses', icon: Euro, label: 'Dépenses' },
-                    { id: 'material', icon: Package, label: 'Matériel' },
-                    { id: 'agenda', icon: CalendarDays, label: 'Agenda' },
-                    ...(canExport ? [{ id: 'export', icon: FileSpreadsheet, label: 'Export' }] : []),
-                  ],
-                },
-                {
-                  label: 'HISTORIQUE',
-                  items: [{ id: 'archives', icon: Archive, label: 'Archives' }],
-                },
-              ];
-
-          // ⚠️ Cette nav groupée réécrivait ses rubriques EN DUR et ignorait
-          // complètement `mainItems` : un rôle restreint voyait donc toute la
-          // navigation malgré le filtrage (constaté par Théo le 05/08/2026 avec le
-          // premier compte chef de site). On la réaligne sur la source unique —
-          // `mainItems` porte déjà toutes les règles de rôle. Archives n'y figurant
-          // pas, on l'autorise explicitement pour les rôles qui y ont droit.
-          const idsAutorises = new Set([
-            ...mainItems.map(i => i.id),
-            ...(isSiteManagerUser ? [] : ['archives']),
-          ]);
-          const groupesFiltres = groups
-            .map(g => ({ ...g, items: g.items.filter(i => idsAutorises.has(i.id)) }))
-            .filter(g => g.items.length > 0);
+          // Groupes de `computeNav` (services/navigation.ts), déjà filtrés par rôle.
+          const groupesFiltres = navGroups;
 
           return (
             <nav className="hidden lg:flex flex-1 flex-col py-2 px-2 overflow-y-auto [&::-webkit-scrollbar]:w-0 [-ms-overflow-style:none] [scrollbar-width:none]">
