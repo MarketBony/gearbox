@@ -1,0 +1,219 @@
+/* =====================================================================
+   GEARBOX — socle commun des maquettes de refonte (hors application)
+   Un seul endroit pour la charte : tokens sémantiques, matières, mouvement.
+   Tout écran n'appelle QUE ces variables — aucune couleur en dur ailleurs.
+   ===================================================================== */
+
+:root {
+  /* --- Charte Bony (brandbook 09/2024, p.24-25) --- */
+  --bony-orange: #f75632;
+  --bony-violet: #8f12ab;
+  --bony-blue:   #293f74;
+  --bony-grad:   linear-gradient(135deg, var(--bony-orange), var(--bony-violet));
+
+  /* --- Tokens sémantiques : thème sombre (défaut) --- */
+  --bg:        #0c0a11;
+  --surface-1: #15131b;           /* fenêtres, contenu : OPAQUE, donc gratuit */
+  --surface-2: #1d1a25;           /* cartes posées sur surface-1 */
+  --surface-3: #262231;           /* survol, champs */
+  --line:      rgba(255,255,255,.07);
+  --line-2:    rgba(255,255,255,.12);
+  --text:      #f5f3f8;
+  --text-2:    #a9a4b6;
+  --text-3:    #6f6a7d;
+  --accent:    var(--bony-orange);
+  --ok:        #3ecf8e;
+  --warn:      #f5a524;
+  --danger:    #ff5d5d;
+
+  /* Matière « verre » : réservée au chrome FLOTTANT (dock, barres, menus) */
+  --glass-bg:     rgba(28, 24, 36, .56);
+  --glass-edge:   rgba(255,255,255,.14);
+  --glass-shine:  rgba(255,255,255,.10);
+  --glass-blur:   22px;
+
+  /* --- Échelles --- */
+  --r-xs: 6px; --r-sm: 10px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px;
+  --fs-11: 11px; --fs-12: 12px; --fs-13: 13px; --fs-15: 15px; --fs-20: 20px; --fs-28: 28px; --fs-40: 40px;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.25), 0 8px 24px -8px rgba(0,0,0,.45);
+  --shadow-2: 0 2px 6px rgba(0,0,0,.25), 0 24px 60px -16px rgba(0,0,0,.6);
+  --shadow-3: 0 40px 120px -20px rgba(0,0,0,.75);
+
+  /* --- Mouvement : durées et courbes UNIQUES pour toute l'app --- */
+  --t-fast: 160ms; --t-med: 280ms; --t-slow: 480ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-io:  cubic-bezier(.65, 0, .35, 1);
+  /* --spring-snappy / --spring-soft / --spring-bouncy sont calculés en JS
+     (commun.js) à partir d'un vrai ressort amorti, comme SwiftUI */
+  --spring-snappy: var(--ease-out);
+  --spring-soft:   var(--ease-out);
+  --spring-bouncy: var(--ease-out);
+
+  --font-ui: "Albert Sans", system-ui, sans-serif;
+  --font-display: "Syncopate", var(--font-ui);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg:        #eeecf2;
+  --surface-1: #ffffff;
+  --surface-2: #f6f5f9;
+  --surface-3: #ecebf1;
+  --line:      rgba(20,16,30,.07);
+  --line-2:    rgba(20,16,30,.12);
+  --text:      #17141f;
+  --text-2:    #5d5869;
+  --text-3:    #938ea0;
+  --glass-bg:    rgba(255,255,255,.58);
+  --glass-edge:  rgba(255,255,255,.75);
+  --glass-shine: rgba(255,255,255,.55);
+  --shadow-1: 0 1px 2px rgba(20,16,30,.06), 0 8px 24px -8px rgba(20,16,30,.14);
+  --shadow-2: 0 2px 6px rgba(20,16,30,.06), 0 24px 60px -16px rgba(20,16,30,.22);
+  --shadow-3: 0 40px 120px -20px rgba(20,16,30,.35);
+  color-scheme: light;
+}
+
+/* Mode ÉCONOME : aucun flou, aucune transparence coûteuse, mouvements courts.
+   Activé à la main, ou tout seul si le système demande moins d'effets. */
+:root[data-effects="eco"] {
+  --glass-bg: var(--surface-2);
+  --glass-blur: 0px;
+  --t-med: 160ms; --t-slow: 220ms;
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root:not([data-effects="full"]) { --glass-bg: var(--surface-2); --glass-blur: 0px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
+
+/* ============================ BASE ============================ */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: var(--font-ui);
+  font-size: var(--fs-13);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input { font: inherit; color: inherit; }
+.display { font-family: var(--font-display); font-weight: 700; letter-spacing: -.01em; text-transform: uppercase; }
+.muted { color: var(--text-2); }
+.faint { color: var(--text-3); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Fond d'écran : STATIQUE. Écho au « coucher de soleil » du brandbook (p.27).
+   Rien ne bouge sous le verre → le flou n'est calculé qu'une fois. */
+.wallpaper {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 18% 110%, rgba(247,86,50,.55), transparent 70%),
+    radial-gradient(55% 60% at 85% 100%, rgba(143,18,171,.55), transparent 70%),
+    radial-gradient(70% 50% at 50% -10%, rgba(41,63,116,.55), transparent 70%),
+    var(--bg);
+}
+.wallpaper::after { /* grain très léger, fixe, anti-banding */
+  content: ""; position: absolute; inset: 0; opacity: .08; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+:root[data-theme="light"] .wallpaper {
+  background:
+    radial-gradient(60% 55% at 18% 110%, rgba(247,86,50,.30), transparent 70%),
+    radial-gradient(55% 60% at 85% 100%, rgba(143,18,171,.26), transparent 70%),
+    radial-gradient(70% 50% at 50% -10%, rgba(41,63,116,.22), transparent 70%),
+    var(--bg);
+}
+
+/* ============================ MATIÈRES ============================ */
+/* Verre : bord spéculaire + reflet haut. À n'utiliser que sur de PETITES
+   surfaces flottantes : le coût du flou est proportionnel à la surface. */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.7);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.7);
+  box-shadow: inset 0 1px 0 var(--glass-shine), inset 0 0 0 1px var(--glass-edge), var(--shadow-2);
+}
+.solid { background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-2); }
+.card  { background: var(--surface-2); border-radius: var(--r-lg); box-shadow: inset 0 0 0 1px var(--line); }
+
+/* ============================ PRIMITIVES ============================ */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px;
+  border-radius: 999px; font-weight: 600; font-size: var(--fs-13);
+  background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--line);
+  transition: transform var(--t-fast) var(--ease-out), background var(--t-fast);
+}
+.btn:hover { background: color-mix(in srgb, var(--surface-3), var(--text) 6%); }
+.btn:active { transform: scale(.96); }
+.btn-primary { background: var(--bony-grad); color: #fff; box-shadow: 0 6px 20px -6px rgba(247,86,50,.55); }
+.btn-primary:hover { background: var(--bony-grad); filter: brightness(1.08); }
+.icon-btn { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; color: var(--text-2);
+  transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast) var(--ease-out); }
+.icon-btn:hover { background: var(--surface-3); color: var(--text); }
+.icon-btn:active { transform: scale(.92); }
+.label { font-size: var(--fs-11); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+.badge { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 999px;
+  font-size: var(--fs-11); font-weight: 600; background: var(--surface-3); color: var(--text-2); }
+.badge.ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.badge.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.badge.danger { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface-3); position: relative; }
+.seg button { position: relative; z-index: 1; height: 26px; padding: 0 12px; border-radius: 999px; font-weight: 600; font-size: var(--fs-12); color: var(--text-2); transition: color var(--t-fast); }
+.seg button[aria-pressed="true"] { color: var(--text); }
+.seg .thumb { position: absolute; top: 3px; bottom: 3px; border-radius: 999px; background: var(--surface-1); box-shadow: var(--shadow-1);
+  transition: left var(--t-med) var(--spring-snappy), width var(--t-med) var(--spring-snappy); }
+.bar { height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: inherit; background: var(--bony-grad); transform-origin: left;
+  animation: grow var(--t-slow) var(--spring-soft) both; }
+@keyframes grow { from { transform: scaleX(0); } }
+
+/* Scrollbar discrète */
+.scroll { overflow: auto; scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent; }
+
+/* ============================ OUTILS DE TEST ============================ */
+.devbar {
+  position: fixed; left: 12px; bottom: 12px; z-index: 9999; display: flex; gap: 6px; align-items: center;
+  padding: 6px; border-radius: 999px; font-size: var(--fs-11); font-weight: 600;
+}
+.devbar .fps { min-width: 58px; text-align: center; padding: 0 8px; }
+.devbar button { height: 24px; padding: 0 10px; border-radius: 999px; background: var(--surface-3); }
+.devbar a { color: var(--text-2); text-decoration: none; padding: 0 8px; }
+
+/* Spotlight ⌘K */
+.spot-veil { position: fixed; inset: 0; z-index: 9000; background: rgba(0,0,0,.28); opacity: 0; pointer-events: none;
+  transition: opacity var(--t-med) var(--ease-out); }
+.spot-veil.open { opacity: 1; pointer-events: auto; }
+.spot {
+  position: fixed; z-index: 9001; left: 50%; top: 18vh; width: min(640px, calc(100vw - 32px));
+  border-radius: 22px; overflow: hidden; transform: translateX(-50%) scale(.96) translateY(-8px); opacity: 0; pointer-events: none;
+  transition: transform var(--t-med) var(--spring-snappy), opacity var(--t-fast) var(--ease-out);
+}
+.spot.open { transform: translateX(-50%) scale(1); opacity: 1; pointer-events: auto; }
+.spot input { width: 100%; height: 56px; padding: 0 20px 0 52px; border: 0; outline: 0; background: transparent; font-size: 18px; }
+.spot .ico { position: absolute; left: 20px; top: 18px; color: var(--text-3); }
+.spot ul { list-style: none; margin: 0; padding: 6px; max-height: 360px; border-top: 1px solid var(--line); }
+.spot li { display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 12px; border-radius: 12px; cursor: pointer; }
+.spot li[aria-selected="true"] { background: var(--bony-grad); color: #fff; }
+.spot li[aria-selected="true"] .faint { color: rgba(255,255,255,.75); }
+.spot li .kbd { margin-left: auto; }
+.spot .group { padding: 10px 12px 4px; }
+.kbd { font-size: var(--fs-11); color: var(--text-3); padding: 2px 6px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line-2); }
+
+/* Icônes : trait 1.75, taille pilotée par le parent */
+svg.i { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* Donut / graphique */
+.chart-bars { display: flex; align-items: flex-end; gap: 8px; height: 150px; }
+.chart-bars > div { flex: 1; display: flex; flex-direction: column; height: 100%; }
+.chart-bars .pair { flex: 1; display: flex; align-items: flex-end; gap: 3px; }
+.chart-bars .pair .b { flex: 1; }
+.chart-bars .b { border-radius: 6px 6px 3px 3px; transform-origin: bottom; animation: rise var(--t-slow) var(--spring-soft) both; }
+.chart-bars .b.plan { background: var(--surface-3); }
+.chart-bars .b.real { background: var(--bony-grad); }
+.chart-bars span { font-size: 10px; color: var(--text-3); text-align: center; margin-top: 4px; }
+@keyframes rise { from { transform: scaleY(0); } }

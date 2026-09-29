@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Refonte Gearbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&family=Syncopate:wght@700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="commun.css" />
+<style>
+body { overflow: auto; user-select: text; }
+.wrap { width: min(1080px, calc(100vw - 32px)); margin: 0 auto; padding: 56px 0 90px; position: relative; z-index: 1; }
+h1 { font-size: 36px; margin: 14px 0 8px; }
+h2 { font-size: 20px; margin: 44px 0 14px; letter-spacing: -.01em; }
+p { color: var(--text-2); line-height: 1.6; font-size: 15px; max-width: 760px; }
+.props { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.prop { display: flex; flex-direction: column; gap: 10px; padding: 22px; border-radius: 26px; background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line), var(--shadow-2);
+  text-decoration: none; color: inherit; transition: transform var(--t-med) var(--spring-bouncy), box-shadow var(--t-fast); animation: fade-up var(--t-slow) var(--spring-soft) both; }
+.prop:hover { transform: translateY(-4px); box-shadow: inset 0 0 0 1px var(--line-2), var(--shadow-3); }
+.prop .letter { width: 44px; height: 44px; border-radius: 14px; background: var(--bony-grad); color: #fff; display: grid; place-items: center; font-family: var(--font-display); font-size: 18px; }
+.prop h3 { margin: 4px 0 0; font-size: 20px; }
+.prop ul { margin: 4px 0 0; padding-left: 18px; color: var(--text-2); line-height: 1.6; }
+.prop .go { margin-top: auto; padding-top: 8px; font-weight: 700; color: var(--bony-orange); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+td, th { text-align: left; padding: 11px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+th { color: var(--text-3); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+td:first-child { font-weight: 700; white-space: nowrap; }
+.tbl { background: var(--surface-1); border-radius: 20px; padding: 6px 10px; box-shadow: inset 0 0 0 1px var(--line); overflow-x: auto; }
+.tip { margin-top: 18px; padding: 14px 16px; border-radius: 16px; background: var(--surface-2); color: var(--text-2); box-shadow: inset 0 0 0 1px var(--line); line-height: 1.6; }
+.tip b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wallpaper" style="position:fixed"></div>
+<div class="wrap">
+  <img src="logo-white.svg" alt="Gearbox" style="height:26px" />
+  <h1 class="display">Refonte · vues test</h1>
+  <p>Trois directions pour faire passer Gearbox « de Windows XP à Windows 7 ». Elles partagent <b>le même socle</b> (<code>commun.css</code> : charte, tokens, matières, ressorts) et <b>les mêmes contenus</b> (Cockpit, Projets) : seule la coque change, pour comparer ce qui compte, la navigation et le mouvement. Aucune donnée réelle, rien n’est branché à Gearbox.</p>
+
+  <a class="prop" href="v2/index.html" style="margin-top:28px;display:flex;flex-direction:row;align-items:center;gap:18px;background:linear-gradient(var(--surface-1),var(--surface-1)) padding-box,var(--bony-grad) border-box;border:1.5px solid transparent">
+    <span class="letter" style="width:56px;height:56px;font-size:15px">2.0</span>
+    <div style="flex:1"><h3>Maquette 2.0 — Gearbox OS « Bureau »</h3><div class="muted" style="margin-top:4px">La direction A retenue, poussée jusqu’au bout : fenêtres façon macOS et Windows (ancrage, dispositions, bureaux, Mission Control), toutes les rubriques simulées sur leur fonctionnement réel, et une version téléphone.</div></div>
+    <span class="go" style="margin:0;padding:0">Ouvrir →</span></a>
+  <h2>Les trois propositions</h2>
+  <div class="props">
+    <a class="prop" href="a-bureau.html" style="animation-delay:0ms"><span class="letter">A</span><h3>Bureau</h3>
+      <div class="muted">macOS : barre de menus, Dock, fenêtres.</div>
+      <ul><li>Chaque rubrique s’ouvre en <b>fenêtre</b>, zoomée depuis son icône</li><li>Dock qui s’agrandit sous le curseur</li><li><b>Fenêtres</b> (F3) : toutes les rubriques ouvertes d’un coup d’œil</li><li>Réduire, agrandir, déplacer, fermer</li></ul>
+      <span class="go">Ouvrir →</span></a>
+    <a class="prop" href="b-scene.html" style="animation-delay:60ms"><span class="letter">B</span><h3>Scène</h3>
+      <div class="muted">visionOS + Stage Manager : une rubrique au centre, les autres en attente.</div>
+      <ul><li>Navigation en <b>ornement flottant</b> qui s’élargit au survol</li><li>Les 3 rubriques récentes restent <b>vivantes</b> en miniatures 3D</li><li>Carte projet → détail par <b>élément partagé</b></li><li>« Nouveau » : feuille iOS, la fenêtre recule</li></ul>
+      <span class="go">Ouvrir →</span></a>
+    <a class="prop" href="c-accueil.html" style="animation-delay:120ms"><span class="letter">C</span><h3>Accueil</h3>
+      <div class="muted">Widgets iOS + barre de commande façon Linear.</div>
+      <ul><li>Accueil en <b>widgets</b> : chacun se <b>transforme</b> en sa page</li><li>Une <b>URL par rubrique</b> : liens directs, bouton Retour</li><li>Projets en tableau, <b>clavier</b> (↑ ↓ Entrée), feuille latérale</li><li>Le plus sobre en effets, le plus proche d’un outil de travail</li></ul>
+      <span class="go">Ouvrir →</span></a>
+  </div>
+  <div class="tip">À essayer partout : <b>Ctrl K</b> (recherche universelle façon Spotlight), le bouton <b>Thème</b> (bascule animée), et <b>Effets : économes</b> (plus aucun flou) en surveillant le compteur <b>fps</b> en bas à gauche. C’est ce compteur qu’il faudra regarder sur un PC du réseau qui chauffe.</div>
+
+  <h2>Benchmark : ce qu’on a pris, et à qui</h2>
+  <div class="tbl"><table>
+    <tr><th>Référence</th><th>Ce qu’elle fait bien</th><th>Ce qu’on en retient pour Gearbox</th></tr>
+    <tr><td>macOS (Dock, Exposé)</td><td>Chaque fenêtre sait d’où elle vient : l’animation part de l’icône et y retourne.</td><td>Proposition A. Des animations qui ont une origine, pas des fondus génériques.</td></tr>
+    <tr><td>visionOS</td><td>Le verre est réservé aux ornements flottants ; le contenu reste lisible, posé sur du plein.</td><td>Le verre sur le <b>chrome</b> seulement, jamais sous un tableau. Profondeur par l’échelle et l’ombre, pas par le flou.</td></tr>
+    <tr><td>iPadOS Stage Manager</td><td>Les apps récentes restent visibles et vivantes sur le côté.</td><td>Proposition B. Retrouver la rubrique d’il y a 30 secondes sans passer par le menu.</td></tr>
+    <tr><td>iOS (widgets, feuilles)</td><td>Le widget <i>est</i> le début de l’app ; une feuille garde le contexte derrière elle.</td><td>Proposition C, et les feuilles de B et C.</td></tr>
+    <tr><td>Linear</td><td>Tout au clavier, transitions de 150-250 ms, aucune attente entre deux vues.</td><td>Ctrl K partout, listes navigables au clavier, jamais d’animation qui fait attendre.</td></tr>
+    <tr><td>Raycast / Spotlight</td><td>Une seule entrée pour tout : rubriques, projets, actions.</td><td>La recherche universelle, commune aux trois propositions.</td></tr>
+    <tr><td>Arc</td><td>La navigation s’efface quand on travaille, revient quand on la cherche.</td><td>L’ornement de B, la barre flottante de C.</td></tr>
+    <tr><td>Things 3</td><td>Des ressorts partout, mais courts : ça rebondit sans jamais ralentir.</td><td>Les courbes <code>--spring-*</code> : calculées depuis un vrai ressort, comme SwiftUI.</td></tr>
+  </table></div>
+
+  <h2>Ce qui change sous le capot, quelle que soit la direction</h2>
+  <div class="tbl"><table>
+    <tr><th>Sujet</th><th>Aujourd’hui</th><th>Dans les maquettes</th></tr>
+    <tr><td>Charte</td><td>Tokens dans index.html, mais 1 591 couleurs génériques contre 1 429 <code>bony-*</code> dans les pages, et 512 tailles de texte arbitraires.</td><td>Un fichier de tokens sémantiques (<code>--surface-1</code>, <code>--text-2</code>…) ; un écran n’appelle rien d’autre.</td></tr>
+    <tr><td>Composants</td><td>Aucun Button, Modal, Card ou Input commun ; 14 modales recodées, 5 tailles de label.</td><td>Primitives <code>.btn</code>, <code>.card</code>, <code>.badge</code>, <code>.seg</code>, <code>.label</code> : à transposer en composants React.</td></tr>
+    <tr><td>Verre</td><td>5 règles <code>backdrop-filter</code> (flou 30 px) sur 86 % de l’écran, au-dessus de halos qui bougent en boucle : flou recalculé à chaque image.</td><td>Fond <b>statique</b>, verre sur les petites surfaces flottantes, contenu sur du plein. Mode économe sans aucun flou.</td></tr>
+    <tr><td>Transitions</td><td>La page sortante joue son animation, <i>puis</i> la suivante entre : ~420 ms bloquants mesurés en passant de Dashboard à Projets.</td><td>Transitions qui se chevauchent, élément partagé (View Transitions), rien n’attend la fin d’une autre animation.</td></tr>
+    <tr><td>Navigation</td><td>Une variable d’état : pas d’URL par rubrique, bouton Retour inopérant.</td><td>Proposition C : une URL par rubrique et par projet.</td></tr>
+  </table></div>
+</div>
+<script src="commun.js"></script>
+</body>
+</html>

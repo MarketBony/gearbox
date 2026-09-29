@@ -1,0 +1,112 @@
+/* =====================================================================
+   GEARBOX OS — coque TÉLÉPHONE (façon iOS)
+   Le Bureau à fenêtres ne tient pas sur 390 px : on garde le même
+   système (mêmes apps, même charte, mêmes ressorts) avec la grammaire
+   du téléphone — accueil, apps plein écran, gestes, sélecteur d'apps.
+   ===================================================================== */
+:root[data-shell="mobile"] { --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px); --m-status: calc(44px + var(--sat)); }
+:root[data-shell="mobile"] body { touch-action: manipulation; }
+.m-root { position: fixed; inset: 0; overflow: hidden; }
+
+/* Barre d'état */
+.m-status { position: fixed; inset: 0 0 auto 0; height: var(--m-status); padding: var(--sat) 22px 0; z-index: 9000; display: flex; align-items: center; justify-content: space-between;
+  font-weight: 700; font-size: 15px; color: var(--text); pointer-events: none; }
+.m-status > * { pointer-events: auto; }
+.m-status .m-sl, .m-status .m-sr { display: flex; align-items: center; gap: 6px; min-width: 90px; height: 100%; }
+.m-status .m-sr { justify-content: flex-end; } .m-status svg.i { width: 16px; height: 16px; }
+.m-status .ndot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); }
+.m-root.app-open .m-status { color: var(--text); }
+
+/* Accueil */
+.m-home { position: absolute; inset: 0; padding-top: var(--m-status); display: flex; flex-direction: column; transform-origin: 50% 50%; will-change: transform; transition: transform 420ms var(--spring-soft), opacity 300ms, filter 300ms; }
+.m-home.away { transform: scale(.9); opacity: .0; filter: blur(0); pointer-events: none; }
+.m-home.dim { transform: scale(.94); filter: brightness(.6); }
+.m-pages { flex: 1; min-height: 0; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.m-pages::-webkit-scrollbar { display: none; }
+.m-page { flex: 0 0 100%; scroll-snap-align: start; padding: 10px 20px 20px; overflow-y: auto; scrollbar-width: none; }
+.m-search { display: flex; align-items: center; justify-content: center; gap: 6px; height: 34px; margin: 4px auto 14px; width: 150px; border-radius: 99px; font-weight: 600; font-size: 13px; color: var(--text-2); }
+.m-greet { margin: 6px 4px 14px; } .m-greet .label { color: var(--text-2); } .m-greet h1 { font-size: 30px; letter-spacing: -.03em; margin-top: 4px; }
+.m-widgets { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.m-wdg { aspect-ratio: 1; border-radius: 24px; padding: 14px; display: flex; flex-direction: column; overflow: hidden; position: relative; animation: ui-pop var(--t-slow) var(--spring-bouncy) both; transition: transform var(--t-med) var(--spring-bouncy); }
+.m-wdg:active { transform: scale(.96); }
+.m-wdg.w2 { grid-column: span 2; aspect-ratio: auto; min-height: 150px; }
+.m-wdg .wt { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12px; color: var(--text-2); }
+.m-wdg .wv { font-size: 36px; font-weight: 700; letter-spacing: -.03em; margin-top: auto; line-height: 1; }
+.m-wdg.accent { background: var(--bony-grad); color: #fff; } .m-wdg.accent .wt, .m-wdg.accent .faint { color: rgba(255,255,255,.8); }
+.m-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px 8px; padding-top: 8px; }
+.m-ico { display: grid; justify-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text); text-shadow: 0 1px 3px rgba(0,0,0,.35); position: relative; }
+.m-ico .app-ico { transition: transform 200ms var(--ease-out); }
+.m-ico:active .app-ico, .m-ico.press .app-ico { transform: scale(.88); }
+.m-ico .count { position: absolute; top: -6px; right: 8px; z-index: 2; }
+.m-ico span.nm { max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-dots { display: flex; justify-content: center; gap: 7px; padding: 8px 0 10px; }
+.m-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); opacity: .5; transition: all var(--t-med) var(--spring-snappy); }
+.m-dots i.on { opacity: 1; background: var(--text); width: 18px; border-radius: 4px; }
+.m-dock { margin: 0 12px calc(12px + var(--sab)); padding: 14px 16px; border-radius: 30px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; justify-items: center; }
+.m-dock .m-ico span.nm { display: none; }
+
+/* Apps plein écran */
+.m-app { position: absolute; inset: 0; z-index: 100; background: var(--surface-1); display: flex; flex-direction: column; overflow: hidden; transform-origin: 0 0; will-change: transform; }
+.m-app.hidden { display: none; }
+.m-nav { flex: none; height: calc(var(--m-status) + 44px); padding: var(--m-status) 8px 0; display: flex; align-items: center; gap: 4px; background: var(--surface-1); border-bottom: 1px solid var(--line); }
+.m-nav .m-back { display: inline-flex; align-items: center; color: var(--accent); font-weight: 600; font-size: 15px; height: 36px; padding: 0 8px 0 2px; border-radius: 10px; }
+.m-nav .m-title { flex: 1; min-width: 0; font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; padding-left: 6px; }
+.m-nav .m-title .sub { color: var(--text-3); font-weight: 500; font-size: 13px; }
+.m-nav .icon-btn { width: 38px; height: 38px; border-radius: 12px; } .m-nav .icon-btn svg.i { width: 20px; height: 20px; }
+.m-body { flex: 1; min-height: 0; position: relative; padding-bottom: calc(22px + var(--sab)); }
+.m-body > .app { height: 100%; }
+.m-ind { position: absolute; left: 0; right: 0; bottom: 0; height: calc(26px + var(--sab)); z-index: 60; display: flex; align-items: flex-end; justify-content: center; padding-bottom: calc(8px + var(--sab)); touch-action: none; cursor: grab; }
+.m-ind::after { content: ""; width: 134px; height: 5px; border-radius: 99px; background: var(--text); opacity: .85; }
+.m-hint { position: absolute; left: 50%; bottom: calc(36px + var(--sab)); transform: translateX(-50%); z-index: 61; padding: 7px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; animation: m-hint 3.4s var(--ease-out) both; pointer-events: none; }
+@keyframes m-hint { 0% { opacity: 0; transform: translate(-50%, 8px); } 10%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+/* Feuilles : par le bas sur téléphone */
+.m-app .sheet { top: auto; bottom: 0; width: 100%; max-height: 88%; border-radius: 24px 24px 0 0; padding-bottom: calc(24px + var(--sab)); transform: translate(-50%, 104%); }
+.m-app .sheet.on { transform: translate(-50%, 0); }
+.m-app .sheet::before { content: ""; display: block; width: 38px; height: 5px; border-radius: 99px; background: var(--line-3); margin: -8px auto 12px; }
+
+/* Sélecteur d'apps */
+.m-switch { position: absolute; inset: 0; z-index: 500; display: flex; align-items: center; gap: 18px; padding: 0 calc(50% - 32vw); overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+  background: color-mix(in srgb, var(--bg) 60%, transparent); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); animation: ui-fade-up 240ms var(--ease-out) both; }
+:root[data-effects="eco"] .m-switch { background: var(--bg); }
+.m-card { flex: 0 0 64vw; scroll-snap-align: center; display: grid; gap: 8px; touch-action: pan-x; }
+.m-card .lbl { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; color: var(--text); }
+.m-card .shot { height: 62vh; border-radius: 26px; overflow: hidden; position: relative; background: var(--surface-1); box-shadow: var(--shadow-3); pointer-events: none; }
+.m-card .shot > * { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; transform-origin: 0 0; }
+.m-switch .m-empty { width: 100%; text-align: center; color: var(--text-2); font-weight: 600; }
+
+/* Centres tirés depuis le haut */
+.m-sheetv { position: absolute; inset: 0; z-index: 800; padding: calc(var(--m-status) + 6px) 14px 20px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto;
+  background: color-mix(in srgb, var(--bg) 55%, transparent); backdrop-filter: blur(calc(var(--glass-blur) * 1.2)); -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.2));
+  transform: translateY(-100%); transition: transform 460ms var(--spring-snappy); }
+:root[data-effects="eco"] .m-sheetv { background: var(--bg); }
+.m-sheetv.on { transform: none; }
+.m-sheetv .grab { width: 40px; height: 5px; border-radius: 99px; background: var(--text-3); margin: 8px auto 0; flex: none; }
+.m-sheetv h2 { font-size: 26px; letter-spacing: -.03em; margin: 4px 4px 6px; }
+.m-cc { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.m-cc .cc-tile { border-radius: 20px; min-height: 76px; }
+
+/* Bannières */
+.m-banners { position: fixed; top: calc(var(--sat) + 6px); left: 8px; right: 8px; z-index: 9500; display: grid; gap: 8px; pointer-events: none; }
+.m-banners .notif { pointer-events: auto; animation: m-ban 460ms var(--spring-snappy) both; }
+.m-banners .notif.out { animation: m-ban-out 260ms var(--ease-in) both; }
+@keyframes m-ban { from { transform: translateY(-130%); } } @keyframes m-ban-out { to { transform: translateY(-130%); opacity: 0; } }
+
+/* Recherche mobile */
+.m-spot { position: absolute; inset: 0; z-index: 700; padding: calc(var(--m-status) + 8px) 14px 20px; display: flex; flex-direction: column; gap: 10px;
+  background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(calc(var(--glass-blur) * 1.2)); -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.2)); animation: ui-fade-up 260ms var(--ease-out) both; }
+:root[data-effects="eco"] .m-spot { background: var(--bg); }
+.m-spot .search { height: 44px; border-radius: 14px; font-size: 16px; }
+.m-spot .res { flex: 1; overflow-y: auto; display: grid; align-content: start; gap: 4px; }
+.m-spot .res .sp-r { display: flex; align-items: center; gap: 12px; min-height: 50px; padding: 0 10px; border-radius: 14px; font-weight: 600; }
+.m-spot .res .sp-r:active { background: var(--line-2); }
+.m-spot .res .sub { margin-left: auto; color: var(--text-3); font-weight: 500; font-size: 12px; }
+
+/* Widgets du bureau réutilisés sur l'accueil du téléphone */
+.m-wdg.msz-M, .m-wdg.msz-XL { grid-column: span 2; aspect-ratio: auto; min-height: 160px; }
+.m-wdg.msz-L { grid-column: span 2; aspect-ratio: 1; }
+.m-wdg .wt { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 12.5px; color: var(--text-2); }
+.m-wdg.accent .wt, .m-wdg.sky .wt { color: rgba(255,255,255,.85); }
+.m-wdg .wv { font-size: 36px; font-weight: 700; letter-spacing: -.03em; margin-top: auto; line-height: 1; }
+.m-wdg .wl { display: grid; gap: 2px; margin-top: 8px; }
+.m-wdg .wr { display: flex; align-items: center; gap: 8px; font-size: 13px; min-height: 30px; }
+.m-wdg.sky { background: linear-gradient(160deg,#4d8dde,#2a4f9b 70%,#253d78); color: #fff; }

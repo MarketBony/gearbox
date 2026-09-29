@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Digital — calendrier éditorial</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&amp;family=Syncopate:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#09090d}
+.gx{font-family:"Albert Sans",system-ui,sans-serif;color:#ededf2;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#ff7a52}
+.lb{font-size:9.5px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:#9494aa;line-height:1}
+.post{background:rgba(20,20,28,.72);border:1px solid rgba(255,255,255,.09);border-radius:12px;backdrop-filter:blur(18px)}
+.field{height:40px;padding:0 13px;border-radius:10px;border:1px solid rgba(255,255,255,.13);background:rgba(8,8,12,.55);color:#ededf2;font:600 14px "Albert Sans",sans-serif;display:flex;align-items:center;gap:8px;cursor:pointer;box-sizing:border-box}
+.tab{height:40px;padding:0 16px;border:0;border-radius:10px;background:transparent;color:#b8b8c8;font:700 13.5px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.tab.on{background:linear-gradient(135deg,#ff5a2e,#b43bff);color:#fff;box-shadow:0 8px 20px -10px rgba(255,90,46,.8)}
+.btn{height:40px;padding:0 16px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);color:#ededf2;font:600 14px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.btn.primary{background:linear-gradient(135deg,#ff5a2e,#b43bff);border-color:transparent;color:#fff;box-shadow:0 10px 24px -12px rgba(255,90,46,.8)}
+.f{display:flex;flex-direction:column;gap:5px;min-width:0}
+.v{height:30px;padding:0 8px;border-radius:7px;background:rgba(8,8,12,.55);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;box-sizing:border-box}
+.tag{height:20px;padding:0 7px;border-radius:5px;font:700 11px "Albert Sans",sans-serif;display:inline-flex;align-items:center;flex-shrink:0}
+.more{height:20px;padding:0 5px;border-radius:5px;font:700 10.5px "Albert Sans",sans-serif;display:inline-flex;align-items:center;background:rgba(255,255,255,.09);color:#d0d0dc;flex-shrink:0}
+.tog{height:30px;flex:1;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:rgba(8,8,12,.55);color:#8a8aa0;font:700 10.5px "Albert Sans",sans-serif;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;padding:0}
+.tog.on{background:rgba(255,90,46,.18);border-color:rgba(255,90,46,.65);color:#ff9272}
+.ib{width:36px;height:36px;border-radius:9px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.04);color:#d0d0dc;display:grid;place-items:center;cursor:pointer;position:relative;padding:0}
+.bdg{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#ff5a2e;color:#fff;font:700 10px "Albert Sans",sans-serif;display:grid;place-items:center;box-sizing:border-box}
+.th{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9494aa}
+.row{display:flex;align-items:center}
+.scr{height:100%;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.22) transparent}
+.scr::-webkit-scrollbar{width:12px}.scr::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
+a{color:#ff7a52}a:hover{color:#ffa07f}
+</style>
+</helmet>
+<div class="gx" style="width: 1920px; height: 1080px; box-sizing: border-box; background: radial-gradient(1100px 700px at 0% 100%, rgba(255,90,46,.16), transparent 70%), radial-gradient(1100px 800px at 100% 0%, rgba(180,59,255,.18), transparent 70%), #09090d; overflow: hidden">
+<div class="scr">
+<div style="padding: 34px 48px 48px; display: flex; flex-direction: column; gap: 18px">
+
+<header style="display: flex; align-items: flex-end; gap: 24px">
+<div>
+<div class="eyebrow">Com digitale</div>
+<h1 style="margin: 6px 0 0; font-family: Syncopate, sans-serif; font-weight: 700; font-size: 30px; letter-spacing: .02em; text-transform: uppercase; line-height: 1.1">Digital &amp; social</h1>
+<p style="margin: 7px 0 0; font-size: 14px; color: #b8b8c8">Gestion éditoriale &amp; réseaux</p>
+</div>
+<span style="flex-grow: 1"></span>
+<nav class="row" style="gap: 4px; padding: 4px; border-radius: 13px; background: rgba(10,10,14,.6); border: 1px solid rgba(255,255,255,.08)">
+<button class="tab on">Calendrier éditorial</button><button class="tab">Planning digital</button><button class="tab">Archives</button><button class="tab">Gestion des tags</button>
+</nav>
+</header>
+
+<div class="row" style="gap: 10px">
+<label style="width: 320px; height: 40px; border-radius: 10px; background: rgba(8,8,12,.55); border: 1px solid rgba(255,255,255,.13); display: flex; align-items: center; gap: 10px; padding: 0 12px; box-sizing: border-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9494aa" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg><input placeholder="Rechercher…" aria-label="Rechercher" style="flex-grow: 1; border: 0; outline: 0; background: transparent; color: #ededf2; font: 500 14px 'Albert Sans', sans-serif"></label>
+<button class="field">Toutes marques ▾</button>
+<button class="field">Tous services ▾</button>
+<span style="flex-grow: 1"></span>
+<button class="btn primary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Ajouter</button>
+</div>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 900px 96px; gap: 20px; padding: 6px 16px 0">
+<span class="th">Contenu du post</span><span class="th">Réglages · tri par date ↑</span><span class="th" style="text-align: right">Média / actions</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{posts}}" as="p" hint-placeholder-count="9">
+<article class="post" style="padding: 12px 16px; display: grid; grid-template-columns: minmax(0, 1fr) 900px 96px; gap: 20px; align-items: center">
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<div class="row" style="gap: 10px; min-width: 0"><span style="font-family: Syncopate, sans-serif; font-weight: 700; font-size: 13px; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{p.t}}</span><span style="flex-grow: 1"></span><span class="row" style="gap: 5px; font-size: 11.5px; color: {{p.lc}}; flex-shrink: 0; max-width: 200px; overflow: hidden; white-space: nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"></path></svg>{{p.link}}</span></div>
+<div style="font-size: 12.5px; line-height: 1.45; color: #cfcfdb; height: 36px; overflow: hidden; padding: 4px 8px; border-radius: 7px; background: rgba(8,8,12,.45); border: 1px solid rgba(255,255,255,.07)">{{p.x}}</div>
+</div>
+<div style="display: grid; grid-template-rows: auto auto; gap: 7px">
+<div style="display: grid; grid-template-columns: 118px 130px 124px minmax(0, 1fr) minmax(0, 1fr); gap: 8px">
+<div class="f"><span class="lb">Date</span><div class="v">{{p.date}}</div></div>
+<div class="f"><span class="lb">Statut</span><div class="v" style="background: {{p.sb}}; color: {{p.sc}}; border-color: transparent">{{p.st}}<span style="flex-grow: 1"></span>▾</div></div>
+<div class="f"><span class="lb">Service</span><div class="v">{{p.svc}}<span style="flex-grow: 1"></span>▾</div></div>
+<div class="f"><span class="lb">Marques</span><div class="v"><span class="tag" style="background: {{p.b1bg}}; color: {{p.b1fg}}">{{p.b1}}</span><span class="more">{{p.bm}}</span></div></div>
+<div class="f"><span class="lb">Sites</span><div class="v"><span class="tag" style="background: #2a3a66; color: #d4ddff">{{p.site}}</span><span class="more">{{p.sm}}</span></div></div>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 130px minmax(0, 1fr) minmax(0, 1fr) 96px; gap: 8px">
+<div class="f"><span class="lb">Réseaux</span><div class="v"><span class="tag" style="background: #1d3f72; color: #d4e4ff">{{p.net}}</span><span class="more">{{p.nm}}</span></div></div>
+<div class="f"><span class="lb">Diffusion</span><div class="row" style="gap: 5px"><button class="tog {{p.web}}">Web</button><button class="tog {{p.col}}">Collab.</button></div></div>
+<div class="f"><span class="lb">Loi LOM</span><div class="v">{{p.lom}}<span style="flex-grow: 1"></span>▾</div></div>
+<div class="f"><span class="lb">Classes CO²</span><div class="v" style="color: {{p.cc}}">{{p.co2}}</div></div>
+<div class="f"><span class="lb">Client B2B</span><label class="v" style="gap: 6px"><input type="checkbox" style="width: 14px; height: 14px; accent-color: #ff5a2e; margin: 0">PRO+</label></div>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, 36px); gap: 10px; justify-content: end">
+<button class="ib" aria-label="Médias" style="border-color: rgba(255,90,46,.55); color: #ff9272"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="9" cy="10" r="1.6"></circle><path d="m21 16-5-5-9 8"></path></svg><span class="bdg">{{p.med}}</span></button>
+<button class="ib" aria-label="Commentaires"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"></path></svg><span class="bdg" style="background: #8b3cf0">{{p.com}}</span></button>
+<label class="ib" aria-label="Archiver"><input type="checkbox" style="width: 16px; height: 16px; accent-color: #ff5a2e; margin: 0"></label>
+<button class="ib" aria-label="Supprimer" style="color: #ff7070"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button>
+</div>
+</article>
+</sc-for>
+</div>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ST = {
+      'À venir': ['rgba(91,140,255,.18)', '#9dbaff'], 'Validé': ['rgba(62,207,142,.18)', '#4be0a0'], 'En attente': ['rgba(245,165,36,.18)', '#f7bd52'],
+      'Rédigé': ['rgba(180,59,255,.2)', '#dcb2ff'], 'Programmé': ['rgba(44,194,216,.18)', '#6fdcec'], 'Publié': ['rgba(255,255,255,.1)', '#d0d0dc']
+    };
+    const R = { b1: 'Renault', b1bg: '#f5c518', b1fg: '#1a1400' }, N = { b1: 'Nissan', b1bg: '#d0103a', b1fg: '#fff' }, G = { b1: 'GROUPE BONY', b1bg: '#3a3f55', b1fg: '#e4e7f7' };
+    const mk = (o) => ({ ...o, sb: ST[o.st][0], sc: ST[o.st][1], lc: o.link === 'Lien…' ? '#74748a' : '#9dbaff', cc: o.co2 === 'Aucune' ? '#8a8aa0' : '#ededf2' });
+    const posts = [
+      mk({ ...G, t: 'Cyclo Bony × CMV', link: 'Lien…', st: 'À venir', date: '28/09/2026', svc: 'Tous services', bm: '+1', site: 'GROUPE BONY', sm: '+3', net: 'LinkedIn', nm: '+2', web: '', col: 'on', lom: 'Aucune', co2: 'Aucune', med: '9+', com: '1', x: 'Nous avons eu 70 cyclistes le jour J, une belle météo, c’était que du bonheur ! On remercie le club du CMV et les participants, on publie en crosspost sur Insta avec le compte TeamCMV.' }),
+      mk({ ...R, t: 'Salon Aveyr’Auto', link: 'wetransfer.com/9f2c…', st: 'À venir', date: '28/09/2026', svc: 'VN', bm: '+1', site: 'Villefranche', sm: '+1', net: 'Facebook', nm: '+1', web: 'on', col: 'on', lom: 'Au quotidien…', co2: 'A · B', med: '4', com: '0', x: 'Merci d’être venus à notre rencontre ce week-end au salon Aveyr’Auto ! Retrouvez toutes nos offres dans vos concessions.' }),
+      mk({ ...R, t: 'Salon de l’auto Albi', link: 'Lien…', st: 'Validé', date: '28/09/2026', svc: 'VN', bm: '+2', site: 'Albi', sm: '+1', net: 'Facebook', nm: '+2', web: 'on', col: '', lom: 'Au quotidien…', co2: 'A · B · C', med: '2', com: '0', x: 'Présence au salon du 2 au 5 octobre avec toutes les marques (y compris Alpine). Essais sur place et offres salon.' }),
+      mk({ ...N, t: 'Recrutement technicien APV', link: 'indeed.fr/emploi/…', st: 'En attente', date: '29/09/2026', svc: 'RH', bm: '+1', site: 'Clermont', sm: '+2', net: 'LinkedIn', nm: '+1', web: 'on', col: 'on', lom: 'Aucune', co2: 'Aucune', med: '1', com: '3', x: 'Nous recrutons un technicien après-vente H/F pour nos ateliers Nissan de Clermont. CDI, prime d’intégration.' }),
+      mk({ ...R, t: 'Offre pneus hiver', link: 'Lien…', st: 'Rédigé', date: '30/09/2026', svc: 'APV', bm: '+2', site: 'GROUPE BONY', sm: '+1', net: 'Facebook', nm: '+1', web: 'on', col: '', lom: 'Pour les trajets…', co2: 'Aucune', med: '3', com: '0', x: 'Passez l’hiver l’esprit tranquille : montage offert pour l’achat de 4 pneus hiver jusqu’au 31 octobre.' }),
+      mk({ ...R, t: 'Nouvelle R5 : réservez votre essai', link: 'renault.fr/r5-e-tech', st: 'Programmé', date: '02/10/2026', svc: 'VN', bm: '+1', site: 'Clermont', sm: '+4', net: 'Instagram', nm: '+2', web: 'on', col: 'on', lom: 'Au quotidien…', co2: 'A', med: '6', com: '2', x: 'La R5 E-Tech électrique arrive dans vos concessions Bony. Réservez votre essai en ligne dès maintenant.' }),
+      mk({ ...N, t: 'Journées Qashqai e-Power', link: 'Lien…', st: 'À venir', date: '04/10/2026', svc: 'VN', bm: '+1', site: 'Montluçon', sm: '+1', net: 'Facebook', nm: '+2', web: 'on', col: '', lom: 'Au quotidien…', co2: 'B · C', med: '0', com: '0', x: 'Deux jours pour découvrir le Qashqai e-Power : essais, reprise valorisée et café offert.' }),
+      mk({ ...G, t: 'Portes ouvertes R5 E-Tech', link: 'Lien…', st: 'Publié', date: '05/10/2026', svc: 'VN', bm: '+1', site: 'Clermont', sm: '+1', net: 'Facebook', nm: '+3', web: 'on', col: 'on', lom: 'Au quotidien…', co2: 'A', med: '12', com: '4', x: 'Merci pour ce week-end de portes ouvertes : plus de 300 visiteurs et 40 essais de la R5 E-Tech.' })
+    ];
+    return { posts };
+  }
+}
+</script>
+</body>
+</html>

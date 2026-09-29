@@ -1,0 +1,181 @@
+/* =====================================================================
+   GEARBOX OS — les trois DIRECTIONS ARTISTIQUES, au choix de l'utilisateur
+   (Réglages › Apparence, ou Centre de contrôle). Sombre par défaut.
+   Chaque direction ne redéfinit que des TOKENS : aucune rubrique n'a de
+   code propre à une direction.
+     nocturne (défaut) · la nuit Bony : bleu nuit de la charte, lueurs orange→violet
+     carbone           · instrument de bord : graphite mat, un seul accent orange
+     signal            · grille et traces lumineuses : noir profond, angles vifs
+   En thème clair, seuls l'accent, les rayons et la typographie suivent la direction.
+   ===================================================================== */
+
+/* ---------------- Nocturne ---------------- */
+:root[data-da="nocturne"]:not([data-theme="light"]) {
+  --bg: #0a0e1f; --surface-0: #0e1328; --surface-1: #121831; --surface-2: #19213f; --surface-3: #232c4f; --surface-4: #2d375e;
+  --line: rgba(170,185,255,.1); --line-2: rgba(170,185,255,.17); --line-3: rgba(170,185,255,.26);
+  --text: #f3f4fb; --text-2: #bcc2df; --text-3: #8189ae;
+  --accent: #f75632; --sel: rgba(247,86,50,.18);
+  --tint: #1d2550;
+  --glass-bg: color-mix(in srgb, #141a37 66%, var(--tint)); --glass-strong: color-mix(in srgb, #141a37 86%, var(--tint));
+  --glass-edge: rgba(170,185,255,.12);
+  --bony-grad: linear-gradient(135deg, #ff6a3d, #a52fce);
+}
+:root[data-da="nocturne"] { --r-sm: 10px; --r-md: 13px; --r-lg: 16px; --r-xl: 22px; --win-r: 18px; --da-title-ls: .03em; --da-title-size: 17px; }
+:root[data-da="nocturne"]:not([data-theme="light"]) .card { box-shadow: inset 0 0 0 1px var(--line), inset 0 1px 0 rgba(255,255,255,.035), 0 18px 36px -26px rgba(0,0,0,.7); }
+:root[data-da="nocturne"]:not([data-theme="light"]) .btn.primary { box-shadow: 0 6px 18px -6px rgba(247,86,50,.6), 0 0 0 1px rgba(255,255,255,.08) inset; }
+
+/* ---------------- Carbone ---------------- */
+:root[data-da="carbone"]:not([data-theme="light"]) {
+  --bg: #0c0c0e; --surface-0: #111114; --surface-1: #151518; --surface-2: #1c1c20; --surface-3: #26262b; --surface-4: #303036;
+  --line: rgba(255,255,255,.075); --line-2: rgba(255,255,255,.13); --line-3: rgba(255,255,255,.22);
+  --text: #f2f1ef; --text-2: #b8b6b1; --text-3: #807e79;
+  --tint: #1d1b1a;
+  --glass-bg: rgba(22,22,25,.74); --glass-strong: rgba(22,22,25,.9); --glass-edge: rgba(255,255,255,.09); --glass-blur: 28px;
+}
+/* Un seul accent : l'orange Bony, en aplat (plus de dégradé) */
+:root[data-da="carbone"] { --bony-grad: linear-gradient(135deg, #f75632, #f75632); --r-sm: 8px; --r-md: 10px; --r-lg: 12px; --r-xl: 16px; --win-r: 14px; --da-title-ls: .14em; --da-title-size: 13px; }
+:root[data-da="carbone"] .btn.primary { box-shadow: none; }
+:root[data-da="carbone"] .chip[aria-pressed="true"] { background: var(--accent); color: #0c0c0e; box-shadow: none; }
+
+/* ---------------- Signal ---------------- */
+:root[data-da="signal"]:not([data-theme="light"]) {
+  --bg: #08080a; --surface-0: #0c0c0f; --surface-1: #101013; --surface-2: #15151a; --surface-3: #1e1e25; --surface-4: #282830;
+  --line: rgba(255,255,255,.085); --line-2: rgba(255,255,255,.15); --line-3: rgba(255,255,255,.24);
+  --text: #ededf2; --text-2: #adadbc; --text-3: #74748a;
+  --accent: #ff5a2e; --sel: rgba(255,90,46,.14);
+  --tint: #16121c;
+  --glass-bg: rgba(10,10,13,.8); --glass-strong: rgba(10,10,13,.92); --glass-edge: rgba(255,255,255,.1); --glass-blur: 20px;
+  --bony-grad: linear-gradient(135deg, #ff5a2e, #b43bff);
+}
+:root[data-da="signal"] { --r-xs: 3px; --r-sm: 5px; --r-md: 6px; --r-lg: 8px; --r-xl: 10px; --r-2xl: 12px; --win-r: 8px; --da-title-ls: .18em; --da-title-size: 12px; }
+/* Boutons primaires et sélections « au trait lumineux » */
+/* (Signal au « trait lumineux » retiré : direction unique, le modèle validé utilise le dégradé Bony) */
+:root[data-da="signal"] .kpi-v, :root[data-da="signal"] .dsh-kpi .kpi-v { font-family: var(--font-display); font-size: 22px; letter-spacing: -.01em; }
+:root[data-da="signal"] .dock, :root[data-da="signal"] .menu, :root[data-da="signal"] .pick { border-radius: 10px; }
+
+/* =================== MATIÈRES : Pixel · Liquid Glass · Opaque ===================
+   Elles habillent tout ce qui NAVIGUE : barre de menus, Dock, menus et sélecteurs,
+   notifications, centre de contrôle, widgets — et le CADRE des fenêtres : barre de titre,
+   en-tête de rubrique et sa barre de filtres, barre latérale. Le CONTENU (listes, tableaux,
+   cartes, formulaires) reste plein : c'est là qu'on lit, on n'y met pas de verre.
+   Sélecteurs à 4 attributs : ils doivent passer devant les jetons des directions ci-dessus. */
+
+/* Liquid Glass : presque incolore, peu flouté, saturé — le fond reste lisible au travers */
+:root[data-da][data-material="liquid"]:not([data-theme="light"]) {
+  --glass-bg: rgba(14,12,22,.16); --glass-strong: rgba(16,14,24,.82); --chrome-bg: rgba(16,14,26,.5);
+  --glass-blur: 10px; --glass-sat: 1.9; --rim-hi: rgba(255,255,255,.3); --rim-lo: rgba(255,255,255,.06);
+}
+:root[data-da][data-material="liquid"][data-theme="light"] {
+  --glass-bg: rgba(255,255,255,.14); --glass-strong: rgba(250,249,253,.86); --chrome-bg: rgba(250,249,253,.66);
+  --glass-blur: 10px; --glass-sat: 1.8; --rim-hi: rgba(255,255,255,.7); --rim-lo: rgba(255,255,255,.16);
+}
+:root[data-material="liquid"] .glass {
+  background: linear-gradient(165deg, rgba(255,255,255,.06), rgba(255,255,255,0) 42%), var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(1.05);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(1.05);
+  box-shadow: inset 0 0 22px rgba(255,255,255,.035), 0 8px 26px -12px rgba(0,0,0,.42);
+}
+:root[data-material="liquid"] .glass.glass-strong { background: linear-gradient(165deg, rgba(255,255,255,.06), rgba(255,255,255,0) 42%), var(--glass-strong); backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8); }
+/* La barre du haut reste légère : seuls les menus, sélecteurs et panneaux flottants sont couvrants */
+:root[data-material="liquid"] .menubar.glass.glass-strong { background: linear-gradient(165deg, rgba(255,255,255,.06), rgba(255,255,255,0) 42%), color-mix(in srgb, var(--glass-strong) 62%, transparent); }
+/* Contour : un liseré d'un pixel en DÉGRADÉ (vif en haut, qui s'éteint sur les flancs, à peine
+   relevé en bas) dessiné par masque — et non plus trois ombres internes superposées, trop épaisses. */
+:root[data-material="liquid"] :is(.dock, .nc-head, .notif) { position: relative; }
+:root[data-material="liquid"] .glass::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(172deg, var(--rim-hi), var(--rim-lo) 24%, transparent 46%, transparent 72%, var(--rim-lo));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+:root[data-material="liquid"] #widgets .wdg.glass { text-shadow: 0 1px 2px rgba(0,0,0,.28); }
+
+/* Cadre des fenêtres façon « Mica » (Windows 11) : barre de titre, en-tête, filtres et barre
+   latérale prennent la couleur de la fenêtre, à peine teintée par le fond d'écran (flou très fort,
+   80 % de matière) — pas une vitre. Le contenu est une feuille pleine posée à côté, séparée par un
+   liseré. Ainsi le cadre et le contenu forment un tout, au lieu d'une bande transparente sur un bloc. */
+:root:is([data-material="pixel"], [data-material="liquid"]):not([data-effects="eco"]) .win { background: var(--mica); backdrop-filter: blur(60px) saturate(1.7); -webkit-backdrop-filter: blur(60px) saturate(1.7); }
+:root:is([data-material="pixel"], [data-material="liquid"]):not([data-effects="eco"]) :is(.win-body, .win .app) { background: transparent; }
+:root:is([data-material="pixel"], [data-material="liquid"]):not([data-effects="eco"]) :is(.titlebar, .app-head, .split > .side) { background: transparent; }
+:root[data-material="pixel"] { --mica: color-mix(in srgb, var(--surface-1) 84%, transparent); }
+:root[data-material="liquid"] { --mica: color-mix(in srgb, var(--surface-1) 74%, transparent); }
+:root:is([data-material="pixel"], [data-material="liquid"]):not([data-effects="eco"]) :is(.win .app > :not(.app-head, .app-head2, input, :has(> .app-head, > .app-head2, > .split)), .split > .main) { background: var(--page-bg, var(--surface-1)); }
+
+/* Opaque, et mode économe : aucune transparence, aucun flou — ils passent devant tout le reste */
+:root[data-material="solid"], :root[data-effects="eco"] { --glass-bg: var(--surface-2) !important; --glass-strong: var(--surface-2) !important; --chrome-bg: var(--surface-1) !important; --glass-blur: 0px !important; }
+
+/* ---------------- Commun : l'identité typographique Bony ---------------- */
+/* Le titre d'une rubrique passe en Syncopate, capitales, approche propre à la direction */
+:root[data-da] .app-head .ah-t h1 { font-family: var(--font-display); text-transform: uppercase; font-size: var(--da-title-size, 15px); letter-spacing: var(--da-title-ls, .06em); }
+:root[data-da] .win { border-radius: var(--win-r); }
+/* Agrandie, plein écran ou fusionnée avec la barre du haut : plus aucun coin arrondi */
+:root[data-da] .win:is(.maxi, .full, .merged) { border-radius: 0; }
+
+/* ---------------- Fonds d'écran associés ---------------- */
+.wp-grille { background:
+  linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px) 0 0/40px 40px,
+  linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px) 0 0/40px 40px,
+  radial-gradient(50% 50% at 18% 100%, rgba(255,90,46,.2), transparent 70%),
+  radial-gradient(45% 50% at 96% 8%, rgba(180,59,255,.22), transparent 70%), #08080a; }
+:root[data-theme="light"] .wp-grille { background:
+  linear-gradient(rgba(20,16,30,.05) 1px, transparent 1px) 0 0/40px 40px,
+  linear-gradient(90deg, rgba(20,16,30,.05) 1px, transparent 1px) 0 0/40px 40px, #eeedf2; }
+:root[data-wallpaper="grille"] { --tint: #16121c; }
+.wp-carbone { background: radial-gradient(90% 70% at 85% 110%, rgba(247,86,50,.18), transparent 60%), radial-gradient(70% 60% at 0% 0%, rgba(255,255,255,.04), transparent 60%), #0c0c0e; }
+:root[data-theme="light"] .wp-carbone { background: radial-gradient(90% 70% at 85% 110%, rgba(247,86,50,.14), transparent 60%), #ecebe9; }
+:root[data-wallpaper="carbone"] { --tint: #1d1b1a; }
+
+/* =================== CONTRÔLES EN MATIÈRE (Liquid Glass / Pixel) ===================
+   Comme sur iOS / macOS : les CONTRÔLES (boutons, sélecteurs, puces, segments, champs,
+   recherche) et les CONTENEURS portent la matière. Rendu SOBRE, sans relief : un voile
+   translucide + un filet d'un pixel, rien d'autre (pas d'ombre portée, pas de reflet bombé —
+   la version « bouton de 3310 » a été rejetée). Pas de backdrop-filter sur ces petits
+   éléments (coûteux sur les PC du bureau, et le fond derrière est presque uni). */
+:root[data-material="liquid"]:not([data-theme="light"]) {
+  --ctl-bg: rgba(255,255,255,.045); --ctl-bg-h: rgba(255,255,255,.085); --ctl-line: rgba(255,255,255,.1); --ctl-line-h: rgba(255,255,255,.18);
+  --box-bg: rgba(255,255,255,.03); --box-line: rgba(255,255,255,.075);
+}
+:root[data-material="liquid"][data-theme="light"] {
+  --ctl-bg: rgba(255,255,255,.55); --ctl-bg-h: rgba(255,255,255,.85); --ctl-line: rgba(20,16,30,.1); --ctl-line-h: rgba(20,16,30,.18);
+  --box-bg: rgba(255,255,255,.5); --box-line: rgba(20,16,30,.08);
+}
+:root[data-material="pixel"]:not([data-theme="light"]) {
+  --ctl-bg: color-mix(in srgb, var(--surface-3) 80%, var(--tint)); --ctl-bg-h: color-mix(in srgb, var(--surface-4) 80%, var(--tint)); --ctl-line: transparent; --ctl-line-h: rgba(255,255,255,.08);
+  --box-bg: color-mix(in srgb, var(--surface-2) 88%, var(--tint)); --box-line: transparent;
+}
+:root[data-material="pixel"][data-theme="light"] {
+  --ctl-bg: color-mix(in srgb, var(--surface-3) 85%, var(--tint)); --ctl-bg-h: color-mix(in srgb, var(--surface-4) 85%, var(--tint)); --ctl-line: transparent; --ctl-line-h: rgba(20,16,30,.08);
+  --box-bg: color-mix(in srgb, var(--surface-2) 90%, var(--tint)); --box-line: transparent;
+}
+:root:is([data-material="liquid"], [data-material="pixel"]):not([data-effects="eco"]) :is(.btn:not(.primary):not(.ghost), .picker-btn, .chip:not([aria-pressed="true"]), .prj-tog:not(.on), .seg, .search, .input, .textarea, .select, select:not([multiple]), input[type="date"]:not(.input)) {
+  background-color: var(--ctl-bg); box-shadow: inset 0 0 0 1px var(--ctl-line);
+  transition: background-color .16s ease, box-shadow .16s ease, color .16s ease, transform .5s var(--spring-bouncy);
+}
+:root:is([data-material="liquid"], [data-material="pixel"]):not([data-effects="eco"]) :is(.btn:not(.primary):not(.ghost), .picker-btn, .chip:not([aria-pressed="true"]), .prj-tog:not(.on), .search, .input, .textarea, .select, select:not([multiple]), input[type="date"]:not(.input)):hover {
+  background-color: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h);
+}
+:root:is([data-material="liquid"], [data-material="pixel"]):not([data-effects="eco"]) :is(.input, .textarea, .search):focus-within {
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--focus);
+}
+/* Icônes de barre d'outils : nues au repos, voile au survol */
+:root:is([data-material="liquid"], [data-material="pixel"]):not([data-effects="eco"]) .icon-btn:hover { background-color: var(--ctl-bg-h); }
+/* Pouce des segments : une pastille un peu plus claire, qui glisse en ressort */
+:root:is([data-material="liquid"], [data-material="pixel"]):not([data-effects="eco"]) .seg > .thumb { background: var(--ctl-bg-h); box-shadow: inset 0 0 0 1px var(--ctl-line-h); }
+/* Sélections : le dégradé Bony du modèle validé, sans halo */
+.chip[aria-pressed="true"] { background: var(--bony-grad); color: #fff; box-shadow: none; }
+.chip[aria-pressed="true"] .brand-dot { box-shadow: 0 0 0 1.5px rgba(255,255,255,.7); }
+.prj-tog.on { box-shadow: none; }
+/* Conteneurs : voile léger + filet (le contenu dessus reste net) */
+:root:is([data-material="liquid"], [data-material="pixel"]):not([data-effects="eco"]) :is(.card, .app-head2) {
+  background: var(--box-bg); box-shadow: inset 0 0 0 1px var(--box-line);
+}
+/* Appui : léger enfoncement, retour en ressort */
+:root:is([data-material="liquid"], [data-material="pixel"]) :is(.btn, .picker-btn, .chip, .icon-btn, .prj-tog):active { transform: scale(.96); }
+/* Pas de halos « néon » : boutons principaux et éléments sélectionnés sans lueur colorée */
+.btn.primary { box-shadow: none; }
+.btn.primary:hover { filter: brightness(1.07); }
+.prj-item.sel { background: color-mix(in srgb, var(--text) 7%, var(--surface-2)); box-shadow: inset 0 0 0 1px var(--line-2), inset 3px 0 0 var(--accent); }
+.prj-item.sel .t { color: var(--text); }
+
+/* Signal, direction unique : arrondis alignés sur les maquettes validées (cartes 14 px, champs 10 px) */
+:root[data-da="signal"] { --r-xs: 4px; --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-xl: 16px; --r-2xl: 20px; --win-r: 14px; }
+:root[data-da="signal"] .dock, :root[data-da="signal"] .menu, :root[data-da="signal"] .pick { border-radius: 16px; }

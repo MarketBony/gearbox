@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b0a10" />
+<title>Gearbox OS</title>
+<link rel="icon" href="icon-mark.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&family=Syncopate:wght@700&display=swap" rel="stylesheet" />
+<script>
+  /* Maquette servie par un serveur statique sans en-têtes de cache : on
+     versionne chaque fichier pour toujours charger la dernière version. */
+  window.__V = Date.now();
+  ['css/ui.css', 'css/os.css', 'css/mobile.css', 'css/da.css'].forEach((h) => document.write(`<link rel="stylesheet" href="${h}?v=${__V}" />`));
+</script>
+</head>
+<body>
+<!-- Noyau, puis une rubrique par fichier (même contrat : GX.registerApp) -->
+<script>
+  ['js/core.js', 'js/data.js', 'js/charts.js', 'js/pickers.js', 'js/controls.js', 'js/icons.js', 'js/wallpapers.js', 'js/widgets.js', 'js/wm.js', 'js/shell.js', 'js/mobile.js', 'js/apps/dashboard.js', 'js/apps/projects.js', 'js/apps/todo.js', 'js/apps/digital.js', 'js/apps/campaigns.js', 'js/apps/chat.js', 'js/apps/hello.js', 'js/apps/agenda.js', 'js/apps/budget.js', 'js/apps/fixed.js', 'js/apps/material.js', 'js/apps/conges.js', 'js/apps/export.js', 'js/apps/games.js', 'js/apps/settings.js', 'js/apps/system.js'].forEach((src) => document.write(`<script src="${src}?v=${__V}"><\/script>`));
+</script>
+<script>
+  /* Téléphone → coque mobile (façon iOS) ; tablette et ordinateur → Bureau.
+     Le même code de rubrique sert les deux : les apps s'adaptent à la largeur
+     de leur conteneur (container queries), pas à celle de l'écran. */
+  const small = () => innerWidth <= 760 || (matchMedia('(pointer: coarse)').matches && Math.min(innerWidth, innerHeight) <= 520);
+  const mode = small() ? 'mobile' : 'desktop';
+  document.documentElement.dataset.shell = mode;
+  (mode === 'mobile' ? GX.mobile : GX.shell).init();
+  let rT; addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(() => { if ((small() ? 'mobile' : 'desktop') !== mode) location.reload(); }, 300); });
+</script>
+</body>
+</html>

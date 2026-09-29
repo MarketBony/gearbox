@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Mouvement · banc d'essai</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&amp;family=Syncopate:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+
+  .gx-ico{width:var(--s);height:var(--s);border-radius:calc(var(--s)*.2237);display:grid;place-items:center;position:relative;overflow:hidden;flex:none;isolation:isolate;
+    --gf:#fff;--ga:var(--h2);
+    background:linear-gradient(180deg,var(--h1),var(--h2));
+    box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14),0 1px 2px rgba(0,0,0,.28),0 4px 10px -6px rgba(0,0,0,.45)}
+  .gx-ico::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.14),transparent 40%);pointer-events:none}
+  .gx-ico .gl{width:64%;height:64%;position:relative;z-index:1;filter:drop-shadow(0 .5px .6px rgba(0,0,0,.18))}
+  /* Signatures : To-do (fiche blanche à pastilles), Agenda (page du jour), Dépenses (portefeuille noir) */
+  .gx-ico[data-a="todo"]{--ga:#c7c7cc}
+  .gx-ico[data-a="todo"] .gl{filter:none}
+  .gx-ico[data-a="fixed"]{--gf:#fff;--ga:#ff9f0a}
+  .gx-ico[data-a="fixed"] .gl circle{fill:#141416}
+  .gx-cal{flex-direction:column;align-content:center;gap:0;color:#1c1c1e}
+  .gx-cal .cd{font:700 calc(var(--s)*.15)/1 "Albert Sans",system-ui;color:#ff3b30;letter-spacing:.02em;margin-top:calc(var(--s)*.06)}
+  .gx-cal .cn{font:500 calc(var(--s)*.5)/1 "Albert Sans",system-ui;letter-spacing:-.04em;margin-top:calc(var(--s)*.02)}
+  /* Sombre (iOS 18) : tuile noire, pictogramme à la couleur de l'app */
+  [data-icons="dark"] .gx-ico{background:linear-gradient(180deg,#2c2c2f,#111113);--gf:var(--h1);--ga:#1c1c1e;box-shadow:inset 0 0 0 .5px rgba(255,255,255,.1),0 1px 2px rgba(0,0,0,.4)}
+  [data-icons="dark"] .gx-ico .gl{filter:none}
+  [data-icons="dark"] .gx-ico[data-a="todo"],[data-icons="dark"] .gx-ico[data-a="agenda"],[data-icons="dark"] .gx-ico[data-a="fixed"],[data-icons="dark"] .gx-ico[data-a="settings"],[data-icons="dark"] .gx-ico[data-a="archives"],[data-icons="dark"] .gx-ico[data-a="launchpad"]{--gf:#e5e5ea;--ga:#3a3a3c}
+  [data-icons="dark"] .gx-ico[data-a="fixed"]{--ga:#ff9f0a}
+  [data-icons="dark"] .gx-cal{color:#f2f2f7}
+  /* Teintée (iOS 18) : toutes les icônes à la teinte d'accent de la direction artistique */
+  [data-icons="tinted"] .gx-ico{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 22%,#232326),#0e0e10);--gf:color-mix(in srgb,var(--accent) 80%,#fff);--ga:#161618;box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--accent) 35%,transparent)}
+  [data-icons="tinted"] .gx-ico .gl{filter:none}
+  [data-icons="tinted"] .gx-ico .gl circle[fill^="#"]{fill:var(--gf)}
+  [data-icons="tinted"] .gx-cal{color:var(--gf)}[data-icons="tinted"] .gx-cal .cd{color:var(--accent)}
+  
+:root{--accent:#f75632}
+body{margin:0;font-family:"Albert Sans",system-ui,sans-serif;background:#0a0e1f;color:#f3f4fb;-webkit-font-smoothing:antialiased}
+a{color:#f75632}a:hover{color:#f3f4fb}
+.ttl{font-family:"Syncopate",sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:.02em;font-size:16px}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7e86ab}
+.num{font-variant-numeric:tabular-nums}
+.card{background:#19213f;border-radius:16px;box-shadow:inset 0 0 0 1px rgba(170,185,255,.09);box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 20px 40px -24px rgba(0,0,0,.6);}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:18px;font:600 12.5px "Albert Sans";color:#b9bfdc;background:#232c4f;border:0;box-shadow:inset 0 0 0 1px rgba(170,185,255,.09);cursor:pointer}
+.chip.on{background:linear-gradient(135deg,#f75632,#8f12ab);color:#fff}
+.btn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 14px;border-radius:14px;font:700 13px "Albert Sans";border:0;cursor:pointer;background:#232c4f;color:#f3f4fb;box-shadow:inset 0 0 0 1px rgba(170,185,255,.09)}
+.btn.pri{background:#f75632;color:#fff;box-shadow:none}
+.glass{background:rgba(20,26,54,.62);backdrop-filter:blur(44px) saturate(1.3);-webkit-backdrop-filter:blur(44px) saturate(1.3)}
+.bar{height:6px;border-radius:9px;background:#232c4f;overflow:hidden}
+.row{display:flex;align-items:center;gap:10px}
+
+/* Un seul vocabulaire de mouvement. Seuls transform et opacity s'animent : 60 i/s même sur un PC modeste. */
+:root{--snap:linear(0, 0.0404 2.3%, 0.0932 3.8%, 0.1601 5.4%, 0.2364 6.9%, 0.3181 8.5%, 0.4019 10.0%, 0.4849 11.5%, 0.5651 13.1%, 0.6409 14.6%, 0.7110 16.2%, 0.7747 17.7%, 0.8315 19.2%, 0.8814 20.8%, 0.9243 22.3%, 0.9605 23.8%, 0.9903 25.4%, 1.0143 26.9%, 1.0330 28.5%, 1.0470 30.0%, 1.0568 31.5%, 1.0630 33.1%, 1.0662 34.6%, 1.0670 36.2%, 1.0657 37.7%, 1.0629 39.2%, 1.0589 40.8%, 1.0541 42.3%, 1.0489 43.8%, 1.0433 45.4%, 1.0377 46.9%, 1.0322 48.5%, 1.0270 50.0%, 1.0220 51.5%, 1.0175 53.1%, 1.0134 54.6%, 1.0098 56.2%, 1.0067 57.7%, 1.0040 59.2%, 1.0018 60.8%, 0.9999 62.3%, 0.9985 63.8%, 0.9974 65.4%, 0.9966 66.9%, 0.9960 68.5%, 0.9957 70.0%, 0.9955 71.5%, 0.9955 73.1%, 0.9957 74.6%, 0.9959 76.2%, 0.9962 77.7%, 0.9965 79.2%, 0.9969 80.8%, 0.9973 82.3%, 0.9976 83.8%, 0.9980 85.4%, 0.9983 86.9%, 0.9987 88.5%, 0.9989 90.0%, 0.9992 91.5%, 0.9994 93.1%, 0.9996 94.6%, 0.9998 96.2%, 0.9999 97.7%, 1.0000 99.2%, 1);--soft:linear(0, 0.0465 2.8%, 0.1243 5.0%, 0.2231 7.2%, 0.3324 9.4%, 0.4437 11.7%, 0.5510 13.9%, 0.6502 16.1%, 0.7387 18.3%, 0.8151 20.6%, 0.8792 22.8%, 0.9311 25.0%, 0.9719 27.2%, 1.0026 29.4%, 1.0245 31.7%, 1.0391 33.9%, 1.0476 36.1%, 1.0514 38.3%, 1.0517 40.6%, 1.0493 42.8%, 1.0451 45.0%, 1.0400 47.2%, 1.0343 49.4%, 1.0285 51.7%, 1.0230 53.9%, 1.0178 56.1%, 1.0133 58.3%, 1.0094 60.6%, 1.0061 62.8%, 1.0034 65.0%, 1.0013 67.2%, 0.9998 69.4%, 0.9987 71.7%, 0.9979 73.9%, 0.9975 76.1%, 0.9973 78.3%, 0.9973 80.6%, 0.9975 82.8%, 0.9977 85.0%, 0.9979 87.2%, 0.9982 89.4%, 0.9985 91.7%, 0.9988 93.9%, 0.9991 96.1%, 0.9993 98.3%, 1);--bounce:linear(0, 0.1167 2.5%, 0.3198 4.6%, 0.5635 6.6%, 0.8039 8.7%, 1.0088 10.8%, 1.1593 12.9%, 1.2489 14.9%, 1.2810 17.0%, 1.2663 19.1%, 1.2188 21.2%, 1.1536 23.2%, 1.0842 25.3%, 1.0213 27.4%, 0.9718 29.5%, 0.9390 31.5%, 0.9231 33.6%, 0.9219 35.7%, 0.9317 37.8%, 0.9483 39.8%, 0.9678 41.9%, 0.9866 44.0%, 1.0023 46.1%, 1.0137 48.1%, 1.0202 50.2%, 1.0223 52.3%, 1.0207 54.4%, 1.0168 56.4%, 1.0115 58.5%, 1.0060 60.6%, 1.0012 62.7%, 0.9974 64.7%, 0.9950 66.8%, 0.9939 68.9%, 0.9939 71.0%, 0.9947 73.0%, 0.9961 75.1%, 0.9976 77.2%, 0.9991 79.3%, 1.0003 81.3%, 1.0012 83.4%, 1.0016 85.5%, 1.0018 87.6%, 1.0016 89.6%, 1.0013 91.7%, 1.0009 93.8%, 1.0004 95.9%, 1.0001 97.9%, 0.9998 100.0%, 1);--win:linear(0, 0.0363 2.8%, 0.0831 4.6%, 0.1420 6.4%, 0.2087 8.3%, 0.2799 10.1%, 0.3527 11.9%, 0.4250 13.8%, 0.4951 15.6%, 0.5618 17.4%, 0.6242 19.3%, 0.6818 21.1%, 0.7341 22.9%, 0.7812 24.8%, 0.8229 26.6%, 0.8596 28.4%, 0.8914 30.3%, 0.9187 32.1%, 0.9418 33.9%, 0.9611 35.8%, 0.9770 37.6%, 0.9898 39.4%, 1.0000 41.3%, 1.0079 43.1%, 1.0137 45.0%, 1.0180 46.8%, 1.0208 48.6%, 1.0224 50.5%, 1.0231 52.3%, 1.0231 54.1%, 1.0226 56.0%, 1.0215 57.8%, 1.0202 59.6%, 1.0187 61.5%, 1.0171 63.3%, 1.0154 65.1%, 1.0137 67.0%, 1.0121 68.8%, 1.0105 70.6%, 1.0090 72.5%, 1.0077 74.3%, 1.0064 76.1%, 1.0053 78.0%, 1.0043 79.8%, 1.0034 81.7%, 1.0027 83.5%, 1.0020 85.3%, 1.0015 87.2%, 1.0010 89.0%, 1.0006 90.8%, 1.0003 92.7%, 1.0000 94.5%, 0.9999 96.3%, 0.9997 98.2%, 0.9996 100.0%, 1);--out:cubic-bezier(.22,1,.36,1)}
+.stage{position:relative;height:300px;border-radius:18px;background:linear-gradient(180deg,#0f1530,#0b0f22);box-shadow:inset 0 0 0 1px rgba(170,185,255,.09);overflow:hidden}
+.win{position:absolute;left:50%;top:50%;width:300px;height:190px;margin:-95px 0 0 -150px;border-radius:16px;background:#19213f;box-shadow:inset 0 0 0 1px rgba(170,185,255,.16),0 30px 60px -20px rgba(0,0,0,.8);transform-origin:50% 100%;transition:transform 454ms var(--win),opacity 180ms var(--out)}
+.win.closed{transform:translate(0,140px) scale(.12);opacity:0;transition:transform 300ms cubic-bezier(.55,0,.75,.2),opacity 260ms ease-in}
+.row2{display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;border-radius:10px;font-size:13.5px;font-weight:600;transition:background 150ms}
+.pane{position:absolute;inset:0;padding:18px;transition:transform 542ms var(--snap),opacity 220ms var(--out)}
+.pane.off-r{transform:translateX(100%)}.pane.off-l{transform:translateX(-26%);opacity:.5}
+.sheet{position:absolute;left:24px;right:24px;bottom:0;height:170px;border-radius:20px 20px 0 0;background:#19213f;box-shadow:inset 0 0 0 1px rgba(170,185,255,.16);transform:translateY(105%);transition:transform 542ms var(--snap)}
+.sheet.on{transform:none}
+.veil{position:absolute;inset:0;background:rgba(5,8,20,.55);opacity:0;transition:opacity 260ms var(--out);pointer-events:none}.veil.on{opacity:1}
+.behind{position:absolute;inset:18px;border-radius:14px;background:#121831;box-shadow:inset 0 0 0 1px rgba(170,185,255,.09);transition:transform 542ms var(--snap),filter 440ms}.behind.back{transform:scale(.94)}
+.toast{position:absolute;right:16px;top:16px;width:250px;padding:12px 14px;border-radius:16px;background:rgba(20,26,54,.62);box-shadow:inset 0 0 0 1px rgba(170,185,255,.16);transform:translateX(120%);transition:transform 542ms var(--snap)}.toast.on{transform:none}
+.press{transition:transform 1004ms var(--bounce)}.press:active{transform:scale(.92);transition:transform 90ms cubic-bezier(.3,0,.5,1)}
+.rubber{position:absolute;left:50%;top:50%;width:170px;height:84px;margin:-42px 0 0 -85px;border-radius:18px;background:linear-gradient(135deg,#f75632,#8f12ab);display:grid;place-items:center;color:#fff;font-weight:800;cursor:grab;touch-action:none;user-select:none;box-shadow:0 20px 40px -18px rgba(247,86,50,.8)}
+.rubber.back{transition:transform 1004ms var(--bounce)}
+.seg{position:relative;display:inline-flex;padding:3px;border-radius:12px;background:#232c4f}
+.seg button{position:relative;z-index:1;height:30px;padding:0 16px;border:0;background:none;color:#b9bfdc;font:700 13px Albert Sans;cursor:pointer}
+.seg .thumb{position:absolute;top:3px;bottom:3px;width:92px;border-radius:9px;background:linear-gradient(135deg,#f75632,#8f12ab);transition:transform 1004ms var(--bounce)}
+.spec{font-size:12.5px;color:#7e86ab;line-height:1.55}
+</style>
+</helmet>
+<div style="width:1440px;height:900px;box-sizing:border-box;padding:40px 48px;background:#0a0e1f;display:flex;flex-direction:column;gap:22px">
+<div class="row" style="align-items:flex-end"><div><div class="lbl" style="color:#f75632">Banc d’essai · cliquez</div><div class="ttl" style="font-size:24px;margin-top:6px">Mouvement</div></div>
+<div style="margin-left:auto;max-width:640px;font-size:13.5px;color:#b9bfdc;line-height:1.6">Ce qui rendait la maquette saccadée : des animations de largeur, de hauteur et de flou, et des transitions qui attendaient la fin de la précédente. Ici, tout est <b>transform + opacity</b>, animé par de vrais ressorts <b>sous-amortis</b> : chaque mouvement dépasse légèrement sa cible puis se pose, comme chez Apple. Interruptible à tout moment.</div></div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px">
+<section style="display:grid;gap:10px"><div class="row"><b>1 · Fenêtre ⇄ Dock</b><button class="btn pri press" style="margin-left:auto" onClick="{{toggleWin}}">{{winLabel}}</button></div>
+<div class="stage"><div class="{{winClass}}"><div class="row" style="gap:7px;padding:12px 14px;border-bottom:1px solid rgba(170,185,255,.09)"><span style="width:10px;height:10px;border-radius:50%;background:#ff5f57"></span><span style="width:10px;height:10px;border-radius:50%;background:#febc2e"></span><span style="width:10px;height:10px;border-radius:50%;background:#28c840"></span><b style="margin-left:8px;font-size:13px">Projets</b></div><div style="padding:14px;display:grid;gap:8px"><div class="bar"><div style="width:64%;height:100%;background:linear-gradient(180deg,#ff7a45,#b23ad6)"></div></div><div class="bar"><div style="width:38%;height:100%;background:linear-gradient(180deg,#ff7a45,#b23ad6)"></div></div><div class="bar"><div style="width:81%;height:100%;background:linear-gradient(180deg,#ff7a45,#b23ad6)"></div></div></div></div>
+<div style="position:absolute;left:50%;bottom:14px;transform:translateX(-50%)"><span class="app-ico gx-ico" data-a="projects" style="--s:40px;--h1:#5aa9ff;--h2:#1d6ef2;--hx:#1d6ef2"><svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.4A2.4 2.4 0 0 1 5.4 5h4.1c.6 0 1.1.2 1.5.6l1.3 1.3h6.3A2.4 2.4 0 0 1 21 9.3v8.3a2.4 2.4 0 0 1-2.4 2.4H5.4A2.4 2.4 0 0 1 3 17.6z" fill="var(--gf)" opacity=".5"></path><path d="M3 10.6a1.6 1.6 0 0 1 1.6-1.6h14.8a1.6 1.6 0 0 1 1.6 1.6v7a2.4 2.4 0 0 1-2.4 2.4H5.4A2.4 2.4 0 0 1 3 17.6z" fill="var(--gf)" ></path></svg></span></div></div>
+<div class="spec">Ouverture : ressort « fenêtre » (≈ 3 % de dépassement) depuis l’icône · fermeture : accélération 300 ms vers le Dock. Aucune largeur animée.</div></section>
+<section style="display:grid;gap:10px"><div class="row"><b>2 · Liste → détail</b><button class="btn pri press" style="margin-left:auto" onClick="{{toggleDetail}}">{{detailLabel}}</button></div>
+<div class="stage"><div class="{{listClass}}"><div class="row2" style="background:transparent"><span style="width:8px;height:8px;border-radius:50%;background:#f75632"></span>Salon VO Saint-Etienne</div><div class="row2" style="background:#19213f"><span style="width:8px;height:8px;border-radius:50%;background:#3d7fe0"></span>Soirée clients Alpine A290</div><div class="row2" style="background:transparent"><span style="width:8px;height:8px;border-radius:50%;background:#57d18f"></span>Street marketing Millau</div><div class="row2" style="background:transparent"><span style="width:8px;height:8px;border-radius:50%;background:#b23ad6"></span>Essais Dacia Bigster</div><div class="row2" style="background:transparent"><span style="width:8px;height:8px;border-radius:50%;background:#ffcc33"></span>Campagne APV hiver</div></div>
+<div class="{{detailClass}}" style="background:#121831"><div class="lbl">Vichy · VN · Alpine</div><div style="font-size:18px;font-weight:700;margin:6px 0 14px">Soirée clients Alpine A290</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="card" style="padding:12px"><div class="lbl">Avancement</div><b class="num" style="font-size:22px">64 %</b></div><div class="card" style="padding:12px"><div class="lbl">Budget</div><b class="num" style="font-size:22px">26 600 €</b></div></div></div></div>
+<div class="spec">Le détail glisse en ressort vif (≈ 8 % de dépassement, il « arrive » et se cale) pendant que la liste recule de 26 %.</div></section>
+<section style="display:grid;gap:10px"><div class="row"><b>3 · Feuille modale</b><button class="btn pri press" style="margin-left:auto" onClick="{{toggleSheet}}">{{sheetLabel}}</button></div>
+<div class="stage"><div class="{{behindClass}}" style="padding:16px"><b style="font-size:14px">Dépenses</b><div style="margin-top:12px;display:grid;gap:8px"><div class="bar"></div><div class="bar"></div><div class="bar"></div></div></div><div class="{{veilClass}}"></div>
+<div class="{{sheetClass}}" style="padding:18px"><b style="font-size:15px">Nouvelle dépense</b><div class="row" style="margin-top:14px;gap:8px"><span class="chip on">Ponctuelle</span><span class="chip">Annuelle</span></div><div style="margin-top:14px;height:34px;border-radius:10px;background:#232c4f"></div></div></div>
+<div class="spec">La fenêtre recule (échelle 0,94) derrière la feuille : on garde le contexte. Voile en fondu 260 ms, feuille en ressort 440 ms.</div></section>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px">
+<section style="display:grid;gap:10px"><div class="row"><b>4 · Notification</b><button class="btn pri press" style="margin-left:auto" onClick="{{toggleToast}}">Déclencher</button></div>
+<div class="stage" style="height:140px"><div class="{{toastClass}}"><div class="row" style="gap:10px"><span class="app-ico gx-ico" data-a="chat" style="--s:30px;--h1:#62e873;--h2:#24b43c;--hx:#24b43c"><svg class="gl" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.8c4.8 0 8.7 3.1 8.7 7.1S16.8 18 12 18c-.95 0-1.86-.12-2.7-.34l-3.9 2.08c-.55.3-1.18-.22-.99-.82l.93-2.86C3.9 14.8 3.3 13 3.3 10.9c0-4 3.9-7.1 8.7-7.1z" fill="var(--gf)" ></path></svg></span><div><b style="font-size:13px">Léa Bernard</b><div style="font-size:12.5px;color:#b9bfdc">La story de samedi est validée</div></div></div></div></div></section>
+<section style="display:grid;gap:10px"><b>5 · Sélecteur segmenté</b><div class="stage" style="height:140px;display:grid;place-items:center"><div class="seg"><span class="thumb" style="transform:translateX({{segX}}px)"></span><button onClick="{{seg0}}" style="width:92px">Semaine</button><button onClick="{{seg1}}" style="width:92px">Mois</button><button onClick="{{seg2}}" style="width:92px">Année</button></div></div></section>
+<section style="display:grid;gap:10px"><b>6 · Élastique — tirez la carte</b><div class="stage" style="height:140px"><div class="{{rubberClass}}" style="transform:translateX({{rubberX}}px)" onPointerDown="{{rDown}}" onPointerMove="{{rMove}}" onPointerUp="{{rUp}}" onPointerCancel="{{rUp}}">Tirez-moi</div></div></section>
+<section style="display:grid;gap:10px"><b>Barème</b><div class="card" style="padding:16px;display:grid;gap:8px;font-size:13px">
+<div class="row"><span style="flex-grow:1">Appui → relâchement</span><b class="num">90 ms → rebond</b></div>
+<div class="row"><span style="flex-grow:1">Survol, couleur</span><b class="num">150 ms</b></div>
+<div class="row"><span style="flex-grow:1">Menu, info-bulle</span><b class="num">ressort vif ≈ 300 ms</b></div>
+<div class="row"><span style="flex-grow:1">Feuille, pile, notif.</span><b class="num">ζ 0,63 · +8 %</b></div><div class="row"><span style="flex-grow:1">Fenêtre</span><b class="num">ζ 0,74 · +3 %</b></div>
+<div class="row"><span style="flex-grow:1">Changement de bureau</span><b class="num">ressort doux 520 ms</b></div>
+<div class="row"><span style="flex-grow:1">Mode économe</span><b class="num">tout ≤ 160 ms, sans flou</b></div></div></section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { win: true, detail: false, sheet: false, toast: false, seg: 0, rx: 0, drag: false }; }
+  renderVals() {
+    const s = this.state;
+    return {
+      winClass: s.win ? 'win' : 'win closed', winLabel: s.win ? 'Réduire' : 'Ouvrir',
+      toggleWin: () => this.setState({ win: !s.win }),
+      listClass: s.detail ? 'pane off-l' : 'pane', detailClass: s.detail ? 'pane' : 'pane off-r', detailLabel: s.detail ? 'Retour' : 'Ouvrir',
+      toggleDetail: () => this.setState({ detail: !s.detail }),
+      sheetClass: s.sheet ? 'sheet on' : 'sheet', veilClass: s.sheet ? 'veil on' : 'veil', behindClass: s.sheet ? 'behind back' : 'behind', sheetLabel: s.sheet ? 'Fermer' : 'Ouvrir',
+      toggleSheet: () => this.setState({ sheet: !s.sheet }),
+      toastClass: s.toast ? 'toast on' : 'toast',
+      toggleToast: () => { this.setState({ toast: true }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: false }), 2600); },
+      rubberClass: s.drag ? 'rubber' : 'rubber back', rubberX: s.rx,
+      rDown: (e) => { e.currentTarget.setPointerCapture(e.pointerId); this._sx = e.clientX; this.setState({ drag: true }); },
+      rMove: (e) => { if (!this.state.drag) return; const d = e.clientX - this._sx; this.setState({ rx: Math.sign(d) * Math.pow(Math.abs(d), .82) }); },
+      rUp: () => this.setState({ drag: false, rx: 0 }),
+      segX: s.seg * 92, seg0: () => this.setState({ seg: 0 }), seg1: () => this.setState({ seg: 1 }), seg2: () => this.setState({ seg: 2 }),
+    };
+  }
+}
+</script>
+</body>
+</html>

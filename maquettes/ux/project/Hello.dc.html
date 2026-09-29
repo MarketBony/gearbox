@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Hello Marketing</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&amp;family=Syncopate:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#09090d}
+.gx{font-family:"Albert Sans",system-ui,sans-serif;color:#ededf2;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#ff7a52}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9494aa}
+.card{background:rgba(20,20,28,.72);border:1px solid rgba(255,255,255,.09);border-radius:16px;backdrop-filter:blur(18px);box-shadow:0 20px 40px -28px rgba(0,0,0,.8)}
+.h2{margin:0;font-family:Syncopate,sans-serif;font-weight:700;font-size:13px;letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;gap:9px}
+.row{display:flex;align-items:center}
+.ib{width:34px;height:34px;border-radius:9px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.04);color:#d0d0dc;display:grid;place-items:center;cursor:pointer;padding:0}
+.src{height:20px;padding:0 7px;border-radius:5px;font:700 10.5px "Albert Sans",sans-serif;letter-spacing:.06em;display:inline-flex;align-items:center;color:#fff}
+.scr{height:100%;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.22) transparent}
+.scr::-webkit-scrollbar{width:12px}.scr::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
+a{color:#ff7a52}
+</style>
+</helmet>
+<div class="gx" style="width: 1920px; height: 1080px; box-sizing: border-box; background: radial-gradient(1100px 700px at 0% 100%, rgba(255,90,46,.16), transparent 70%), radial-gradient(1100px 800px at 100% 0%, rgba(180,59,255,.18), transparent 70%), #09090d; overflow: hidden">
+<div class="scr">
+<div style="padding: 32px 48px 48px; display: flex; flex-direction: column; gap: 22px">
+
+<header style="display: flex; align-items: flex-end; gap: 24px">
+<div>
+<div class="eyebrow">Communauté</div>
+<h1 style="margin: 6px 0 0; font-family: Syncopate, sans-serif; font-weight: 700; font-size: 30px; letter-spacing: .02em; text-transform: uppercase; line-height: 1.1">Hello Marketing</h1>
+<p style="margin: 7px 0 0; font-size: 15px; color: #c8c8d4">Lundi 28 septembre 2026</p>
+</div>
+</header>
+
+<div class="lbl" style="margin-top: 2px">L'équipe aujourd'hui</div>
+<section style="display: grid; grid-template-columns: 1.35fr 1fr 1fr 1fr; gap: 20px">
+
+<article class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column">
+<div style="padding: 20px 22px; background: linear-gradient(135deg, #3b6fd8, #1f3f8f 70%); display: flex; flex-direction: column; gap: 6px; position: relative">
+<div class="row" style="gap: 7px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.88)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>Clermont-Ferrand · Lundi 28 septembre<span style="flex-grow: 1"></span><button class="ib" aria-label="Rafraîchir" style="width: 30px; height: 30px; background: rgba(255,255,255,.14); border-color: transparent; color: #fff">↻</button></div>
+<div class="row" style="gap: 14px"><span style="font-size: 64px; font-weight: 700; line-height: 1">17°</span><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"><circle cx="9" cy="9" r="3.5"></circle><path d="M9 2v1.5M2 9h1.5M4 4l1 1M14 4l-1 1M7 19h10a4 4 0 0 0 0-8 5 5 0 0 0-9.6 1.6A3.2 3.2 0 0 0 7 19z"></path></svg><div><div style="font-size: 17px; font-weight: 700">Éclaircies</div><div style="font-size: 14px; color: rgba(255,255,255,.85)">Ressenti 16°</div></div></div>
+</div>
+<div style="padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 10px; flex-grow: 1">
+<span class="lbl">Prévisions 5 jours</span>
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{fc}}" as="f" hint-placeholder-count="5"><div style="padding: 10px 4px; border-radius: 10px; background: rgba(8,8,12,.45); text-align: center; display: flex; flex-direction: column; gap: 5px; align-items: center"><span style="font-size: 11.5px; font-weight: 700; letter-spacing: .08em; color: #b8b8c8">{{f.d}}</span><span style="font-size: 20px">{{f.i}}</span><span style="font-size: 14px"><b>{{f.max}}</b> <span style="color: #8a8aa0">{{f.min}}</span></span></div></sc-for>
+</div>
+</div>
+</article>
+
+<article class="card" style="padding: 20px 22px; display: flex; flex-direction: column; gap: 12px">
+<h2 class="h2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a52" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>Prochains événements</h2>
+<sc-for list="{{events}}" as="e" hint-placeholder-count="3">
+<div class="row" style="gap: 14px; padding: 10px 12px; border-radius: 12px; background: rgba(8,8,12,.45); border: 1px solid rgba(255,255,255,.06)">
+<div style="width: 54px; text-align: center; flex-shrink: 0"><div style="font-family: Syncopate, sans-serif; font-weight: 700; font-size: 18px; color: #ff7a52">{{e.j}}</div><div style="font-size: 10.5px; color: #9494aa; text-transform: uppercase; letter-spacing: .08em">jours</div></div>
+<div style="min-width: 0; flex-grow: 1"><div style="font-size: 14.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{e.n}}</div><div class="row" style="gap: 8px; margin-top: 5px; font-size: 12.5px; color: #b8b8c8"><span style="height: 20px; padding: 0 7px; border-radius: 5px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; background: {{e.tb}}; color: {{e.tc}}">{{e.t}}</span>{{e.s}} · {{e.d}}</div></div>
+</div>
+</sc-for>
+</article>
+
+<article class="card" style="padding: 20px 22px; display: flex; flex-direction: column; gap: 14px">
+<h2 class="h2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a52" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>Musique du jour</h2>
+<div class="row" style="gap: 14px"><div style="width: 88px; height: 88px; border-radius: 12px; background: linear-gradient(135deg,#ff5a2e,#b43bff); flex-shrink: 0; display: grid; place-items: center; font-family: Syncopate, sans-serif; font-weight: 700; font-size: 11px; text-align: center; padding: 6px; box-sizing: border-box">POCHETTE</div><div style="min-width: 0"><div style="font-size: 16px; font-weight: 700">[Titre du jour]</div><div style="font-size: 14px; color: #b8b8c8; margin-top: 4px">[Artiste]</div><div style="font-size: 12px; color: #8a8aa0; margin-top: 8px">Playlist Deezer · même piste pour toute l'équipe</div></div></div>
+<div class="row" style="gap: 12px; margin-top: auto"><button class="ib" aria-label="Lecture" style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg,#ff5a2e,#b43bff); border-color: transparent; color: #fff; font-size: 16px">▶</button><span style="font-size: 12.5px; color: #b8b8c8">0:12</span><span style="flex-grow: 1; height: 5px; border-radius: 3px; background: rgba(255,255,255,.1)"><span style="display: block; width: 40%; height: 100%; border-radius: 3px; background: linear-gradient(90deg,#ff5a2e,#b43bff)"></span></span><span style="font-size: 12.5px; color: #b8b8c8">0:30</span></div>
+</article>
+
+<article class="card" style="padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center">
+<h2 class="h2" style="align-self: stretch">🥐 Viennoiseries de la semaine</h2>
+<span style="font-size: 13px; font-style: italic; color: #b8b8c8">Roulement de tambour…</span>
+<span style="width: 84px; height: 84px; border-radius: 50%; background: #1f9d55; display: grid; place-items: center; font-size: 26px; font-weight: 700; box-shadow: 0 0 0 5px rgba(255,90,46,.25), 0 0 30px rgba(255,90,46,.35)">ML</span>
+<div><div style="font-size: 17px; font-weight: 700">Marie Leroy</div><div style="font-size: 13px; font-weight: 700; color: #ff7a52; margin-top: 3px">Digital Manager</div></div>
+<span style="height: 26px; padding: 0 11px; border-radius: 99px; background: rgba(245,165,36,.16); color: #f7bd52; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center">Roi de la brioche 👑</span>
+<div class="row" style="gap: 10px; margin-top: auto; font-size: 12px; color: #9494aa; align-self: stretch; justify-content: space-between"><span>Semaine 40 · change le 5 oct.</span><a href="#" style="font-weight: 700; text-decoration: none">4 sem. précédentes ▴</a></div>
+</article>
+</section>
+
+<section class="card" style="padding: 16px 22px; display: flex; align-items: center; gap: 22px">
+<h2 class="h2" style="flex-shrink: 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff6fae" stroke-width="2" stroke-linecap="round"><path d="M4 21h16M5 21V12h14v9M12 12V8M9 5c0 1 1.3 2 3 3 1.7-1 3-2 3-3a3 3 0 0 0-6 0"></path></svg>Anniversaires</h2>
+<div class="row" style="gap: 12px; overflow: hidden">
+<sc-for list="{{bdays}}" as="b" hint-placeholder-count="6">
+<div class="row" style="gap: 10px; padding: 7px 14px 7px 7px; border-radius: 99px; background: {{b.bg}}; border: 1px solid {{b.bd}}; flex-shrink: 0"><span style="width: 34px; height: 34px; border-radius: 50%; background: {{b.c}}; display: grid; place-items: center; font-size: 12px; font-weight: 700">{{b.i}}</span><div><div style="font-size: 13.5px; font-weight: 700">{{b.n}} <span style="font-weight: 500; color: #b8b8c8">· {{b.a}}</span></div><div style="font-size: 12px; font-weight: 700; color: {{b.wc}}">{{b.w}}</div></div></div>
+</sc-for>
+</div>
+</section>
+
+<div class="lbl" style="margin-top: 6px">La veille</div>
+<section style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px">
+<sc-for list="{{feeds}}" as="fd" hint-placeholder-count="2">
+<article class="card" style="padding: 20px 22px; display: flex; flex-direction: column; gap: 12px">
+<div class="row" style="gap: 12px"><h2 class="h2" style="color: {{fd.c}}">{{fd.t}}</h2><span style="flex-grow: 1"></span><span style="font-size: 12.5px; color: #9494aa">Mis à jour à 11:42</span><button class="ib" aria-label="Rafraîchir">↻</button></div>
+<div class="row" style="gap: 6px"><sc-for list="{{fd.srcs}}" as="s" hint-placeholder-count="4"><span class="src" style="background: {{s.c}}">{{s.n}}</span></sc-for><span style="font-size: 12px; color: #8a8aa0; margin-left: 6px">12 derniers articles, toutes sources</span></div>
+<sc-for list="{{fd.items}}" as="it" hint-placeholder-count="6">
+<a href="#" style="display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 14px; padding: 10px; border-radius: 12px; background: rgba(8,8,12,.4); border: 1px solid rgba(255,255,255,.06); text-decoration: none; color: inherit">
+<div style="height: 80px; border-radius: 9px; background: {{it.bg}}; display: grid; place-items: center; font-family: Syncopate, sans-serif; font-weight: 700; font-size: 22px; color: rgba(255,255,255,.7)">{{it.ini}}</div>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 5px"><div class="row" style="gap: 8px"><span class="src" style="background: {{it.sc}}">{{it.src}}</span><span style="font-size: 12px; color: #9494aa">{{it.ago}}</span><span style="flex-grow: 1"></span><span style="font-size: 12px; color: #ff7a52; font-weight: 700">Voir ↗</span></div><div style="font-size: 14.5px; font-weight: 700; line-height: 1.3">{{it.t}}</div><div style="font-size: 12.5px; color: #b8b8c8; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{it.x}}</div></div>
+</a>
+</sc-for>
+</article>
+</sc-for>
+</section>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const fc = [{ d: 'MAR', i: '☀', max: '19°', min: '9°' }, { d: 'MER', i: '⛅', max: '17°', min: '10°' }, { d: 'JEU', i: '🌧', max: '14°', min: '9°' }, { d: 'VEN', i: '🌧', max: '13°', min: '8°' }, { d: 'SAM', i: '⛅', max: '16°', min: '7°' }];
+    const TY = { 'Expo/Salon': ['rgba(255,90,46,.18)', '#ff9272'], 'Animation Co': ['rgba(91,140,255,.18)', '#9dbaff'], 'OP Clients': ['rgba(62,207,142,.18)', '#4be0a0'] };
+    const events = [['J-5', 'Salon VO Saint-Étienne', 'Expo/Salon', 'Saint-Étienne', '3 oct.'], ['J-9', 'Soirée clients Alpine A290', 'Animation Co', 'Vichy', '7 oct.'], ['J-17', 'Street marketing Millau', 'Animation Co', 'Millau', '15 oct.']]
+      .map(([j, n, t, s, d]) => ({ j, n, t, s, d, tb: TY[t][0], tc: TY[t][1] }));
+    const bdays = [
+      { i: 'CM', n: 'Chloé', a: '31 ans', w: 'Auj. !', wc: '#ff6fae', c: '#b0620f', bg: 'rgba(255,111,174,.14)', bd: 'rgba(255,111,174,.45)' },
+      { i: 'JD', n: 'Julien', a: '28 ans', w: 'demain', wc: '#f7bd52', c: '#3a63d6', bg: 'rgba(8,8,12,.45)', bd: 'rgba(255,255,255,.08)' },
+      { i: 'TL', n: 'Théo', a: '30 ans', w: 'dans 12 j', wc: '#b8b8c8', c: '#ff5a2e', bg: 'rgba(8,8,12,.45)', bd: 'rgba(255,255,255,.08)' },
+      { i: 'ML', n: 'Marie', a: '34 ans', w: 'dans 41 j', wc: '#b8b8c8', c: '#1f9d55', bg: 'rgba(8,8,12,.45)', bd: 'rgba(255,255,255,.08)' },
+      { i: 'SB', n: 'Sophie', a: '26 ans', w: 'dans 58 j', wc: '#b8b8c8', c: '#8b3cf0', bg: 'rgba(8,8,12,.45)', bd: 'rgba(255,255,255,.08)' },
+      { i: 'AR', n: 'Antoine', a: '45 ans', w: 'dans 77 j', wc: '#b8b8c8', c: '#1a9fb5', bg: 'rgba(8,8,12,.45)', bd: 'rgba(255,255,255,.08)' }
+    ];
+    const A = { AUTOPLUS: '#059669', AUTOMOTO: '#9333ea', CARADISIAC: '#2563eb', AUTOACTU: '#ef4444' }, M = { BDM: '#3b82f6', JDN: '#4f46e5', INFLUENCIA: '#db2777', 'USINE DIGITALE': '#0e7490' };
+    const it = (src, sc, ago, t) => ({ src, sc, ago, t, x: '[Chapô de l’article, sans HTML, coupé à 180 caractères]', ini: src[0], bg: 'linear-gradient(135deg,' + sc + ',#15151d)' });
+    const feeds = [
+      { t: 'Actu auto', c: '#ff8a66', srcs: Object.entries(A).map(([n, c]) => ({ n, c })), items: [
+        it('CARADISIAC', A.CARADISIAC, 'il y a 12 min', '[Titre d’article Caradisiac]'), it('AUTOPLUS', A.AUTOPLUS, 'il y a 1 h', '[Titre d’article AutoPlus]'), it('AUTOACTU', A.AUTOACTU, 'il y a 3 h', '[Titre d’article Autoactu]'),
+        it('AUTOMOTO', A.AUTOMOTO, 'hier', '[Titre d’article AutoMoto]'), it('CARADISIAC', A.CARADISIAC, 'il y a 2 j', '[Titre d’article Caradisiac]'), it('AUTOPLUS', A.AUTOPLUS, '26 sept.', '[Titre d’article AutoPlus]') ] },
+      { t: 'Marketing & tech', c: '#d6a4ff', srcs: Object.entries(M).map(([n, c]) => ({ n, c })), items: [
+        it('BDM', M.BDM, 'à l’instant', '[Titre d’article BDM]'), it('JDN', M.JDN, 'il y a 40 min', '[Titre d’article JDN]'), it('INFLUENCIA', M.INFLUENCIA, 'il y a 2 h', '[Titre d’article Influencia]'),
+        it('USINE DIGITALE', M['USINE DIGITALE'], 'il y a 5 h', '[Titre d’article Usine Digitale]'), it('BDM', M.BDM, 'hier', '[Titre d’article BDM]'), it('JDN', M.JDN, 'il y a 2 j', '[Titre d’article JDN]') ] }
+    ];
+    return { fc, events, bdays, feeds };
+  }
+}
+</script>
+</body>
+</html>

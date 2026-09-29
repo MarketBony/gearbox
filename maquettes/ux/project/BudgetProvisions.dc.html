@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Budget — provisions</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&amp;family=Syncopate:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#09090d}
+.gx{font-family:"Albert Sans",system-ui,sans-serif;color:#ededf2;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#ff7a52}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9494aa}
+.card{background:rgba(20,20,28,.72);border:1px solid rgba(255,255,255,.09);border-radius:14px;backdrop-filter:blur(18px);box-shadow:0 20px 40px -28px rgba(0,0,0,.8)}
+.field{height:40px;padding:0 13px;border-radius:10px;border:1px solid rgba(255,255,255,.13);background:rgba(8,8,12,.55);color:#ededf2;font:600 14px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:8px;cursor:pointer;box-sizing:border-box}
+.chip{height:32px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.02);color:#dcdce6;font:600 13px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:6px;opacity:.35}
+.seg{display:inline-flex;padding:4px;border-radius:12px;background:rgba(8,8,12,.55);border:1px solid rgba(255,255,255,.12)}
+.seg button{height:36px;padding:0 18px;border:0;border-radius:9px;background:transparent;color:#b8b8c8;font:700 13.5px "Albert Sans",sans-serif;cursor:pointer}
+.seg button.on{background:linear-gradient(135deg,#ff5a2e,#b43bff);color:#fff}
+.muted{color:#b8b8c8}
+.row{display:flex;align-items:center}
+.vsep{width:1px;align-self:stretch;background:rgba(255,255,255,.08)}
+.scr{overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.22) transparent}
+.scr::-webkit-scrollbar{width:12px}.scr::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
+.plq{display:flex;align-items:center;gap:14px;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#ff7a52;margin-top:6px}
+.plq::before,.plq::after{content:"";height:1px;flex:1;background:rgba(255,90,46,.3)}
+.site{padding:14px 20px;display:flex;align-items:center;gap:14px}
+.num{width:100%;height:34px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:rgba(8,8,12,.55);color:#ededf2;font:600 13.5px "Albert Sans",sans-serif;text-align:right;padding:0 8px;box-sizing:border-box}
+.gh{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9494aa;text-align:right}
+.svc{height:24px;padding:0 9px;border-radius:6px;font:700 12px "Albert Sans",sans-serif;display:inline-flex;align-items:center;color:#fff}
+.bdot{width:9px;height:9px;border-radius:50%;display:inline-block}
+a{color:#ff7a52}
+</style>
+</helmet>
+<div class="gx" style="width: 1920px; height: 1080px; box-sizing: border-box; background: radial-gradient(1100px 700px at 0% 100%, rgba(255,90,46,.16), transparent 70%), radial-gradient(1100px 800px at 100% 0%, rgba(180,59,255,.18), transparent 70%), #09090d; overflow: hidden; display: flex; flex-direction: column; padding: 32px 48px 0; gap: 20px">
+
+<header style="display: flex; align-items: flex-end; gap: 24px; flex-shrink: 0">
+<div>
+<div class="eyebrow">Outils</div>
+<h1 style="margin: 6px 0 0; font-family: Syncopate, sans-serif; font-weight: 700; font-size: 30px; letter-spacing: .02em; text-transform: uppercase; line-height: 1.1">Budget &amp; prévisionnel</h1>
+<p style="margin: 7px 0 0; font-size: 14px; color: #b8b8c8">Pilotage financier par concession</p>
+</div>
+<span style="flex-grow: 1"></span>
+<div class="seg"><button>Suivi réalisé</button><button class="on">Provisions</button></div>
+</header>
+
+<section class="card" style="padding: 16px 22px; display: flex; align-items: flex-end; gap: 22px; flex-shrink: 0">
+<div style="display: flex; flex-direction: column; gap: 8px"><span class="lbl">Périmètre</span><button class="field">Tout le réseau<span style="flex-grow: 1"></span>▾</button></div>
+<div class="vsep"></div>
+<div style="display: flex; flex-direction: column; gap: 8px"><span class="lbl">Marque · Service · PRO+ · Année · Période</span><div class="row" style="gap: 6px"><span class="chip">Toutes</span><span class="chip">Tous</span><span class="chip">Tout</span><span class="chip">2026</span><span class="chip">Jan → Déc</span></div></div>
+<span style="font-size: 13px; color: #9494aa; max-width: 420px; line-height: 1.4; padding-bottom: 4px">Sur les provisions, seul le périmètre s'applique : les enveloppes n'ont pas d'année et le total groupe n'est pas filtré.</span>
+<span style="flex-grow: 1"></span>
+</section>
+
+<div class="scr" style="flex-grow: 1; min-height: 0; margin: 0 -12px; padding: 0 12px 48px">
+<div style="display: flex; flex-direction: column; gap: 14px">
+
+<section class="card" style="padding: 22px 26px; display: flex; align-items: center; gap: 24px; background: linear-gradient(135deg, rgba(255,90,46,.14), rgba(180,59,255,.14)), rgba(20,20,28,.72)">
+<div><span class="lbl" style="color: #ffb49d">Budget prévisionnel groupe (annuel)</span><div style="margin-top: 8px; font-family: Syncopate, sans-serif; font-weight: 700; font-size: 36px">1 480 800 €</div></div>
+<span style="flex-grow: 1"></span>
+<span class="row" style="gap: 8px; height: 32px; padding: 0 12px; border-radius: 8px; background: rgba(255,255,255,.08); font-size: 13px; font-weight: 700"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 7h8M8 12h2M14 12h2M8 16h2M14 16h2"></path></svg>Calculé sur 27 sites</span>
+<span class="row" style="gap: 8px; height: 32px; padding: 0 12px; border-radius: 8px; background: rgba(255,107,107,.14); color: #ff8a8a; font-size: 13px; font-weight: 700"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Lecture seule (autres rôles)</span>
+</section>
+
+<div class="plq">Plaque centre</div>
+
+<article class="card" style="overflow: hidden">
+<div class="site" style="border-bottom: 1px solid rgba(255,255,255,.08)">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a52" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg>
+<b style="font-family: Syncopate, sans-serif; font-size: 15px; letter-spacing: .05em">CLERMONT</b>
+<span style="height: 22px; padding: 0 8px; border-radius: 6px; background: rgba(255,255,255,.08); font-size: 11px; font-weight: 700; color: #c8c8d4; display: inline-flex; align-items: center">PLAQUE CENTRE</span>
+<span class="row" style="gap: 5px"><span class="bdot" style="background: #f5c518"></span><span class="bdot" style="background: #7c8c5a"></span><span class="bdot" style="background: #8b5cf6"></span></span>
+<span style="flex-grow: 1"></span>
+<div style="text-align: right"><div class="lbl">Mensuel moy.</div><div style="font-size: 15px; font-weight: 700; margin-top: 3px">12 733 €</div></div>
+<div style="text-align: right; margin-left: 26px"><div class="lbl">Annuel prévu</div><div style="font-size: 20px; font-weight: 700; margin-top: 2px; background: linear-gradient(90deg,#ff7a52,#c77dff); -webkit-background-clip: text; background-clip: text; color: transparent">152 800 €</div></div>
+</div>
+<div style="padding: 16px 20px 20px; display: grid; grid-template-columns: 90px repeat(12, minmax(0, 1fr)) 120px; gap: 8px; align-items: center">
+<span class="gh" style="text-align: left">Service</span>
+<sc-for list="{{months}}" as="m" hint-placeholder-count="12"><span class="gh">{{m}}</span></sc-for>
+<span class="gh">Total annuel</span>
+<sc-for list="{{grid}}" as="r" hint-placeholder-count="4">
+<span><span class="svc" style="background: {{r.c}}">{{r.s}}</span></span>
+<sc-for list="{{r.vals}}" as="v" hint-placeholder-count="12"><input class="num" value="{{v}}" aria-label="Enveloppe mensuelle"></sc-for>
+<b style="text-align: right; font-size: 15px">{{r.tot}}</b>
+</sc-for>
+</div>
+</article>
+
+<sc-for list="{{collapsed1}}" as="s" hint-placeholder-count="3">
+<article class="card"><div class="site">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9494aa" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg>
+<b style="font-family: Syncopate, sans-serif; font-size: 14px; letter-spacing: .05em">{{s.n}}</b>
+<span style="height: 22px; padding: 0 8px; border-radius: 6px; background: rgba(255,255,255,.08); font-size: 11px; font-weight: 700; color: #c8c8d4; display: inline-flex; align-items: center">{{s.p}}</span>
+<span class="row" style="gap: 5px"><span class="bdot" style="background: #f5c518"></span><span class="bdot" style="background: #7c8c5a"></span></span>
+<span style="flex-grow: 1"></span>
+<div style="text-align: right"><div class="lbl">Mensuel moy.</div><div style="font-size: 15px; font-weight: 700; margin-top: 3px">{{s.m}}</div></div>
+<div style="text-align: right; margin-left: 26px; width: 150px"><div class="lbl">Annuel prévu</div><div style="font-size: 20px; font-weight: 700; margin-top: 2px; background: linear-gradient(90deg,#ff7a52,#c77dff); -webkit-background-clip: text; background-clip: text; color: transparent">{{s.a}}</div></div>
+</div></article>
+</sc-for>
+
+<div class="plq">Plaque nord</div>
+<sc-for list="{{collapsed2}}" as="s" hint-placeholder-count="3">
+<article class="card"><div class="site">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9494aa" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg>
+<b style="font-family: Syncopate, sans-serif; font-size: 14px; letter-spacing: .05em">{{s.n}}</b>
+<span style="height: 22px; padding: 0 8px; border-radius: 6px; background: rgba(255,255,255,.08); font-size: 11px; font-weight: 700; color: #c8c8d4; display: inline-flex; align-items: center">{{s.p}}</span>
+<span style="flex-grow: 1"></span>
+<div style="text-align: right"><div class="lbl">Mensuel moy.</div><div style="font-size: 15px; font-weight: 700; margin-top: 3px">{{s.m}}</div></div>
+<div style="text-align: right; margin-left: 26px; width: 150px"><div class="lbl">Annuel prévu</div><div style="font-size: 20px; font-weight: 700; margin-top: 2px; background: linear-gradient(90deg,#ff7a52,#c77dff); -webkit-background-clip: text; background-clip: text; color: transparent">{{s.a}}</div></div>
+</div></article>
+</sc-for>
+
+<div class="plq">Entités spécifiques</div>
+<sc-for list="{{collapsed3}}" as="s" hint-placeholder-count="3">
+<article class="card"><div class="site">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9494aa" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg>
+<b style="font-family: Syncopate, sans-serif; font-size: 14px; letter-spacing: .05em">{{s.n}}</b>
+<span style="height: 22px; padding: 0 8px; border-radius: 6px; background: rgba(255,255,255,.08); font-size: 11px; font-weight: 700; color: #c8c8d4; display: inline-flex; align-items: center">{{s.p}}</span>
+<span class="row"><span class="bdot" style="background: {{s.c}}"></span></span>
+<span style="flex-grow: 1"></span>
+<div style="text-align: right"><div class="lbl">Mensuel moy.</div><div style="font-size: 15px; font-weight: 700; margin-top: 3px">{{s.m}}</div></div>
+<div style="text-align: right; margin-left: 26px; width: 150px"><div class="lbl">Annuel prévu</div><div style="font-size: 20px; font-weight: 700; margin-top: 2px; background: linear-gradient(90deg,#ff7a52,#c77dff); -webkit-background-clip: text; background-clip: text; color: transparent">{{s.a}}</div></div>
+</div></article>
+</sc-for>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+    const rows = [['VN', '#2a4fb8', 5200], ['VO', '#d9661f', 3100], ['PR', '#1a9fb5', 1400], ['APV', '#8b3cf0', 2500]];
+    const grid = rows.map(([s, c, base]) => { const vals = months.map((m, i) => String(base + (i % 3 === 2 ? 400 : 0))); const tot = vals.reduce((a, v) => a + Number(v), 0); return { s, c, vals, tot: tot.toLocaleString('fr-FR') + ' €' }; });
+    const collapsed1 = [{ n: 'MASSAGETTES', p: 'PLAQUE CENTRE', m: '3 100 €', a: '37 200 €' }, { n: 'MOZAC', p: 'PLAQUE CENTRE', m: '5 400 €', a: '64 800 €' }, { n: 'USSEL', p: 'PLAQUE CENTRE', m: '2 600 €', a: '31 200 €' }];
+    const collapsed2 = [{ n: 'MOULINS', p: 'PLAQUE NORD', m: '6 200 €', a: '74 400 €' }, { n: 'RICOUX', p: 'PLAQUE NORD', m: '4 900 €', a: '58 800 €' }, { n: 'VICHY', p: 'PLAQUE NORD', m: '8 700 €', a: '104 400 €' }];
+    const collapsed3 = [{ n: 'ALPINE-CLERMONT', p: 'ENTITÉS SPÉCIFIQUES', c: '#2f6fe4', m: '2 500 €', a: '30 000 €' }, { n: 'ALPINE-VICHY', p: 'ENTITÉS SPÉCIFIQUES', c: '#2f6fe4', m: '1 000 €', a: '12 000 €' }, { n: 'NISSAN', p: 'ENTITÉS SPÉCIFIQUES', c: '#d0103a', m: '7 500 €', a: '90 000 €' }];
+    return { months, grid, collapsed1, collapsed2, collapsed3 };
+  }
+}
+</script>
+</body>
+</html>

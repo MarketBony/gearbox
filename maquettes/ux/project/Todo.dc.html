@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>To-do — kanban</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&amp;family=Syncopate:wght@400;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#09090d}
+.gx{font-family:"Albert Sans",system-ui,sans-serif;color:#ededf2;-webkit-font-smoothing:antialiased}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#ff7a52}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9494aa}
+.card{background:rgba(20,20,28,.72);border:1px solid rgba(255,255,255,.09);border-radius:14px;backdrop-filter:blur(18px)}
+.chip{height:32px;padding:0 13px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.02);color:#dcdce6;font:600 13px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.field{height:40px;padding:0 13px;border-radius:10px;border:1px solid rgba(255,255,255,.13);background:rgba(8,8,12,.55);color:#ededf2;font:600 14px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:8px;cursor:pointer;box-sizing:border-box}
+.btn{height:40px;padding:0 16px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);color:#ededf2;font:600 14px "Albert Sans",sans-serif;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.btn.primary{background:linear-gradient(135deg,#ff5a2e,#b43bff);border-color:transparent;color:#fff;box-shadow:0 10px 24px -12px rgba(255,90,46,.8)}
+.row{display:flex;align-items:center}
+.vsep{width:1px;align-self:stretch;background:rgba(255,255,255,.08)}
+.col{display:flex;flex-direction:column;min-height:0;border-radius:16px;background:rgba(12,12,18,.5);border:1px solid rgba(255,255,255,.07);border-top:3px solid}
+.scr{overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.22) transparent}
+.scr::-webkit-scrollbar{width:10px}.scr::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
+.task{border-radius:12px;background:rgba(24,24,33,.9);border:1px solid rgba(255,255,255,.08);padding:14px 16px 10px;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
+.b{height:22px;padding:0 8px;border-radius:6px;font:700 11.5px "Albert Sans",sans-serif;display:inline-flex;align-items:center}
+.nav{flex:1;height:30px;border:0;border-radius:8px;background:rgba(255,255,255,.04);color:#c8c8d4;font-size:16px;cursor:pointer}
+a{color:#ff7a52}
+</style>
+</helmet>
+<div class="gx" style="width: 1920px; height: 1080px; box-sizing: border-box; background: radial-gradient(1100px 700px at 0% 100%, rgba(255,90,46,.16), transparent 70%), radial-gradient(1100px 800px at 100% 0%, rgba(180,59,255,.18), transparent 70%), #09090d; overflow: hidden; display: flex; flex-direction: column; padding: 32px 48px 28px; gap: 18px">
+
+<header style="display: flex; align-items: flex-end; gap: 24px; flex-shrink: 0">
+<div>
+<div class="eyebrow">Gestion de projets</div>
+<h1 style="margin: 6px 0 0; font-family: Syncopate, sans-serif; font-weight: 700; font-size: 30px; letter-spacing: .02em; text-transform: uppercase; line-height: 1.1">To-do</h1>
+<p style="margin: 7px 0 0; font-size: 14px; color: #b8b8c8">13 tâches assignées · les plus urgentes en haut de chaque colonne</p>
+</div>
+<span style="flex-grow: 1"></span>
+<span class="row" style="gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: .08em; color: #ff7a52; text-transform: uppercase">Sauvegarde…</span>
+<button class="btn primary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>Nouvelle tâche</button>
+</header>
+
+<section class="card" style="padding: 14px 20px; display: flex; align-items: center; gap: 18px; flex-shrink: 0">
+<label style="width: 340px; height: 40px; border-radius: 10px; background: rgba(8,8,12,.55); border: 1px solid rgba(255,255,255,.13); display: flex; align-items: center; gap: 10px; padding: 0 12px; box-sizing: border-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9494aa" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg><input placeholder="Rechercher une tâche ou un projet…" aria-label="Rechercher une tâche ou un projet" style="flex-grow: 1; border: 0; outline: 0; background: transparent; color: #ededf2; font: 500 14px 'Albert Sans', sans-serif"></label>
+<button class="field" style="border-color: rgba(255,90,46,.6); color: #ff9272">2 sites ▾</button>
+<div class="vsep"></div>
+<div class="row" style="gap: 6px"><span class="lbl" style="margin-right: 4px">Marques</span><button class="chip" style="background: #f5c518; color: #1a1400; border-color: transparent">Renault</button><button class="chip">Dacia</button><button class="chip">Alpine</button><button class="chip">Nissan</button><button class="chip">Mobilize</button><button class="chip">Holding</button></div>
+<div class="vsep"></div>
+<div class="row" style="gap: 6px"><span class="lbl" style="margin-right: 4px">Services</span><button class="chip">VN</button><button class="chip">VO</button><button class="chip">APV</button><button class="chip">PR</button></div>
+<div class="vsep"></div>
+<div class="row" style="gap: 8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a52" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg><button class="field" style="width: 120px; color: #9494aa">Début</button><span style="color: #9494aa">→</span><button class="field" style="width: 120px; color: #9494aa">Fin</button></div>
+<span style="flex-grow: 1"></span>
+<a href="#" style="font-size: 13px; font-weight: 700; color: #ff7070; text-decoration: none">✕ Effacer tout</a>
+</section>
+
+<section style="flex-grow: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px">
+<sc-for list="{{cols}}" as="c" hint-placeholder-count="4">
+<div class="col" style="border-top-color: {{c.color}}">
+<div class="row" style="padding: 14px 16px 10px; gap: 9px"><span style="width: 9px; height: 9px; border-radius: 50%; background: {{c.color}}"></span><b style="font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: {{c.color}}">{{c.l}}</b><span style="flex-grow: 1"></span><span style="min-width: 26px; height: 24px; border-radius: 12px; background: rgba(255,255,255,.08); display: grid; place-items: center; font-size: 12.5px; font-weight: 700">{{c.n}}</span></div>
+<div class="scr" style="flex-grow: 1; min-height: 0; padding: 4px 12px 14px; display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{c.tasks}}" as="t" hint-placeholder-count="3">
+<article class="task">
+<span style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: {{t.urg}}"></span>
+<b style="font-size: 15px; line-height: 1.3">{{t.name}}</b>
+<div class="row" style="gap: 10px; justify-content: space-between">
+<sc-if value="{{t.free}}" hint-placeholder-val="{{t.free}}"><span class="row" style="gap: 7px; font-size: 13px; color: #d0d0dc; min-width: 0"><span class="b" style="background: rgba(180,59,255,.2); color: #dcb2ff">Libre</span><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{t.sites}}</span><span title="Modifier cette tâche">✎</span></span></sc-if>
+<sc-if value="{{t.proj}}" hint-placeholder-val="{{t.proj}}"><a href="#" class="row" style="gap: 6px; font-size: 13px; color: #d0d0dc; text-decoration: none; min-width: 0"><b style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; color: #ededf2">{{t.project}}</b><span style="color: #9494aa">{{t.site}}</span><span style="color: #ff7a52">↗</span></a></sc-if>
+<span style="font-size: 12.5px; font-weight: 700; white-space: nowrap; color: {{t.dc}}">{{t.due}}</span>
+</div>
+<div class="row" style="gap: 5px; flex-wrap: wrap">
+<sc-for list="{{t.svc}}" as="s" hint-placeholder-count="1"><span class="b" style="background: {{s.c}}; color: #fff">{{s.l}}</span></sc-for>
+<sc-for list="{{t.br}}" as="br" hint-placeholder-count="1"><span class="b" style="background: {{br.c}}; color: {{br.f}}">{{br.l}}</span></sc-for>
+<sc-if value="{{t.ch}}" hint-placeholder-val="{{t.ch}}"><span class="b" style="background: rgba(255,255,255,.1); color: #d0d0dc">{{t.ch}}</span></sc-if>
+<span style="flex-grow: 1"></span>
+<sc-if value="{{t.cost}}" hint-placeholder-val="{{t.cost}}"><span style="font-size: 13px; font-weight: 700; color: #d0d0dc">{{t.cost}}</span></sc-if>
+</div>
+<div class="row" style="gap: 6px; border-top: 1px solid rgba(255,255,255,.06); padding-top: 8px"><button class="nav" aria-label="Statut précédent" style="opacity: {{t.po}}">‹</button><button class="nav" aria-label="Statut suivant" style="opacity: {{t.no}}">›</button></div>
+</article>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const SV = { VN: '#2a4fb8', VO: '#d9661f', APV: '#8b3cf0', PR: '#1a9fb5' };
+    const BR = { Renault: ['#f5c518', '#1a1400'], Dacia: ['#6f7d4f', '#fff'], Alpine: ['#2f6fe4', '#fff'], Nissan: ['#d0103a', '#fff'] };
+    const T = (o, i, last) => ({ free: false, proj: true, ch: '', cost: '', urg: 'transparent', dc: '#9d9db2', ...o,
+      svc: (o.s || []).map((l) => ({ l, c: SV[l] })), br: (o.b || []).map((l) => ({ l, c: BR[l][0], f: BR[l][1] })), po: i === 0 ? '.3' : '1', no: last ? '.3' : '1' });
+    const red = '#ff5a5a', org = '#f5a524';
+    const cols = [
+      { l: 'À faire', color: '#5b8cff', tasks: [
+        T({ name: 'Contacter les mécaniciens pour les 6 burons', project: 'Salon VO Saint-Étienne', site: 'Saint-Étienne', due: 'Expiré il y a 3 j', dc: red, urg: red, s: ['VO'], b: ['Renault', 'Dacia'], ch: 'Lieu' }, 0),
+        T({ name: 'Signature de la convention', project: 'Partenariat GT4 Servol', site: 'Clermont', due: '2 j restants', dc: '#ff8a8a', urg: red, s: ['VN'], b: ['Renault', 'Dacia', 'Alpine'] }, 0),
+        T({ name: 'Mobilier VA', project: 'VA Vichy', site: 'Vichy', due: '29 oct. 2026', s: ['APV'], b: ['Renault', 'Dacia'], ch: 'Mobilier', cost: '1 200 €' }, 0),
+        T({ name: 'Invitations e-mail', project: 'VA Thiers', site: 'Thiers', due: '29 oct. 2026', s: ['APV'], b: ['Renault', 'Dacia'], ch: 'E-mail' }, 0),
+        T({ name: 'Relancer l’imprimeur (devis kakémonos)', free: true, proj: false, sites: 'Clermont, Vichy', due: 'Sans échéance', dc: '#9d9db2', s: ['PR'], b: ['Renault'] }, 0)
+      ] },
+      { l: 'En cours', color: '#f5a524', tasks: [
+        T({ name: 'E-mailing remerciement Forum', project: 'Forum Pièces 2026', site: 'Clermont', due: 'Expiré il y a 3 j', dc: red, urg: red, s: ['PR'], b: ['Renault', 'Dacia'], ch: 'E-mail', cost: '350 €' }, 1),
+        T({ name: 'Fichier T. Dubernat', project: 'Lancement Clio Clermont', site: 'Clermont', due: '6 j restants', dc: org, urg: org, s: ['VN'], b: ['Renault', 'Dacia'] }, 1),
+        T({ name: 'Signature convention', project: 'Jazz en Velay', site: 'Le Puy', due: '1 j restant', dc: '#ff8a8a', urg: red, s: ['VN'], b: ['Renault'] }, 1),
+        T({ name: 'Landing page', project: 'Test-drive & CE Limagrain', site: 'Clermont', due: '15 oct. 2026', s: ['VN'], b: ['Renault', 'Dacia', 'Alpine'], ch: 'GMB' }, 1)
+      ] },
+      { l: 'Programmé', color: '#b43bff', tasks: [
+        T({ name: 'Repas VA', project: 'VA Vichy', site: 'Vichy', due: '29 oct. 2026', s: ['APV'], b: ['Renault', 'Dacia'], ch: 'Traiteur', cost: '1 724 €' }, 2)
+      ] },
+      { l: 'Terminé', color: '#3ecf8e', tasks: [
+        T({ name: 'Réunion du 25/08', project: 'Salon VO Saint-Étienne', site: 'Saint-Étienne', due: 'Expiré il y a 34 j', dc: red, urg: red, s: ['VN'], b: ['Renault', 'Dacia', 'Alpine'] }, 3, true),
+        T({ name: 'Proposition finale', project: 'Partenariat GT4 Servol', site: 'Clermont', due: 'Expiré il y a 3 j', dc: red, urg: red, s: ['VN'], b: ['Renault', 'Dacia', 'Alpine'] }, 3, true),
+        T({ name: 'Prêt de véhicule', project: 'Jazz en Velay', site: 'Le Puy', due: '19 oct. 2026', s: ['VN'], b: ['Renault'] }, 3, true)
+      ] }
+    ].map((c) => ({ ...c, n: c.tasks.length }));
+    return { cols };
+  }
+}
+</script>
+</body>
+</html>

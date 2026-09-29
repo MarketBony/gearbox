@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Marque carree GEARBOX (levier de vitesses) extraite de logo-color.svg le 30/07/2026.
+     Source : le 1er <path> (class="cls-1"), seul element de la marque ; les 8 autres
+     paths du logo d'origine sont les lettres de "GEARBOX" et donnent un ratio 3,9:1
+     inutilisable comme icone. viewBox carre serre (121.25) avec la marque centree
+     verticalement : le remplissage et le fond sont ajoutes au rendu, pas ici. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -3.945 121.25 121.25">
+  <defs>
+    <linearGradient id="gxGrad" x1="0" y1="56.68" x2="121.25" y2="56.68" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e95638"/>
+      <stop offset="0" stop-color="#e95638"/>
+      <stop offset=".17" stop-color="#d34f48"/>
+      <stop offset=".73" stop-color="#933d78"/>
+      <stop offset=".99" stop-color="#7a368b"/>
+      <stop offset="1" stop-color="#7a368b"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#gxGrad)" d="M116.64,63.24V20.2c2.79-2.03,4.61-5.31,4.61-9.03,0-6.17-5-11.17-11.17-11.17s-11.17,5-11.17,11.17c0,3.71,1.82,7,4.61,9.03v29.92h-36.33v-29.92c2.79-2.03,4.61-5.31,4.61-9.03,0-6.17-5-11.17-11.17-11.17s-11.17,5-11.17,11.17c0,3.71,1.82,7,4.61,9.03v29.92H17.73v-29.92c2.79-2.03,4.61-5.31,4.61-9.03C22.34,5,17.34,0,11.17,0S0,5,0,11.17c0,3.71,1.82,7,4.61,9.03v72.96c-2.79,2.03-4.61,5.31-4.61,9.03,0,6.17,5,11.17,11.17,11.17s11.17-5,11.17-11.17c0-3.71-1.82-7-4.61-9.03v-29.92h36.33v29.92c-2.79,2.03-4.61,5.31-4.61,9.03,0,6.17,5,11.17,11.17,11.17s11.17-5,11.17-11.17c0-3.71-1.82-7-4.61-9.03v-29.92h49.45"/>
+</svg>

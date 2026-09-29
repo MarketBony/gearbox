@@ -1,0 +1,100 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Digital.dc.html": {
+      "h": 1080,
+      "title": "Digital — éditos compacts (1920×1080, défile)",
+      "w": 1920,
+      "x": 4000,
+      "y": 0,
+      "is_interactive": true
+    },
+    "Main.dc.html": {
+      "h": 1080,
+      "title": "Dashboard — Cockpit général (1920×1080, défile)",
+      "w": 1920,
+      "x": 0,
+      "y": 0,
+      "is_interactive": true
+    },
+    "Projets.dc.html": {
+      "h": 1080,
+      "title": "Projets — filtres complets et fiche (1920×1080, défile)",
+      "w": 1920,
+      "x": 2000,
+      "y": 0,
+      "is_interactive": true
+    },
+    "Todo.dc.html": {
+      "x": 0,
+      "y": 1320,
+      "w": 1920,
+      "h": 1080,
+      "title": "To-do — kanban (1920×1080)",
+      "is_interactive": true
+    },
+    "Budget.dc.html": {
+      "x": 2000,
+      "y": 1320,
+      "w": 1920,
+      "h": 1080,
+      "title": "Budget — suivi réalisé (1920×1080)",
+      "is_interactive": true
+    },
+    "BudgetProvisions.dc.html": {
+      "x": 4000,
+      "y": 1320,
+      "w": 1920,
+      "h": 1080,
+      "title": "Budget — provisions (1920×1080, défile)",
+      "is_interactive": true
+    },
+    "Hello.dc.html": {
+      "x": 0,
+      "y": 2640,
+      "w": 1920,
+      "h": 1080,
+      "title": "Hello Marketing (1920×1080, défile)",
+      "is_interactive": true
+    },
+    "Depenses.dc.html": {
+      "x": 2000,
+      "y": 2640,
+      "w": 1920,
+      "h": 1080,
+      "title": "Dépenses — liste et saisie (1920×1080)",
+      "is_interactive": true
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-09-28T12:05:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "titre": {
+      "kind": "title1",
+      "maxW": 5920,
+      "text": "UX type — direction Signal, aérée et contrastée",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Projets.dc.html",
+    "Digital.dc.html",
+    "Todo.dc.html",
+    "Budget.dc.html",
+    "BudgetProvisions.dc.html",
+    "Hello.dc.html",
+    "Depenses.dc.html"
+  ],
+  "pages": [],
+  "title": "Gearbox — UX type des rubriques"
+}
