@@ -232,8 +232,20 @@ export function useCompact(ref: React.RefObject<HTMLElement>, threshold: number)
  * L'ancienne règle (la maquette : un pas toutes les 550 ms) faisait 2 à 3 pas sur un pavé Windows, dont
  * l'inertie dure plus d'une seconde (recette 30/09/2026 : « ça m'envoie 3 semaines plus loin »).
  * Un élément qui défile lui-même horizontalement garde son défilement (tableau large, etc.).
+ * Dans la coque, le geste passe par la PORTE UNIQUE du moteur (`GX.gesture`, ui2/os/engine/gesture.ts) :
+ * l'élément devient le destinataire des gestes commencés au-dessus de lui (pas de bascule de fenêtre
+ * par-dessus l'Agenda), et des balayages enchaînés sans pause comptent chacun pour un pas.
  */
 export function bindSwipeWheel(el: HTMLElement, onStep: (dir: 1 | -1) => void, { threshold = 70, idle = 200 } = {}) {
+  const G = gx()?.gesture;
+  if (G) {
+    let stepped = false;
+    return G.register(el, {
+      begin: () => { stepped = false; },
+      move: (acc: number) => { if (!stepped && Math.abs(acc) >= threshold) { stepped = true; onStep(acc > 0 ? 1 : -1); } },
+    }) as () => void;
+  }
+  // Hors coque (sans moteur) : reconnaissance locale d'origine.
   let acc = 0, locked = false, t = 0;
   const scrollsX = (target: EventTarget | null, dx: number) => {
     for (let n = target as HTMLElement | null; n && n !== el; n = n.parentElement) {

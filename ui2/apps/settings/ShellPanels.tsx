@@ -1,7 +1,7 @@
 import React from 'react';
 import { useBridge } from '../../os/bridge';
 import { getPushState } from '../../../services/pushNotifications';
-import { gx, hud, Icon } from '../ui/kit';
+import { gx, hud, Icon, Seg, useEngineStore } from '../ui/kit';
 import { Head, Row, Switch, css, roleLabel, type SectionDef } from './common';
 
 // =====================================================================
@@ -92,10 +92,27 @@ export function DesktopPanel({ s, role, openSheet }: { s: SectionDef; role: stri
       </div>
       <div className="set-gt">Fenêtres</div>
       <div className="set-group enter" style={css({ '--i': 2 })} data-anchor="session">
+        <SwipeRows />
         <Row t="Session en cours" d={`${n} fenêtre${n > 1 ? 's' : ''} ouverte${n > 1 ? 's' : ''} · ${sp} bureau${sp > 1 ? 'x' : ''}. Positions, ancrages et bureaux sont restaurés à la prochaine ouverture.`}><span className="badge" style={css({ '--c': 'var(--ok)' })}><i className="dot" />Enregistrée</span></Row>
         <Row t="Réinitialiser la session des fenêtres" d="Referme toutes les fenêtres et oublie leurs positions. La page se recharge." cls="stk"><button className="btn danger" onClick={resetSession}><Icon name="refresh" size="sm" />Réinitialiser…</button></Row>
       </div>
     </div>
+  );
+}
+
+// Balayage 2 doigts entre fenêtres (ui2/os/engine/winswipe.ts) — EN ESSAI : les deux rendus sont
+// proposés pour comparaison ; `gestureLite` coupe le verre des fenêtres pendant le geste (mesure).
+type SwipeMode = 'auto' | 'slide' | 'strip' | 'off';
+function SwipeRows() {
+  const [m, setM] = useEngineStore<SwipeMode>('gestureMode', 'auto');
+  const [lite, setLite] = useEngineStore<boolean>('gestureLite', false);
+  return (
+    <>
+      <Row t="Balayage à deux doigts entre les fenêtres" d="Sur une fenêtre : fenêtre suivante ou précédente, dans l’ordre du Dock. Sur le fond : bureau suivant. Auto = Glissement si la fenêtre est agrandie, Bandeau sinon." cls="stk">
+        <Seg<SwipeMode> value={m} onChange={setM} options={[['auto', 'Auto'], ['slide', 'Glissement'], ['strip', 'Bandeau'], ['off', 'Désactivé']]} />
+      </Row>
+      <Row t="Verre coupé pendant le balayage" d="Les fenêtres deviennent opaques le temps du geste : plus fluide sur un PC modeste"><Switch on={lite} label="Verre coupé pendant le balayage" onChange={setLite} /></Row>
+    </>
   );
 }
 

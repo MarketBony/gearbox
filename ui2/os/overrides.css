@@ -61,3 +61,11 @@ input[type="checkbox"].switch:disabled { opacity: .5; cursor: default; }
 /* 2. Légende de la matrice des accès : `.set-legend2 span` (inline-flex) s'appliquait aussi aux pastilles
       imbriquées et cassait leur centrage. */
 .set-legend2 :is(.set-yes, .set-ro) { display: inline-grid; place-items: center; gap: 0; }
+
+/* [GEARBOX] Balayage 2 doigts entre fenêtres (engine/winswipe.ts). Pendant le geste : aucune fenêtre ne
+   capte la souris, l'échelle du « Bandeau » part du coin haut gauche. `gx-swipe-lite` (réglage de mesure) :
+   verre des fenêtres coupé le temps du geste. */
+:host(.gx-swiping) .win { pointer-events: none !important; transform-origin: 0 0; }
+.gx-sw-veil { position: absolute; inset: 0; z-index: 99; background: rgba(0, 0, 0, .38); pointer-events: none; }
+.win.gx-sw-on { box-shadow: 0 0 0 7px var(--bony-orange), var(--shadow-3) !important; }
+:host(.gx-swipe-lite) .win { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: var(--surface-1) !important; }

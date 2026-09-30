@@ -15,7 +15,9 @@ import { install as controls } from './controls';
 import { install as icons } from './icons';
 import { install as wallpapers } from './wallpapers';
 import { install as widgets } from './widgets';
+import { install as gesture } from './gesture';
 import { install as wm } from './wm';
+import { install as winswipe } from './winswipe';
 import { install as shell } from './shell';
 import { install as mobile } from './mobile';
 import { install as system } from './apps/system';
@@ -56,7 +58,7 @@ export function boot(host: HTMLElement, root: ShadowRoot, body: HTMLElement): Sh
   GX.data.ME = b0.user.id;
   r();
 
-  charts(); pickers(); controls(); icons(); wallpapers(); widgets(); wm(); shell(); mobile(); system();
+  charts(); pickers(); controls(); icons(); wallpapers(); widgets(); gesture(); wm(); winswipe(); shell(); mobile(); system();
 
   // --- Rubriques PORTÉES (React, ui2/apps/*) : le moteur fournit la fenêtre, React la remplit par
   //     portail (OsHost). Un conteneur dédié en `display: contents` : React ne partage pas son nœud

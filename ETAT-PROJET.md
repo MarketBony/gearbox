@@ -185,7 +185,28 @@
     réservé au **Master** ; carte « projet cité » du Chat (un GROUPE BONY listait tous ses sites et élargissait la
     conversation) ; balayage 2 doigts **un pas par geste**, inertie ignorée (`bindSwipeWheel` dans `ui/kit.tsx`,
     Agenda — qui avançait de 3 semaines — et planning du Matériel). Vérifié dans le navigateur (Master).
-  - En étude, non codé : navigation gestuelle entre fenêtres ; gestion des accès par rôle depuis Rôles & accès.
+  - En étude, non codé : gestion des accès par rôle depuis Rôles & accès (noté au backlog, pour plus tard).
+- **Navigation gestuelle — 30/09, branche `feat/ui2-gestes` (depuis `feat/ui2-lot3`, NON poussée), étapes 1 à 3
+  du plan, INTÉGRATION À VALIDER PAR THÉO** : balayage 2 doigts du pavé entre les fenêtres du bureau.
+  - Contraintes : seuls les 2 doigts arrivent au navigateur (3/4 doigts pris par Windows), en `wheel` sans phase
+    ni signal de lever ; le retour arrière de Chrome/Edge au balayage est coupé (`overscroll-behavior-x: none`).
+  - `ui2/os/engine/gesture-core.ts` : reconnaissance pure (axe décidé au début, lever = décroissance du flux,
+    inertie avalée, geste enchaîné = ré-accélération au-dessus du creux ou changement de sens).
+  - `ui2/os/engine/gesture.ts` : **PORTE UNIQUE** — un seul écouteur `wheel` ; chaque geste entier va à un seul
+    destinataire : élément enregistré (`GX.gesture.register`, utilisé par `bindSwipeWheel` : Agenda, Matériel)
+    > défilement horizontal natif possible > fenêtre > bureaux. L'ancien écouteur des bureaux (`wm.ts`) y est
+    branché ; menus, sélecteurs et volets n'ont plus de balayage.
+  - `ui2/os/engine/winswipe.ts` : rendu qui suit les doigts + ressort parti de la vitesse. « Glissement »
+    (fenêtre agrandie, façon apps plein écran du Mac) et « Bandeau » (cartes, plusieurs fenêtres d'un geste
+    lancé), choix dans Réglages › Bureau et Dock (Auto par défaut) ; ordre du Dock figé pendant le geste,
+    fenêtres réduites exclues, butée élastique en bout de liste. Option de mesure « verre coupé pendant le geste ».
+  - `maquettes/ux/diag-geste.html` (page de diagnostic du pavé, servie par Vite) et `scripts/gesture-replay.mjs`
+    (rejoue les enregistrements hors navigateur ; sans argument, auto-test synthétique : 5/5).
+  - Vérifié en simulation dans la coque (Bandeau : butée, une fenêtre par geste, deux d'un geste fort ;
+    Glissement corrigé après un faux « nouveau geste » pendant une saccade). NON vérifié : vrai pavé, Agenda et
+    Matériel via la porte, bureaux via la porte, fluidité en build de prod — session expirée pendant les tests.
+  - ⚠️ Piège : un onglet en arrière-plan ne donne plus d'images (rAF) ; l'animation se conclut désormais d'office
+    si la page est masquée en plein geste.
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
@@ -3465,6 +3486,11 @@
 > l'historique des correctifs ci-dessus et dans `BUGS-CONNUS.md`.
 
 ### Fonctionnel / produit
+- **Gestion des accès par rôle depuis Réglages › Rôles & accès** (demande de Théo, 30/09/2026, NOTÉE POUR PLUS
+  TARD) : rendre la matrice modifiable. Plan proposé : table de droits (rôle × rubrique × Aucun/Lecture/Édition,
+  vide = droits actuels), une porte serveur unique à la place des 44 `requireRole`, client (navigation, routage,
+  droits d'écriture) sur la même configuration dans les deux interfaces, cases verrouillées (Master, Rôles &
+  accès, chef de site plafonné à la Lecture), journal des changements. À faire après la bascule v2 sur master.
 - **✅ IMPORT DU CALENDRIER ÉDITORIAL FAIT le 02/09/2026** — 43 publications en base,
   du 01/09 au 29/12/2026. Détail et contrôles dans le correctif 46.
   **Reste le dépôt MANUEL des 7 fichiers** que le classeur ne contenait pas

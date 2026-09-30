@@ -462,18 +462,21 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   };
   /* Swipe horizontal (pavé tactile / molette horizontale / doigt sur le fond) */
   function initSwipe() {
-    let acc = 0, t = 0, active = false;
-    const onWheel = (e) => {
-      if (Math.abs(e.deltaX) < Math.abs(e.deltaY) * 1.2 || Math.abs(e.deltaX) < 2) return;
-      if (e.target.closest('.win-body') && !e.target.closest('.titlebar')) return; // à l'intérieur d'une fenêtre, on laisse défiler
-      if (spaces.length < 2 && !e.shiftKey) { /* rien */ }
-      e.preventDefault(); if (!active) showAllSpaces(); active = true; acc += e.deltaX;
-      const max = innerWidth * .9; const atEdge = (acc < 0 && cur === 0) || (acc > 0 && cur === spaces.length - 1);
-      const shown = atEdge ? Math.sign(acc) * Math.sqrt(Math.abs(acc)) * 6 : Math.max(-max, Math.min(max, acc));
-      spaceEls.forEach((s, i) => { s.classList.remove('anim'); s.style.transform = `translateX(calc(${(i - cur) * 100}% - ${shown}px))`; });
-      clearTimeout(t); t = setTimeout(() => { active = false; const go = Math.abs(acc) > innerWidth * .16 ? cur + Math.sign(acc) : cur; acc = 0; if (go !== cur && go >= 0 && go < spaces.length) goSpace(go, true); else layoutSpaces(true); }, 130);
+    /* [GEARBOX] Pavé : le flux `wheel` passe par la porte unique (engine/gesture.ts), qui confie ici les
+       gestes commencés hors d'une fenêtre. Même rendu qu'avant ; la fin du geste est décidée au lever des
+       doigts (avec la vitesse) au lieu d'attendre la fin de l'inertie. */
+    if (GX.gesture) GX.gesture.owners.spaces = {
+      begin: () => { if (desk.classList.contains('mc')) return false; showAllSpaces(); },
+      move: (acc) => {
+        const max = innerWidth * .9; const atEdge = (acc < 0 && cur === 0) || (acc > 0 && cur === spaces.length - 1);
+        const shown = atEdge ? Math.sign(acc) * Math.sqrt(Math.abs(acc)) * 6 : Math.max(-max, Math.min(max, acc));
+        spaceEls.forEach((s, i) => { s.classList.remove('anim'); s.style.transform = `translateX(calc(${(i - cur) * 100}% - ${shown}px))`; });
+      },
+      end: (acc, v) => {
+        const d = Math.abs(acc) > innerWidth * .16 || (Math.abs(v) > .5 && Math.sign(v) === Math.sign(acc)) ? Math.sign(acc) : 0;
+        const go = cur + d; if (d && go >= 0 && go < spaces.length) goSpace(go, true); else layoutSpaces(true);
+      },
     };
-    GX.win(window, 'wheel', onWheel, { passive: false });
     // Doigt / stylet sur le fond du bureau
     desk.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' || e.target.closest('.win,.wdg')) return;
