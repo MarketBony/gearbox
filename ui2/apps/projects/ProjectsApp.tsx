@@ -79,8 +79,11 @@ export default function ProjectsApp({ win, inst, mode }: AppProps & { mode: Mode
     const pr = workspace.getState().byId[id]; if (!pr || mode === 'doc') return false;
     if ((pr.status === 'Archived') !== (mode === 'archived')) {
       // Mauvaise rubrique : la bonne s'en charge (l'origine l'ouvrait dans la mauvaise vue).
+      // Rubrique refusée (chef de site → Archives) : on s'arrête là. Avant, la commande repartait vers la
+      // fenêtre active — celle-ci — qui recommençait : boucle toutes les 60 ms (audit du 30/09/2026).
       const w = gx().wm.open(pr.status === 'Archived' ? 'archives' : 'projects');
-      setTimeout(() => (w || gx().wm.active())?.inst?.command?.(`select:${id}`), 60); return true;
+      if (!w) return false;
+      setTimeout(() => w.inst?.command?.(`select:${id}`), 60); return true;
     }
     if (f.status !== 'All' || n) setF(F0());
     select(id); return true;

@@ -109,7 +109,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {}
     home.classList.add('dim'); b.style.zIndex = 900; GX.animate(b.querySelector('.app-ico'), [{ transform: 'scale(.88)' }, { transform: 'scale(1.12)' }], { spring: 'bouncy', fill: 'forwards' });
     const r = b.getBoundingClientRect();
-    GX.menu.open([{ label: 'Ouvrir ' + a.name, icon: 'arrowr', action: () => M.open(id, {}, b.querySelector('.app-ico')) }, ...(q && !GX.ctx.readOnly ? [{ label: q[1], icon: 'plus', action: () => { const w = M.open(id); setTimeout(() => w?.inst?.command?.(q[0]), 480); } }] : []), '-', { label: 'Rechercher', icon: 'search', action: spotlight }],
+    GX.menu.open([{ label: 'Ouvrir ' + a.name, icon: 'arrowr', action: () => M.open(id, {}, b.querySelector('.app-ico')) }, ...(q && GX.shell.canAction(q[0]) /* [GEARBOX] même règle que la rubrique (engine/shell.ts) */ ? [{ label: q[1], icon: 'plus', action: () => { const w = M.open(id); setTimeout(() => w?.inst?.command?.(q[0]), 480); } }] : []), '-', { label: 'Rechercher', icon: 'search', action: spotlight }],
       { x: r.left, y: r.bottom + 8 }, { onClose: () => { home.classList.remove('dim'); b.style.zIndex = ''; b.querySelector('.app-ico').getAnimations().forEach((x) => x.cancel()); } });
   }
   function refreshBadges() {
@@ -318,8 +318,8 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const render = () => {
       const t = q.value.trim().toLowerCase(), has = (x) => x.toLowerCase().includes(t);
       const apps = [...GX.apps.values()].filter((a) => !a.hidden && !a.system && GX.shell.canOpen(a.id) && (!t || has(a.name))).slice(0, t ? 6 : 8).map((a) => ({ i: GX.appIcon(a, 34), l: a.name, s: 'Rubrique', run: () => M.open(a.id) }));
-      const pr = t ? D.PROJECTS.filter((p) => has(p.name)).slice(0, 5).map((p) => ({ i: GX.icon('projects', 'lg'), l: p.name, s: p.sites[0], run: () => M.open('project', { id: p.id, title: p.name }) })) : [];
-      const pp = t ? D.USERS.filter((u) => u.id !== GX.ctx.uid && has(u.name)).slice(0, 3).map((u) => ({ i: GX.r.av(u.id), l: u.name, s: 'Message', run: () => { const w = M.open('chat'); setTimeout(() => w?.inst?.command?.('dm:' + u.id), 450); } })) : [];
+      const pr = t && GX.shell.canOpen('projects') ? D.PROJECTS.filter((p) => has(p.name)).slice(0, 5).map((p) => ({ i: GX.icon('projects', 'lg'), l: p.name, s: p.sites[0], run: () => M.open('project', { id: p.id, title: p.name }) })) : [];
+      const pp = t && GX.shell.canOpen('chat') ? D.USERS.filter((u) => u.id !== GX.ctx.uid && has(u.name)).slice(0, 3).map((u) => ({ i: GX.r.av(u.id), l: u.name, s: 'Message', run: () => { const w = M.open('chat'); setTimeout(() => w?.inst?.command?.('dm:' + u.id), 450); } })) : [];
       const items = [...pr, ...apps, ...pp];
       res.innerHTML = items.map((x, i) => `<button class="sp-r" data-i="${i}">${x.i}<span class="ellipsis">${GX.esc(x.l)}</span><span class="sub">${GX.esc(x.s || '')}</span></button>`).join('') || `<div class="empty">${GX.icon('search')}Aucun résultat</div>`;
       res.onclick = (e) => { const b = e.target.closest('.sp-r'); if (b) { s.remove(); items[+b.dataset.i].run(); } };

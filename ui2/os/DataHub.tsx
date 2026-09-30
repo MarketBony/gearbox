@@ -22,6 +22,7 @@ import type { Project, BudgetLine, SocialPost, FixedExpense, User, Equipment, Eq
 // Le moteur (engine/boot.ts) a créé GX.data AVANT d'installer ses modules : on remplit CET objet.
 const gx = () => (window as any).GX;
 
+const NONE: never[] = [];
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 // Le pont est publié par OsHost AVANT le montage de DataHub ; ce garde ne sert qu'aux cas limites
@@ -46,8 +47,16 @@ function DataHubInner() {
   // Budgets, publications, dépenses, matériel, congés : ressources PARTAGÉES (ui2/store/collections.ts),
   // les mêmes que les rubriques portées — chargées une fois, rechargées sur leurs événements.
   const allowed = b.nav.allowedIds;
-  const budgetsL = rBudgets.use(), socialL = rSocial.use(), fixedL = rFixed.use();
-  const core = useMemo(() => (budgetsL && socialL && fixedL && projectsReady ? { budgets: budgetsL, socialPosts: socialL, fixedExpenses: fixedL, projects } : null), [budgetsL, socialL, fixedL, projects, projectsReady]);
+  // ⚠️ Chargées SEULEMENT pour un rôle qui a une rubrique qui s'en sert (comme l'ancienne interface, qui ne les
+  // demandait qu'à l'ouverture de ces pages). Avant le 30/09/2026 : chargées pour TOUS, donc les budgets et
+  // dépenses de tout le réseau passaient dans l'onglet Réseau d'un External (les GET du serveur ne filtrent
+  // pas par rôle). Non chargée = liste vide pour les widgets et les statistiques.
+  const needBudgets = allowed.has('budget') || allowed.has('dashboard');
+  const needFixed = needBudgets || allowed.has('fixed-expenses');
+  const needSocial = allowed.has('digital') || allowed.has('dashboard');
+  const budgetsR = rBudgets.useWhen(needBudgets), socialR = rSocial.useWhen(needSocial), fixedR = rFixed.useWhen(needFixed);
+  const budgetsL = needBudgets ? budgetsR : NONE, socialL = needSocial ? socialR : NONE, fixedL = needFixed ? fixedR : NONE;
+  const core = useMemo(() => (budgetsL && socialL && fixedL && projectsReady ? { budgets: budgetsL as BudgetLine[], socialPosts: socialL as SocialPost[], fixedExpenses: fixedL as FixedExpense[], projects } : null), [budgetsL, socialL, fixedL, projects, projectsReady]);
   const eqL = rEquip.useWhen(allowed.has('material')), bkL = rBookings.useWhen(allowed.has('material'));
   const equip = useMemo(() => (eqL && bkL ? { eq: eqL, bk: bkL } : null), [eqL, bkL]);
   // Congés : période de référence en cours (juin → mai) jusqu'à J+60, comme avant.
@@ -77,7 +86,7 @@ function DataHubInner() {
     D.ME = uid;
     GX.ctx.uid = uid; GX.ctx.role = role;
     GX.ctx.readOnly = ['Site Manager', 'Guest'].includes(role);
-    GX.ctx.site = role === 'Site Manager' ? (b.user.sites || [])[0] || null : null;
+    // `ctx.site` / `ctx.sites` (chef de site) : posés par la coque (engine/shell.ts, applyRole) — une seule règle.
     D.USERS = users.map(u => mapUser(u, !!presence && Object.values(presence as any).some((arr: any) => Array.isArray(arr) && arr.some((x: any) => x?.userId === u.id || x === u.id))));
     if (core) {
       // Brouillons : présents dans PROJECTS (la To-do les montre), exclus par les widgets comme par les pages.

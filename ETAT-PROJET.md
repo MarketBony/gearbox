@@ -227,8 +227,29 @@
     **Trouvé en mesurant : chaque changement de fenêtre active re-rendait TOUTES les rubriques portées ouvertes**
     (`DeferredApp` d'`OsHost.tsx` non figé ; 125 à 178 ms en prod, à chaque clic d'une fenêtre à l'autre) :
     `DeferredApp` et `DataHub` passés en `React.memo` → 0 tâche longue. Aide des raccourcis et
-    `ui2/apps/PORTAGE.md` (règle de la porte unique) à jour. Non fait, en attente d'un avis de Théo : passage au
-    bureau suivant en bout de liste.
+    `ui2/apps/PORTAGE.md` (règle de la porte unique) à jour. Passage au bureau suivant en bout de liste : refusé
+    par Théo (butée élastique conservée).
+- **Correctif 59 — 30/09 : bêta v2 ouverte à TOUS les rôles et déployée** (`UI2_BETA_ROLES = null`, `ui2/beta.ts`).
+  - **Audit des droits des 16 rubriques** (lecture du code, 3 agents + contrôle des 4 dernières) avant l'ouverture.
+    Corrigé :
+    - ⚠️ `ui2/os/DataHub.tsx` chargeait budgets, dépenses et publications pour TOUS les rôles au démarrage : les
+      budgets et dépenses de tout le réseau passaient dans l'onglet Réseau d'un External (les GET du serveur ne
+      filtrent pas par rôle). Chargés désormais seulement si le rôle a une rubrique qui s'en sert.
+    - actions globales (menu Fichier, Spotlight, appui long mobile) proposées à tous puis refusées : gardées par
+      les règles des rubriques (`S.canAction`, `engine/shell.ts`) ; résultats Projets / Publications / Personnes
+      de la recherche seulement si la rubrique est ouvrable ; Launchpad sans les rubriques interdites ;
+    - commande envoyée à la fenêtre ACTIVE quand l'ouverture est refusée (`S.openWith`, widgets Chat) ; dans
+      Projets, ce repli faisait BOUCLER la fenêtre toutes les 60 ms pour un chef de site envoyé vers un projet
+      archivé ;
+    - segment de statut de la fiche Projet actionnable au clavier en lecture seule ; To-do gardée par
+      `canEditProjects` ; carte d'événement de Hello non cliquable pour un External ;
+    - réaction du widget Chat factice (restée dans le navigateur) : ouvre désormais la conversation ;
+    - chef de site multi-concessions : libellés et périmètre global sur TOUTES ses concessions (pas la 1re).
+  - **Écritures sensibles testées par l'interface** : provision du Budget (Aurillac PR janvier 250 → 251 → 250 :
+    une seule valeur changée, puis 25 lignes identiques à l'état initial) ; congé posé puis retiré sur le compte de
+    Théo (17/12/2026 ; aucune notification, base identique à l'état initial).
+  - Non fait : test avec de vrais comptes restreints (la bêta ouverte sert à ça), coque mobile (test par Théo).
+  - ECU : graphe global rafraîchi (`ECU.ps1 -Rafraichir`, gearbox 1 638 → 3 676 nœuds), non commité (règle ECU).
   - ⚠️ Piège : un onglet en arrière-plan ne donne plus d'images (rAF) ; l'animation se conclut désormais d'office
     si la page est masquée en plein geste.
 
@@ -239,15 +260,16 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- ⚠️ **Depuis le 30/09/2026, `master` est EN AVANCE sur la prod** : l'interface v2 (Gearbox OS, lots 1 à 4 +
-  navigation gestuelle, branche `feat/ui2-lot3`) est mergée et poussée à la demande de Théo, **NON déployée**.
-  Aucun changement backend ni migration : au prochain déploiement, seule l'image **`web`** change. La bêta reste
-  proposée au seul **Master** (`UI2_BETA_ROLES` dans `ui2/beta.ts`) tant que la liste n'est pas ouverte ; l'ancienne
-  interface reste celle de tout le monde. Mais ⚠️ le lot touche aussi l'ANCIENNE interface : `pages/Budget.tsx`,
-  `pages/Export.tsx`, `pages/Dashboard.tsx` passent par les services partagés `services/budgetStats.ts`,
-  `services/exportXlsx.ts`, `services/dashboardStats.ts` (chiffres vérifiés identiques le 30/09). Tout correctif
-  déployé depuis `master` embarque désormais ce lot.
-- Avant le 30/09 : master = prod, synchronisés. Dernier lot déployé : **correctif 58** (Digital : plusieurs
+- master = prod, synchronisés. Dernier lot déployé : **correctif 59** (30 septembre 2026) — **INTERFACE V2
+  (Gearbox OS) EN BÊTA OUVERTE À TOUS LES RÔLES** : lots 1 à 4 (coque + 16 rubriques portées), navigation
+  gestuelle, audit des droits corrigé. **`web` SEUL, sans migration** (aucun fichier sous `backend/`).
+  L'ancienne interface reste celle PAR DÉFAUT ; chacun bascule par Paramètres › Application › « Nouvelle
+  interface (bêta) » (retour au même endroit, ou `?ui=classic`, ou automatique si la coque plante).
+  ⚠️ Le lot touche aussi l'ANCIENNE interface : `pages/Budget.tsx`, `pages/Export.tsx`, `pages/Dashboard.tsx`
+  passent par les services partagés `services/budgetStats.ts`, `services/exportXlsx.ts`,
+  `services/dashboardStats.ts` (chiffres vérifiés identiques le 30/09). Push, merge et déploiement demandés par
+  Théo (« go », hotspot).
+- Avant lui le **correctif 58** (Digital : plusieurs
   classes CO² par édito, case PRO+, 24 septembre) — **`api` ET `web`**, **avec migration**
   (`20260924150000_social_co2_multi_et_proplus`, additive : `SocialPost.co2s` et
   `SocialPost.proPlus`, reprise des 7 classes existantes). Push et déploiement autorisés

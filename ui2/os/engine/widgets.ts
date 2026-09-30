@@ -384,7 +384,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       }
       if (e.target.closest('input,textarea,button[data-play]')) return;
       const pr = e.target.closest('[data-proj]'); if (pr) { const p = D.project(pr.dataset.proj); return GX.openProject(p.id); }
-      const cv = e.target.closest('[data-conv]'); if (cv) { const win = GX.wm.open('chat', {}, { origin: cv }); return setTimeout(() => (win || GX.wm.active())?.inst?.command?.('conv:' + cv.dataset.conv), 420); }
+      const cv = e.target.closest('[data-conv]'); if (cv) { const win = GX.wm.open('chat', {}, { origin: cv }); if (!win) return; /* [GEARBOX] refusé : rien (pas la fenêtre active) */ return setTimeout(() => win.inst?.command?.('conv:' + cv.dataset.conv), 420); }
       const op = e.target.closest('[data-open]'); if (op) return GX.wm.open(op.dataset.open, {}, { origin: op.querySelector('.app-ico') });
       if (el.dataset.app) { if (GX.wm.desktopShown?.()) GX.wm.showDesktop(false); GX.wm.open(el.dataset.app, {}, { origin: el }); }
     };
@@ -564,13 +564,14 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     if (!c) return;
     if (origin?.closest('#widgets') && GX.wm.desktopShown?.()) GX.wm.showDesktop(false);
     const win = GX.wm.open('chat', {}, { origin: origin?.closest('.wdg') || origin });
-    const go = () => (win || GX.wm.active?.())?.inst?.command?.('conv:' + c.id);
+    if (!win) return;                                  // [GEARBOX] ouverture refusée : rien
+    const go = () => win.inst?.command?.('conv:' + c.id);
     if (win?.inst?.command) go(); else setTimeout(go, 420);
   }
   function chSend(w, input) {
     const c = chConv(w.cfg), t = input?.value.trim(); if (!c || !t) return;
     /* [GEARBOX] envoyer ÉCRIRAIT en base : le message part depuis l'app Chat (conversation ouverte) */
-    { const win = GX.wm.open('chat'); setTimeout(() => (win || GX.wm.active())?.inst?.command?.('conv:' + c.id), 420); return; }
+    { const win = GX.wm.open('chat'); if (win) setTimeout(() => win.inst?.command?.('conv:' + c.id), 420); return; }
     const m = { id: GX.uid('m'), u: GX.ctx.uid, t, at: Date.now(), type: 'text', r: {}, seen: [] };
     chMsgs(c).push(m); delete chDraft[w.id + c.id]; input.value = '';
     w.cfg = { ...(w.cfg || {}), conv: c.id }; save();
@@ -621,10 +622,10 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       return chRefresh(w.id);
     }
     if (a === 'react') {
-      const m = chMsgs(c).find((x) => x.id === b.closest('[data-wmsg]')?.dataset.wmsg); if (!m) return;
-      const us = ((m.r ||= {})[b.dataset.e] ||= []), i = us.indexOf(GX.ctx.uid); i < 0 ? us.push(GX.ctx.uid) : us.splice(i, 1);
-      GX.emit('chat:message', { conv: c.id, msg: m, from: 'widget-react' });
-      chRefresh();
+      /* [GEARBOX] Le widget n'a que le DERNIER message de chaque conversation, sans son vrai identifiant :
+         réagir ouvre la conversation dans le Chat (comme l'envoi). Avant : réaction factice, gardée dans ce
+         seul navigateur (audit du 30/09/2026). */
+      return chOpen(c, b);
     }
   }, true);
   GX.win(document, 'keydown', (e) => {

@@ -718,7 +718,7 @@ const Settings: React.FC = () => {
         )}
 
         {/* Interface v2 (Gearbox OS, bêta). `BetaToggle` ne s'affiche que pour les rôles
-            de `UI2_BETA_ROLES` (Master seul jusqu'au lot 1, puis tous). */}
+            de `UI2_BETA_ROLES` (ouvert à tous les rôles depuis le 30/09/2026). */}
         {user && <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/5 empty:hidden">
           <BetaToggle userId={user.id} role={user.role} />
         </div>}

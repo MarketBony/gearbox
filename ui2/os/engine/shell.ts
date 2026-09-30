@@ -1,6 +1,8 @@
 // @ts-nocheck — moteur de la maquette CONVERTI (maquettes/v2/js/shell.js), comportement identique.
 // Typage fin : second temps, fichier par fichier, une fois le rendu validé identique à la maquette.
 // Substitutions mécaniques : scripts/ui2-convert-engine.mjs. Retouches manuelles : balises [GEARBOX].
+import { canEditProjects, canEditDigital, FIXED_EXPENSE_EDIT_ROLES, peutLireConges } from '../../../constants';
+import { canBook } from '../../apps/material/logic';
 export function install(): void {
 const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à l'import
 /* =====================================================================
@@ -22,8 +24,14 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   /* [GEARBOX] Rôle et site RÉELS du compte (pont de l'appli) — « Voir comme » est retiré. */
   const applyRole = () => {
     const b = GX.bridge(); GX.ctx.role = b.user.role; GX.ctx.uid = b.user.id;
-    GX.ctx.site = GX.ctx.role === 'Site Manager' ? ((b.user.sites || [])[0] || null) : null;
-    GX.ctx.readOnly = ['Site Manager', 'Guest'].includes(GX.ctx.role); GX.ctx.perimetre = GX.ctx.site || GX.ctx.perimetre;
+    /* Chef de site : `ctx.site` = LIBELLÉ de son périmètre verrouillé (toutes ses concessions, pas la première
+       seule — audit du 30/09/2026) ; `ctx.sites` = la liste. Le périmètre global ne filtre rien de plus : le
+       serveur n'envoie déjà que ses sites (d'où « Tout le réseau » dès qu'il en a plusieurs). */
+    const sm = GX.ctx.role === 'Site Manager', ss = sm ? (b.user.sites || []) : [];
+    GX.ctx.sites = sm ? ss : null;
+    GX.ctx.site = sm ? (ss.length > 1 ? ss.join(', ') : ss[0] || 'Aucun site') : null;
+    GX.ctx.readOnly = ['Site Manager', 'Guest'].includes(GX.ctx.role);
+    GX.ctx.perimetre = sm ? (ss.length === 1 ? ss[0] : 'Tout le réseau') : GX.ctx.perimetre;
   };
   applyRole();
 
@@ -34,6 +42,21 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const b = GX.bridge(), tab = GX.tabOf(id);
     return b.nav.allowedIds.has(tab) && b.resolveTab(tab) === tab;
   };
+  /* [GEARBOX] Actions globales (menu Fichier, Spotlight, appui long mobile) : proposées seulement au rôle qui
+     peut les FAIRE — mêmes règles que les rubriques (constants.ts), jamais une liste locale. Avant : proposées à
+     tous puis refusées à l'ouverture (audit des droits du 30/09/2026). */
+  const ACTION_RIGHTS = {
+    'new-project': () => canEditProjects(GX.ctx.role) && !GX.ctx.readOnly,
+    'new-post': () => canEditDigital(GX.ctx.role) && !GX.ctx.readOnly,
+    'conge': () => peutLireConges(GX.ctx.role),
+    'book': () => canBook(GX.ctx.role),
+    'expense': () => FIXED_EXPENSE_EDIT_ROLES.includes(GX.ctx.role) && !GX.ctx.readOnly,
+  };
+  const ACTION_APP = { 'new-project': 'projects', 'new-post': 'digital', 'conge': 'conges', 'book': 'material', 'expense': 'fixed' };
+  S.canAction = (k) => !ACTION_APP[k] || (S.canOpen(ACTION_APP[k]) && (ACTION_RIGHTS[k]?.() ?? true));
+  /** Ouvre une rubrique puis lui passe une commande — RIEN si l'ouverture est refusée (avant : la commande
+      partait vers la fenêtre active, une autre rubrique). */
+  S.openWith = (appId, cmd, params) => { const w = GX.wm.open(appId, params); if (!w) return null; setTimeout(() => w.inst?.command?.(cmd), 420); return w; };
   const DOCK = ['launchpad', 'dashboard', 'projects', 'todo', 'digital', 'campaigns', 'chat', 'hello', 'agenda', 'budget', 'fixed', 'material', 'conges', 'export', 'games', '|', 'archives', 'settings'];
 
   /* ======================= Démarrage ======================= */
@@ -104,7 +127,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       { label: 'Tout afficher', action: () => GX.wm.list().forEach((x) => x.min && GX.wm.restore(x)) }, '-',
       { label: `Quitter ${app.name}`, kbd: '', action: () => GX.wm.list().filter((x) => (x.app.parent || x.appId) === app.id).forEach((x) => GX.wm.close(x)) },
     ] : [{ label: 'À propos de Gearbox OS', action: about }];
-    m['Fichier'] = [...(custom['Fichier'] || []), ...(custom['Fichier'] ? ['-'] : []), { label: 'Nouveau projet', icon: 'plus', action: () => S.action('new-project') }, '-', { label: 'Fermer la fenêtre', kbd: 'Ctrl Alt W', disabled: !w, action: () => w && GX.wm.close(w) }];
+    m['Fichier'] = [...(custom['Fichier'] || []), ...(custom['Fichier'] ? ['-'] : []), ...(S.canAction('new-project') ? [{ label: 'Nouveau projet', icon: 'plus', action: () => S.action('new-project') }, '-'] : []), { label: 'Fermer la fenêtre', kbd: 'Ctrl Alt W', disabled: !w, action: () => w && GX.wm.close(w) }];
     m['Édition'] = [{ label: 'Annuler', kbd: 'Ctrl Z', disabled: true }, { label: 'Rétablir', kbd: 'Ctrl Y', disabled: true }, '-', { label: 'Copier', kbd: 'Ctrl C', disabled: true }, { label: 'Coller', kbd: 'Ctrl V', disabled: true }, '-', { label: 'Rechercher partout', icon: 'search', kbd: 'Ctrl K', action: () => S.spotlight() }];
     m['Présentation'] = [...(custom['Présentation'] || []), ...(custom['Présentation'] ? ['-'] : []),
       { label: prefs.theme === 'dark' ? 'Thème clair' : 'Thème sombre', icon: prefs.theme === 'dark' ? 'sun' : 'moon', action: toggleTheme },
@@ -275,8 +298,8 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const lp = $('#launchpad'), grid = lp.querySelector('.lp-grid'), q = lp.querySelector('input');
     const render = () => {
       const t = q.value.trim().toLowerCase();
-      grid.innerHTML = [...GX.apps.values()].filter((a) => !a.hidden && !a.system && (!t || a.name.toLowerCase().includes(t))).map((a, i) =>
-        `<button class="lp-app ${S.canOpen(a.id) ? '' : 'locked'}" data-app="${a.id}" style="animation:ui-pop var(--t-med) var(--spring-bouncy) both;animation-delay:${i * 14}ms">${GX.appIcon(a, 76)}<span>${GX.esc(a.name)}</span></button>`).join('');
+      grid.innerHTML = [...GX.apps.values()].filter((a) => !a.hidden && !a.system && S.canOpen(a.id) && (!t || a.name.toLowerCase().includes(t))).map((a, i) =>
+        `<button class="lp-app" data-app="${a.id}" style="animation:ui-pop var(--t-med) var(--spring-bouncy) both;animation-delay:${i * 14}ms">${GX.appIcon(a, 76)}<span>${GX.esc(a.name)}</span></button>`).join('');
     };
     S.launchpad = (on = !lp.classList.contains('on')) => { if (on) { q.value = ''; render(); } lp.classList.toggle('on', on); if (on) setTimeout(() => q.focus(), 50); };
     q.oninput = render;
@@ -296,7 +319,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const a = ACTIONS.find((x) => x.k === k);
     if (k === 'mission') return GX.wm.mission(true); if (k === 'desktop') return GX.wm.showDesktop(); if (k === 'theme') return toggleTheme(); if (k === 'eco') return toggleEco();
     if (k === 'shortcuts') return shortcuts();
-    if (a?.app) { const w = GX.wm.open(a.app); setTimeout(() => (w || GX.wm.active())?.inst?.command?.(k), 420); }
+    if (a?.app && S.canAction(k)) S.openWith(a.app, k);
   };
   function buildSpotlight() {
     const spot = $('#spot'), veil = $('#spotVeil'), q = spot.querySelector('input'), res = spot.querySelector('.sp-res');
@@ -304,10 +327,10 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const render = () => {
       const t = q.value.trim().toLowerCase(), has = (s) => s.toLowerCase().includes(t);
       const apps = [...GX.apps.values()].filter((a) => !a.hidden && !a.system && S.canOpen(a.id) && (!t || has(a.name))).map((a) => ({ g: 'Rubriques', icon: GX.appIcon(a, 24), l: a.name, sub: '', run: () => GX.wm.open(a.id) }));
-      const acts = ACTIONS.filter((a) => t && has(a.l) && (!a.app || S.canOpen(a.app))).map((a) => ({ g: 'Actions', icon: GX.icon(a.icon), l: a.l, sub: 'Action', run: () => S.action(a.k) }));
-      const prj = t ? D.PROJECTS.filter((p) => has(p.name + ' ' + p.sites.join(' '))).slice(0, 5).map((p) => ({ g: 'Projets', icon: GX.icon('projects'), l: p.name, sub: p.sites.join(', '), run: () => GX.wm.open('project', { id: p.id, title: p.name }) })) : [];
-      const posts = t ? D.POSTS.filter((p) => has(p.title)).slice(0, 3).map((p) => ({ g: 'Publications', icon: GX.icon('digital'), l: p.title, sub: GX.fmt.date(p.date), run: () => { const w = GX.wm.open('digital'); setTimeout(() => (w || GX.wm.active())?.inst?.command?.('post:' + p.id), 420); } })) : [];
-      const ppl = t ? D.USERS.filter((u) => u.id !== GX.ctx.uid && has(u.name)).slice(0, 3).map((u) => ({ g: 'Personnes', icon: GX.r.av(u.id, 'sm'), l: u.name, sub: D.ROLES[u.role].l, run: () => { const w = GX.wm.open('chat'); setTimeout(() => (w || GX.wm.active())?.inst?.command?.('dm:' + u.id), 420); } })) : [];
+      const acts = ACTIONS.filter((a) => t && has(a.l) && S.canAction(a.k)).map((a) => ({ g: 'Actions', icon: GX.icon(a.icon), l: a.l, sub: 'Action', run: () => S.action(a.k) }));
+      const prj = t && S.canOpen('projects') ? D.PROJECTS.filter((p) => has(p.name + ' ' + p.sites.join(' '))).slice(0, 5).map((p) => ({ g: 'Projets', icon: GX.icon('projects'), l: p.name, sub: p.sites.join(', '), run: () => GX.wm.open('project', { id: p.id, title: p.name }) })) : [];
+      const posts = t && S.canOpen('digital') ? D.POSTS.filter((p) => has(p.title)).slice(0, 3).map((p) => ({ g: 'Publications', icon: GX.icon('digital'), l: p.title, sub: GX.fmt.date(p.date), run: () => S.openWith('digital', 'post:' + p.id) })) : [];
+      const ppl = t && S.canOpen('chat') ? D.USERS.filter((u) => u.id !== GX.ctx.uid && has(u.name)).slice(0, 3).map((u) => ({ g: 'Personnes', icon: GX.r.av(u.id, 'sm'), l: u.name, sub: D.ROLES[u.role].l, run: () => S.openWith('chat', 'dm:' + u.id) })) : [];
       items = [...acts, ...prj, ...apps.slice(0, t ? 5 : 8), ...posts, ...ppl]; sel = Math.min(sel, Math.max(0, items.length - 1));
       let g = ''; res.innerHTML = items.length ? items.map((it, i) => (it.g !== g ? `<div class="sp-g label">${(g = it.g)}</div>` : '') + `<div class="sp-r ${i === sel ? 'on' : ''}" data-i="${i}">${it.icon}<span class="ellipsis">${GX.esc(it.l)}</span><span class="sub">${GX.esc(it.sub)}</span></div>`).join('') : `<div class="empty">${GX.icon('search')}Aucun résultat pour « ${GX.esc(q.value)} »</div>`;
     };

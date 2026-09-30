@@ -3,10 +3,10 @@ import { useSyncExternalStore } from 'react';
 // Interrupteur « Nouvelle interface (bêta) » — chantier Gearbox OS (interface v2).
 // Préférence PAR COMPTE et par navigateur (localStorage) : la clé porte l'id du compte,
 // pour qu'un poste partagé ne fasse pas passer la bêta d'un compte à l'autre.
-// ⚠️ Jusqu'au lot 1 (coque réelle), l'interrupteur n'est proposé qu'au Master : un
-// correctif déployé entre-temps embarquerait sinon une coque vide pour tout le monde.
-// Au lot 1 : ouvrir à tous les rôles (décision du plan de déploiement v2).
-export const UI2_BETA_ROLES = ['Master'];
+// Ouvert à TOUS les rôles le 30/09/2026 (décision de Théo : bêta pour toute l'équipe, retours dans le
+// Chat). Avant : Master seul, le temps que la coque soit complète. L'ancienne interface reste celle par
+// défaut ; `null` = aucune restriction de rôle.
+export const UI2_BETA_ROLES: string[] | null = null;
 
 const KEY = (userId: string) => `gearbox_ui2_beta:${userId}`;
 const listeners = new Set<() => void>();
@@ -23,7 +23,7 @@ let forcedClassic = (() => {
 })();
 
 export function canUseUi2(role: string | undefined): boolean {
-  return !!role && UI2_BETA_ROLES.includes(role);
+  return !!role && (UI2_BETA_ROLES === null || UI2_BETA_ROLES.includes(role));
 }
 
 export function setUi2Beta(userId: string, on: boolean): void {

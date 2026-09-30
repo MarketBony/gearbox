@@ -111,7 +111,7 @@ export const ProjectDetail: React.FC<{ p: Project; api: DetailApi }> = ({ p, api
           <div className="prj-r1">
             <div className="prj-fg"><span className="prj-lbl">Statut du projet</span><div className="row" style={{ gap: 8 }}>
               <Seg value={(arch ? '' : p.status) as any} options={(['Draft', 'Active', 'Done'] as const).map((s) => [s, D().PROJECT_STATUS[s].l])} style={ro ? { pointerEvents: 'none', opacity: .6 } : undefined}
-                onChange={(s) => { if (arch) api.onRestore(p, s); else setTimeout(() => set({ status: s }), 160); }} />
+                onChange={(s) => { if (ro) return; /* inerte à la souris ET au clavier (Tab + Entrée) */ if (arch) api.onRestore(p, s); else setTimeout(() => set({ status: s }), 160); }} />
               {ro ? (arch ? <span className="badge" style={{ '--c': 'var(--text-3)' } as React.CSSProperties}><Icon name="archives" size="sm" />Archivé</span> : null)
                 : <button className={`btn ${arch ? 'primary' : ''}`} style={{ width: 40, padding: 0, justifyContent: 'center' }} data-tip={arch ? 'Restaurer' : 'Archiver'} aria-label={arch ? 'Restaurer' : 'Archiver'} onClick={() => api.onArchive(p)}><Icon name="archives" size="sm" /></button>}</div></div>
             <div className="prj-fg"><span className="prj-lbl">Période</span><div className="row" style={{ gap: 6 }}>

@@ -225,6 +225,15 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   navigation). Corrigé le 30/09 : `bindSwipeWheel`, un pas par geste ; ajouté au planning du Matériel.
 - [x] **Interface v2 : interrupteurs des Réglages en carrés, légende de Rôles & accès cassée** — cascade CSS du
   `input[type=checkbox]`. Corrigé le 30/09 (`ui2/os/overrides.css`).
+- [x] **Interface v2 : budgets et dépenses de tout le réseau chargés pour un External** (DataHub, au démarrage de
+  la coque). Corrigé le 30/09 (correctif 59) : chargés seulement pour les rôles qui ont une rubrique qui s'en sert.
+- [ ] **Serveur : `GET /api/budget` et `GET /api/fixed-expenses` sans garde de rôle** (`authenticateToken` seul,
+  `routes/budget.ts`, `routes/fixedExpenses.ts`) — un External peut les lire par appel direct, dans les DEUX
+  interfaces. Relevé par l'audit des droits du 30/09. À fermer côté serveur (`requireRole` + cloisonnement).
+- [x] **Interface v2 : actions proposées puis refusées** (Nouveau projet / publication / dépense dans le menu
+  Fichier et la Spotlight, résultats de recherche, Launchpad), **boucle de la fenêtre Projets** (chef de site →
+  projet archivé), **réaction factice du widget Chat**, **chef de site multi-sites réduit à sa 1re concession**.
+  Corrigés le 30/09 (correctif 59).
 <!-- Lot 3 de l'interface v2 (30/09/2026) : points remontés par les agents, À ARBITRER (non corrigés) -->
 - [ ] **Matériel : routes de réservation sans `requireRole`** — un chef de site ou un External peut réserver par appel
   direct, un Guest par l'interface ; une baisse de stock n'est pas contrôlée face aux réservations existantes.

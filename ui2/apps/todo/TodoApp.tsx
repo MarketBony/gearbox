@@ -111,7 +111,8 @@ export default function TodoApp({ win, inst }: AppProps) {
   const [savingFree, setSavingFree] = useState(0);
   const [, setTick] = useState(0);                       // périmètre global changé (GX.ctx)
   const { open: openSheet, portals } = useSheets(win);
-  const ro = !!gx().ctx.readOnly;
+  // Écritures : mêmes rôles que le serveur (tâches = EDIT_ROLES des projets), pas la seule liste « lecture seule ».
+  const ro = !canEditProjects(user?.role) || !!gx().ctx.readOnly;
   const canCreate = canEditProjects(user?.role) && !ro;
   const appRef = useRef<HTMLDivElement>(null), boardRef = useRef<HTMLDivElement>(null);
 

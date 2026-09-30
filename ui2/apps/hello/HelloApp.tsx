@@ -126,9 +126,10 @@ const Weather: React.FC<{ current: WeatherData | null; forecast: ForecastDay[]; 
 const Events: React.FC<{ list: Project[]; canCreate: boolean; i: number }> = ({ list, canCreate, i }) => (
   <article className="hel-card hel-in" style={{ '--i': i } as React.CSSProperties}><h2 className="hel-h"><Icon name="agenda" />Prochains événements</h2>
     {list.length ? list.map((p) => {
-      const n = daysTo(parseLocalDate(p.startDate)), c = EVENT_TYPES[p.projectType];
+      // External : pas de rubrique Projets → carte non cliquable (comme l'ancienne page), au lieu d'un « Accès restreint ».
+      const n = daysTo(parseLocalDate(p.startDate)), c = EVENT_TYPES[p.projectType], canProj = !!gx().shell?.canOpen?.('projects');
       return (
-        <button key={p.id} className="hel-ev" style={{ '--c': c } as React.CSSProperties} onClick={(e) => gx().wm.open('project', { id: p.id, title: p.name }, { origin: e.currentTarget })}>
+        <button key={p.id} className="hel-ev" style={{ '--c': c, cursor: canProj ? undefined : 'default' } as React.CSSProperties} onClick={(e) => { if (canProj) gx().wm.open('project', { id: p.id, title: p.name }, { origin: e.currentTarget }); }}>
           <div className="hel-j"><b>{n === 0 ? 'Auj.' : `J-${n}`}</b>{n > 0 ? <span>jours</span> : null}</div>
           <div style={{ minWidth: 0, flex: 1 }}><div className="nm" title={p.name}>{p.name}</div>
             <div className="mt"><span className="hel-type" style={{ '--c': c } as React.CSSProperties}>{p.projectType}</span>{p.status === 'Draft' ? <span className="badge" style={{ '--c': 'var(--text-3)' } as React.CSSProperties}>Brouillon</span> : null}<span>{sitesOf(p)[0] || ''} · {gx().fmt.date(parseLocalDate(p.startDate))}</span></div></div>
