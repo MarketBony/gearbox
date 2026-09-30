@@ -239,7 +239,15 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 58** (Digital : plusieurs
+- ⚠️ **Depuis le 30/09/2026, `master` est EN AVANCE sur la prod** : l'interface v2 (Gearbox OS, lots 1 à 4 +
+  navigation gestuelle, branche `feat/ui2-lot3`) est mergée et poussée à la demande de Théo, **NON déployée**.
+  Aucun changement backend ni migration : au prochain déploiement, seule l'image **`web`** change. La bêta reste
+  proposée au seul **Master** (`UI2_BETA_ROLES` dans `ui2/beta.ts`) tant que la liste n'est pas ouverte ; l'ancienne
+  interface reste celle de tout le monde. Mais ⚠️ le lot touche aussi l'ANCIENNE interface : `pages/Budget.tsx`,
+  `pages/Export.tsx`, `pages/Dashboard.tsx` passent par les services partagés `services/budgetStats.ts`,
+  `services/exportXlsx.ts`, `services/dashboardStats.ts` (chiffres vérifiés identiques le 30/09). Tout correctif
+  déployé depuis `master` embarque désormais ce lot.
+- Avant le 30/09 : master = prod, synchronisés. Dernier lot déployé : **correctif 58** (Digital : plusieurs
   classes CO² par édito, case PRO+, 24 septembre) — **`api` ET `web`**, **avec migration**
   (`20260924150000_social_co2_multi_et_proplus`, additive : `SocialPost.co2s` et
   `SocialPost.proPlus`, reprise des 7 classes existantes). Push et déploiement autorisés
