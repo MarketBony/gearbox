@@ -1,9 +1,8 @@
-import type { FixedExpense, Project } from '../../../types';
+import type { FixedExpense, Project } from '../types';
 
 // =====================================================================
-// ⚠️ À DÉPLACER DANS services/ À L'INTÉGRATION (ex. `services/exportXlsx.ts`), puis à faire
-// utiliser AUSSI par pages/Export.tsx : tant que les deux copies coexistent, elles peuvent diverger
-// (c'est exactement ce qui a fait diverger Budget et Dashboard quatre fois). Voir ./BESOINS.md.
+// ⚠️ SOURCE UNIQUE de l'export Excel depuis le 30/09/2026 : utilisée par pages/Export.tsx ET par la
+// rubrique v2 (ui2/apps/export). Ne jamais recopier ce calcul dans un écran.
 //
 // Contenu repris À L'IDENTIQUE de pages/Export.tsx (`handleExport`) — mêmes filtres, mêmes
 // colonnes, mêmes valeurs, même bibliothèque (`xlsx-js-style`, import dynamique), mêmes styles,

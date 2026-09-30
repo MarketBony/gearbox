@@ -2,11 +2,11 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import type { AppProps } from '../types';
 import { useAuth } from '../../../contexts/AuthContext';
 // BESOIN: `EXPORT_ALLOWED_ROLES` vit dans pages/Export.tsx (App.tsx l'importe de là) : à déplacer dans constants.ts.
-import { EXPORT_ALLOWED_ROLES } from '../../../pages/Export';
+import { EXPORT_ALLOWED_ROLES } from '../../../constants';
 import { useWorkspace, workspace, reloadProjects } from '../../store/workspace';
 import { fixedExpenses } from '../../store/collections';
 import { gx, Icon } from '../ui/kit';
-import { buildExport, writeExportFile, exportFileName, periodError, PROJ_HEADERS, EXP_HEADERS, type ExportData, type Cell } from './exportXlsx';
+import { buildExport, writeExportFile, exportFileName, periodError, PROJ_HEADERS, EXP_HEADERS, type ExportData, type Cell } from '../../../services/exportXlsx';
 
 // =====================================================================
 // Rubrique « Export » (Export Excel) — transposition de maquettes/v2/js/apps/export.js (même

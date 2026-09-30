@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { canSeeGames, SITE_MANAGER_SECTIONS, isSiteManager } from '../constants';
-import { EXPORT_ALLOWED_ROLES } from '../pages/Export';
+import { EXPORT_ALLOWED_ROLES } from '../constants';
 
 // ============================================================================
 // Navigation : SOURCE UNIQUE des rubriques visibles, partagée par la Sidebar

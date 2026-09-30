@@ -163,8 +163,8 @@
     Congés et Campagnes (20) = anciennes pages ; Export 131 projets / 747 dépenses ; écritures de test créées puis
     supprimées (dépense, publication, réservation). NON testé : écriture des provisions (aucune ligne de test
     possible sans toucher un vrai site), écritures Congés (données réelles de personnes), génération d'un .xlsx.
-  - Reste : `ui2/apps/export/exportXlsx.ts` à sortir dans `services/` et à faire utiliser par `pages/Export.tsx`
-    (même doctrine que budgetStats) ; arbitrages remontés par les agents (voir BUGS-CONNUS 30/09).
+  - **Export : génération sortie dans `services/exportXlsx.ts`** (source unique, page et v2) ; `EXPORT_ALLOWED_ROLES`
+    déplacé dans `constants.ts` (ré-exporté par pages/Export.tsx). Arbitrages des agents : BUGS-CONNUS 30/09.
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,

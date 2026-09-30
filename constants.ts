@@ -714,6 +714,8 @@ export const canEditProjects = (role?: string): boolean => !!role && PROJECT_EDI
 // pages/FixedExpenses.tsx et pages/Budget.tsx gardent leur copie locale jusqu'à leur retrait.
 export const FIXED_EXPENSE_EDIT_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
 export const BUDGET_PROVISION_EDIT_ROLES: string[] = ['Master', 'Administrator', 'Director'];
+// Export des données financières (projets + dépenses fixes). Déplacé depuis pages/Export.tsx le 30/09/2026.
+export const EXPORT_ALLOWED_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator'];
 
 // ============================================================================
 // RÔLE « CHEF DE SITE » (Site Manager) — 05/08/2026

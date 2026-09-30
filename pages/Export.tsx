@@ -4,27 +4,10 @@ import { db } from '../services/dataService';
 import { FileSpreadsheet, Calendar, Loader2, CheckCircle2, AlertCircle, Lock, Download } from 'lucide-react';
 import DatePicker from '../components/DatePicker';
 
-// Rôles autorisés à exporter les données financières (projets + dépenses fixes).
-export const EXPORT_ALLOWED_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator'];
-
-// Parse local (anti-décalage J+1) : 'YYYY-MM-DD' → Date à minuit local.
-const parseLocalDate = (iso: string): Date => {
-  const [y, m, d] = (iso || '').split('-').map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-};
-
-const fmtDateFr = (iso: string): string => {
-  if (!iso) return '';
-  const d = parseLocalDate(iso);
-  return isNaN(d.getTime()) ? iso : d.toLocaleDateString('fr-FR');
-};
-
-const joinTags = (arr?: (string | undefined)[]): string =>
-  (arr ? arr.filter(Boolean) : []).join(', ');
-
-const STATUS_LABELS: Record<string, string> = {
-  Draft: 'Brouillon', Active: 'Actif', Done: 'Terminé', Archived: 'Archivé',
-};
+import { EXPORT_ALLOWED_ROLES } from '../constants';
+import { buildExport, writeExportFile, periodError } from '../services/exportXlsx';
+// Rôles autorisés : constants.ts (ré-exportés ici pour les imports existants).
+export { EXPORT_ALLOWED_ROLES };
 
 const Export: React.FC = () => {
   const { user } = useAuth();
@@ -54,127 +37,24 @@ const Export: React.FC = () => {
     setMessage(null);
     setResult(null);
 
-    if (from && to && parseLocalDate(from).getTime() > parseLocalDate(to).getTime()) {
-      setMessage({ type: 'error', text: 'La date de début doit précéder la date de fin.' });
-      return;
-    }
+    const err = periodError(from, to);
+    if (err) { setMessage({ type: 'error', text: err }); return; }
 
     setLoading(true);
     try {
-      const fromTime = from ? parseLocalDate(from).getTime() : -Infinity;
-      const toTime = to ? parseLocalDate(to).getTime() : Infinity;
-
       const [projects, fixedExpenses] = await Promise.all([
         db.getProjects(),
         db.getFixedExpenses(),
       ]);
-
-      // Filtrage période : projets sur la date de début, dépenses sur leur date (parse local anti J+1).
-      const projInRange = projects.filter(p => {
-        // Brouillon : ne remonte nulle part (règle métier, cf. CLAUDE.md) — donc
-        // pas non plus dans un export qui sert de référence chiffrée.
-        if (p.status === 'Draft') return false;
-        if (!p.startDate) return false;
-        const t = parseLocalDate(p.startDate).getTime();
-        return t >= fromTime && t <= toTime;
-      });
-      const expInRange = fixedExpenses.filter(e => {
-        if (!e.date) return false;
-        const t = parseLocalDate(e.date).getTime();
-        return t >= fromTime && t <= toTime;
-      });
-
-      if (projInRange.length === 0 && expInRange.length === 0) {
+      // ⚠️ Filtres, colonnes et fichier : services/exportXlsx.ts (source unique, partagée avec l'interface v2).
+      const data = buildExport(projects, fixedExpenses, from, to);
+      if (data.projects.length === 0 && data.expenses.length === 0) {
         setMessage({ type: 'info', text: 'Aucune donnée (projet ou dépense fixe) sur la période sélectionnée.' });
         setLoading(false);
         return;
       }
-
-      // Import dynamique du fork compatible styles (résolu via importmap / node_modules).
-      const mod: any = await import('xlsx-js-style');
-      const XLSX = mod.default ?? mod;
-
-      // ---- Style des en-têtes : gras, fond bleu charte Bony, texte blanc ----
-      const headerStyle = {
-        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11, name: 'Calibri' },
-        fill: { patternType: 'solid', fgColor: { rgb: '293F74' } },
-        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-        border: {
-          bottom: { style: 'thin', color: { rgb: 'F75632' } },
-        },
-      };
-
-      const styleSheet = (
-        ws: any,
-        headers: string[],
-        cols: number[],
-        numberCols: number[],
-      ) => {
-        // En-têtes stylés
-        headers.forEach((_, c) => {
-          const ref = XLSX.utils.encode_cell({ r: 0, c });
-          if (ws[ref]) ws[ref].s = headerStyle;
-        });
-        // Largeurs de colonnes
-        ws['!cols'] = cols.map(wch => ({ wch }));
-        // Format nombre (séparateur de milliers) sur les colonnes montants → sommable
-        const range = XLSX.utils.decode_range(ws['!ref']);
-        numberCols.forEach(c => {
-          for (let r = 1; r <= range.e.r; r++) {
-            const ref = XLSX.utils.encode_cell({ r, c });
-            if (ws[ref] && ws[ref].t === 'n') ws[ref].z = '#,##0';
-          }
-        });
-        // Filtre automatique sur l'en-tête
-        ws['!autofilter'] = { ref: ws['!ref'] };
-      };
-
-      const wb = XLSX.utils.book_new();
-
-      // ---- Onglet Projets (sans les tâches) ----
-      const projHeaders = [
-        'Nom', 'Site(s)', 'Marque(s)', 'Service(s)', 'Type', 'Statut', 'PRO+',
-        'Date début', 'Date fin', 'Budget prévisionnel', 'Budget réalisé',
-        'Avancement (%)', 'Description',
-      ];
-      const projData = projInRange.map(p => [
-        p.name || '',
-        joinTags(p.sites && p.sites.length ? p.sites : [p.site]),
-        joinTags(p.brands),
-        joinTags(p.service),
-        p.projectType || '',
-        STATUS_LABELS[p.status] ?? p.status ?? '',
-        p.proPlus ? 'Oui' : 'Non',
-        fmtDateFr(p.startDate),
-        fmtDateFr(p.endDate),
-        Number(p.budgetPlanned || 0),
-        Number(p.budgetActual || 0),
-        Number(p.progress || 0),
-        p.description || '',
-      ]);
-      const wsProj = XLSX.utils.aoa_to_sheet([projHeaders, ...projData]);
-      styleSheet(wsProj, projHeaders, [34, 22, 18, 16, 16, 12, 8, 12, 12, 18, 16, 14, 50], [9, 10]);
-      XLSX.utils.book_append_sheet(wb, wsProj, 'Projets');
-
-      // ---- Onglet Dépenses ----
-      const expHeaders = ['Date', 'Site(s)', 'Marque(s)', 'Service', 'Commentaire', 'Montant', 'PRO+'];
-      const expData = expInRange.map(e => [
-        fmtDateFr(e.date),
-        joinTags(e.sites && e.sites.length ? e.sites : [e.site]),
-        joinTags(e.brands && e.brands.length ? e.brands : (e.brand ? [e.brand] : [])),
-        e.service || '',
-        e.comment || '',
-        Number(e.amount || 0),
-        e.proPlus ? 'Oui' : 'Non',
-      ]);
-      const wsExp = XLSX.utils.aoa_to_sheet([expHeaders, ...expData]);
-      styleSheet(wsExp, expHeaders, [12, 22, 18, 14, 50, 16, 8], [5]);
-      XLSX.utils.book_append_sheet(wb, wsExp, 'Dépenses');
-
-      const fileName = `GEARBOX_Export_${from || 'debut'}_${to || 'fin'}.xlsx`;
-      XLSX.writeFile(wb, fileName);
-
-      setResult({ projects: projInRange.length, expenses: expInRange.length });
+      await writeExportFile(data, from, to);
+      setResult({ projects: data.projects.length, expenses: data.expenses.length });
     } catch (err) {
       console.error('Export error:', err);
       setMessage({ type: 'error', text: "Une erreur est survenue lors de la génération du fichier." });
