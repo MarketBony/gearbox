@@ -73,7 +73,7 @@ export default function DigitalApp({ win, inst }: AppProps) {
   const setField = useCallback((id: string, k: keyof SocialPost, v: any) => {
     if (!ed) return;
     const cur = current(id); if (!cur || same((cur as any)[k], v)) return;
-    // BESOIN: file de sauvegarde par publication (fileSauvegardePublication) dans updateSocialPost — voir BESOINS.md.
+    // Par la file `fileSauvegardePublication` (collections.updateSocialPost) : un PUT en vol, ordre garanti.
     track(updateSocialPost({ ...cur, [k]: v } as SocialPost)).catch(() => { /* message déjà affiché, état serveur relu */ });
     if (k === 'archived' && v === true) logAct('a archivé la publication', cur);
   }, [ed]); // eslint-disable-line react-hooks/exhaustive-deps

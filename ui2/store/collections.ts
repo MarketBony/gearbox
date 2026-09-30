@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import type { BudgetLine, FixedExpense, SocialPost, SocialComment, DigitalTags, Campaign, Equipment, EquipmentBooking, CongeJour, CongeDroit, CongeType, CongeDemi } from '../../types';
-import { db } from '../../services/dataService';
+import { db, ApiError } from '../../services/dataService';
+import { fileSauvegardePublication } from '../../services/fileSauvegardePublication';
 import { getSocket, connectSocket } from '../../services/socket';
 import { RT_EVENTS } from '../../services/realtime';
 import { echo, isEchoing, notify } from './workspace';
@@ -107,10 +108,43 @@ export const updateFixedExpense = (e: FixedExpense) => write({ res: fixedExpense
 export const deleteFixedExpense = (id: string) => write({ res: fixedExpenses, optimistic: () => fixedExpenses.set([], (L) => byId(L, id, () => null)), call: () => db.deleteFixedExpense(id), echo: () => ['fixed-expense:deleted', id], fail: 'Échec de la suppression.' });
 
 // ---------------------------------------------------------------- Digital : publications, commentaires, tags
-export const socialPosts = defineResource<SocialPost[]>('socialPosts', () => db.getSocialPosts(), RT_EVENTS.social, []);
+export const socialPosts = defineResource<SocialPost[]>('socialPosts', () => db.getSocialPosts(), [...RT_EVENTS.social, ...RT_EVENTS.socialComments], []);   // commentCount suit les commentaires
 export const useSocialPosts = () => socialPosts.use();
 export const createSocialPost = (p: Omit<SocialPost, 'id'>) => write({ res: socialPosts, call: () => db.createSocialPost(p), echo: (r) => ['social:updated', r], fail: 'Échec de la création de la publication.' });
-export const updateSocialPost = (p: SocialPost) => write({ res: socialPosts, optimistic: () => socialPosts.set([], (L) => byId(L, p.id, () => p)), call: () => db.updateSocialPost(p), echo: (r) => ['social:updated', r], fail: 'Échec de l’enregistrement de la publication.' });
+/**
+ * Modifier une publication : par la FILE `fileSauvegardePublication` (comme pages/Digital.tsx depuis le
+ * correctif 49) — UN SEUL PUT en vol par publication, instantanés COMPLETS, ordre garanti. Deux champs
+ * modifiés coup sur coup ne peuvent plus s'écraser. L'instantané part de l'état PARTAGÉ (dernier connu),
+ * pas d'une copie du composant ; une publication disparue n'est jamais ressuscitée.
+ * Se résout au succès (ou au repos de la file, si l'instantané a été remplacé par un plus récent).
+ */
+export const updateSocialPost = (p: SocialPost) => patchSocialPost(p.id, p);
+export function patchSocialPost(id: string, patch: Partial<SocialPost>): Promise<SocialPost> {
+  const cur = (socialPosts.get() || []).find((x) => x.id === id);
+  if (!cur) return Promise.reject(new Error("Cette publication n'existe plus (supprimée depuis un autre poste ?)."));
+  const next = { ...cur, ...patch } as SocialPost;
+  socialPosts.set([], (L) => byId(L, id, () => next));
+  return new Promise((resolve, reject) => {
+    let done = false;
+    fileSauvegardePublication.pousser(next, {
+      onSucces: (srv) => { if (!done) { done = true; resolve(srv); } },
+      onEchec: (e) => { publicationError(e); socialPosts.reloadAll(); if (!done) { done = true; reject(e); } },
+      onRepos: () => { if (fileSauvegardePublication.aDesEcrituresEnCours(id)) return; echo('social:updated', next); socialPosts.reloadAll(); if (!done) { done = true; resolve(next); } },
+    });
+  });
+}
+/** Messages repris de `onEchecSauvegarde` (pages/Digital.tsx). */
+function publicationError(e: unknown) {
+  if (!(e instanceof ApiError)) return notify("Échec inattendu de l'enregistrement.");
+  switch (e.status) {
+    case 0: return notify('Serveur injoignable. Vos modifications ne sont PAS perdues — ne fermez pas cet onglet.');
+    case 503: return notify('La base est momentanément saturée. Réessayez dans une minute.');
+    case 401: return;
+    case 403: return notify('Droits insuffisants pour modifier cette publication.');
+    case 404: return notify("Cette publication n'existe plus (supprimée depuis un autre poste ?).");
+    default: return notify(e.message && !/^Erreur \d+$/.test(e.message) ? e.message : "Échec de l'enregistrement.");
+  }
+}
 export const deleteSocialPost = (id: string) => write({ res: socialPosts, optimistic: () => socialPosts.set([], (L) => byId(L, id, () => null)), call: () => db.deleteSocialPost(id), echo: () => ['social:deleted', id], fail: 'Échec de la suppression.' });
 
 /** Fil de commentaires d'UNE publication (lu à l'ouverture du panneau, comme Digital.tsx). */
