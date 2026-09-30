@@ -8,7 +8,6 @@ import { computeDashboardStats } from '../../../services/dashboardStats';
 import { useWorkspace } from '../../store/workspace';
 import { useBudgets, useFixedExpenses, useSocialPosts } from '../../store/collections';
 import { gx, Icon, Chips, Seg, PickerBtn, useEngineEvent } from '../ui/kit';
-import { projectIdOfGap } from './besoins';
 
 // =====================================================================
 // Rubrique « Dashboard » (Cockpit général) — transposition de maquettes/v2/js/apps/dashboard.js
@@ -290,7 +289,7 @@ export default function DashboardApp({ win, inst }: AppProps) {
           right={<div className="dsh-legend"><span><i style={{ background: 'var(--text-3)' }} />Prévu</span><span><i style={{ background: 'var(--danger)' }} />Dépassement</span><span><i style={{ background: 'var(--ok)' }} />Sous budget</span></div>} />
           {stats.ecartsTop.length ? <div className="dsh-gaps">{stats.ecartsTop.map((g, i) => {
             const m = Math.max(g.prevu, g.realise) || 1, col = g.ecart > 0 ? 'var(--danger)' : 'var(--ok)';
-            const pid = projectIdOfGap(projects, g.nom);                            // BESOIN: `id` dans ecartsTop
+            const pid = g.id;
             return (
               <div key={`${i}:${g.nom}`} className="dsh-gap" onClick={(e) => pid && openProject(pid, g.nom, e.currentTarget)}>
                 <div className="row" style={{ gap: 10, fontSize: 14 }}><b className="ellipsis grow">{g.nom}</b><b className="num" style={{ color: col }}>{g.ecart > 0 ? '+' : g.ecart < 0 ? '−' : ''}{Math.abs(g.ecartPct)} %</b></div>

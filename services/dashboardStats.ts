@@ -64,7 +64,7 @@ export function computeDashboardStats(input: DashboardStatsInput) {
   const coutParSite: Record<string, number> = {};
   const coutParPrestataire: Record<string, { montant: number; taches: number }> = {};
   const chargeParUtilisateur: Record<string, number> = {};
-  const ecartsProjets: { nom: string; prevu: number; realise: number; ecart: number }[] = [];
+  const ecartsProjets: { id: string; nom: string; prevu: number; realise: number; ecart: number }[] = [];   // `id` ajouté le 30/09/2026 (v2 : écart cliquable), sans effet sur les montants
   const projetsEnRetard: { id: string; nom: string; site: string; fin: string; avancement: number }[] = [];
   let sommeAvancement = 0, nbActifsPourAvancement = 0;
   // Performance des campagnes : on cumule les NUMÉRATEURS pondérés par la
@@ -242,7 +242,7 @@ export function computeDashboardStats(input: DashboardStatsInput) {
           // sinon l'écart vaudrait -100 % et polluerait le classement.
           if ((p.budgetPlanned || 0) > 0) {
               ecartsProjets.push({
-                  nom: p.name, prevu: p.budgetPlanned, realise: coutTotal,
+                  id: p.id, nom: p.name, prevu: p.budgetPlanned, realise: coutTotal,
                   ecart: coutTotal - p.budgetPlanned
               });
           }
