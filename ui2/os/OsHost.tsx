@@ -39,11 +39,16 @@ export interface OsHostProps {
 // d'un seul tenant — mesuré le 30/09/2026 (build de prod) : 125 à 183 ms de script à l'ouverture de
 // Projets (117 projets + fiche), 59 ms pour la To-do. Les nœuds DOM sont créés pendant le rendu :
 // la validation finale ne fait qu'insérer l'arbre déjà prêt.
-const DeferredApp: React.FC<{ App: React.ComponentType<any>; win: any; inst: any }> = ({ App, win, inst }) => {
+// Figée elle aussi (React.memo) : ses props ne changent jamais pour une fenêtre donnée, et chaque changement
+// de fenêtre active (setTab → rendu d'App → rendu de cet hôte) re-rendait TOUTES les rubriques portées
+// ouvertes — tâche de 125 à 178 ms mesurée en build de prod le 30/09/2026, à chaque clic d'une fenêtre à
+// l'autre et à la fin de chaque balayage. Les rubriques se mettent à jour par leurs stores et contextes.
+const DeferredApp = React.memo<{ App: React.ComponentType<any>; win: any; inst: any }>(({ App, win, inst }) => {
   const [go, setGo] = useState(false);
   useEffect(() => { startTransition(() => setGo(true)); }, []);
   return go ? <App win={win} inst={inst} /> : null;
-};
+});
+const Hub = React.memo(DataHub);  // même raison : aucun prop, il suit le pont par useBridge
 
 // Page actuelle projetée dans une fenêtre. Figée par rubrique : les pages ne prennent aucun
 // prop et se mettent à jour par leurs contextes et leurs données. Sans ce gel, chaque
@@ -122,7 +127,7 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
   useEffect(() => { startTransition(() => setLegacy(legacyIds)); }, [legacyIds]);
   return (
     <div ref={slotRef}>
-      {booted && <DataHub />}
+      {booted && <Hub />}
       {booted && ported.map(m => { const App = PORTED_APPS[m.appId]; return App ? createPortal(<DeferredApp App={App} win={m.win} inst={m.inst} />, m.host, m.key) : null; })}
       {booted && legacy.map(id => createPortal(
         <div key={id} slot={`app-${id}`} className="gx2-legacy text-bony-text font-sans" style={{ height: '100%', overflow: 'hidden' }}>

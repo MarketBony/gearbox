@@ -513,7 +513,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const K = (s) => s.split(' ').map((k) => `<span class="kbd">${k}</span>`).join('');
     const list = [['Rechercher partout', 'Ctrl K'], ['Launchpad', 'F4'], ['Mission Control', 'F3'], ['Changer d’app', 'Alt ²'], ['Ancrer à gauche / droite', 'Ctrl ⇧ ← →'], ['Agrandir / quart haut', 'Ctrl ⇧ ↑'],
       ['Restaurer / quart bas / réduire', 'Ctrl ⇧ ↓'], ['Plein écran', 'Ctrl Alt F'], ['Réduire', 'Ctrl Alt M'], ['Fermer la fenêtre', 'Ctrl Alt W'], ['Toujours au premier plan', 'Ctrl Alt T'], ['Afficher le bureau', 'Ctrl Alt D'],
-      ['Aller au bureau 1…4', 'Ctrl Alt 1'], ['Envoyer la fenêtre au bureau', 'Ctrl Alt ⇧ 1'], ['Changer de bureau', 'Swipe 2 doigts'], ['Aperçu rapide (listes)', 'Espace'], ['Verrouiller', 'Ctrl Alt L'], ['Cette aide', 'Ctrl /']];
+      ['Aller au bureau 1…4', 'Ctrl Alt 1'], ['Envoyer la fenêtre au bureau', 'Ctrl Alt ⇧ 1'], ['Fenêtre suivante / précédente', 'Swipe 2 doigts sur une fenêtre'], ['Changer de bureau', 'Swipe 2 doigts sur le fond'], ['Aperçu rapide (listes)', 'Espace'], ['Verrouiller', 'Ctrl Alt L'], ['Cette aide', 'Ctrl /']];
     const el = document.createElement('div'); el.className = 'shortcuts glass glass-strong';
     el.innerHTML = `<div class="row"><h3 style="font-size:18px">Raccourcis clavier</h3><button class="icon-btn" style="margin-left:auto">${GX.icon('close')}</button></div>
       <div class="muted" style="margin-top:4px">Gestes aussi : glisser une fenêtre sur un bord ou un coin pour l’ancrer, en haut au centre pour les dispositions, la secouer pour réduire les autres. Coin bas-gauche : Mission Control. Coin bas-droit : Aero Peek.</div>

@@ -189,8 +189,8 @@
     conversation) ; balayage 2 doigts **un pas par geste**, inertie ignorée (`bindSwipeWheel` dans `ui/kit.tsx`,
     Agenda — qui avançait de 3 semaines — et planning du Matériel). Vérifié dans le navigateur (Master).
   - En étude, non codé : gestion des accès par rôle depuis Rôles & accès (noté au backlog, pour plus tard).
-- **Navigation gestuelle — 30/09, branche `feat/ui2-gestes` (depuis `feat/ui2-lot3`, NON poussée), étapes 1 à 3
-  du plan, INTÉGRATION À VALIDER PAR THÉO** : balayage 2 doigts du pavé entre les fenêtres du bureau.
+- **Navigation gestuelle — 30/09, branche `feat/ui2-gestes`, INTÉGRÉE dans `feat/ui2-lot3` (local, NON poussée,
+  jamais déployée)** : balayage 2 doigts du pavé entre les fenêtres du bureau.
   - Contraintes : seuls les 2 doigts arrivent au navigateur (3/4 doigts pris par Windows), en `wheel` sans phase
     ni signal de lever ; le retour arrière de Chrome/Edge au balayage est coupé (`overscroll-behavior-x: none`).
   - `ui2/os/engine/gesture-core.ts` : reconnaissance pure (axe décidé au début, lever = décroissance du flux,
@@ -219,7 +219,16 @@
     bascule de fenêtre en butée. Fluidité (dev) : 60 i/s pendant le geste, 1 à 2 images perdues ; le `WM.focus`
     (≈ 160 ms en dev : l'appli change de rubrique courante) est repoussé APRÈS l'animation, et la souris est bloquée
     par un écran transparent au lieu d'une classe sur l'hôte (qui recalculait toute la coque : 70 ms).
-    NON vérifié : le vrai pavé dans la coque (à faire par Théo), le Matériel via la porte, le build de prod.
+    Recette de Théo au vrai pavé (30/09) : « ça m'a l'air propre ».
+  - **Étape 4 (30/09)** : mesure en **build de prod** (5 fenêtres, verre Liquid) — Glissement 1 à 2 images perdues
+    sur le geste ; Bandeau 0 pendant le suivi, 5 à 8 images isolées pendant les zooms d'entrée et de retour (flou du
+    verre recalculé à chaque échelle ; 3 avec « verre coupé », laissé en option, pas imposé : saut visible
+    translucide → opaque). Matériel via la porte vérifié (un pas par geste, désinscrit hors Planning).
+    **Trouvé en mesurant : chaque changement de fenêtre active re-rendait TOUTES les rubriques portées ouvertes**
+    (`DeferredApp` d'`OsHost.tsx` non figé ; 125 à 178 ms en prod, à chaque clic d'une fenêtre à l'autre) :
+    `DeferredApp` et `DataHub` passés en `React.memo` → 0 tâche longue. Aide des raccourcis et
+    `ui2/apps/PORTAGE.md` (règle de la porte unique) à jour. Non fait, en attente d'un avis de Théo : passage au
+    bureau suivant en bout de liste.
   - ⚠️ Piège : un onglet en arrière-plan ne donne plus d'images (rAF) ; l'animation se conclut désormais d'office
     si la page est masquée en plein geste.
 

@@ -70,6 +70,12 @@ données. **Modèles à lire en premier :** `todo/TodoApp.tsx` (rubrique simple)
   `gx().shell.quickLook({ title, html, origin })`, `gx().shell.notify(...)`, `hud(msg)`.
   `<select className="select">` et `<input type="date">` ouvrent AUTOMATIQUEMENT le menu et le
   calendrier du moteur : utilisez les éléments natifs, rien à brancher.
+- **Balayage 2 doigts (pavé)** : une rubrique qui navigue au balayage (période suivante / précédente) utilise
+  `bindSwipeWheel(el, onStep)` (kit) — UN pas par geste, inertie comprise. Il inscrit l'élément à la **porte
+  unique** du moteur (`ui2/os/engine/gesture.ts`) : un geste commencé au-dessus de lui ne change plus de fenêtre.
+  **N'ajoutez jamais un écouteur `wheel` horizontal à la main** : il entrerait en conflit avec le passage d'une
+  fenêtre à l'autre (`engine/winswipe.ts`). Un conteneur qui défile horizontalement (`overflow-x: auto`) n'a
+  rien à faire : il garde son défilement tant qu'il peut défiler.
 - **Animations** : `gx().animate(el, keyframes, { spring })`, `gx().flip(el, rectAvant, { spring })`
   — les mêmes ressorts que la coque. Pas de bibliothèque d'animation.
 - **Barre du haut et Spotlight** : remplissez `inst.menus = () => ({ 'Fichier': [...], ... })` et
