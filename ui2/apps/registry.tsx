@@ -11,6 +11,9 @@ import CampaignsApp from './campaigns/CampaignsApp';
 import MaterialApp from './material/MaterialApp';
 import ExportApp from './export/ExportApp';
 import DashboardApp from './dashboard/DashboardApp';
+import HelloApp from './hello/HelloApp';
+import GamesApp from './games/GamesApp';
+import SettingsApp from './settings/SettingsApp';
 
 /** Composant React de chaque rubrique portée (ids : ./ids.ts). */
 export const PORTED_APPS: Record<string, React.ComponentType<AppProps>> = {
@@ -27,4 +30,7 @@ export const PORTED_APPS: Record<string, React.ComponentType<AppProps>> = {
   material: MaterialApp,
   export: ExportApp,
   dashboard: DashboardApp,
+  hello: HelloApp,
+  games: GamesApp,
+  settings: SettingsApp,
 };
