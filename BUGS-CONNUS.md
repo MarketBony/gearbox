@@ -219,4 +219,13 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   → Corrigé le 30/09 (lot 2b) : premier rendu en transition (To-do 0 ms, Projets ~53 ms de tâche longue).
 - [ ] **Interface v2 (moteur de la maquette) : un widget posé sur un écran plus large déborde à droite sur un écran
   plus étroit** — la disposition n'est pas recalculée (comportement d'origine de la maquette).
+<!-- Lot 3 de l'interface v2 (30/09/2026) : points remontés par les agents, À ARBITRER (non corrigés) -->
+- [ ] **Matériel : routes de réservation sans `requireRole`** — un chef de site ou un External peut réserver par appel
+  direct, un Guest par l'interface ; une baisse de stock n'est pas contrôlée face aux réservations existantes.
+- [ ] **Campagnes : Digital Manager en lecture seule à l'écran alors que le serveur l'autorise à écrire.**
+- [ ] **Dépenses : filtre Site à égalité stricte** conservé en v2 (le corriger changerait le « Total période »).
+- [ ] **Budget : migration des enveloppes Alpine-* / Nissan manquantes** faite au montage par l'ancienne page (écriture),
+  pas par la v2 — probablement sans objet en production, à vérifier en base.
+- [ ] **Digital : renommer un tag ne répercute pas le nom sur les publications** ; filtre Site du Planning sans
+  Montluçon, Saint-Etienne, Yssingeaux.
 

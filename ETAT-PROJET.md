@@ -147,6 +147,24 @@
     à gauche et à droite, widget du dernier rang aligné sur le bord droit), calée en haut (`engine/widgets.ts`,
     `[GEARBOX]`). Fonds Bony refaits (Théo) : « Bony · Trait » (défaut, id historique `bony`), « Bony · Trame »,
     « Bony · Tracés » — nets, sur noir, SANS grain (refusé), aucune aura floue (refusée). ⚠️ Un premier essai étirait les cases : en plein écran les widgets se déformaient et débordaient sur le Dock.
+- **Lot 3 — 30/09, branche `feat/ui2-lot3` (NON mergée, jamais déployée), EN RECETTE : 8 rubriques portées par
+  4 agents Opus en parallèle** (copies isolées, `ui2/apps/PORTAGE.md`), intégrées et testées par Claude :
+  Agenda, Congés, Budget, Dépenses, Digital, Campagnes, Matériel, Export.
+  - **Étape A (avant les agents)** : `ui2/store/collections.ts` — ressources partagées à la demande (budgets,
+    dépenses fixes, publications + commentaires + tags, campagnes, matériel, réservations, congés par fenêtre),
+    rechargées sur leurs événements, écritures + écho local ; DataHub branché dessus.
+  - **Budget : moteur sorti dans `services/budgetStats.ts`** (source unique) et `pages/Budget.tsx` l'appelle —
+    vérifié IDENTIQUE au centime ancienne page ⇄ v2 (filtres par défaut, puis Alpine + VN : 25 lignes, 0 écart).
+  - **Digital : les modifications passent par `fileSauvegardePublication`** (`collections.patchSocialPost`) —
+    vérifié : deux champs modifiés coup sur coup arrivent tous les deux.
+  - Partagés ajoutés : `logActivity(entity, action, name, id?)` (workspace), `FIXED_EXPENSE_EDIT_ROLES`,
+    `BUDGET_PROVISION_EDIT_ROLES` (constants.ts). `.claude/worktrees/` ignoré par git.
+  - Contrôles faits : ouverture des 8 sans erreur ; Dépenses 747 lignes / 1 137 709,76 € = ancienne page ;
+    Congés et Campagnes (20) = anciennes pages ; Export 131 projets / 747 dépenses ; écritures de test créées puis
+    supprimées (dépense, publication, réservation). NON testé : écriture des provisions (aucune ligne de test
+    possible sans toucher un vrai site), écritures Congés (données réelles de personnes), génération d'un .xlsx.
+  - Reste : `ui2/apps/export/exportXlsx.ts` à sortir dans `services/` et à faire utiliser par `pages/Export.tsx`
+    (même doctrine que budgetStats) ; arbitrages remontés par les agents (voir BUGS-CONNUS 30/09).
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
