@@ -165,6 +165,20 @@
     possible sans toucher un vrai site), écritures Congés (données réelles de personnes), génération d'un .xlsx.
   - **Export : génération sortie dans `services/exportXlsx.ts`** (source unique, page et v2) ; `EXPORT_ALLOWED_ROLES`
     déplacé dans `constants.ts` (ré-exporté par pages/Export.tsx). Arbitrages des agents : BUGS-CONNUS 30/09.
+- **Lot 4 — 30/09, branche `feat/ui2-lot3` (NON mergée, jamais déployée), EN RECETTE : les 5 dernières rubriques
+  portées (4 agents Opus) — Dashboard, Chat, Hello Marketing, Jeux, Réglages. LES 16 RUBRIQUES SONT PORTÉES :
+  plus aucune page actuelle ne s'affiche dans la coque v2.**
+  - Dashboard : montants par `computeDashboardStats` (inchangé ; `id` ajouté aux écarts, additif) — les 6 KPI
+    vérifiés identiques à la page actuelle.
+  - Chat : services temps réel EXISTANTS réutilisés tels quels (`chatStore`, `emitWithAck`, présence) ; testé en
+    LECTURE seulement (aucun message envoyé).
+  - Copies temporaires assumées (aucun montant) : `ui2/apps/hello/sources.ts` (flux RSS / musique), `ui2/apps/games/logic.ts`
+    (classement, placement de flotte), `ui2/apps/chat/voice.ts` — à supprimer avec les pages actuelles à la bascule.
+  - Incident : un serveur de prod a été lancé sur le port 3000 pendant la nuit (origine non établie, aucun agent ne
+    le reconnaît) ; l'API était restée bloquée sur des connexions mortes (« Can't reach database server ») : un
+    redémarrage de `gearbox-api` a suffi.
+  - Reste avant la bascule : recette complète de Théo, rôles cloisonnés (chef de site, External, Guest) sur chaque
+    rubrique, arbitrages (BUGS-CONNUS 30/09), `BESOINS.md` des agents (sous `ui2/apps/*/`).
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
