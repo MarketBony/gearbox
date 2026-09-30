@@ -219,6 +219,12 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   → Corrigé le 30/09 (lot 2b) : premier rendu en transition (To-do 0 ms, Projets ~53 ms de tâche longue).
 - [ ] **Interface v2 (moteur de la maquette) : un widget posé sur un écran plus large déborde à droite sur un écran
   plus étroit** — la disposition n'est pas recalculée (comportement d'origine de la maquette).
+- [x] **Interface v2 : menu déroulant / sélecteur impossible à refermer en recliquant dessus** (le clic fermait puis
+  rouvrait). Corrigé le 30/09 (bascule sur le déclencheur, `engine/core.ts`, `engine/pickers.ts`).
+- [x] **Interface v2 : balayage 2 doigts de l'Agenda avançait de 3 semaines** (l'inertie du pavé relançait la
+  navigation). Corrigé le 30/09 : `bindSwipeWheel`, un pas par geste ; ajouté au planning du Matériel.
+- [x] **Interface v2 : interrupteurs des Réglages en carrés, légende de Rôles & accès cassée** — cascade CSS du
+  `input[type=checkbox]`. Corrigé le 30/09 (`ui2/os/overrides.css`).
 <!-- Lot 3 de l'interface v2 (30/09/2026) : points remontés par les agents, À ARBITRER (non corrigés) -->
 - [ ] **Matériel : routes de réservation sans `requireRole`** — un chef de site ou un External peut réserver par appel
   direct, un Guest par l'interface ; une baisse de stock n'est pas contrôlée face aux réservations existantes.

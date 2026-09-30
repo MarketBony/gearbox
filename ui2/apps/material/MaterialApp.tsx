@@ -4,7 +4,7 @@ import type { Equipment, EquipmentBooking } from '../../../types';
 import { useAuth } from '../../../contexts/AuthContext';
 import { db } from '../../../services/dataService';
 import { useEquipment, useBookings, updateBooking, deleteEquipment, bookings as bookingsRes } from '../../store/collections';
-import { gx, hud, Icon, Seg, PickerBtn, useSheets, useCompact, useEngineEvent } from '../ui/kit';
+import { gx, hud, Icon, Seg, PickerBtn, useSheets, useCompact, useEngineEvent, bindSwipeWheel } from '../ui/kit';
 import {
   P, addD, addM, diff, same, isWE, iso, isoAdd, MONTHS, DOW, cap, range, period, pack, colorOf, perOk,
   canManageCatalog, canBook as canBookRole, available, buildUsage, usedFrom,
@@ -211,6 +211,10 @@ export default function MaterialApp({ win, inst }: AppProps) {
     else { n = addM(anchor, dir); const T = gx().today(); if (n.getMonth() === T.getMonth() && n.getFullYear() === T.getFullYear()) n = T; }
     go(n, view, 'slide', dir);
   };
+  // Pavé tactile : balayage horizontal à deux doigts = période suivante / précédente, comme l'Agenda
+  // (demande de Théo, recette 30/09/2026) — UN pas par geste (kit).
+  const navRef = useRef(nav); navRef.current = nav;
+  useEffect(() => { const el = mainRef.current; if (!el || tab !== 'planning') return; return bindSwipeWheel(el, (d) => navRef.current(d)); }, [tab]);
   const goToday = () => {
     const T = gx().today(), p = per;
     if (T >= p.s && T < p.e && (!p.m0 || (T >= p.m0 && T < p.m1!))) {

@@ -223,3 +223,35 @@ export function useCompact(ref: React.RefObject<HTMLElement>, threshold: number)
   }, [threshold]);
   return c;
 }
+
+// ---------------------------------------------------------------- balayage au pavé tactile
+/**
+ * Balayage horizontal au pavé tactile (deux doigts) = UN pas par geste (période suivante / précédente).
+ * Un geste = un flux continu d'événements `wheel`, inertie comprise : on avance UNE fois quand le cumul
+ * franchit le seuil, puis on verrouille jusqu'à ce que le flux s'arrête (`idle` ms sans événement).
+ * L'ancienne règle (la maquette : un pas toutes les 550 ms) faisait 2 à 3 pas sur un pavé Windows, dont
+ * l'inertie dure plus d'une seconde (recette 30/09/2026 : « ça m'envoie 3 semaines plus loin »).
+ * Un élément qui défile lui-même horizontalement garde son défilement (tableau large, etc.).
+ */
+export function bindSwipeWheel(el: HTMLElement, onStep: (dir: 1 | -1) => void, { threshold = 70, idle = 200 } = {}) {
+  let acc = 0, locked = false, t = 0;
+  const scrollsX = (target: EventTarget | null, dx: number) => {
+    for (let n = target as HTMLElement | null; n && n !== el; n = n.parentElement) {
+      if (n.scrollWidth > n.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(n).overflowX)) {
+        if (dx > 0 ? n.scrollLeft + n.clientWidth < n.scrollWidth - 1 : n.scrollLeft > 0) return true;
+      }
+    }
+    return false;
+  };
+  const wheel = (e: WheelEvent) => {
+    const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.3;
+    if (!locked && !horizontal) return;
+    clearTimeout(t); t = window.setTimeout(() => { acc = 0; locked = false; }, idle);
+    if (locked) return;                                   // fin du geste (inertie) : ignorée
+    if (scrollsX(e.target, e.deltaX)) { acc = 0; return; }
+    acc += e.deltaX;
+    if (Math.abs(acc) >= threshold) { locked = true; onStep(acc > 0 ? 1 : -1); acc = 0; }
+  };
+  el.addEventListener('wheel', wheel, { passive: true });
+  return () => { el.removeEventListener('wheel', wheel); clearTimeout(t); };
+}

@@ -27,6 +27,9 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   /* groups : [{ label?, toggleAll?, items: [{ v, l, color?, hint? }] }]
      opts : { multi=true, search=auto, selected=[], allLabel, title, onChange(values), width, noneLabel } */
   GX.ui.pick = (anchor, groups, opts = {}) => {
+    /* [GEARBOX] Bascule : un nouveau clic sur le déclencheur du sélecteur OUVERT le referme (avant : le clic
+       n'était pas « extérieur » et rouvrait le sélecteur — impossible à fermer par son bouton ; recette 30/09). */
+    if (openPick && openPick.anchor === anchor) { GX.ui.closePick(); return null; }
     GX.ui.closePick(); GX.menu.close();
     const multi = opts.multi !== false;
     let sel = new Set(opts.selected || []);
@@ -79,7 +82,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const away = (e) => { if (e.target.closest?.('.gx-datecal')) return; if (!el.contains(e.target) && !(anchor.contains && anchor.contains(e.target))) GX.ui.closePick(); };
     const key = (e) => { if (e.key === 'Escape') { e.stopPropagation(); GX.ui.closePick(); } };
     setTimeout(() => { if (openPick?.el !== el) return; /* [GEARBOX] déjà refermé avant ce tic : sinon écouteurs orphelins (Échap avalé pour toujours) — défaut de la maquette */ GX.win(window, 'pointerdown', away, true); GX.win(window, 'keydown', key, true); });
-    openPick = { el, cleanup: () => { GX.unwin(window, 'pointerdown', away, true); GX.unwin(window, 'keydown', key, true); opts.onClose && opts.onClose([...sel]); } };
+    openPick = { el, anchor, cleanup: () => { GX.unwin(window, 'pointerdown', away, true); GX.unwin(window, 'keydown', key, true); opts.onClose && opts.onClose([...sel]); } };
     return el;
   };
 
@@ -112,6 +115,9 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
 
   /* Période : raccourcis + du / au */
   GX.ui.dateRange = (anchor, { from, to }, onChange) => {
+    /* [GEARBOX] Bascule : un nouveau clic sur le déclencheur du sélecteur OUVERT le referme (avant : le clic
+       n'était pas « extérieur » et rouvrait le sélecteur — impossible à fermer par son bouton ; recette 30/09). */
+    if (openPick && openPick.anchor === anchor) { GX.ui.closePick(); return null; }
     GX.ui.closePick(); GX.menu.close();
     const T = GX.today(), y = T.getFullYear(), m = T.getMonth(), iso = GX.iso;
     const q0 = Math.floor(m / 3) * 3, s0 = m < 6 ? 0 : 6, dow = (T.getDay() + 6) % 7;
@@ -127,7 +133,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     place(el, anchor);
     const away = (e) => { if (e.target.closest?.('.gx-datecal')) return; if (!el.contains(e.target) && !(anchor.contains && anchor.contains(e.target))) GX.ui.closePick(); };
     setTimeout(() => { if (openPick?.el === el) GX.win(window, 'pointerdown', away, true); }); /* [GEARBOX] pas d'écouteur orphelin */
-    openPick = { el, cleanup: () => GX.unwin(window, 'pointerdown', away, true) };
+    openPick = { el, anchor, cleanup: () => GX.unwin(window, 'pointerdown', away, true) };
     return el;
   };
   GX.ui.periodLabel = (from, to) => { const f = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }); return from && to ? `${f(from)} → ${f(to)}` : 'Toute la période'; };

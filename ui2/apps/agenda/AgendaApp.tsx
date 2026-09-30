@@ -5,7 +5,7 @@ import { BRANDS, SERVICES, PROJECT_TYPES } from '../../../constants';
 import { sitesDuProjet, groupeDuProjet } from '../../../utils/projet';
 import { ferieDe } from '../../../lib/joursFeries';
 import { useWorkspace, workspace } from '../../store/workspace';
-import { gx, Icon, Seg, PickerBtn, useEngineStore, useEngineEvent, useCompact } from '../ui/kit';
+import { gx, Icon, Seg, PickerBtn, useEngineStore, useEngineEvent, useCompact, bindSwipeWheel } from '../ui/kit';
 
 // =====================================================================
 // Rubrique « Agenda » — transposition de maquettes/v2/js/apps/agenda.js (même balisage, mêmes
@@ -435,13 +435,8 @@ export default function AgendaApp({ win, inst }: AppProps) {
   };
   useEffect(() => {
     const stage = stageRef.current; if (!stage) return;
-    // Pavé tactile : balayage horizontal = période suivante / précédente
-    let acc = 0, accT = 0, wheelAt = 0;
-    const wheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) * 1.3) return;
-      acc += e.deltaX; clearTimeout(accT); accT = window.setTimeout(() => (acc = 0), 180);
-      if (Math.abs(acc) > 110 && Date.now() - wheelAt > 550) { navRef.current(acc > 0 ? 1 : -1); acc = 0; wheelAt = Date.now(); }
-    };
+    // Pavé tactile : balayage horizontal = période suivante / précédente — UN pas par geste (kit).
+    const unbindWheel = bindSwipeWheel(stage, (d) => navRef.current(d));
     // Doigt : la vue suit le doigt, puis bascule (ou revient en ressort)
     const down = (e: PointerEvent) => {
       if (e.pointerType === 'mouse') return;
@@ -460,8 +455,8 @@ export default function AgendaApp({ win, inst }: AppProps) {
       };
       stage.addEventListener('pointermove', mv); stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
     };
-    stage.addEventListener('wheel', wheel, { passive: true }); stage.addEventListener('pointerdown', down);
-    return () => { stage.removeEventListener('wheel', wheel); stage.removeEventListener('pointerdown', down); clearTimeout(accT); };
+    stage.addEventListener('pointerdown', down);
+    return () => { unbindWheel(); stage.removeEventListener('pointerdown', down); };
   }, []);
   useEffect(() => () => gx().ui.closePick?.(), []);
 

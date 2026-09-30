@@ -47,3 +47,17 @@
 :host([data-theme="light"][data-material="liquid"]:is([data-wallpaper="bony-trame"], [data-wallpaper="bony-traces"])) :is(#widgets .wdg.glass, .dock.glass) {
   --text: #fff; --text-2: rgba(255,255,255,.84); --text-3: rgba(255,255,255,.64); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.45);
 }
+
+/* Défauts de CASCADE de la maquette (30/09/2026, recette Théo) :
+   1. Interrupteurs `.switch` : la règle des cases à cocher chartées `input[type="checkbox"]` (engine/controls)
+      est PLUS spécifique que `.switch` et les redessinait en petit carré à coche. On rétablit l'interrupteur. */
+input[type="checkbox"].switch { width: 34px; height: 20px; border-radius: 99px; background: var(--surface-4); box-shadow: none; display: inline-block; position: relative; }
+input[type="checkbox"].switch:hover { box-shadow: none; }
+input[type="checkbox"].switch:checked { background: var(--ok); box-shadow: none; }
+input[type="checkbox"].switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transform: none; transition: transform 520ms var(--spring-bouncy); }
+input[type="checkbox"].switch:checked::after { transform: translateX(14px); }
+input[type="checkbox"].switch:focus-visible { box-shadow: 0 0 0 3px var(--focus); }
+input[type="checkbox"].switch:disabled { opacity: .5; cursor: default; }
+/* 2. Légende de la matrice des accès : `.set-legend2 span` (inline-flex) s'appliquait aussi aux pastilles
+      imbriquées et cassait leur centrage. */
+.set-legend2 :is(.set-yes, .set-ro) { display: inline-grid; place-items: center; gap: 0; }

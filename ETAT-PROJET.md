@@ -179,6 +179,13 @@
     redémarrage de `gearbox-api` a suffi.
   - Reste avant la bascule : recette complète de Théo, rôles cloisonnés (chef de site, External, Guest) sur chaque
     rubrique, arbitrages (BUGS-CONNUS 30/09), `BESOINS.md` des agents (sous `ui2/apps/*/`).
+  - **Recette 1 du lot 4 (30/09) — retouches faites** : menus et sélecteurs du moteur qui se rouvraient au reclic
+    (bascule sur le déclencheur : `engine/core.ts` menu, `engine/pickers.ts` pick/dateRange) ; interrupteurs `.switch`
+    rendus en carrés et légende de la matrice cassée (cascade du `input[type=checkbox]`, `overrides.css`) ; Rôles & accès
+    réservé au **Master** ; carte « projet cité » du Chat (un GROUPE BONY listait tous ses sites et élargissait la
+    conversation) ; balayage 2 doigts **un pas par geste**, inertie ignorée (`bindSwipeWheel` dans `ui/kit.tsx`,
+    Agenda — qui avançait de 3 semaines — et planning du Matériel). Vérifié dans le navigateur (Master).
+  - En étude, non codé : navigation gestuelle entre fenêtres ; gestion des accès par rôle depuis Rôles & accès.
 
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,

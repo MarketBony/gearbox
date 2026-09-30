@@ -272,9 +272,14 @@ GX.win(window, 'resize', () => GX.ui.refresh());
 
 /* Menus contextuels et déroulants : un seul composant pour toute l'app */
 let openMenu = null;
+/* [GEARBOX] Bascule du menu sur son déclencheur : l'appui (pointerdown) EXTÉRIEUR ferme le menu, puis le
+   clic qui suit sur le même bouton le rouvrait — un menu ne se refermait jamais par son bouton (recette
+   30/09). On retient le déclencheur fermé par cet appui, et le clic qui suit ne rouvre pas. */
+let closedByPress = null;
 GX.menu = {
   /* items : [{label, icon, kbd, action, checked, disabled, sub}] | '-' | {header} */
   open(items, at, { align = 'left', onClose } = {}) {
+    if (at instanceof Element && closedByPress && closedByPress.at === at && performance.now() - closedByPress.t < 600) { closedByPress = null; return null; }
     GX.menu.close();
     const m = document.createElement('div'); m.className = 'menu glass glass-strong';
     m.innerHTML = items.map((it, i) => it === '-' ? '<div class="sep"></div>' : it.header ? `<div class="mh">${GX.esc(it.header)}</div>` :
@@ -292,7 +297,7 @@ GX.menu = {
       if (e.key === 'Enter' && kb >= 0) mis[kb].click();
     };
     m.addEventListener('click', (e) => { const mi = e.target.closest('.mi'); if (!mi) return; const it = items[+mi.dataset.i]; GX.menu.close(); it.action && it.action(); });
-    const away = (e) => { if (!m.contains(e.target)) GX.menu.close(); };
+    const away = (e) => { if (m.contains(e.target)) return; if (at instanceof Element && at.contains(e.target)) closedByPress = { at, t: performance.now() }; GX.menu.close(); };
     setTimeout(() => { if (openMenu?.m !== m) return; /* [GEARBOX] déjà refermé avant ce tic : sinon écouteurs orphelins (Échap avalé pour toujours) — défaut de la maquette */ GX.win(window, 'pointerdown', away, true); GX.win(window, 'keydown', key, true); });
     openMenu = { m, cleanup: () => { GX.unwin(window, 'pointerdown', away, true); GX.unwin(window, 'keydown', key, true); onClose && onClose(); } };
     return m;

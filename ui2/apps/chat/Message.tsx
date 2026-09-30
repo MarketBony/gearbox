@@ -95,16 +95,19 @@ function ProjectCard({ id, ext }: { id: string; ext: boolean }) {
   // Supprimé depuis, ou hors du périmètre renvoyé par l'API : on l'annonce au lieu d'une carte vide.
   if (!p) return <div className="cht-b del"><Icon name="projects" size="sm" />Projet introuvable</div>;
   const st = gx().data.PROJECT_STATUS[p.status] || { l: p.status, c: 'var(--text-3)' };
-  const sites = p.sites && p.sites.length ? p.sites : [p.site];
+  // Libellé court (comme la liste des Projets) : un GROUPE BONY listait ses 16-20 sites et élargissait la
+  // carte sur toute la conversation (recette 30/09/2026).
+  const all = p.sites && p.sites.length ? p.sites : [p.site];
+  const siteTxt = p.site === 'GROUPE BONY' || p.site === 'GROUPE BONY (R/N)' ? p.site : all.length > 2 ? `${all.slice(0, 2).join(', ')} +${all.length - 2}` : all.join(', ');
   const pr = p.progress || 0;
   return (
     <button className="cht-proj" data-tip="Ouvrir le projet" onClick={() => gx().openProject(p.id)}>
       <span className="ic"><Icon name="projects" /></span>
-      <span className="grow" style={{ minWidth: 0 }}>
+      <span className="grow" style={{ minWidth: 0, gridTemplateColumns: 'minmax(0, 1fr)' }}>
         <span className="label">Projet cité</span>
         <b className="ellipsis">{p.name}</b>
-        <span className="row" style={{ gap: 6, fontSize: 12, color: 'var(--text-2)' }}><span className="badge" style={{ '--c': st.c } as React.CSSProperties}><i className="dot" />{st.l}</span><span className="ellipsis">{sites.join(', ')}</span></span>
-        <span className="row" style={{ gap: 6 }}><span className="bar grow" style={{ height: 4 }}><i style={{ width: `${pr}%` }} /></span><span className="num faint" style={{ fontSize: 11.5 }}>{pr} %</span></span>
+        <span className="row" style={{ gap: 6, fontSize: 12, color: 'var(--text-2)', minWidth: 0 }}><span className="badge" style={{ '--c': st.c, flex: 'none' } as React.CSSProperties}><i className="dot" />{st.l}</span><span className="ellipsis" style={{ minWidth: 0 }} title={all.join(', ')}>{siteTxt}</span></span>
+        <span className="row" style={{ gap: 6, minWidth: 0 }}><span className="bar grow" style={{ height: 4, minWidth: 0 }}><i style={{ width: `${pr}%` }} /></span><span className="num faint" style={{ fontSize: 11.5 }}>{pr} %</span></span>
       </span>
     </button>
   );
