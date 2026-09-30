@@ -17,11 +17,15 @@ const { createSwipeRecognizer } = await import(pathToFileURL(out).href + '?t=' +
 const args = process.argv.slice(2);
 const oi = args.indexOf('--opts'); const opts = oi >= 0 ? JSON.parse(args.splice(oi, 2)[1]) : {};
 
+// Une seule reconnaissance pour tout un fichier, comme dans la coque (elle vit toute la session : ce
+// qu'elle a appris du pavé, le delta nul du lever, vaut pour les étapes suivantes).
+let ends = [], begins = 0, r = null, base = 0;
+const fresh = () => { r = createSwipeRecognizer({ begin: () => { begins++; return true; }, move() {}, end: (acc, v, reason) => ends.push({ acc: Math.round(acc), v: +v.toFixed(2), reason }) }, opts); base = 0; };
 function run(samples) {
-  const ends = []; let begins = 0;
-  const r = createSwipeRecognizer({ begin: () => { begins++; return true; }, move() {}, end: (acc, v, reason) => ends.push({ acc: Math.round(acc), v: +v.toFixed(2), reason }) }, opts);
-  for (const [t, dx, dy, mode = 0, ctrl = 0] of samples) { if (ctrl) continue; const k = mode === 1 ? 16 : 1; r.feed({ t, dx: dx * k, dy: dy * k }); }
-  r.flush(Infinity);
+  ends = []; begins = 0;
+  const off = base; let last = off;
+  for (const [t, dx, dy, mode = 0, ctrl = 0] of samples) { if (ctrl) continue; const k = mode === 1 ? 16 : 1; last = off + t; r.feed({ t: last, dx: dx * k, dy: dy * k }); }
+  r.flush(last + 5000); base = last + 10000;
   return { begins, ends };
 }
 
@@ -38,16 +42,19 @@ if (!args.length) {
     ['vertical', () => push(Array.from({ length: 30 }, () => [0.5, 12])), 0],
   ];
   let ok = true;
-  for (const [name, gen, want] of cases) { s.length = 0; t += 1000; gen(); const { begins } = run(s); const pass = begins === want; ok &&= pass; console.log(`${pass ? 'OK ' : 'KO '} ${name} : ${begins}/${want}`); }
+  for (const [name, gen, want] of cases) { fresh(); s.length = 0; t += 1000; gen(); const { begins } = run(s); const pass = begins === want; ok &&= pass; console.log(`${pass ? 'OK ' : 'KO '} ${name} : ${begins}/${want}`); }
   process.exit(ok ? 0 : 1);
 }
 
 for (const f of args) {
-  const rec = JSON.parse(readFileSync(f, 'utf8'));
+  const rec = JSON.parse(readFileSync(f, 'utf8')); fresh();
   console.log(`\n${f}\n  ${rec.ua}\n  écran ${rec.screen}, dpr ${rec.dpr}`);
   for (const [id, st] of Object.entries(rec.steps)) {
     const { begins, ends } = run(st.samples);
     const lifts = ends.filter((e) => e.reason === 'lift').length;
-    console.log(`  ${begins === st.expected ? 'OK' : 'KO'}  ${id.padEnd(13)} ${String(begins).padStart(2)}/${st.expected}  (${st.samples.length} évts, ${lifts} levers détectés)  ${ends.map((e) => e.acc).join(' ')}`);
+    // Vérité terrain : levers réels = événements à delta nul (Chrome / Windows), un par geste horizontal.
+    const zeros = st.samples.filter(([, dx, dy], i) => dx === 0 && dy === 0 && i > 0 && Math.abs(st.samples[i - 1][1]) > Math.abs(st.samples[i - 1][2])).length;
+    const truth = id === 'vertical' ? 0 : zeros || st.expected;
+    console.log(`  ${begins === truth ? 'OK' : 'KO'}  ${id.padEnd(13)} reconnus ${String(begins).padStart(2)} · levers réels ${String(zeros).padStart(2)} · demandés ${st.expected}  (${st.samples.length} évts)  ${ends.map((e) => e.acc).join(' ')}`);
   }
 }

@@ -107,9 +107,12 @@ export function install(): void {
     const maxed = w0.state === 'max' || w0.state === 'full' || (w0.state === 'snap' && w0.zone === 'max');
     const m = mode(), kind = list.length < 2 ? 'slide' : m === 'slide' ? 'slide' : m === 'strip' ? 'strip' : maxed ? 'slide' : 'strip';
     g = { kind, list, i0, base: i0, pos: i0, acc: 0, W: innerWidth, e: 0, live: true, fadeUntil: performance.now() + 120 };
-    GX.host.classList.add('gx-swiping');
+    // Souris bloquée par un écran transparent, PAS par une classe sur l'hôte : une classe sur l'hôte fait
+    // recalculer les styles de toute la coque (tâche de 70 ms mesurée au début du geste).
+    g.shield = document.createElement('div'); g.shield.className = 'gx-sw-shield'; GX.body.append(g.shield);
+    GX.gesture.register(g.shield, GX.gesture.owners.windows);   // un geste relancé pendant la fin animée reste ici
     if (GX.store.get('gestureLite', false)) GX.host.classList.add('gx-swipe-lite');
-    list.forEach((w) => { w.el.style.willChange = 'transform, opacity'; });
+    list.forEach((w) => { w.el.style.transformOrigin = '0 0'; });
     if (kind === 'slide') {
       list.forEach((w, k) => { if (k !== i0) { w.el.style.transition = 'opacity 120ms ease-out'; w.el.style.opacity = '0'; } });
     } else {
@@ -125,7 +128,9 @@ export function install(): void {
     if (!g || !g.live) return;
     g.acc = acc;
     const n = g.list.length, unit = g.kind === 'slide' ? g.W : g.S;
-    g.pos = rub(g.base * unit + acc, 0, (n - 1) * unit) / unit;
+    // Glissement : UNE fenêtre par geste au plus (butée élastique au-delà) ; Bandeau : libre.
+    const s0 = Math.round(g.base), lo = g.kind === 'slide' ? Math.max(0, s0 - 1) : 0, hi = g.kind === 'slide' ? Math.min(n - 1, s0 + 1) : n - 1;
+    g.pos = rub(g.base * unit + acc, lo * unit, hi * unit) / unit;
   }
 
   function end(acc, v) {
@@ -135,10 +140,10 @@ export function install(): void {
     const start = Math.round(g.base), d = g.pos - start;
     let j;
     if (g.kind === 'slide') {
-      if (Math.abs(d) >= .5) j = Math.round(g.pos);
+      if (Math.abs(d) >= .5) j = start + Math.sign(d);
       else if (Math.abs(d) > .16 || (Math.abs(v) > .35 && Math.sign(v) === Math.sign(d || v))) j = start + Math.sign(d || v);
       else j = start;
-    } else j = Math.round(g.pos + vp * .12);
+    } else j = Math.round(g.pos + vp * .08);
     j = clamp(j, 0, n - 1);
     g.stop?.();
     g.stop = spring(g.pos, j, vp, (x) => { g.pos = x; render(); }, () => finish(j), g.kind === 'slide' ? 300 : 420);
@@ -147,7 +152,9 @@ export function install(): void {
   function finish(j) {
     const w = g.list[j];
     if (g.kind === 'slide') { cleanup(w); return; }
-    GX.wm.focus(w);
+    // Premier plan par le seul z-index pendant le retour : `WM.focus` prévient l'appli (rubrique courante),
+    // tâche de 100 à 160 ms mesurée qui faisait caler le zoom à son départ. Le vrai focus vient à la fin.
+    w.el.style.zIndex = String(Math.max(...g.list.map((x) => +x.el.style.zIndex || 0)) + 1);
     const e0 = g.e;
     g.stop = tween(300, easeInOut, (t) => { g.e = e0 * (1 - t); render(); }, () => cleanup(w));
   }
@@ -155,18 +162,18 @@ export function install(): void {
   function cleanup(w) {
     const G0 = g; g = null;
     if (loop) { cancelAnimationFrame(loop); loop = 0; }
-    GX.wm.focus(w);
-    G0.veil?.remove();
+    if (GX.wm.active() !== w) GX.wm.focus(w);                  // un seul focus, animation finie
+    G0.veil?.remove(); G0.shield?.remove();
     G0.list.forEach((x) => {
       x.el.classList.remove('gx-sw-on');
-      x.el.style.transform = ''; x.el.style.willChange = '';
+      x.el.style.transform = ''; x.el.style.transformOrigin = '';
       if (G0.kind === 'slide' && x !== w) {
         x.el.style.transition = 'none'; x.el.style.opacity = '0';
         requestAnimationFrame(() => { x.el.style.transition = 'opacity 200ms ease-out'; x.el.style.opacity = ''; });
         setTimeout(() => { if (!g) x.el.style.transition = ''; }, 260);
       } else { x.el.style.transition = ''; x.el.style.opacity = ''; }
     });
-    GX.host.classList.remove('gx-swiping', 'gx-swipe-lite');
+    GX.host.classList.remove('gx-swipe-lite');
   }
 
   // Page masquée en plein geste (Alt+Tab) : plus d'images, l'animation resterait figée à mi-course.

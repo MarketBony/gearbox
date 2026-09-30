@@ -174,6 +174,9 @@
     LECTURE seulement (aucun message envoyé).
   - Copies temporaires assumées (aucun montant) : `ui2/apps/hello/sources.ts` (flux RSS / musique), `ui2/apps/games/logic.ts`
     (classement, placement de flotte), `ui2/apps/chat/voice.ts` — à supprimer avec les pages actuelles à la bascule.
+  - Incident (2e fois le 30/09 vers midi) : API locale bloquée sur « Timed out fetching a new connection from the
+    connection pool » / connexions réinitialisées par Supabase → `/api/auth/me` échoue et l'appli affiche l'écran de
+    connexion alors que le jeton est valide. Redémarrer `gearbox-api` suffit (inutile de se reconnecter).
   - Incident : un serveur de prod a été lancé sur le port 3000 pendant la nuit (origine non établie, aucun agent ne
     le reconnaît) ; l'API était restée bloquée sur des connexions mortes (« Can't reach database server ») : un
     redémarrage de `gearbox-api` a suffi.
@@ -202,9 +205,21 @@
     fenêtres réduites exclues, butée élastique en bout de liste. Option de mesure « verre coupé pendant le geste ».
   - `maquettes/ux/diag-geste.html` (page de diagnostic du pavé, servie par Vite) et `scripts/gesture-replay.mjs`
     (rejoue les enregistrements hors navigateur ; sans argument, auto-test synthétique : 5/5).
-  - Vérifié en simulation dans la coque (Bandeau : butée, une fenêtre par geste, deux d'un geste fort ;
-    Glissement corrigé après un faux « nouveau geste » pendant une saccade). NON vérifié : vrai pavé, Agenda et
-    Matériel via la porte, bureaux via la porte, fluidité en build de prod — session expirée pendant les tests.
+  - **Calibrage sur le diagnostic de Théo (30/09, pavé Windows, Chrome 152 de l'appli Claude)** — enregistrement
+    gardé en jeu de test : `scripts/fixtures/diag-geste-theo-2026-09-30.json`. Constats : deltaX entiers à 60 Hz
+    très bruités pendant le mouvement (d'où une vitesse LISSÉE sur 50 ms), inertie lisse et souvent absente, fin
+    des gestes lents clairsemée (trous jusqu'à 133 ms → silence de fin à 160 ms), et surtout **un événement à delta
+    NUL exactement au lever des doigts** : c'est le signal de lever retenu (la décroissance ne sert plus qu'en secours,
+    tant qu'aucun delta nul n'a été vu). Résultat : 7 séries sur 7 = nombre de levers réels de l'enregistrement.
+    Un aller-retour sans lever = UN geste (la fenêtre suit les doigts dans les deux sens).
+  - Glissement limité à UNE fenêtre par geste ; Bandeau libre (≈ 2 fenêtres pour un geste rapide).
+  - Vérifié dans la coque (gestes rejoués à la forme des vrais) : Glissement et Bandeau (butée, geste minuscule sans
+    effet, enchaînés) ; Agenda : un pas par geste sur la grille, bascule de fenêtre sur la barre de titre ;
+    défilement vertical sans effet ; fond = bureaux ; tableau du Budget : défilement natif tant qu'il peut défiler,
+    bascule de fenêtre en butée. Fluidité (dev) : 60 i/s pendant le geste, 1 à 2 images perdues ; le `WM.focus`
+    (≈ 160 ms en dev : l'appli change de rubrique courante) est repoussé APRÈS l'animation, et la souris est bloquée
+    par un écran transparent au lieu d'une classe sur l'hôte (qui recalculait toute la coque : 70 ms).
+    NON vérifié : le vrai pavé dans la coque (à faire par Théo), le Matériel via la porte, le build de prod.
   - ⚠️ Piège : un onglet en arrière-plan ne donne plus d'images (rAF) ; l'animation se conclut désormais d'office
     si la page est masquée en plein geste.
 
