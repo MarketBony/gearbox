@@ -6,7 +6,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useWeatherData, computeBirthdays, type WeatherData, type ForecastDay } from '../../../pages/HelloMarketing';
 import { parseLocalDate } from '../../../components/DateRangePicker';
 import { useWorkspace } from '../../store/workspace';
-import { gx, Icon, useEngineEvent } from '../ui/kit';
+import { gx, Icon, useEngineEvent, Avatar } from '../ui/kit';
 import { loadFeed, loadTrack, sourceHex, feedHex, type FeedCat, type FeedResult, type DeezerTrack } from './sources';
 
 // =====================================================================
@@ -70,8 +70,7 @@ const relDate = (s: string) => {
   const d = Math.floor(h / 24); if (d === 1) return 'hier'; if (d < 7) return `il y a ${d} j`;
   return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 };
-const initials = (name: string) => name.split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-const Av: React.FC<{ u: User; cls?: string }> = ({ u, cls = '' }) => <span className={`av ${cls}`} style={{ '--c': u.avatarColor || '#8a8599' } as React.CSSProperties}>{initials(u.name)}</span>;
+const Av: React.FC<{ u: User; cls?: string }> = ({ u, cls = '' }) => <Avatar user={u} cls={cls} tip={false} />;
 const sitesOf = (p: Project) => (p.sites && p.sites.length ? p.sites : p.site ? [p.site] : []);
 
 /** 3 prochains événements (règles de NextEventSection) + périmètre global de la barre du haut. */
@@ -187,7 +186,7 @@ const Viennoiseries: React.FC<{ users: User[]; i: number }> = ({ users, i }) => 
   return (
     <article className="hel-card hel-vien hel-in" style={{ '--i': i } as React.CSSProperties}>{title}
       <span className="hel-acc">{ACCROCHES[v.w % ACCROCHES.length]}</span>
-      <div className="hel-spot"><span key={v.u.id} className="av hel-bounce" style={{ '--c': v.u.avatarColor || '#8a8599' } as React.CSSProperties}>{initials(v.u.name)}</span></div>
+      <div className="hel-spot"><React.Fragment key={v.u.id}><Avatar user={v.u} cls="hel-bounce" tip={false} /></React.Fragment></div>
       <div><div className="nm">{v.u.name}</div><div className="rl">{role(v.u.role)}</div></div>
       <span className="hel-award">{BADGES[v.w % BADGES.length]}</span>
       <div className="hel-vfoot"><span>Semaine {v.w} · change le {nextMonday().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span><button onClick={(e) => hist(e.currentTarget)}>4 sem. précédentes ▴</button></div>

@@ -9,7 +9,7 @@ import { emitWithAck, getSocket } from '../../../services/socket';
 import { useAppSettings } from '../../../services/appSettings';
 import { GAME_LABELS, type GameChallenge, type GameSession, type GameSummary, type GameType } from '../../../components/games/gameTypes';
 import { useWorkspace } from '../../store/workspace';
-import { gx, hud, Icon, Seg, useEngineEvent } from '../ui/kit';
+import { gx, hud, Icon, Seg, useEngineEvent, Avatar } from '../ui/kit';
 import { computeStats, computeRivalries, computeStreak } from './logic';
 import { Morpion, Connect4, Battleship } from './boards';
 
@@ -34,7 +34,6 @@ const GAMES: { id: GameType; pitch: string; c: string; icon: string }[] = [
 const gOf = (id: GameType) => GAMES.find((g) => g.id === id) || GAMES[0];
 const PODIUM_H: Record<number, number> = { 1: 96, 2: 64, 3: 48 };
 
-const initials = (name: string) => name.split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 const errMsg = (e: unknown, fallback: string) => (e instanceof ApiError && e.message && !/^Erreur \d+$/.test(e.message) ? e.message : fallback);
 
 function confetti(host: HTMLElement) {
@@ -90,7 +89,7 @@ export default function GamesApp({ win, inst }: AppProps) {
   const uName = (id: string) => byId.get(id)?.name ?? 'Joueur retiré';
   const first = (id: string) => uName(id).split(' ')[0];
   // Rendus (fonctions, pas composants : un composant déclaré ici serait remonté à chaque rendu).
-  const av = (id: string, cls = '') => <span className={`av ${cls}`} style={{ '--c': byId.get(id)?.avatarColor || '#8a8599' } as React.CSSProperties} data-tip={uName(id)}>{initials(uName(id))}</span>;
+  const av = (id: string, cls = '') => <Avatar user={byId.get(id)} name={uName(id)} cls={cls} />;
   const player = (id: string, firstOnly = false, cls = 'sm') => <span className="row" style={{ gap: 8, minWidth: 0 }}>{av(id, cls)}<b className="ellipsis">{firstOnly ? first(id) : uName(id)}</b></span>;
 
   const active = sessions.find((s) => s.id === activeId) ?? null;

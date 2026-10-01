@@ -7,7 +7,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { computeDashboardStats } from '../../../services/dashboardStats';
 import { useWorkspace } from '../../store/workspace';
 import { useBudgets, useFixedExpenses, useSocialPosts } from '../../store/collections';
-import { gx, Icon, Chips, Seg, PickerBtn, useEngineEvent } from '../ui/kit';
+import { gx, Icon, Chips, Seg, PickerBtn, useEngineEvent, Avatar } from '../ui/kit';
 
 // =====================================================================
 // Rubrique « Dashboard » (Cockpit général) — transposition de maquettes/v2/js/apps/dashboard.js
@@ -63,12 +63,8 @@ const Head: React.FC<{ title: React.ReactNode; hint?: React.ReactNode; right?: R
 );
 /** HTML du moteur (`gx().chart.*`) inséré sans enveloppe visible : même arbre que la maquette. */
 const Html: React.FC<{ html: string }> = ({ html }) => <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: html }} />;
-/** `GX.r.av` sur le VRAI utilisateur (GX.data.user retomberait sur « moi » pour un inconnu). */
-const Av: React.FC<{ u?: User }> = ({ u }) => {
-  const name = u?.name || 'Utilisateur inconnu';
-  const ini = name.split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-  return <span className="av sm" style={{ '--c': u?.avatarColor || '#8a8599' } as React.CSSProperties} data-tip={name}>{u ? ini : '?'}</span>;
-};
+/** Avatar du VRAI utilisateur (porte `Avatar` du kit : photo, sinon initiales ; « ? » pour un inconnu). */
+const Av: React.FC<{ u?: User }> = ({ u }) => <Avatar user={u} cls="sm" />;
 /** `GX.r.net` ; un réseau hors catalogue (ajouté dans les Tags) = globe, comme la page. */
 const Net: React.FC<{ id: string }> = ({ id }) => {
   const n = gx().data.network(id);

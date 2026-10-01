@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { SocialPost, SocialComment } from '../../../types';
 import { db, ApiError } from '../../../services/dataService';
 import { useSocialPosts, socialPosts, updateSocialPost, useSocialComments, addSocialComment, deleteSocialComment } from '../../store/collections';
-import { gx, hud, Icon } from '../ui/kit';
+import { gx, hud, Icon, Avatar } from '../ui/kit';
 import { MEDIA_ACCEPTED, MEDIA_MAX, MEDIA_MAX_SIZE, estLienExterne, isVideoUrl, mediaFilename, normLink, provider, shortLink, pd } from './common';
 
 // Volets de la rubrique Digital (maquette : newPost, openWording, openMedia, lightbox, openComments),
@@ -192,7 +192,6 @@ function Lightbox({ items, start, onClose, onDownload }: { items: Media[]; start
 }
 
 // ---------------------------------------------------------------- commentaires
-const initials = (n: string) => n.split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '?';
 const quand = (s: string) => { const d = new Date(s); return Number.isNaN(d.getTime()) ? '' : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} à ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 
 /**
@@ -235,7 +234,7 @@ export function CommentsSheet({ p, ed, uid, isAdmin, close }: { p: SocialPost; e
             const mine = c.authorId === uid, name = c.author?.name ?? 'Compte supprimé';
             return (
               <div key={c.id} className={`dig-cmt ${mine ? 'mine' : ''}`}>
-                <span className="av" style={{ '--c': c.author?.avatarColor || '#8a8599' } as React.CSSProperties} data-tip={name}>{initials(name)}</span>
+                <Avatar user={c.author} name={name} />
                 <div className="bub"><div className="who"><b>{name}</b><span className="faint num">{quand(c.createdAt)}</span><span className="grow" />
                   {ed && (mine || isAdmin) ? <button className="icon-btn sm x" data-tip="Supprimer" onClick={(e) => del(c, (e.currentTarget as HTMLElement).closest('.dig-cmt'))}><Icon name="trash" size="sm" /></button> : null}</div>
                   <div className="txt">{c.content}</div></div>
