@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { EngineWin } from '../types';
+import { photoOf, avBg, initials } from '../../os/data';
 
 // =====================================================================
 // Primitives de la maquette en React — MÊME balisage, MÊMES classes que les générateurs HTML du
@@ -37,10 +38,34 @@ export const Icon = React.memo(function Icon({ name, size = '' }: { name: string
 
 // ---------------------------------------------------------------- rendus partagés (engine/r.ts)
 const D = () => gx().data;
-export const Avatar: React.FC<{ uid: string; cls?: string }> = ({ uid, cls = '' }) => {
-  const u = D().user(uid);
-  return <span className={`av ${cls}`} style={{ '--c': u.color } as React.CSSProperties} data-tip={u.name}>{u.initials}</span>;
-};
+/** Re-rendu à chaque `gearbox-avatar-updated` (photo changée ici ou ailleurs, cache des photos amorcé). */
+export function useAvatarTick() {
+  const [, set] = useState(0);
+  useEffect(() => { const h = () => set((n) => n + 1); window.addEventListener('gearbox-avatar-updated', h); return () => window.removeEventListener('gearbox-avatar-updated', h); }, []);
+}
+type AvUser = { id: string; name: string; avatarColor?: string; avatarUrl?: string | null };
+/**
+ * PORTE UNIQUE des avatars React de la v2 (pendant de `GX.r.av`) : photo si la personne en a une
+ * (`photoOf`, ui2/os/data.ts), sinon initiales sur sa couleur. Trois façons de désigner la personne :
+ *  - `uid` : un utilisateur de GX.data (cas courant) ;
+ *  - `user` : un `User` des stores (rubriques qui lisent `useWorkspace`) ;
+ *  - `name` (+ `color`) seuls : auteur absent de la liste des utilisateurs (« Ancien membre »).
+ * `online` ajoute la pastille de présence ; `tip={false}` tait l'infobulle.
+ */
+export function Avatar({ uid, user, name, color, cls = '', online, tip = true, style }:
+  { uid?: string; user?: AvUser | null; name?: string; color?: string; cls?: string; online?: boolean; tip?: boolean; style?: React.CSSProperties }) {
+  useAvatarTick();
+  const m = uid ? D().user(uid) : null;
+  const id = m?.id || user?.id || '';
+  const nm = (m && m.name) || user?.name || name || 'Ancien membre';
+  const c = m?.color || user?.avatarColor || color || '#8a8599';
+  const ph = id ? photoOf({ id, avatarUrl: user?.avatarUrl ?? m?.photo }) : null;
+  return (
+    <span className={`av ${cls}`} style={{ '--c': c, ...(ph ? { background: avBg(ph) } : null), ...style } as React.CSSProperties} data-tip={tip ? nm : undefined}>
+      {ph ? null : m ? m.initials : initials(user?.name || name || '?')}{online ? <i className="pres" /> : null}
+    </span>
+  );
+}
 export const ServiceBadge: React.FC<{ s: string }> = ({ s }) => {
   const c = D().SERVICE_COLOR[s];
   return <span className="badge svc" style={{ '--c': c === '#293f74' ? '#5b7fd6' : c || '#8a8599' } as React.CSSProperties}>{s}</span>;

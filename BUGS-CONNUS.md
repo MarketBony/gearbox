@@ -249,3 +249,20 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [ ] **Digital : renommer un tag ne répercute pas le nom sur les publications** ; filtre Site du Planning sans
   Montluçon, Saint-Etienne, Yssingeaux.
 
+<!-- Interface v2 (Gearbox OS) — 01/10/2026, correctif 60 -->
+- [x] **Interface v2 : plus aucune photo de profil, des initiales partout.** Aucune donnée perdue : `mapUser`
+  (`ui2/os/data.ts`) ne remplissait pas `photo` et tous les rendus (moteur, kit, copies locales des rubriques)
+  écrivaient les initiales en dur. Portes uniques `photoOf` / `avBg`, `GX.r.av`, `Avatar` du kit ; mise à jour en
+  direct par `data:users`. **Correctif 60.**
+- [x] **Interface v2 : le widget Chat n'affichait « que mes messages ».** Faux message « dernier message » sans
+  auteur, rattaché à l'utilisateur connecté par le repli de `D.user` ; envoi et réaction qui ouvraient le Chat ;
+  réponses simulées de la maquette encore présentes. Pont `GX.chatFeed` (vrais fils, temps réel, envoi et réactions
+  directs, lu). **Correctif 60.**
+- [x] **Interface v2 : `D.user(id inconnu)` rendait l'utilisateur connecté** (piège général, au-delà du Chat). Rend
+  « Ancien membre ». **Correctif 60.**
+- [x] **Interface v2 : le Chat Général absent du widget Chat** (filtre sur `participants`, vide pour le Général dont
+  l'appartenance est implicite). **Correctif 60.**
+- [ ] **Aucune suppression de conversation possible** (pas de route `DELETE /api/chat/conversations/:id`). Pas
+  bloquant, mais un groupe créé par erreur ou pour un test reste à vie. À arbitrer.
+- [ ] **Sauvegarde du volume `uploads_data` du VPS (photos, pièces jointes) : à vérifier** — le workflow hebdomadaire
+  ne pousse qu'un dump Supabase. Prérequis du chantier « fichiers maison ».

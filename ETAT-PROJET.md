@@ -4,16 +4,22 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 01/10/2026 (lire en premier)
-- **En production : correctif 59 (30/09)** — interface v2 « Gearbox OS » en **BÊTA OUVERTE À TOUS LES RÔLES**
-  (`UI2_BETA_ROLES = null`, `ui2/beta.ts`). L'ancienne interface reste **par défaut** ; bascule par Paramètres ›
-  Application › « Nouvelle interface (bêta) » (retour au même endroit, `?ui=classic`, ou automatique si la coque
-  plante). `master` = `origin/master` = prod (`cccba26`). Déployé : `web` seul, aucune migration.
+- **En production : correctif 60 (01/10)** — v2 : photos de profil partout et widgets Chat branchés sur le serveur
+  (détail plus bas). Avant lui le **correctif 59 (30/09)** : interface v2 « Gearbox OS » en **BÊTA OUVERTE À TOUS
+  LES RÔLES** (`UI2_BETA_ROLES = null`, `ui2/beta.ts`). L'ancienne interface reste **par défaut** ; bascule par
+  Paramètres › Application › « Nouvelle interface (bêta) » (retour au même endroit, `?ui=classic`, ou automatique
+  si la coque plante). `master` = `origin/master` = prod. Déployé : `web` seul, aucune migration.
+- **Nouveautés = dans la v2 SEULEMENT** (décision de Théo, 01/10) ; les bugs se corrigent là où ils sont.
 - **Ce qui est fait** (détail plus bas) : coque = moteur de la maquette converti (`ui2/os/engine/`, Shadow DOM) ;
   les 16 rubriques réécrites en React (`ui2/apps/*`, modèle et règles : `ui2/apps/PORTAGE.md`) ; navigation
   gestuelle (porte unique `engine/gesture.ts`, rendu `engine/winswipe.ts`, calibrée sur le pavé de Théo) ; perf
   (plus aucune tâche longue au changement de fenêtre) ; audit des droits des 16 rubriques corrigé ; écritures
   sensibles testées (provisions Budget, Congés). Plan et état du chantier : `maquettes/ux/PLAN-DEPLOIEMENT-V2.md`.
 - **Où on va (dans l'ordre)** :
+  0. **Chantiers d'octobre (liste de Théo du 01/10, arbitrages dans le backlog § « Chantiers d'octobre 2026 »)** :
+     lot 1 fait (correctif 60) ; prochain lot au choix de Théo entre **intégration Google** (Drive, Sheets, Forms
+     du compte marketbony@gmail.com) et **Post-it** (agenda libre dans la To-do) ; puis tâches multi-assignées,
+     prestataire sur les dépenses, répartitions personnalisées, fichiers maison, mascotte / agent IA.
   1. **Retours de la bêta** (groupe « Bêta Gearbox OS » du Chat, créé par Théo) : les trier, corriger par lots.
   2. **Fermer le trou serveur** : `GET /api/budget` et lecture des dépenses fixes sans garde de rôle (External)
      — lot backend dédié, `ETAT-BACKEND.md` + `BUGS-CONNUS.md`.
@@ -280,6 +286,30 @@
   - ⚠️ Piège : un onglet en arrière-plan ne donne plus d'images (rAF) ; l'animation se conclut désormais d'office
     si la page est masquée en plein geste.
 
+- **Correctif 60 — 01/10 : photos de profil et widgets Chat de la v2** (branche `fix/ui2-photos-widget-chat`, `web`
+  seul, aucune migration). Signalés par Théo : « les images de profil n'apparaissent plus nulle part » et « le widget
+  de chat n'affiche que mes messages ».
+  - **Photos** : aucune donnée perdue — la v2 n'avait jamais été branchée. `mapUser` (`ui2/os/data.ts`) ne remplissait
+    pas `photo` et tous les rendus écrivaient les initiales en dur. **Portes uniques** : `photoOf` / `avBg`
+    (`ui2/os/data.ts`), `GX.r.av` côté moteur (options `s`, `pres`, `tip`), `Avatar` du kit côté React (désigne la
+    personne par `uid`, `user` ou `name` seul pour un ancien membre). Copies locales retirées (Chat, Congés,
+    Dashboard, Digital, Jeux, Hello, Réglages). Mise à jour en direct : `gearbox-avatar-updated` → `DataHub`
+    re-mappe les utilisateurs et émet **`data:users`** (nouvel événement, les widgets se redessinent).
+  - **Widget Chat** : chaque conversation n'avait qu'un FAUX message « dernier message » sans auteur, que
+    `D.user('')` rattachait à l'utilisateur connecté (repli sur `D.ME`) → tout semblait venir de soi. Envoi et
+    réaction ne faisaient qu'ouvrir le Chat ; le code de réponses simulées de la maquette était encore là.
+    Désormais **pont unique `GX.chatFeed`** (`useChatFeed`, `ui2/os/DataHub.tsx`) : fil réel chargé à l'affichage
+    (`db.getMessages`), suivi par `chat:message:new` / `updated`, envoi et réactions par les mêmes événements socket
+    que la rubrique Chat (sans optimisme), conversation affichée marquée lue (`chat:conversation:read`). Simulation
+    supprimée. Widget « Derniers messages » corrigé de même (aperçu serveur sans auteur → avatar de la conversation).
+  - **`D.user` d'un id inconnu rend « Ancien membre »**, plus jamais l'utilisateur connecté (seul `'me'` le désigne).
+  - Découvert en route : **le Chat Général n'apparaissait pas dans le widget** (appartenance implicite côté serveur,
+    `participants` vide) — corrigé (`chVisible`).
+  - Testé sur localhost avec le compte de Théo : conversation privée réelle (124 messages, ceux de l'autre à gauche
+    avec son avatar), Chat Général (6 auteurs), photos factices injectées dans le cache du navigateur (17/22 avatars
+    basculent en direct ; les 5 autres attendus). **Envoi depuis le widget testé par Théo** dans une vraie
+    conversation. ⚠️ Les vraies photos ne s'affichent PAS en local (fichiers sur le VPS seulement, cf. Pièges).
+
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
   51.83.75.181)
@@ -287,7 +317,11 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 59** (30 septembre 2026) — **INTERFACE V2
+- master = prod, synchronisés. Dernier lot déployé : **correctif 60** (1er octobre 2026) — v2 : photos de profil
+  partout (portes `photoOf` / `GX.r.av` / `Avatar` du kit) et widgets Chat branchés sur le serveur (`GX.chatFeed` :
+  vrais messages, envoi et réactions directs). **`web` SEUL, sans migration.** Push et déploiement autorisés par
+  Théo après sa recette (« go push »).
+- Avant lui le **correctif 59** (30 septembre 2026) — **INTERFACE V2
   (Gearbox OS) EN BÊTA OUVERTE À TOUS LES RÔLES** : lots 1 à 4 (coque + 16 rubriques portées), navigation
   gestuelle, audit des droits corrigé. **`web` SEUL, sans migration** (aucun fichier sous `backend/`).
   L'ancienne interface reste celle PAR DÉFAUT ; chacun bascule par Paramètres › Application › « Nouvelle
@@ -3567,6 +3601,37 @@
 > l'historique des correctifs ci-dessus et dans `BUGS-CONNUS.md`.
 
 ### Fonctionnel / produit
+- **Chantiers d'octobre 2026 (liste de Théo du 01/10) — arbitrages, ne pas les rediscuter :**
+  - Nouveautés **dans la v2 seulement**.
+  - ~~Photos de profil absentes, widget Chat « que mes messages »~~ → **fait, correctif 60**.
+  - **Prestataire sur les dépenses** : texte libre + auto-complétion des valeurs déjà saisies, sur les tâches ET les
+    dépenses (`Task.provider` existe déjà ; `FixedExpense` n'a rien). Vérifier la validation d'écriture de
+    `backend/src/routes/fixedExpenses.ts` (champ jeté en silence sinon). Migration additive.
+  - **Répartitions personnalisées** : pouvoir créer d'autres répartitions « pré-faites » comme GROUPE BONY et
+    GROUPE BONY R/N (aujourd'hui figées dans `constants.ts`, `DISTRIBUTION_GROUPE_BONY` / `_RN`), depuis les
+    Réglages. ⚠️ Touche la porte unique du routage ; à trancher : une répartition déjà utilisée reste-t-elle
+    modifiable (recalcul des montants passés) ? Théo y reviendra.
+  - **Post-it** (remplace la vue calendrier de la To-do, ABANDONNÉE) : sous-rubrique de la To-do, agenda façon
+    Outlook (semaine par défaut, mois), clic pour poser un créneau. Post-it = titre, début (jour + heure), fin,
+    case « journée(s) entière(s) ». **Connecté à rien d'autre** dans Gearbox.
+  - **Tâches multi-assignées** (`assignedUserId` → liste) : n'importe qui peut attribuer à n'importe qui, mais
+    seulement les rôles qui ont accès à la To-do ; attribution à d'autres dès la création depuis la To-do. KPI du
+    mode Expert : coût compté **EN ENTIER pour chacun** (5 000 € chacun). Reprise des données, `TASK_FIELDS`.
+  - **Intégration Google** (marketbony@gmail.com, gmail PERSONNEL partagé par l'équipe) : parcourir le Drive,
+    ouvrir et éditer Sheets et Forms, remonter les réponses des Forms dans une interface maison. Tout le monde agit
+    sous l'identité de ce compte ; accès : Coordinator, Digital Manager, Administrator, Director, Master (à
+    inscrire dans la matrice Rôles & accès). ⚠️ Expiration à 7 jours des autorisations en mode test OAuth : piste
+    à creuser (application sortie du mode test, non vérifiée). Édition dans une fenêtre intégrée : à tester
+    (cookies tiers).
+  - **Fichiers maison** (façon SharePoint, stockage sur le VPS ; droits par fichier gérés par le Master). 179 Go
+    libres au 01/10. ⚠️ Avant d'y mettre les documents : la sauvegarde hebdomadaire ne copie que la base Supabase,
+    pas le volume `uploads_data` (à vérifier et régler).
+  - **Mascotte / agent IA** : 100 % gratuit, mascotte pixel art mignonne, « vivante » (se balade sur la barre des
+    tâches). Cadrage juste après le lot 1. Pistes du cerveau : API gratuites (gpt-oss chez Groq / OpenRouter,
+    palier gratuit Gemini — quotas et usage des données à vérifier) ; modèle sur le VPS possible mais lent
+    (8 vCPU sans GPU, 22 Go). Prévoir un cerveau interchangeable côté serveur, et l'agent agit avec les droits de
+    son interlocuteur (`siteScope`).
+  - **Microsoft / Outlook** : mis de côté par Théo.
 - **Gestion des accès par rôle depuis Réglages › Rôles & accès** (demande de Théo, 30/09/2026, NOTÉE POUR PLUS
   TARD) : rendre la matrice modifiable. Plan proposé : table de droits (rôle × rubrique × Aucun/Lecture/Édition,
   vide = droits actuels), une porte serveur unique à la place des 44 `requireRole`, client (navigation, routage,
@@ -3754,6 +3819,15 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Les photos de profil (et toutes les pièces jointes) ne s'affichent PAS en local** : les fichiers vivent dans le
+  volume Docker `uploads_data` du VPS, pas dans `backend/uploads/` du poste → 404 en local, 200 en prod. Pour tester
+  un rendu d'avatar en local : injecter une URL `data:` dans le cache (`setAvatarUrl` de
+  `services/avatarCache.ts`, côté navigateur seulement) puis émettre `gearbox-avatar-updated` (01/10/2026).
+- **Aucune route ne supprime une conversation du Chat** : un groupe créé pour un test reste en base pour toujours.
+  Tester l'envoi dans une vraie conversation (Théo) ; une réaction posée deux fois s'annule.
+- **Interface v2 : un événement de la coque ne redessine que ce qui l'écoute.** Les widgets du moteur se
+  redessinent sur `ctx`, `badges`, `data:projects` et `data:users` — PAS sur `data`. Une donnée nouvelle affichée
+  dans un widget doit avoir son événement (01/10 : photos changées sans effet sur les widgets avant `data:users`).
 - **Interface v2 : un rendu d'`OsHost` re-rend tout ce qui n'est pas figé.** Rubriques portées (`DeferredApp`),
   pages projetées (`LegacyPage`) et `DataHub` sont en `React.memo` : sans ça, chaque changement de fenêtre active
   (`setTab`) coûtait 125 à 178 ms en build de prod (30/09). Tout nouvel enfant d'`OsHost` doit l'être aussi.

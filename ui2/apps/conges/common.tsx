@@ -56,7 +56,7 @@ export const K: React.FC<{ c: CongeJour; tip?: boolean }> = ({ c, tip = true }) 
 /** Petite pastille d'un absent (agenda) : couleur de la personne, liseré du type. */
 export const AbsAv: React.FC<{ c: CongeJour }> = ({ c }) => {
   const u = gx().data.user(c.userId), L = typeOf(c.type);
-  return <span className={`cng-av ${c.validated ? '' : 'pend'}`} style={{ '--c': u.color, '--r': L?.c } as React.CSSProperties} data-tip={`${u.name} — ${L?.l || c.type}${c.demi ? ` (${CONGES_DEMI[c.demi].court})` : ''}`}>{u.initials}</span>;
+  return <span className={`cng-av ${c.validated ? '' : 'pend'}`} style={{ '--c': u.color, '--r': L?.c, ...(u.photo ? { background: gx().data.avBg(u.photo) } : null) } as React.CSSProperties} data-tip={`${u.name} — ${L?.l || c.type}${c.demi ? ` (${CONGES_DEMI[c.demi].court})` : ''}`}>{u.photo ? null : u.initials}</span>;
 };
 
 /** Liste des familles (panneau d'une case, période). */

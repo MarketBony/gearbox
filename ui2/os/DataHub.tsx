@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { mapProject, mapPost, mapUser, GXData } from './data';
+import { mapProject, mapPost, mapUser, mapMessage, GXData } from './data';
 import { useBridge, appOf } from './bridge';
 import { db } from '../../services/dataService';
 import { chatStore } from '../../services/chatStore';
+import { getSocket, connectSocket, emitWithAck } from '../../services/socket';
 import { usePresence } from '../../services/presenceStore';
 import { useRealtimeSync, RT_EVENTS } from '../../services/realtime';
 import { computeDashboardStats } from '../../services/dashboardStats';
@@ -71,6 +72,11 @@ function DataHubInner() {
   // Chat : le store temps réel de l'appli (le même que la Sidebar).
   const [chatTick, setChatTick] = useState(0);
   useEffect(() => chatStore.subscribe(() => setChatTick(n => n + 1)), []);
+  useChatFeed(uid, allowed.has('chat'));
+
+  // Photos de profil : changées ici ou ailleurs (Réglages, autre onglet via l'API) → USERS re-mappés.
+  const [avTick, setAvTick] = useState(0);
+  useEffect(() => { const h = () => setAvTick(n => n + 1); window.addEventListener('gearbox-avatar-updated', h); return () => window.removeEventListener('gearbox-avatar-updated', h); }, []);
 
   const stats = useMemo(() => {
     if (!core) return null;
@@ -80,7 +86,7 @@ function DataHubInner() {
   }, [core]);
 
   const first = useRef(true);
-  const prev = useRef<{ core: any; badges: string }>({ core: null, badges: '' });
+  const prev = useRef<{ core: any; badges: string; users: any; avTick: number }>({ core: null, badges: '', users: null, avTick: 0 });
   useEffect(() => {
     const GX = gx(); const D: GXData = GX.data;
     D.ME = uid;
@@ -113,10 +119,12 @@ function DataHubInner() {
       id: c.id, kind: c.type === 'private' ? 'dm' : c.type, raw: c,
       name: c.type === 'general' ? 'Chat Général' : c.name || users.find(u => u.id === c.participants.find(p => p !== uid))?.name || 'Message privé',
       members: c.participants, unread: c.unreadCounts?.[uid] || 0, admins: c.adminIds || [], pinned: (c.pinnedBy || []).includes(uid), muted: (c.mutedBy || []).includes(uid),
-      last: c.lastMessage, lastAt: c.lastMessageAt ? new Date(c.lastMessageAt).getTime() : undefined,
+      last: c.lastMessage, lastAt: c.lastMessageAt ? new Date(c.lastMessageAt).getTime() : undefined, photo: c.avatarUrl ? encodeURI(c.avatarUrl) : null,
     }));
-    // Messages : le dernier de chaque conversation (le fil complet est lu par la rubrique Chat).
-    D.MESSAGES = Object.fromEntries(D.CONVS.filter(c => c.last).map(c => [c.id, [{ id: c.id + '-last', u: '', t: c.last!, at: c.lastAt || 0, type: 'text', r: {} }]]));
+    // Messages : D.MESSAGES n'est PAS réécrit ici — il est tenu par `GX.chatFeed` (useChatFeed, plus bas),
+    // qui y range les VRAIS fils des conversations affichées par le widget. Avant le 01/10/2026 il était
+    // rempli à chaque rendu avec un faux message « dernier message » SANS auteur, que D.user rattachait à
+    // l'utilisateur connecté : le widget montrait tout comme venant de soi.
     D.GAMES = { challenges: (lobby?.challenges || []).filter((x: any) => x.toUserId === uid && x.status === 'pending').map((x: any) => ({ from: x.fromUserId, game: x.gameType || x.game || '', at: new Date(x.createdAt || Date.now()).getTime() })), running: [], board: [] };
     D.FEED = b.feed.entries.map(e => ({ id: e.id, u: e.userId, a: e.action, o: e.entityName, app: appOf(D.tabOfEntity(e.entity)), at: new Date(e.timestamp).getTime(), unread: b.feed.isUnread(e), raw: e }));
     D.HELLO = {
@@ -130,10 +138,63 @@ function DataHubInner() {
     // présence ou de chat) : c'est ce qui évite de redessiner bureau, Dock et widgets pour rien.
     GX.emit('data');
     if (core && core !== prev.current.core) { prev.current.core = core; GX.emit('data:projects'); }
+    // Utilisateurs ou photos changés : les widgets du moteur (avatars en HTML) se redessinent.
+    if (users !== prev.current.users || avTick !== prev.current.avTick) { prev.current.users = users; prev.current.avTick = avTick; GX.emit('data:users'); }
     const badges = `${chatTick}|${lobby ? JSON.stringify(D.GAMES.challenges.length) : ''}|${b.feed.unreadCount}|${b.chatUnread}|${b.gamesChallenges}`;
     if (badges !== prev.current.badges) { prev.current.badges = badges; GX.emit('badges'); }
     if (first.current && core) { first.current = false; GX.emit('ctx'); }
-  }, [core, users, equip, conges, lobby, stats, chatTick, weather.current, weather.forecast, b.feed.entries, b.feed.unreadCount, presence, uid, role]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [core, users, equip, conges, lobby, stats, chatTick, avTick, weather.current, weather.forecast, b.feed.entries, b.feed.unreadCount, presence, uid, role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
+}
+
+// =====================================================================
+// GX.chatFeed — PONT UNIQUE du widget Chat vers le serveur (le moteur n'appelle jamais l'API).
+// Mêmes chemins que la rubrique Chat (ui2/apps/chat/ChatApp.tsx) : historique par `db.getMessages`,
+// direct par `chat:message:new` / `chat:message:updated`, écritures par le socket SANS optimisme (le
+// message s'affiche quand le serveur le diffuse : identité, horodatage, non-lus viennent de lui).
+// Droits : appartenance contrôlée par le serveur (403 = fil vide) ; pas de pont sans rubrique Chat.
+// =====================================================================
+function useChatFeed(uid: string, enabled: boolean) {
+  useEffect(() => {
+    const GX = gx(); const D: GXData = GX.data;
+    D.MESSAGES = {};
+    if (!enabled) { GX.chatFeed = null; return; }
+    const loaded = new Set<string>(), pending = new Set<string>();
+    const changed = (conv: string, msg?: any) => GX.emit('chat:message', { conv, msg, from: 'server' });
+    const load = (conv: string, force = false) => {
+      if (!conv || pending.has(conv) || (loaded.has(conv) && !force)) return;
+      pending.add(conv);
+      db.getMessages(conv)
+        .then(ms => { D.MESSAGES[conv] = ms.map(mapMessage); loaded.add(conv); })
+        .catch(() => { D.MESSAGES[conv] = []; loaded.add(conv); })   // 403 / 404 : fil vide silencieux
+        .finally(() => { pending.delete(conv); changed(conv); });
+    };
+    GX.chatFeed = {
+      load,
+      isLoaded: (conv: string) => loaded.has(conv),
+      send: (conv: string, content: string) => emitWithAck('chat:message:send', { conversationId: conv, content, type: 'text' }),
+      react: (messageId: string, emoji: string) => emitWithAck('chat:message:react', { messageId, emoji }),
+      read: (conv: string) => emitWithAck('chat:conversation:read', { conversationId: conv }).catch(() => {}),
+    };
+    const s = getSocket() ?? connectSocket();     // idempotent
+    if (!s) return () => { GX.chatFeed = null; };
+    const onNew = (m: any) => {
+      if (!loaded.has(m.conversationId)) return;   // fil non affiché : l'aperçu de la liste suit par chatStore
+      const arr = D.MESSAGES[m.conversationId] ||= [];
+      if (!arr.some(x => x.id === m.id)) arr.push(mapMessage(m));
+      changed(m.conversationId, { u: m.senderId });
+    };
+    const onUpdated = (m: any) => {
+      const arr = D.MESSAGES[m.conversationId]; if (!arr) return;
+      const i = arr.findIndex(x => x.id === m.id); if (i < 0) return;
+      arr[i] = mapMessage(m); changed(m.conversationId);
+    };
+    // Reconnexion : les fils chargés ont pu manquer des messages — rechargés.
+    const onReconnect = () => { [...loaded].forEach(c => load(c, true)); };
+    s.on('chat:message:new', onNew);
+    s.on('chat:message:updated', onUpdated);
+    window.addEventListener('gearbox-chat-reconnected', onReconnect);
+    return () => { s.off('chat:message:new', onNew); s.off('chat:message:updated', onUpdated); window.removeEventListener('gearbox-chat-reconnected', onReconnect); GX.chatFeed = null; };
+  }, [uid, enabled]);
 }

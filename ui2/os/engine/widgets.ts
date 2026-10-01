@@ -41,17 +41,20 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
 
   /* ---------------- Widget « Chat interactif » ----------------
      Liste compacte (Général, groupes, privés) + fil de la conversation choisie + saisie.
-     Écrit réellement dans D.MESSAGES et prévient l'app Chat (GX.emit 'chat:message',
-     from:'widget') : si elle est ouverte, elle prend la suite (« Vu par », réponse simulée) ;
-     sinon le widget simule lui-même la réponse. Les clics dans le widget n'ouvrent PAS
+     [GEARBOX] Branché sur le serveur par GX.chatFeed (ui2/os/DataHub.tsx) : fil réel de la conversation
+     affichée (chargé à l'affichage, suivi en direct), envoi et réactions par les mêmes événements socket que
+     la rubrique Chat, conversation affichée marquée lue. Plus aucune réponse simulée (01/10/2026 ; avant :
+     faux « dernier message » attribué à soi-même, envoi qui ouvrait le Chat). Les clics dans le widget n'ouvrent PAS
      l'app (écoute en capture) — sauf le bouton « Ouvrir » et le titre, qui ouvrent la
      conversation dans l'app Chat (commande 'conv:<id>'). Rôles sans chat (Chef de site) :
      widget indisponible via allowed(). External : pas de Chat Général, projet cité neutre. */
   /* [GEARBOX] utilisateur courant = id réel */
-  const CH_REACTS = ['👍', '❤️', '😂', '😮'], chDraft = {}, chPending = {};
-  const chVisible = () => D.CONVS.filter((c) => c.members.includes(GX.ctx.uid) && !(c.kind === 'general' && GX.ctx.role === 'External'));
-  const chMsgs = (c) => (D.MESSAGES[c.id] ||= []);
-  const chLast = (c) => { const a = chMsgs(c); return a[a.length - 1]; };
+  const CH_REACTS = ['👍', '❤️', '😂', '😮'], chDraft = {};
+  /* [GEARBOX] Chat Général : appartenance IMPLICITE côté serveur (participants vides) — visible de tous sauf External. */
+  const chVisible = () => D.CONVS.filter((c) => (c.kind === 'general' ? GX.ctx.role !== 'External' : c.members.includes(GX.ctx.uid)));
+  const chMsgs = (c) => D.MESSAGES[c.id] || [];
+  /* Dernier message : celui du fil s'il est chargé, sinon l'aperçu serveur de la conversation (sans auteur). */
+  const chLast = (c) => { const a = chMsgs(c); return a[a.length - 1] || (c.last ? { id: '', u: null, t: c.last, at: c.lastAt || 0, type: 'preview', r: {} } : undefined); };
   const chOther = (c) => c.members.find((u) => u !== GX.ctx.uid) || GX.ctx.uid;
   const chTitle = (c) => (c.kind === 'dm' ? D.user(chOther(c)).name : c.name);
   const chFirst = (u) => (u === GX.ctx.uid ? 'Vous' : D.user(u).name.split(' ')[0]);
@@ -59,13 +62,13 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   const chConv = (cfg = {}) => { const v = chOrder(); return v.find((c) => c.id === cfg.conv) || v[0]; };
   const chHhmm = (at) => new Date(at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   const chText = (m) => (!m ? '' : m.deleted ? 'Message supprimé' : m.expired ? '📎 Pièce jointe expirée' : ({ image: '📷 Image', file: '📎 ' + String(m.file || 'Pièce jointe').split(' · ')[0], voice: '🎤 Message vocal' + (m.dur ? ` (${m.dur})` : ''), project: '📋 ' + (GX.ctx.role === 'External' ? 'Projet cité' : D.project(m.project)?.name || 'Projet cité'), gif: '🎞️ GIF' + (m.gif ? ' · ' + m.gif : '') }[m.type] ?? (m.t || '')));
-  const chPrev = (c, m) => (!m ? 'Aucun message' : m.type === 'sys' ? m.t : (m.u === GX.ctx.uid ? 'Vous : ' : c.kind !== 'dm' ? chFirst(m.u) + ' : ' : '') + chText(m));
+  const chPrev = (c, m) => (!m ? 'Aucun message' : m.type === 'sys' || m.type === 'preview' ? m.t : (m.u === GX.ctx.uid ? 'Vous : ' : c.kind !== 'dm' ? chFirst(m.u) + ' : ' : '') + chText(m));
   function chAv(c, s) {
-    if (c.kind === 'dm') { const u = D.user(chOther(c)); return `<span class="av" style="--s:${s}px;--c:${u.color}">${u.initials}${u.online ? '<i class="pres"></i>' : ''}</span>`; }
+    if (c.kind === 'dm') return GX.r.av(chOther(c), '', { s, pres: true, tip: false });
     if (c.kind === 'general') return `<span class="wch-gav" style="--s:${s}px;background:var(--bony-grad)">#</span>`;
-    if (c.photo) return `<span class="wch-gav" style="--s:${s}px;background:${c.photo}"></span>`;
+    if (c.photo) return `<span class="wch-gav" style="--s:${s}px;background:${GX.esc(D.avBg(c.photo))}"></span>`;
     const us = c.members.filter((u) => u !== GX.ctx.uid).slice(0, 2).map((u) => D.user(u));
-    return `<span class="wch-duo" style="--d:${s}px">${us.map((u) => `<span class="av" style="--c:${u.color}">${u.initials}</span>`).join('')}</span>`;
+    return `<span class="wch-duo" style="--d:${s}px">${us.map((u) => GX.r.av(u.id, '', { tip: false })).join('')}</span>`;
   }
   function chatLive(sz, cfg = {}, w) {
     const all = chOrder(), c = chConv(cfg), n = all.reduce((s, x) => s + (x.unread || 0), 0);
@@ -74,20 +77,22 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const list = all.map((x) => `<button class="wch-it ${x.id === c.id ? 'on' : ''} ${x.unread ? 'unread' : ''}" data-wc="sel" data-conv-id="${x.id}"${wide ? '' : ` data-tip="${GX.esc(chTitle(x))}"`} aria-label="${GX.esc(chTitle(x))}">
         <span class="wch-avw">${chAv(x, wide ? 28 : 32)}${x.unread ? `<i class="count">${x.unread > 99 ? '99+' : x.unread}</i>` : ''}</span>
         ${wide ? `<span class="wch-itx"><b class="ellipsis">${GX.esc(chTitle(x))}</b>${dh >= 4 ? `<span class="ellipsis">${GX.esc(chPrev(x, chLast(x)))}</span>` : ''}</span>` : ''}</button>`).join('');
+    const feed = GX.chatFeed, ready = !feed || feed.isLoaded(c.id);
+    if (feed && !ready) feed.load(c.id);           // [GEARBOX] fil réel, chargé une fois (puis suivi en direct)
     const arr = chMsgs(c).slice(dh <= 2 ? -8 : -16);
     const same = (a, b) => a && b && a.type !== 'sys' && b.type !== 'sys' && a.u === b.u && Math.abs(a.at - b.at) < 5 * 6e4;
     const th = arr.map((m, i) => {
       if (m.type === 'sys') return `<div class="wch-sys">${GX.esc(m.t)}</div>`;
       const mine = m.u === GX.ctx.uid, u = D.user(m.u), f = !same(arr[i - 1], m), rs = Object.entries(m.r || {}).filter(([, us]) => us.length);
       return `<div class="wch-m ${mine ? 'me' : ''} ${f ? 'first' : ''}" data-wmsg="${m.id}">
-        ${mine ? '' : f ? `<span class="av" style="--s:22px;--c:${u.color}" data-tip="${GX.esc(u.name)}">${u.initials}</span>` : '<span class="wch-sp"></span>'}
+        ${mine ? '' : f ? GX.r.av(m.u, '', { s: 22 }) : '<span class="wch-sp"></span>'}
         <div class="wch-mc">${f && !mine && c.kind !== 'dm' ? `<span class="wch-au" style="color:${u.color}">${GX.esc(chFirst(m.u))}</span>` : ''}
           <div class="wch-b ${m.deleted || m.expired ? 'del' : ''}">${GX.esc(chText(m))}${m.edited ? ' <span class="wch-h">(modifié)</span>' : ''}<span class="wch-h">${chHhmm(m.at)}</span></div>
           ${rs.length && !m.deleted ? `<div class="wch-rs">${rs.map(([e, us]) => `<button data-wc="react" data-e="${e}" class="${us.includes(GX.ctx.uid) ? 'mine' : ''}">${e}<span>${us.length}</span></button>`).join('')}</div>` : ''}
         </div>
         ${m.deleted ? '' : `<div class="wch-rx">${CH_REACTS.map((e) => `<button data-wc="react" data-e="${e}" aria-label="Réagir ${e}">${e}</button>`).join('')}</div>`}
       </div>`;
-    }).join('') || '<div class="wch-empty">Aucun message — dites bonjour 👋</div>';
+    }).join('') || `<div class="wch-empty">${ready ? 'Aucun message — dites bonjour 👋' : 'Chargement…'}</div>`;
     const to = c.kind === 'dm' ? 'à ' + chFirst(chOther(c)) : 'dans ' + chTitle(c);
     return `<div class="wch sz-${sz} ${wide ? 'cw-w' : 'cw-n'} ${dh <= 2 ? 'ch-2' : dh >= 4 ? 'ch-4' : ''}" data-wid="${w ? w.id : ''}">
       <div class="wt wch-t">${GX.appGlyph ? GX.appGlyph('chat') : GX.icon('chat', 'sm')}<span class="ellipsis grow">Chat <span class="wch-ct">· ${GX.esc(chTitle(c))}</span></span>${n ? `<span class="count">${n > 99 ? '99+' : n}</span>` : ''}<button class="icon-btn sm" data-wc="open" data-tip="Ouvrir la conversation dans Chat">${GX.icon('maximize', 'sm')}</button></div>
@@ -159,8 +164,10 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     chat: { app: 'chat', name: 'Chat', sizes: ['S', 'M', 'M3'], render(sz) {
       const n = D.CONVS.reduce((s, c) => s + c.unread, 0);
       if (sz === 'S') return `${head('chat', 'Chat')}<div class="wv num">${n}</div><div class="faint" style="font-size:12px">messages non lus</div>`;
-      const last = D.CONVS.map((c) => ({ c, m: (D.MESSAGES[c.id] || []).slice(-1)[0] })).filter((x) => x.m).sort((a, b) => b.m.at - a.m.at).slice(0, fit(sz));
-      return `${head('chat', 'Derniers messages', n ? `<span class="count">${n}</span>` : '')}<div class="wl">${last.map(({ c, m }) => `<div class="wr" data-conv="${c.id}">${GX.r.av(m.u, 'sm')}<span class="ellipsis grow"><b>${GX.esc(c.name)}</b> <span class="muted">${GX.esc(m.t || (m.type === 'image' ? '📷 Photo' : '📎 Pièce jointe'))}</span></span></div>`).join('')}</div>`;
+      /* [GEARBOX] Dernier message de chaque conversation visible : fil réel si chargé, sinon aperçu serveur (sans
+         auteur → avatar de la conversation). Avant le 01/10/2026 : faux message sans auteur, avatar de soi-même. */
+      const last = chVisible().map((c) => ({ c, m: chLast(c) })).filter((x) => x.m).sort((a, b) => b.m.at - a.m.at).slice(0, fit(sz));
+      return `${head('chat', 'Derniers messages', n ? `<span class="count">${n}</span>` : '')}<div class="wl">${last.map(({ c, m }) => `<div class="wr" data-conv="${c.id}">${m.u ? GX.r.av(m.u, 'sm') : chAv(c, 22)}<span class="ellipsis grow"><b>${GX.esc(c.name)}</b> <span class="muted">${GX.esc(m.t || (m.type === 'image' ? '📷 Photo' : '📎 Pièce jointe'))}</span></span></div>`).join('')}</div>`;
     } },
     'chat-live': { app: 'chat', name: 'Chat interactif', sizes: ['L', 'M3', 'XL', 'X3', 'XXL', 'XXW'], live: true, render: (sz, c = {}, w) => chatLive(sz, c, w) },
     birthdays: { app: 'hello', name: 'Anniversaires', sizes: ['S', 'M', 'M3', 'T'], render(sz) {
@@ -540,6 +547,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   GX.on('ctx', () => { layout = null; box?.classList.remove('settled'); W.render(); });
   GX.on('badges', () => W.render());
   GX.on('data:projects', () => !editing && W.render());
+  GX.on('data:users', () => !editing && W.render());   /* [GEARBOX] photos de profil changées */
   setInterval(() => { if (box && !editing && box.querySelector('.wclock')) W.render(); }, 60000);
 
   /* ---------------- Widget Chat : interactions (bureau ET coque téléphone) ---------------- */
@@ -570,39 +578,22 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   }
   function chSend(w, input) {
     const c = chConv(w.cfg), t = input?.value.trim(); if (!c || !t) return;
-    /* [GEARBOX] envoyer ÉCRIRAIT en base : le message part depuis l'app Chat (conversation ouverte) */
-    { const win = GX.wm.open('chat'); if (win) setTimeout(() => win.inst?.command?.('conv:' + c.id), 420); return; }
-    const m = { id: GX.uid('m'), u: GX.ctx.uid, t, at: Date.now(), type: 'text', r: {}, seen: [] };
-    chMsgs(c).push(m); delete chDraft[w.id + c.id]; input.value = '';
+    /* [GEARBOX] Envoi RÉEL par GX.chatFeed (même événement que la rubrique Chat), sans optimisme : le message
+       apparaît quand le serveur le diffuse. Le brouillon est vidé tout de suite (le re-rendu à l'arrivée du
+       message ne doit pas le réafficher) et restauré si l'envoi échoue. */
+    if (!GX.chatFeed) return chOpen(c, input);
+    delete chDraft[w.id + c.id]; input.value = '';
     w.cfg = { ...(w.cfg || {}), conv: c.id }; save();
-    const hadUnread = !!c.unread; c.unread = 0;
-    const det = { conv: c.id, msg: m, from: 'widget' };
-    GX.emit('chat:message', det);                 // l'app Chat, si ouverte, pose det.handled et simule la suite
-    if (!det.handled) chSimReply(c, m);
-    if (hadUnread) { GX.emit('chat:read'); GX.emit('badges'); }
-    chRefresh(w.id);
+    GX.chatFeed.send(c.id, t).catch((e) => {
+      chDraft[w.id + c.id] = t; chRefresh(w.id);
+      GX.shell?.hud?.(e?.message || 'Échec de l’envoi du message.');
+    });
   }
-  /* Réponse fictive quand l'app Chat est fermée (même logique que chat.js, en plus court) */
-  function chSimReply(c, m) {
-    if (c.kind === 'general' || chPending[c.id]) return;
-    const pool = c.members.filter((u) => u !== GX.ctx.uid && D.user(u).role !== 'Site Manager'); if (!pool.length) return;
-    const on = pool.filter((u) => D.user(u).online), src = on.length ? on : pool, who = c.kind === 'dm' ? pool[0] : src[Math.floor(Math.random() * src.length)];
-    const t = (m.t || '').toLowerCase(), pick = (a) => a[Math.floor(Math.random() * a.length)];
-    chPending[c.id] = true;
-    setTimeout(() => { m.seen = c.members.filter((u) => u !== GX.ctx.uid); }, 1400);
-    setTimeout(() => {
-      delete chPending[c.id];
-      const r = { id: GX.uid('m'), u: who, at: Date.now(), type: 'text', r: {}, t: t.includes('merci') ? pick(['Avec plaisir !', 'De rien 😊', 'Quand tu veux']) : t.includes('?') ? pick(['Oui, je regarde ça 👍', 'Je te dis ça dans l’heure', 'Bonne question, je vérifie avec la concession']) : pick(['Parfait, merci !', 'Ça marche 👌', 'Je m’en occupe', 'Noté ✅', 'Super, on en parle au point de jeudi']) };
-      chMsgs(c).push(r);
-      if (!chShown(c.id) && !chChatOpen()) c.unread = (c.unread || 0) + 1;
-      GX.emit('chat:message', { conv: c.id, msg: r, from: 'widget-sim' }); GX.emit('badges');
-    }, 2600 + Math.min(1800, t.length * 30));
-  }
-  /* Nouveau message (app, réponse simulée, autre widget) : le widget suit ; lu s'il est affiché */
-  GX.on('chat:message', ({ conv, msg } = {}) => {
+  /* Fil chargé ou message reçu (GX.chatFeed) : le widget suit ; la conversation affichée est marquée lue AU SERVEUR */
+  GX.on('chat:message', ({ conv } = {}) => {
     if (!layout || !GX.root.querySelector('.wch[data-wid]')) return;
     const c = D.CONVS.find((x) => x.id === conv);
-    if (c && msg && msg.u !== GX.ctx.uid && c.unread && chShown(conv)) { c.unread = 0; setTimeout(() => GX.emit('chat:read')); }
+    if (c && c.unread && chShown(conv)) { c.unread = 0; GX.chatFeed?.read(conv); setTimeout(() => GX.emit('chat:read')); }
     chRefresh();
   });
   /* Capture : les clics dans le widget ne remontent pas jusqu'à l'ouverture de l'app */
@@ -618,14 +609,14 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     if (a === 'sel') {
       const x = D.CONVS.find((y) => y.id === b.dataset.convId); if (!x) return;
       w.cfg = { ...(w.cfg || {}), conv: x.id }; save();
-      if (x.unread) { x.unread = 0; GX.emit('chat:read'); GX.emit('badges'); }
+      if (x.unread && GX.chatFeed?.isLoaded(x.id)) { x.unread = 0; GX.chatFeed.read(x.id); GX.emit('chat:read'); GX.emit('badges'); }
       return chRefresh(w.id);
     }
     if (a === 'react') {
-      /* [GEARBOX] Le widget n'a que le DERNIER message de chaque conversation, sans son vrai identifiant :
-         réagir ouvre la conversation dans le Chat (comme l'envoi). Avant : réaction factice, gardée dans ce
-         seul navigateur (audit du 30/09/2026). */
-      return chOpen(c, b);
+      /* [GEARBOX] Réaction RÉELLE (bascule gérée par le serveur, retour par chat:message:updated). */
+      const id = b.closest('[data-wmsg]')?.dataset.wmsg;
+      if (!id || !GX.chatFeed) return chOpen(c, b);
+      return GX.chatFeed.react(id, b.dataset.e).catch((e2) => GX.shell?.hud?.(e2?.message || 'Échec de la réaction.'));
     }
   }, true);
   GX.win(document, 'keydown', (e) => {

@@ -17,7 +17,9 @@ import {
   valeurJourConge, congeDecompteSolde, periodeCongesDe,
 } from '../../constants';
 import type { DashboardStats } from '../../services/dashboardStats';
-import type { Project, SocialPost, FixedExpense, BudgetLine, User, Equipment, EquipmentBooking, CongeJour, CongeDroit, ChatConversation, ActivityLog } from '../../types';
+import { getAvatarUrl } from '../../services/avatarCache';
+import { avatarKey } from '../../components/Avatar';
+import type { Project, SocialPost, FixedExpense, BudgetLine, User, Equipment, EquipmentBooking, CongeJour, CongeDroit, ChatConversation, ChatMessage, ActivityLog } from '../../types';
 
 // ---------------- Référentiels ----------------
 export const PLAQUES: Record<string, string[]> = PLAQUES_STRUCTURE as any;
@@ -61,13 +63,36 @@ export interface MUser { id: string; name: string; role: string; city: string; c
 export interface MTask { id: string; name: string; provider: string; channel: string; status: string; assignee: string; cost: number; deadline: string; startDate: string; notes: string; volume?: number; openRate?: number; npai?: number; stop?: number; clickRate?: number; codTxt?: string; billed?: number }
 export interface MProject { id: string; name: string; type: string; sites: string[]; brands: string[]; services: string[]; status: string; startDate: string; endDate: string; tasks: MTask[]; team: string[]; budgetPlanned: number; budgetActual: number; progress: number; description: string; proPlus: boolean; expertMode: boolean; alpineShare: number | null; nissanShare: number | null; distribution: Record<string, number> | null; files: { n: string; s: string }[]; raw: Project }
 export interface MPost { id: string; title: string; date: string; status: string; service: string; brands: string[]; concessions: string[]; networks: string[]; archived: boolean; proPlus: boolean; raw: SocialPost }
-export interface MConv { id: string; kind: 'general' | 'group' | 'dm'; name: string; members: string[]; unread: number; admins: string[]; pinned: boolean; muted: boolean; last?: string; lastAt?: number; raw: ChatConversation }
+export interface MConv { id: string; kind: 'general' | 'group' | 'dm'; name: string; members: string[]; unread: number; admins: string[]; pinned: boolean; muted: boolean; last?: string; lastAt?: number; photo?: string | null; raw: ChatConversation }
+/** Message du widget Chat (forme de la maquette), construit depuis un `ChatMessage` serveur par `mapMessage`. */
+export interface MMsg { id: string; u: string; t: string; at: number; type: string; r: Record<string, string[]>; deleted?: boolean; edited?: boolean; expired?: boolean; file?: string; dur?: string; project?: string }
 
-const initials = (name: string) => name.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+export const initials = (name: string) => (name || '').split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+
+// ---------------------------------------------------------------- photos de profil
+// PORTE UNIQUE de la v2 : `photoOf` (où est la photo) et `avBg` (comment la poser en fond d'un `.av`).
+// Moteur (`GX.r.av`) et React (`Avatar` du kit) passent par elles. Avant le 01/10/2026, `mapUser` ne
+// remplissait pas `photo` et chaque rendu écrivait les initiales en dur : aucune photo dans la v2.
+/** Photo : URL serveur (cache alimenté par l'API), sinon photo base64 legacy du poste — même ordre que components/Avatar.tsx. */
+export const photoOf = (u: { id: string; avatarUrl?: string | null }): string | null => {
+  if (!u?.id) return null;
+  let legacy: string | null = null; try { legacy = localStorage.getItem(avatarKey(u.id)); } catch { /* stockage indisponible */ }
+  return getAvatarUrl(u.id) || u.avatarUrl || legacy || null;
+};
+/** Valeur CSS `background` d'un avatar photo (guillemets simples échappés : l'URL vit dans un attribut). */
+export const avBg = (url: string) => `center/cover no-repeat url('${url.replace(/'/g, '%27')}')`;
 
 export const mapUser = (u: User, online: boolean): MUser => ({
   id: u.id, name: u.name, role: u.role, city: (u as any).city || '', color: u.avatarColor || '#8a8599', initials: initials(u.name),
-  birthdate: u.birthdate || '', sites: (u as any).sites || [], online,
+  birthdate: u.birthdate || '', sites: (u as any).sites || [], online, photo: photoOf(u),
+});
+/** `ChatMessage` serveur → message du widget (types de la maquette : `audio` s'y appelle `voice`). */
+export const mapMessage = (m: ChatMessage): MMsg => ({
+  id: m.id, u: m.senderId, t: m.content, at: new Date(m.timestamp).getTime(), r: m.reactions || {},
+  type: m.type === 'audio' ? 'voice' : m.type || 'text',
+  deleted: !!m.deleted, edited: !!m.edited, expired: !!m.fileExpiredAt,
+  file: m.type === 'file' ? m.fileName : undefined, dur: m.type === 'audio' ? m.fileName : undefined,
+  project: m.type === 'project' ? m.content : undefined,
 });
 export const mapProject = (p: Project): MProject => ({
   id: p.id, name: p.name, type: p.projectType, sites: p.sites && p.sites.length ? p.sites : [p.site], brands: p.brands || [], services: p.service || [],
@@ -113,14 +138,19 @@ export function createData() {
     congesDroits: [] as CongeDroit[],
     periodStart: new Date(),
     CONVS: [] as MConv[],
-    MESSAGES: {} as Record<string, { id: string; u: string; t: string; at: number; type: string; r: Record<string, string[]> }[]>,
+    /** Fil des conversations affichées par le widget Chat, tenu par `GX.chatFeed` (DataHub) — VRAIS messages du serveur. */
+    MESSAGES: {} as Record<string, MMsg[]>,
     GAMES: { challenges: [] as { from: string; game: string; at: number }[], running: [] as any[], board: [] as any[] },
     FEED: [] as { id: string; u: string; a: string; o: string; app: string; at: number; unread: boolean; raw: ActivityLog }[],
     HELLO: { weather: null as any, forecast: [] as any[], track: null as any, rss: {} as Record<string, string[]> },
     /** Résultat de computeDashboardStats (réglages par défaut du Dashboard) — SEULE source des montants. */
     stats: null as DashboardStats | null,
     // accès
-    user: (id: string): MUser => D.USERS.find(u => u.id === (id === 'me' ? D.ME : id)) || D.USERS.find(u => u.id === D.ME) || ({ id, name: '—', role: '', city: '', color: '#8a8599', initials: '?', birthdate: '', sites: [], online: false }),
+    // ⚠️ Un identifiant inconnu (ou vide) rend une fiche NEUTRE, jamais l'utilisateur connecté : avant le
+    // 01/10/2026 il retombait sur D.ME, et le widget Chat attribuait à chacun les messages des autres
+    // (auteur vide de l'aperçu « dernier message »). Seul 'me' désigne l'utilisateur connecté.
+    user: (id: string): MUser => D.USERS.find(u => u.id === (id === 'me' ? D.ME : id)) || ({ id, name: 'Ancien membre', role: '', city: '', color: '#8a8599', initials: '?', birthdate: '', sites: [], online: false, photo: null }),
+    avBg, // fond CSS d'un avatar photo (GX.r.av)
     project: (id: string) => D.PROJECTS.find(p => p.id === id),
     brand: (id: string) => BRANDS.find(b => b.id === id),
     socialStatus: (id: string) => SOCIAL_STATUS.find(s => s.id === id) || SOCIAL_STATUS[0],

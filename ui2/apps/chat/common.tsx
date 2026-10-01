@@ -3,7 +3,7 @@ import type { ChatConversation, ChatMessage, Project, User } from '../../../type
 import { hasSocialFeatures } from '../../../constants';
 import { chatStore } from '../../../services/chatStore';
 import { messageEstImageDistante } from '../../../lib/richText';
-import { gx, Icon } from '../ui/kit';
+import { gx, Icon, Avatar } from '../ui/kit';
 
 // =====================================================================
 // Chat (interface v2) — briques partagées par la rubrique : formats de date, résumés de
@@ -126,17 +126,16 @@ export function usePins(meId: string) {
 }
 
 // ---------------------------------------------------------------- avatars
-const initials = (name: string) => name.split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 /**
  * Avatar `.av` de la maquette, avec la pastille de présence `.pres`.
  * BESOIN: l'`Avatar` du kit ne sait pas afficher la présence ni un auteur absent de la liste des
  * utilisateurs (ancien membre) — voir BESOINS.md § 1.
  */
-export const Av: React.FC<{ name: string; color?: string; cls?: string; online?: boolean }> = ({ name, color, cls = '', online }) => (
-  <span className={`av ${cls}`} style={{ '--c': color || '#8a8599' } as React.CSSProperties} data-tip={name}>{initials(name || '?')}{online ? <i className="pres" /> : null}</span>
-);
+export const Av: React.FC<{ name: string; color?: string; cls?: string; online?: boolean }> = ({ name, color, cls = '', online }) =>
+  <Avatar name={name || '?'} color={color} cls={cls} online={online} />;
+/** Avatar d'un utilisateur des stores : sa photo (porte `Avatar` du kit), sinon ses initiales. */
 export const UserAv: React.FC<{ u: User | undefined; cls?: string; online?: boolean }> = ({ u, cls, online }) =>
-  <Av name={u?.name || 'Ancien membre'} color={u?.avatarColor} cls={cls} online={online} />;
+  <Avatar user={u} name="Ancien membre" cls={cls} online={online} />;
 
 /** Avatar de conversation (`convAv` de la maquette, règles de `ConvAvatar` de Chat.tsx). */
 export const ConvAv: React.FC<{ c: ChatConversation; meId: string; byId: Record<string, User>; online: Set<string>; size?: 'lg' | 'sm' }> =

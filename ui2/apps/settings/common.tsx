@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import type { User } from '../../../types';
-import { getAvatarUrl } from '../../../services/avatarCache';
-import { avatarKey } from '../../../components/Avatar';
-import { gx, Icon } from '../ui/kit';
+import { gx, Icon, Avatar, useAvatarTick } from '../ui/kit';
 
 // =====================================================================
 // Réglages (v2) — rendus et constantes partagés par les panneaux. Balisage et classes de
@@ -48,25 +46,13 @@ export const loadCity = (id: string): string => { try { return { city: '', ...JS
 export const saveCity = (id: string, city: string) => { try { localStorage.setItem(USER_PREFS_KEY(id), JSON.stringify({ city })); } catch { /* stockage indisponible */ } };
 
 // ---------------------------------------------------------------- photos de profil
-/** Photo : URL serveur (cache alimenté par l'API), sinon photo base64 legacy du poste — même ordre que components/Avatar.tsx. */
-export const photoOf = (u: { id: string; avatarUrl?: string | null }) => {
-  if (!u.id) return null;
-  let legacy: string | null = null; try { legacy = localStorage.getItem(avatarKey(u.id)); } catch { /* */ }
-  return getAvatarUrl(u.id) || u.avatarUrl || legacy || null;
-};
-/** Re-rendu à chaque `gearbox-avatar-updated` (photo changée ici ou ailleurs). */
-export function useAvatarTick() {
-  const [, set] = useState(0);
-  useEffect(() => { const h = () => set((n) => n + 1); window.addEventListener('gearbox-avatar-updated', h); return () => window.removeEventListener('gearbox-avatar-updated', h); }, []);
-}
+// Portes uniques de la v2 (ui2/os/data.ts `photoOf`, kit `Avatar` / `useAvatarTick`), ré-exportées ici
+// pour les panneaux qui les importaient de ce module.
+export { photoOf } from '../../os/data';
+export { useAvatarTick };
 /** `avHTML()` de la maquette : `.av` teinté, ou la photo en fond. */
-export const UAv = ({ u, cls = '' }: { u: Pick<User, 'id' | 'name' | 'avatarColor' | 'avatarUrl'>; cls?: string }) => {
-  const ph = photoOf(u);
-  const c = u.avatarColor || '#8a8599';
-  return ph
-    ? <span className={`av ${cls}`} style={css({ '--c': c, background: `center/cover url('${ph.replace(/'/g, '%27')}')` })} />
-    : <span className={`av ${cls}`} style={css({ '--c': c })}>{initials(u.name)}</span>;
-};
+export const UAv = ({ u, cls = '' }: { u: Pick<User, 'id' | 'name' | 'avatarColor' | 'avatarUrl'>; cls?: string }) =>
+  <Avatar user={u} cls={cls} tip={false} />;
 
 // ---------------------------------------------------------------- lignes et interrupteurs
 export function Row({ t, d, children, cls = '', anchor, ico }: { t: React.ReactNode; d?: React.ReactNode; children?: React.ReactNode; cls?: string; anchor?: string; ico?: React.ReactNode }) {
