@@ -275,3 +275,14 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   pas un `.paper`, donc sans `position: absolute` : elle tombait sur lundi.
 - [ ] **Post-it : refus d'un External non vérifié avec un vrai compte** (la route a son `requireRole` ; 401 sans
   jeton et 404 sur le post-it d'un autre vérifiés). À faire au passage des rôles restreints dans la v2.
+
+<!-- Forms (Google Forms, v2) — 01/10/2026, correctif 62 -->
+- [x] **Forms : « Invalid ID » de Google à l'enregistrement** (relevé en test, jamais en prod) — les identifiants
+  fabriqués par l'éditeur doivent être des entiers 32 bits positifs en hexadécimal (`newId`, premier octet & 0x7f).
+- [x] **Forms : l'éditeur n'enregistrait rien en développement** (relevé en test) — drapeau « fermé » posé par le
+  nettoyage d'effet du mode strict, jamais remis à zéro.
+- [x] **Forms : formulaire créé par l'API publié et ouvert aux réponses** (contraire à la doc Google) — fermé d'office
+  à la création et à la copie, bandeau « Publier » dans l'éditeur.
+- [ ] **Forms : refus d'un rôle sans accès (Guest, External, chef de site) non vérifié avec un vrai compte** — le
+  contrôle `FORMS_ROLES` est sur chaque route ; à faire au passage des rôles restreints dans la v2.
+- [ ] **Forms : secret client Google à renouveler** (passé dans une conversation le 01/10/2026).

@@ -61,6 +61,31 @@ ne pas les réécrire.
     la section dédiée ci-dessous.
 12. **Fichiers de projet** — `/api/project-files` (mode Expert). Voir la section dédiée.
 
+### 📋 Forms — `/api/forms` et `src/google/client.ts` (01/10/2026, correctif 62)
+Google Forms par UN compte Google partagé (marketbony@gmail.com), connecté côté serveur. Modèles : `GoogleConnection`
+(une ligne, jeton de rafraîchissement **chiffré** AES-256-GCM avec `GOOGLE_TOKEN_KEY`), `GoogleForm` (catalogue :
+`formId` Google, titre, publication, structure du dernier `forms.get`, nombre de réponses, `lastEditedBy/At`),
+`GoogleFormResponse` (cache des réponses — **données personnelles**, purgées au retrait), `GoogleFormLog` (journal
+« qui a modifié quoi » depuis Gearbox).
+- **Porte unique Google** : `src/google/client.ts` — flux OAuth serveur (`state` à usage unique, 10 min), accès
+  `openid email forms.body forms.responses.readonly`, vérification des accès accordés, renouvellement du jeton
+  d'accès (cache mémoire), `invalid_grant` → `lastError` + 409 « reconnexion nécessaire », reprises sur 429 / 5xx.
+  Aucun jeton ne sort de ce module. Variables : `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`,
+  `GOOGLE_TOKEN_KEY` (⚠️ identique en local et sur le VPS : le backend local écrit en prod).
+- **Rôles** : `FORMS_ROLES` (`auth/roles.ts`) sur CHAQUE route, lecture comprise ; connexion / déconnexion :
+  `GOOGLE_CONNECT_ROLES` (Master). Seul `GET /google/callback` (navigation du navigateur, sans jeton) en est exempt,
+  protégé par le `state`.
+- **Routes** : `GET /google/status`, `POST /google/connect` (→ adresse Google), `GET /google/callback`
+  (→ `/?gx-google=ok|annule|refus|erreur`), `POST /google/disconnect` ; `GET /` (catalogue), `POST /import { url }`
+  (lien d'ÉDITION ; un lien de réponse est refusé avec explication), `POST / { title }` (création, **fermée d'office**),
+  `GET /:id` (structure + réponses en cache, synchro si > 2 min), `GET /:id/form` (structure EN DIRECT),
+  `POST /:id/batch { requests, revisionId, summary }` (**liste blanche `EDIT_OPS`** : createItem, updateItem,
+  deleteItem, moveItem, updateFormInfo, updateSettings ; 200 au plus ; `requiredRevisionId` → 409 si modifié
+  ailleurs), `POST /:id/publish`, `POST /:id/duplicate` (mêmes identifiants, images et envoi de fichier non
+  recopiés), `POST /:id/sync` (synchro complète), `GET /:id/log`, `DELETE /:id` (retrait : réponses + journal purgés,
+  le formulaire reste dans Google).
+- **Temps réel** : `forms:changed` (sans charge) après chaque écriture.
+
 ### 📝 Post-it — `/api/postits` (01/10/2026, correctif 61)
 Agenda PERSONNEL de la To-do v2 (sous-rubrique « Post-it »). Modèle `PostIt` (migration
 `20261001150000_postit`, additive) : `id`, `userId` (référence libre, sans FK), `title`, `start`, `end`, `allDay`,

@@ -12,6 +12,8 @@ import { AppearancePanel, DesktopPanel, NotifsPanel } from './ShellPanels';
 import { ApplicationPanel, InstallSheet, StoragePanel } from './AppPanels';
 import { UsersPanel, setOtherAvatar, type UsersApi } from './UsersPanel';
 import { RolesPanel } from './RolesPanel';
+import { GooglePanel } from './GooglePanel';
+import { canSeeForms } from '../../../constants';
 
 // =====================================================================
 // Rubrique « Réglages » — transposition de maquettes/v2/js/apps/settings.js (barre latérale profil +
@@ -23,12 +25,13 @@ import { RolesPanel } from './RolesPanel';
 //  - Espace détente : Master seul ; Nouvelle interface (bêta) : `canUseUi2(role)`.
 // =====================================================================
 
-const SECTIONS: (SectionDef & { manage?: boolean; master?: boolean })[] = [
+const SECTIONS: (SectionDef & { manage?: boolean; master?: boolean; forms?: boolean })[] = [
   { id: 'compte', l: 'Compte', t: 'Paramètres du Compte', icon: 'user', c: 'var(--info)', g: 0, sub: 'Identité, ville de référence et mot de passe' },
   { id: 'apparence', l: 'Apparence', icon: 'contrast', c: 'var(--bony-violet)', g: 1, sub: 'Thème, matière, style d’icônes, effets et fond d’écran' },
   { id: 'bureau', l: 'Bureau et Dock', icon: 'desktop', c: 'var(--bony-blue)', g: 1, desktop: true, sub: 'Dock, widgets du bureau et session des fenêtres' },
   { id: 'notifs', l: 'Notifications', icon: 'bell', c: 'var(--danger)', g: 1, sub: 'Bannières, Ne pas déranger et notifications de cet appareil' },
   { id: 'application', l: 'Application', icon: 'download', c: 'var(--ok)', g: 2, sub: 'Installation, notifications de cet appareil et modules' },
+  { id: 'comptes', l: 'Comptes connectés', icon: 'link', c: 'var(--info)', g: 2, forms: true, sub: 'Compte Google de la rubrique Forms' },
   { id: 'stockage', l: 'Stockage', icon: 'layers', c: 'var(--text-3)', g: 2, sub: 'Disque du serveur et fichiers envoyés dans Gearbox' },
   { id: 'users', l: 'Utilisateurs', t: 'Gestion des Utilisateurs (Master/Admin)', icon: 'users', c: 'var(--bony-orange)', g: 3, manage: true, sub: 'Comptes, rangs, villes, anniversaires et concessions rattachées' },
   { id: 'roles', l: 'Rôles & accès', icon: 'lock', c: 'var(--warn)', g: 3, master: true, sub: 'Qui voit quoi dans Gearbox' },   // Master seul (décision Théo, 30/09/2026)
@@ -41,6 +44,7 @@ const ITEMS: [string, string, string][] = [
   ['Taille du Dock', 'bureau', 'dock'], ['Agrandissement du Dock', 'bureau', 'dock'], ['Masquer automatiquement le Dock', 'bureau', 'dock'], ['Dock intelligent', 'bureau', 'dock'], ['Personnaliser les widgets du bureau', 'bureau', 'wdg'], ['Réinitialiser les widgets', 'bureau', 'wdg'], ['Réinitialiser la session des fenêtres', 'bureau', 'session'], ['Balayage à deux doigts entre les fenêtres', 'bureau', 'session'],
   ['Ne pas déranger', 'notifs', 'notifs'], ['Notification de test', 'notifs', 'notifs'],
   ['Installer l’application', 'application', 'install'],
+  ['Compte Google (Forms)', 'comptes', 'google'], ['Connecter Google', 'comptes', 'google'],
   ['Utilisation du stockage', 'stockage', 'usage'], ['Fichiers par type', 'stockage', 'types'],
   ['Gestion des Utilisateurs', 'users', 'users'], ['Nouvel Utilisateur', 'users', 'users'], ['Concessions rattachées', 'users', 'users'],
   ['Matrice des accès', 'roles', 'matrix'], ['Chef de site', 'roles', 'note'],
@@ -61,7 +65,7 @@ export default function SettingsApp({ win, inst }: AppProps) {
   useEngineEvent('wm:change', tick); // nombre de fenêtres de la session (Bureau et Dock)
 
   const mobile = gx().host?.dataset?.shell === 'mobile';
-  const allowed = useMemo(() => SECTIONS.filter((s) => (!s.manage || canManageUsers(role)) && (!s.master || role === 'Master') && (!s.desktop || !mobile)), [role, mobile]);
+  const allowed = useMemo(() => SECTIONS.filter((s) => (!s.manage || canManageUsers(role)) && (!s.master || role === 'Master') && (!s.forms || canSeeForms(role)) && (!s.desktop || !mobile)), [role, mobile]);
   const ok = (id?: string) => !!id && allowed.some((s) => s.id === id);
   const tab0 = win.params?.tab;
   const [sec, setSec] = useState<string>(() => (ok(tab0) ? tab0 : 'compte'));
@@ -138,6 +142,7 @@ export default function SettingsApp({ win, inst }: AppProps) {
       case 'bureau': return <DesktopPanel s={s} role={role} openSheet={openSheet} />;
       case 'notifs': return <NotifsPanel s={s} onPush={() => go('application', 'push')} />;
       case 'application': return <ApplicationPanel s={s} user={user} onInstall={install} />;
+      case 'comptes': return <GooglePanel s={s} />;
       case 'stockage': return <StoragePanel s={s} />;
       case 'users': return <UsersPanel s={s} actor={role} meId={user.id} users={users} openSheet={openSheet} onPhoto={photo} apiRef={usersApi} />;
       case 'roles': return <RolesPanel s={s} cur={role} />;

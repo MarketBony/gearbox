@@ -376,6 +376,42 @@ export interface PostIt {
   updatedAt?: string;
 }
 
+// --- FORMS (01/10/2026) — Google Forms par le compte partagé (routes /api/forms, FORMS_ROLES) ---
+export interface GoogleStatus {
+  configured: boolean;          // variables GOOGLE_* présentes sur le serveur
+  connected: boolean;
+  email: string | null;         // compte Google connecté (doit être marketbony@gmail.com)
+  connectedAt: string | null;
+  connectedBy: string | null;   // nom du Master qui a connecté
+  lastError: string | null;     // ex. accès révoqué : reconnexion nécessaire
+  canConnect: boolean;          // Master
+}
+/** Formulaire du catalogue Gearbox (sans la structure). */
+export interface GForm {
+  id: string;
+  formId: string;               // identifiant Google
+  title: string;
+  description: string | null;
+  responderUri: string | null;  // lien à partager (formulaire à remplir)
+  isPublished: boolean;
+  acceptingResponses: boolean;
+  revisionId: string | null;
+  responseCount: number;
+  lastResponseAt: string | null;
+  lastSyncedAt: string | null;
+  syncError: string | null;
+  addedBy: string;
+  createdAt: string;
+  updatedAt: string;
+  lastEditedBy?: string | null; // userId de la dernière modification faite depuis Gearbox
+  lastEditedAt?: string | null;
+}
+/** Entrée du journal Gearbox d'un formulaire (qui a modifié quoi, depuis Gearbox). */
+export interface GFormLog { id: string; action: string; detail: string | null; at: string; user: string }
+/** Réponse en cache : `answers` = objet brut de l'API Google (questionId → réponse). */
+export interface GFormResponse { id: string; submittedAt: string; respondentEmail: string | null; answers: Record<string, any> }
+export interface GFormDetail { form: GForm & { structure: { items: any[]; settings: any } | null }; responses: GFormResponse[] }
+
 export interface StorageInfo {
   disque: { total: number; libre: number; utilise: number };
   uploads: {

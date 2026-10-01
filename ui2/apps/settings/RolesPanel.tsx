@@ -21,7 +21,7 @@ export function RolesPanel({ s, cur }: { s: SectionDef; cur: string }) {
   // Congés : visibles des membres du périmètre et des gestionnaires (services/congesAcces.ts) — pour
   // un RÔLE, on montre donc les rôles qui PEUVENT lire le planning (CONGES_LECTURE_ROLES).
   const access = useMemo(() => Object.fromEntries(RANKS.map((r) => {
-    const nav = computeNav({ role: r, gamesEnabled, voitConges: peutLireConges(r) });
+    const nav = computeNav({ role: r, gamesEnabled, voitConges: peutLireConges(r), ui2: true });
     return [r, new Set(apps.filter((id) => id === 'settings' || nav.allowedIds.has(tabOf(id))))];
   })), [gamesEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
   const cell = (r: string, id: string) => access[r].has(id)
