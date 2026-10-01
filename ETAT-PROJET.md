@@ -4,8 +4,10 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 01/10/2026 (lire en premier)
-- **En production : correctif 62 (01/10)** — v2 : rubrique **Forms** (Google Forms du compte marketing : création,
-  éditeur maison, statistiques, compte Google connecté côté serveur). Avant lui le **correctif 61 (01/10)** :
+- **En production : correctif 63 (01/10)** — **Forms Bony, lot F1** : formulaires MAISON (édités dans Gearbox,
+  servis au public par le Worker Cloudflare `forms.bonyauto-mobile.workers.dev`). La rubrique Forms a deux
+  espaces : Forms Bony et Google Forms. Avant lui le **correctif 62 (01/10)** : Google Forms (création, éditeur
+  maison, statistiques). Avant lui le **correctif 61 (01/10)** :
   **Post-it**, sous-rubrique de la To-do (agenda PERSONNEL façon Outlook). Avant eux le **correctif 60 (01/10)** : photos de profil
   partout et widgets Chat branchés sur le serveur (détail plus bas). Avant eux le **correctif 59 (30/09)** : interface v2 « Gearbox OS » en **BÊTA OUVERTE À TOUS
   LES RÔLES** (`UI2_BETA_ROLES = null`, `ui2/beta.ts`). L'ancienne interface reste **par défaut** ; bascule par
@@ -19,9 +21,10 @@
   sensibles testées (provisions Budget, Congés). Plan et état du chantier : `maquettes/ux/PLAN-DEPLOIEMENT-V2.md`.
 - **Où on va (dans l'ordre)** :
   0. **Chantiers d'octobre (liste de Théo du 01/10, arbitrages dans le backlog § « Chantiers d'octobre 2026 »)** :
-     lot 1 fait (correctif 60), Post-it (correctif 61), **Forms fait (correctif 62)** ; restent : tâches
-     multi-assignées, prestataire sur les dépenses, répartitions personnalisées, fichiers maison, mascotte / agent IA.
-     Idée notée par Théo (01/10) : une plateforme de formulaires MAISON à terme (voir backlog, Forms).
+     lot 1 fait (correctif 60), Post-it (61), Google Forms (62), **Forms Bony F1 (63)**. **En cours : Forms Bony
+     F2 → F3 → F4** (plan validé par Théo « de A à Z », toutes les fonctions ; détail au backlog § Forms Bony),
+     avec la **prise d'essai** demandée le 01/10. Ensuite : tâches multi-assignées, prestataire, répartitions,
+     fichiers maison, mascotte / agent IA.
      Trou serveur `GET /api/budget` : Théo le traite « après » (01/10).
   1. **Retours de la bêta** (groupe « Bêta Gearbox OS » du Chat, créé par Théo) : les trier, corriger par lots.
   2. **Fermer le trou serveur** : `GET /api/budget` et lecture des dépenses fixes sans garde de rôle (External)
@@ -383,6 +386,35 @@
     entiers 32 bits POSITIFS en hexadécimal ; éditeur muet en dev (mode strict : drapeau « fermé » jamais remis à zéro) ;
     journal des formulaires retirés laissé en base.
 
+- **Correctif 63 — 01/10 : Forms Bony, lot F1 (fondations)** (branche `feat/forms-bony-f1`, `api` ET `web` + **premier
+  déploiement du Worker Cloudflare `forms`** ; migration additive `20261002110000_bony_forms` appliquée et inscrite
+  avant le push). Idée de Théo : des formulaires maison sans les limites de Google, hébergés hors du VPS.
+  - **Architecture** : UN Worker sert TOUS les formulaires (`/<publicId>`, 10 caractères aléatoires) ; publier =
+    Gearbox dépose la définition dans le KV du Worker (aucun rebuild). Messages Gearbox ↔ Worker **signés** (HMAC +
+    horodatage, `FORMS_WORKER_SECRET` = secret `GEARBOX_SECRET` du Worker). Le Worker n'a AUCUN accès à la base :
+    il filtre (8 envois / min / IP, champ piège, délai minimal, **Turnstile**), valide, transmet à
+    `/api/bony-forms/ingest`, et **met en file** (KV, cron chaque minute) si Gearbox ne répond pas. Écarté : le
+    Worker branché directement sur Supabase (l'API de Supabase exposerait toutes les tables à une clé volée).
+  - **Format partagé** `shared/bonyform.ts` (copie à l'identique `backend/src/bonyforms/schema.ts`, contrôle
+    `scripts/check-bonyform-sync.mjs` sur predev / prebuild) : définition, conditions d'affichage, calculs,
+    validation — la MÊME fonction dans le navigateur, le Worker et Gearbox. Couvre déjà F2-F4.
+  - **Gearbox** : `routes/bonyForms.ts` (brouillon / publication / fermeture / suppression / réponses / effacement
+    d'une réponse ; `/ingest` et `/state` signés par le Worker), `bonyforms/worker.ts` (porte unique vers le Worker).
+    Rubrique Forms scindée en **Forms Bony | Google Forms** ; `ui2/apps/forms/bony/` (BonySpace, BonyEditor,
+    catalog, adapter → mêmes statistiques que Google). Polices Bony **Albert Sans** (texte) et **Syncopate**
+    (titres), servies par Bunny Fonts (sans transfert d'IP à Google).
+  - **Worker** : `forms-worker/` (README : fonctionnement, local, déploiement). Widget Turnstile « Forms Bony » créé
+    par l'API Cloudflare (session wrangler de Théo), clé de site dans `wrangler.jsonc`, clé secrète en secret du Worker.
+  - **Testé en local de bout en bout** (Gearbox local + `wrangler dev`, réponses écrites en prod puis supprimées) :
+    création, champs, condition, publication, préremplissage `?email=`, envoi, paramètres de l'e-mailing reçus,
+    **réponse envoyée Gearbox arrêté → mise en file → arrivée au renvoi**, 401 sans signature, brouillon modifié
+    d'un formulaire en ligne (public intact, republication instantanée), présentation « une question par écran ».
+    Recette de Théo validée. Nettoyage : 0 formulaire, KV local vide.
+  - **Défauts trouvés et corrigés** : clic perdu sur une option quand un autre champ perdait le focus (toutes les
+    cartes se redessinaient — une carte ne se redessine plus que si SON état change) ; double espace sous une
+    question masquée. Doute non levé : un logo passé à « Renault » pendant les tests, très probablement une frappe
+    de l'outil de test tombée dans la liste « Logo » (non reproduit sans frappe).
+
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
   51.83.75.181)
@@ -390,7 +422,12 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 62** (1er octobre 2026) — rubrique **Forms**
+- master = prod, synchronisés. Dernier lot déployé : **correctif 63** (1er octobre 2026) — **Forms Bony F1**.
+  `api` ET `web`, migration `20261002110000_bony_forms` (additive, appliquée avant le push), **plus le premier
+  déploiement du Worker Cloudflare `forms`** (`cd forms-worker && npm run deploy`, secrets `GEARBOX_SECRET` et
+  `TURNSTILE_SECRET`). Variables `FORMS_WORKER_URL` / `FORMS_WORKER_SECRET` au `.env` du VPS et dans
+  `docker-compose.yml`. Push et déploiement après la recette de Théo.
+- Avant lui le **correctif 62** (1er octobre 2026) — rubrique **Forms**
   (Google Forms) dans la v2. **`api` ET `web`, deux migrations** (`20261002090000_google_forms`,
   `20261002100000_google_forms_journal`, additives), appliquées et inscrites AVANT le push. Nouvelles variables
   `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_TOKEN_KEY` (`.env` du VPS +
@@ -3703,6 +3740,20 @@
     MAISON à terme (éditeur sans les limites de Google, données directement dans Gearbox) — analysée dans la session
     du 01/10 : pertinente d'abord pour les formulaires INTERNES (répondants connectés à Gearbox) ; un formulaire
     PUBLIC demande une surface sans connexion sur le VPS (anti-spam, limitation de débit, RGPD, disponibilité).
+    → **Retenu le 01/10 sous la forme « Forms Bony » hébergé chez Cloudflare** (correctif 63, F1 fait).
+- **Forms Bony — suite du plan validé par Théo (« tout implémenter »)** :
+  - **F2, l'éditeur poussé** : aperçu EN DIRECT dans l'éditeur (le formulaire tel que le verra le répondant),
+    thème avancé, présentations soignées (une question par écran : transitions, clavier), champs Bony,
+    préremplissage et champs cachés finalisés, consentement.
+  - **F3, les fonctions avancées** : logique conditionnelle complète, champs calculés (score, somme), places
+    limitées, ouverture / fermeture programmées, une participation par e-mail, fichiers (Cloudflare R2), signature,
+    et le **champ « prise d'essai »** (ci-dessous).
+  - **F4, côté Gearbox** : notifications à l'équipe, **tirage au sort animé**, accusé de réception par e-mail
+    (envoi d'e-mails Cloudflare, droit déjà accordé à la session wrangler), versions (historique des publications).
+  - **Champ « prise d'essai » (demande de Théo, 01/10)** : un vrai formulaire de réservation d'essais clients,
+    paramétrable : calendrier avec créneaux, **liste des voitures mises à l'essai et leur nombre**, nombre maximal de
+    voitures disponibles sur un même créneau, **durée d'un créneau** (15 min, 30 min, 1 h, 2 h…), plages d'ouverture.
+    À cadrer en F3 (jours et horaires d'ouverture, exclusions, une ou plusieurs concessions, confirmation).
     Historique du cadrage Google : (marketbony@gmail.com, gmail PERSONNEL partagé par l'équipe) : parcourir le Drive,
     ouvrir et éditer Sheets et Forms, remonter les réponses des Forms dans une interface maison. Tout le monde agit
     sous l'identité de ce compte ; accès : Coordinator, Digital Manager, Administrator, Director, Master (à
@@ -3915,6 +3966,18 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Forms Bony : le format vit en DEUX exemplaires** (`shared/bonyform.ts` canonique, copie
+  `backend/src/bonyforms/schema.ts`) — modifier le canonique puis `cp`, sinon `npm run dev` refuse de démarrer
+  (`check-bonyform-sync.mjs`). Le Worker et le front importent le canonique.
+- **Forms Bony en local : le Worker (`wrangler dev`, port 8787) a son PROPRE KV local** — un formulaire publié en
+  local n'existe pas sur le Worker de production, et inversement. Le cron ne tourne pas tout seul en local :
+  `curl http://127.0.0.1:8787/cdn-cgi/local/scheduled`. Et l'application peut relancer d'elle-même un serveur arrêté :
+  vérifier que le port est vraiment fermé avant de tester la file d'attente.
+- **Types Cloudflare et DOM incompatibles** : `@cloudflare/workers-types` redéfinit une partie du DOM — le client
+  du formulaire (`forms-worker/src/client.ts`) a son propre `tsconfig.client.json` ; `forms-worker` est exclu du
+  `tsc` racine et du contexte Docker `web`.
+- **Formulaire public : ne redessiner QUE la carte dont l'état a changé** — redessiner les voisines (perte de focus
+  d'un champ) remplace l'option sous le pointeur entre l'appui et le relâchement, et le clic est perdu (01/10).
 - **Google Forms : un identifiant d'élément / de question fourni à la création doit être un entier 32 bits POSITIF
   en hexadécimal (8 chiffres, premier 0-7)** — sinon « Invalid ID ». `newId()` de `ui2/apps/forms/model.ts` (01/10).
 - **Google Forms : la doc dit « créé non publié », la réalité dit « publié et ouvert »** : le serveur ferme d'office

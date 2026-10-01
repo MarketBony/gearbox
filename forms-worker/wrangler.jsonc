@@ -1,0 +1,23 @@
+// Forms Bony — Worker public (01/10/2026). Déploiement : `npm run deploy` dans forms-worker/ (voir README.md).
+// Adresse : https://forms.bonyauto-mobile.workers.dev/<publicId>
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "forms",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  // Client du formulaire (navigateur), compilé avant chaque `wrangler dev` / `deploy`.
+  "build": { "command": "npm run build:client", "watch_dir": ["src/client.ts", "../shared"] },
+  "rules": [{ "type": "Text", "globs": ["**/gen/*.js", "**/*.svg"], "fallthrough": true }],
+  // Définitions publiées (form:<publicId>), file d'attente des réponses (q:<id>), limitation de débit (rl:…).
+  "kv_namespaces": [{ "binding": "FORMS", "id": "48950e3fde4e4e82a923880278b1d766" }],
+  // Toutes les minutes : renvoi des réponses mises en file pendant une indisponibilité de Gearbox.
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": {
+    "GEARBOX_URL": "https://gearbox.bonyauto-mobile.com",
+    // Clé PUBLIQUE du widget Turnstile « Forms Bony » (hôte forms.bonyauto-mobile.workers.dev, créé le 01/10/2026).
+    // En local, .dev.vars la remplace par la clé de test officielle (toujours valide).
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFLXXeGX-H2apLic"
+  }
+  // Secrets (wrangler secret put …) : GEARBOX_SECRET (= FORMS_WORKER_SECRET de Gearbox), TURNSTILE_SECRET.
+}

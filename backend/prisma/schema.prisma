@@ -777,3 +777,51 @@ model GoogleFormLog {
 
   @@index([formId, at])
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FORMS BONY (01/10/2026) — formulaires MAISON : édités dans Gearbox, servis au public par le
+// Worker Cloudflare `forms` (forms.bonyauto-mobile.workers.dev/<publicId>). Format de définition :
+// shared/bonyform.ts (copie : backend/src/bonyforms/schema.ts).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Un formulaire Bony. `draft` = définition en cours d'édition ; `published` = celle que sert le
+/// Worker (copie figée à chaque publication) : on retouche un formulaire en ligne sans casser celui
+/// qui tourne. `publicId` = segment d'adresse public, aléatoire (impossible à deviner).
+model BonyForm {
+  id             String    @id @default(uuid())
+  publicId       String    @unique
+  title          String
+  /// 'draft' (jamais publié) | 'published' (en ligne) | 'closed' (dépublié : le Worker affiche « fermé »)
+  status         String    @default("draft")
+  draft          Json
+  published      Json?
+  version        Int       @default(0)
+  publishedAt    DateTime?
+  /// Dernière erreur d'envoi de la définition au Worker (null = Worker à jour).
+  syncError      String?
+  responseCount  Int       @default(0)
+  lastResponseAt DateTime?
+  createdBy      String
+  updatedBy      String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+/// Réponse reçue du Worker. `id` est fixé PAR LE WORKER (uuid) : un renvoi depuis sa file d'attente
+/// (Gearbox indisponible au moment de l'envoi) ne crée jamais de doublon.
+/// ⚠️ DONNÉES PERSONNELLES des répondants (consentement recueilli par le formulaire).
+/// `uniqueKey` = « champ:valeur » du champ marqué unique (une participation par e-mail) ; l'index
+/// unique sur (formId, uniqueKey) fait le refus, sans course possible.
+model BonyFormResponse {
+  id          String   @id
+  formId      String // BonyForm.id
+  version     Int
+  answers     Json
+  meta        Json?
+  uniqueKey   String?
+  submittedAt DateTime
+  receivedAt  DateTime @default(now())
+
+  @@unique([formId, uniqueKey])
+  @@index([formId, submittedAt])
+}

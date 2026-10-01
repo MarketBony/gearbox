@@ -412,6 +412,28 @@ export interface GFormLog { id: string; action: string; detail: string | null; a
 export interface GFormResponse { id: string; submittedAt: string; respondentEmail: string | null; answers: Record<string, any> }
 export interface GFormDetail { form: GForm & { structure: { items: any[]; settings: any } | null }; responses: GFormResponse[] }
 
+// --- FORMS BONY (01/10/2026) — formulaires maison (routes /api/bony-forms, FORMS_ROLES) ---
+// Le format d'une définition vit dans shared/bonyform.ts (partagé avec le Worker Cloudflare).
+export interface BonyFormRow {
+  id: string;
+  publicId: string;             // segment de l'adresse publique (Worker)
+  title: string;
+  status: 'draft' | 'published' | 'closed';
+  version: number;              // nombre de publications
+  publishedAt: string | null;
+  syncError: string | null;
+  responseCount: number;
+  lastResponseAt: string | null;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+  url: string | null;           // adresse publique (null si le Worker n'est pas configuré)
+  dirty?: boolean;              // brouillon modifié depuis la dernière publication
+}
+export interface BonyFormDetail extends BonyFormRow { draft: any; published: any | null }
+export interface BonyResponse { id: string; version: number; answers: Record<string, any>; meta: Record<string, any> | null; submittedAt: string }
+
 export interface StorageInfo {
   disque: { total: number; libre: number; utilise: number };
   uploads: {

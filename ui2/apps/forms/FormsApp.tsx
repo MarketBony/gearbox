@@ -8,6 +8,7 @@ import { gx, hud, Icon, Seg, useSheets, useEngineStore, useCompact } from '../ui
 import { useGoogleStatus, GoogleAccountCard } from './GoogleAccount';
 import { questionsOf, statOf, overview, exportRows, valuesOf, type QStat, type Question } from './stats';
 import Editor from './Editor';
+import BonySpace from './bony/BonySpace';
 
 // =====================================================================
 // Rubrique « Forms » (interface v2 SEULEMENT, 01/10/2026 — lots G1 + G2). Google Forms du compte marketing
@@ -22,7 +23,7 @@ import Editor from './Editor';
 
 type Tab = 'forms' | 'stats';
 const D = 864e5;
-const rel = (iso: string | null) => {
+export const rel = (iso: string | null) => {
   if (!iso) return '—';
   const t = new Date(iso).getTime(), diff = Date.now() - t;
   if (diff < 60_000) return 'à l’instant';
@@ -36,7 +37,22 @@ const editUrl = (f: GForm, email?: string | null) => `https://docs.google.com/fo
 const statusOf = (f: GForm) => !f.isPublished ? { l: 'Non publié', c: 'var(--text-3)' } : f.acceptingResponses ? { l: 'Ouvert aux réponses', c: 'var(--ok)' } : { l: 'Réponses fermées', c: 'var(--warn)' };
 const plural = (n: number, s: string) => `${n.toLocaleString('fr-FR')} ${s}${n > 1 ? 's' : ''}`;
 
+// =====================================================================
+// Enveloppe : deux espaces, « Forms Bony » (formulaires maison, bony/BonySpace.tsx) et « Google Forms »
+// (ci-dessous). Choix mémorisé par poste ; chaque espace a sa barre et ses onglets.
+// =====================================================================
 export default function FormsApp({ win, inst }: AppProps) {
+  const [space, setSpace] = useEngineStore<'bony' | 'google'>('forms.space', 'bony');
+  const ref = useRef<HTMLDivElement>(null), first = useRef(true);
+  useLayoutEffect(() => {
+    if (first.current) { first.current = false; return; }
+    gx().animate(ref.current?.firstElementChild, [{ opacity: 0, transform: `translateX(${space === 'google' ? 26 : -26}px)` }, { opacity: 1, transform: 'none' }], { spring: 'soft' });
+  }, [space]);
+  const switcher = <Seg value={space} onChange={setSpace} options={[['bony', 'Forms Bony'], ['google', 'Google Forms']]} />;
+  return <div ref={ref} style={{ display: 'contents' }}>{space === 'bony' ? <BonySpace win={win} inst={inst} switcher={switcher} /> : <GoogleSpace win={win} inst={inst} switcher={switcher} />}</div>;
+}
+
+function GoogleSpace({ win, inst, switcher }: AppProps & { switcher: React.ReactNode }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const compact = useCompact(rootRef, 760);
   const { st, err: stErr, reload: reloadStatus } = useGoogleStatus();
@@ -109,7 +125,7 @@ export default function FormsApp({ win, inst }: AppProps) {
       <div className="app-head">
         <div className="ah-t"><span className="ah-eye">Com digitale</span><h1>Forms</h1>
           <span className="sub">{connected ? <>{list ? plural(list.length, 'formulaire') : 'Chargement…'}{st?.email ? <> · compte <b style={{ color: 'var(--text)' }}>{st.email}</b></> : null}</> : 'Google Forms du compte marketing'}</span></div>
-        <div className="ah-f">
+        <div className="ah-f">{switcher}
           {connected ? <Seg value={tab} onChange={setTab} options={[['forms', 'Formulaires'], ['stats', 'Statistiques']]} /> : null}
           {connected ? <button className="btn" data-tip="Ajouter des formulaires existants par leur lien" onClick={importSheet}><Icon name="link" size="sm" /><span>Importer</span></button> : null}
           {connected ? <button className="btn primary" data-tip="Créer un formulaire Google depuis Gearbox" onClick={newSheet}><Icon name="plus" size="sm" /><span>Nouveau</span></button> : null}
@@ -306,7 +322,7 @@ function StatsView({ f, email, compact, list, onPick, onSynced }: { f: GForm; em
   );
 }
 
-function Kpi({ l, v, i }: { l: string; v: number; i: number }) {
+export function Kpi({ l, v, i }: { l: string; v: number; i: number }) {
   // Le chiffre « compte » jusqu'à sa valeur (une fois, à l'arrivée des données).
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -321,7 +337,7 @@ function Kpi({ l, v, i }: { l: string; v: number; i: number }) {
 }
 
 const KIND: Record<string, string> = { choice: 'Choix', text: 'Texte', scale: 'Échelle', rating: 'Note', date: 'Date', time: 'Heure', file: 'Fichier', grid: 'Grille' };
-function QCard({ s, total, i, prevSection }: { s: QStat; total: number; i: number; prevSection: string }) {
+export function QCard({ s, total, i, prevSection }: { s: QStat; total: number; i: number; prevSection: string }) {
   const { q } = s;
   const [all, setAll] = useState(false);
   const pct = (n: number, base: number) => (base ? Math.round((n / base) * 100) : 0);
@@ -357,7 +373,7 @@ function QCard({ s, total, i, prevSection }: { s: QStat; total: number; i: numbe
   );
 }
 
-function OneResponse({ qs, r, idx, n, onIdx }: { qs: Question[]; r: GFormResponse; idx: number; n: number; onIdx: (i: number) => void }) {
+export function OneResponse({ qs, r, idx, n, onIdx }: { qs: Question[]; r: GFormResponse; idx: number; n: number; onIdx: (i: number) => void }) {
   const ref = useRef<HTMLDivElement>(null), last = useRef(idx);
   useLayoutEffect(() => {
     const dir = idx > last.current ? 1 : -1; last.current = idx;

@@ -12,3 +12,5 @@ electron
 .git
 .claude
 maquettes
+# Worker Cloudflare des Forms Bony : déployé à part (wrangler), jamais dans l’image web.
+forms-worker

@@ -22,6 +22,10 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
       GOOGLE_TOKEN_KEY: ${GOOGLE_TOKEN_KEY:-}
+      # Forms Bony (01/10/2026) : adresse du Worker Cloudflare et secret partagé (même valeur que
+      # `wrangler secret put GEARBOX_SECRET` du Worker). Valeurs dans le .env du VPS.
+      FORMS_WORKER_URL: ${FORMS_WORKER_URL:-}
+      FORMS_WORKER_SECRET: ${FORMS_WORKER_SECRET:-}
       NODE_ENV: production
       PORT: 3000
     volumes:
