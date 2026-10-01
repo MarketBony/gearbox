@@ -61,6 +61,23 @@ ne pas les réécrire.
     la section dédiée ci-dessous.
 12. **Fichiers de projet** — `/api/project-files` (mode Expert). Voir la section dédiée.
 
+### 📝 Post-it — `/api/postits` (01/10/2026, correctif 61)
+Agenda PERSONNEL de la To-do v2 (sous-rubrique « Post-it »). Modèle `PostIt` (migration
+`20261001150000_postit`, additive) : `id`, `userId` (référence libre, sans FK), `title`, `start`, `end`, `allDay`,
+`color`, `createdAt`, `updatedAt`, index sur `userId`.
+- **Personnel** : GET / POST / PUT / DELETE filtrés sur `userId = req.user.id` ; le post-it d'un autre rend 404
+  (même pour le Master). `userId` n'est JAMAIS lu dans le corps.
+- **Rôles** : `POSTIT_ROLES` = Master, Administrator, Director, Coordinator, Digital Manager, **Guest** (décision de
+  Théo : ses données personnelles, alors qu'il est en lecture seule ailleurs). Ce n'est pas un `EDIT_ROLES`.
+- **Liste blanche `POSTIT_FIELDS`** (`title`, `start`, `end`, `allDay`, `color`) : un champ absent est jeté EN
+  SILENCE — une colonne ajoutée au modèle s'y ajoute dans le même lot.
+- **Validation** : titre 1-200 caractères ; couleur dans `POSTIT_COLORS` ; dates en TEXTE local — créneau
+  `'YYYY-MM-DDTHH:mm'` (fin exclusive, après le début), journée entière `'YYYY-MM-DD'` (fin inclusive, ≥ début) ;
+  dates calendaires réelles (le 31/02 est refusé). PUT partiel, contrôlé sur le post-it COMPLET qui en résulte.
+- **Temps réel** : `emitToUser(userId, 'postits:changed')` (nouveau, `realtime/index.ts`) — room `user:<id>` seule,
+  sauf le socket auteur (`x-socket-id`). Payload nul : le client rappelle sa route.
+- **Suppression d'un compte** (`DELETE /api/users/:id`) : ses post-it sont supprimés avec lui.
+
 ### 🔗 `mediaFiles` d'une publication Digital — validation serveur (02/09/2026)
 
 `SocialPost.mediaFiles` (`String[]`) porte **deux formes, et deux seulement** :

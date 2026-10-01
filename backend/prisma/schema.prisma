@@ -678,3 +678,28 @@ model CongeDroit {
 
   @@unique([userId, periode])
 }
+
+/// POST-IT (01/10/2026) — agenda PERSONNEL de la To-do (sous-rubrique « Post-it »).
+/// Connecté à RIEN d'autre dans Gearbox (ni Agenda, ni Dashboard, ni Export) : un post-it
+/// n'est lu que par son auteur, et même le Master ne voit pas ceux des autres. Toutes les
+/// requêtes de `routes/postits.ts` filtrent sur `userId = req.user.id`, jamais sur une
+/// valeur envoyée par le client.
+///
+/// ⚠️ Dates en TEXTE LOCAL, comme `CongeJour.date` et `Task.deadline` : un créneau n'a pas
+/// de fuseau, et un DateTime rouvrirait la classe de bug J+1. Format :
+///  - créneau horaire : 'YYYY-MM-DDTHH:mm' (fin EXCLUSIVE) ;
+///  - journée(s) entière(s) (`allDay`) : 'YYYY-MM-DD' (fin INCLUSIVE, le dernier jour couvert).
+model PostIt {
+  id        String   @id @default(uuid())
+  userId    String // référence libre vers User (pas de FK, style du schéma)
+  title     String
+  start     String
+  end       String
+  allDay    Boolean  @default(false)
+  /// Clé de la palette (`POSTIT_COLORS`, routes/postits.ts) — liste blanche côté route.
+  color     String   @default("yellow")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}

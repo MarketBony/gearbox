@@ -33,6 +33,7 @@ import storageRoutes from './routes/storage';
 import gamesRoutes from './routes/games';
 import settingsRoutes from './routes/settings';
 import projectFilesRoutes from './routes/projectFiles';
+import postitRoutes from './routes/postits';
 import { setupRealtime, withEmitterContext } from './realtime';
 import { startPurgeJob } from './jobs/purge';
 import { chargerReglages } from './settings/appSettings';
@@ -106,6 +107,9 @@ app.use('/api/music', musicRoutes);
 
 // Abonnements aux notifications push (clé publique VAPID + subscribe/unsubscribe).
 app.use('/api/push', pushRoutes);
+
+// Post-it : agenda PERSONNEL de la To-do (chaque requête filtrée sur l'utilisateur connecté).
+app.use('/api/postits', postitRoutes);
 
 // Fichiers uploadés servis en statique (URLs relatives renvoyées par la route).
 //

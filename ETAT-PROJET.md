@@ -4,8 +4,9 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 01/10/2026 (lire en premier)
-- **En production : correctif 60 (01/10)** — v2 : photos de profil partout et widgets Chat branchés sur le serveur
-  (détail plus bas). Avant lui le **correctif 59 (30/09)** : interface v2 « Gearbox OS » en **BÊTA OUVERTE À TOUS
+- **En production : correctif 61 (01/10)** — v2 : **Post-it**, sous-rubrique de la To-do (agenda PERSONNEL façon
+  Outlook, nouvelle table `PostIt`, route `/api/postits`). Avant lui le **correctif 60 (01/10)** : photos de profil
+  partout et widgets Chat branchés sur le serveur (détail plus bas). Avant eux le **correctif 59 (30/09)** : interface v2 « Gearbox OS » en **BÊTA OUVERTE À TOUS
   LES RÔLES** (`UI2_BETA_ROLES = null`, `ui2/beta.ts`). L'ancienne interface reste **par défaut** ; bascule par
   Paramètres › Application › « Nouvelle interface (bêta) » (retour au même endroit, `?ui=classic`, ou automatique
   si la coque plante). `master` = `origin/master` = prod. Déployé : `web` seul, aucune migration.
@@ -17,9 +18,10 @@
   sensibles testées (provisions Budget, Congés). Plan et état du chantier : `maquettes/ux/PLAN-DEPLOIEMENT-V2.md`.
 - **Où on va (dans l'ordre)** :
   0. **Chantiers d'octobre (liste de Théo du 01/10, arbitrages dans le backlog § « Chantiers d'octobre 2026 »)** :
-     lot 1 fait (correctif 60) ; prochain lot au choix de Théo entre **intégration Google** (Drive, Sheets, Forms
-     du compte marketbony@gmail.com) et **Post-it** (agenda libre dans la To-do) ; puis tâches multi-assignées,
-     prestataire sur les dépenses, répartitions personnalisées, fichiers maison, mascotte / agent IA.
+     lot 1 fait (correctif 60), **Post-it fait (correctif 61)** ; prochain : **intégration Google** (Drive, Sheets,
+     Forms du compte marketbony@gmail.com — cadrage technique fait le 01/10, voir backlog) ; puis tâches
+     multi-assignées, prestataire sur les dépenses, répartitions personnalisées, fichiers maison, mascotte / agent IA.
+     Trou serveur `GET /api/budget` : Théo le traite « après » (01/10).
   1. **Retours de la bêta** (groupe « Bêta Gearbox OS » du Chat, créé par Théo) : les trier, corriger par lots.
   2. **Fermer le trou serveur** : `GET /api/budget` et lecture des dépenses fixes sans garde de rôle (External)
      — lot backend dédié, `ETAT-BACKEND.md` + `BUGS-CONNUS.md`.
@@ -310,6 +312,36 @@
     basculent en direct ; les 5 autres attendus). **Envoi depuis le widget testé par Théo** dans une vraie
     conversation. ⚠️ Les vraies photos ne s'affichent PAS en local (fichiers sur le VPS seulement, cf. Pièges).
 
+- **Correctif 61 — 01/10 : Post-it, sous-rubrique de la To-do** (branche `feat/todo-postit`, `api` ET `web`, **avec
+  migration** `20261001150000_postit`, additive : table `PostIt`). Demande de Théo : agenda personnel façon Outlook,
+  connecté à rien d'autre ; post-it = titre, début, fin, journée(s) entière(s) ; déplacer / étirer, couleur ;
+  « bute-toi sur les animations ». Arbitrages : **personnels** (même le Master ne voit pas ceux des autres), mêmes rôles
+  que la To-do **Guest compris** (ses données à lui), semaine lundi → dimanche, bandeau « Annuler » plutôt qu'une
+  confirmation.
+  - **Serveur** : `backend/src/routes/postits.ts` — chaque requête filtrée sur `userId = req.user.id` (le post-it d'un
+    autre = 404), `POSTIT_ROLES` (tous sauf External et chef de site), liste blanche **`POSTIT_FIELDS`**, validation
+    (titre 1-200, couleur de la palette, dates réelles, fin après début). Temps réel : **`emitToUser`** (nouveau,
+    `realtime/index.ts`) → `postits:changed` à la seule room `user:<id>`, sauf au socket auteur. Suppression d'un
+    compte = suppression de ses post-it (`routes/users.ts`, pas de FK).
+  - **Dates en TEXTE local** : créneau `'YYYY-MM-DDTHH:mm'` (fin exclusive), journée entière `'YYYY-MM-DD'` (fin
+    inclusive). Logique pure dans `ui2/apps/todo/postitLogic.ts` (découpage par jour, chevauchements côte à côte,
+    couloirs des barres, grille du mois).
+  - **Interface** : sélecteur « Tâches | Post-it » (`TodoApp.tsx` devient une enveloppe ; `TasksView` = l'ancien
+    tableau) ; `PostItBoard.tsx` — semaine (bande « Journée », 24 h, ligne « maintenant »), mois (« +N »), 3 jours en
+    fenêtre étroite ; cliquer-glisser pour créer (un clic = 1 h), glisser, étirer (haut/bas, bords des barres),
+    double-clic = bulle d'édition, clic droit = menu (couleurs, dupliquer le lendemain), Suppr + bandeau « Annuler »,
+    raccourcis ← → T S M N. Feuille `ui2/apps/todo/postit.css`, injectée par `OsHost.tsx` après la maquette.
+  - **Mouvement** : feuille qui se colle, s'incline selon la vitesse du pointeur et vole jusqu'à sa place, fantôme
+    pointillé de la cible, micro-rebond par cran de 15 min, feuille qui se décolle et tombe, FLIP semaine ↔ mois et
+    voisins qui se replacent, balayage au pavé (`bindSwipeWheel`). `prefers-reduced-motion` respecté.
+  - **Recette** : tests de Théo, puis un défaut corrigé avant le push — **décalage entre les dates et la grille**
+    (la barre de défilement de la grille, 10 px, rétrécissait ses colonnes : 9 px d'écart sur dimanche). Parade :
+    largeur mesurée en direct (`--pst-sb`) réservée à droite de l'en-tête et de la bande ; ouverture sur 7 h posée dès
+    que la grille a une hauteur (elle s'ouvrait à minuit). Vérifié au pixel (bords 52 → 1067 identiques).
+  - Testé en local avec le compte de Théo : création, déplacement, étirement, couleur, journée entière étirée,
+    suppression + « Annuler », bascule mois — chaque étape vérifiée côté serveur ; 400 / 404 / 401 sur la route ;
+    **0 post-it en base à la fin**. Non vérifié : un External refusé en vrai (403, pas de compte), deux onglets.
+
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
   51.83.75.181)
@@ -317,7 +349,11 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 60** (1er octobre 2026) — v2 : photos de profil
+- master = prod, synchronisés. Dernier lot déployé : **correctif 61** (1er octobre 2026) — **Post-it** dans la
+  To-do v2. **`api` ET `web`, avec migration** `20261001150000_postit` (additive : table `PostIt`), appliquée sur
+  Supabase AVANT le push (`db execute` puis `migrate resolve --applied`). Push et déploiement autorisés par Théo après
+  sa recette (« fais la modif et déploiement »).
+- Avant lui le **correctif 60** (1er octobre 2026) — v2 : photos de profil
   partout (portes `photoOf` / `GX.r.av` / `Avatar` du kit) et widgets Chat branchés sur le serveur (`GX.chatFeed` :
   vrais messages, envoi et réactions directs). **`web` SEUL, sans migration.** Push et déploiement autorisés par
   Théo après sa recette (« go push »).
@@ -3611,9 +3647,7 @@
     GROUPE BONY R/N (aujourd'hui figées dans `constants.ts`, `DISTRIBUTION_GROUPE_BONY` / `_RN`), depuis les
     Réglages. ⚠️ Touche la porte unique du routage ; à trancher : une répartition déjà utilisée reste-t-elle
     modifiable (recalcul des montants passés) ? Théo y reviendra.
-  - **Post-it** (remplace la vue calendrier de la To-do, ABANDONNÉE) : sous-rubrique de la To-do, agenda façon
-    Outlook (semaine par défaut, mois), clic pour poser un créneau. Post-it = titre, début (jour + heure), fin,
-    case « journée(s) entière(s) ». **Connecté à rien d'autre** dans Gearbox.
+  - ~~**Post-it**~~ → **fait, correctif 61** (sous-rubrique de la To-do, agenda personnel façon Outlook).
   - **Tâches multi-assignées** (`assignedUserId` → liste) : n'importe qui peut attribuer à n'importe qui, mais
     seulement les rôles qui ont accès à la To-do ; attribution à d'autres dès la création depuis la To-do. KPI du
     mode Expert : coût compté **EN ENTIER pour chacun** (5 000 € chacun). Reprise des données, `TASK_FIELDS`.
@@ -3623,6 +3657,16 @@
     inscrire dans la matrice Rôles & accès). ⚠️ Expiration à 7 jours des autorisations en mode test OAuth : piste
     à creuser (application sortie du mode test, non vérifiée). Édition dans une fenêtre intégrée : à tester
     (cookies tiers).
+    **Cadrage technique du 01/10 (recherche, docs Google lues ce jour)** : les 7 jours viennent du seul statut
+    « Testing » → publier « In production » SANS demander la vérification (exception « usage personnel » : un seul
+    compte consent). ⚠️ À tester en premier : passer l'écran « application non vérifiée » avec le scope restreint
+    `drive` (plan B : `drive.file` + Picker, sans explorateur maison). Scopes visés : `drive`, `forms.body`,
+    `forms.responses.readonly`. L'éditeur Google intégré en iframe utilise la session Google DU NAVIGATEUR, pas le
+    jeton serveur → écarté ; approche : explorateur Drive maison, grille maison sur les données Sheets, éditeur de
+    Forms maison, « Ouvrir dans Google » pour le reste. Quota Sheets : 60 lectures + 60 écritures / min pour TOUTE
+    l'équipe (un seul utilisateur Google) → cache serveur. Jeton chiffré en base (AES-256-GCM, clé en env), jamais
+    au navigateur ; Gearbox tient son propre journal (côté Google tout est fait par marketbony). Compte de service
+    écarté (aucun stockage, ne peut posséder de fichier).
   - **Fichiers maison** (façon SharePoint, stockage sur le VPS ; droits par fichier gérés par le Master). 179 Go
     libres au 01/10. ⚠️ Avant d'y mettre les documents : la sauvegarde hebdomadaire ne copie que la base Supabase,
     pas le volume `uploads_data` (à vérifier et régler).
@@ -3819,6 +3863,14 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Interface v2 : la feuille de style de la coque n'est posée qu'UNE fois par page** (hôte persistant) : une retouche
+  de `maquette.css`, `overrides.css` ou `ui2/apps/todo/postit.css` demande un RECHARGEMENT complet, le HMR ne suffit
+  pas (01/10/2026).
+- **Une grille qui défile sous un en-tête en grille = la barre de défilement décale les colonnes.** Réserver sa
+  largeur, MESURÉE (`offsetWidth - clientWidth`), à droite de l'en-tête (Post-it : `--pst-sb`). Et un `scrollTop`
+  posé sur un élément sans hauteur (fenêtre pas encore affichée) retombe à 0 : le poser au premier ResizeObserver
+  qui voit une hauteur (01/10/2026).
+- **Données personnelles en temps réel = `emitToUser`, jamais `emitEvent`** (qui annonce à tout le monde).
 - **Les photos de profil (et toutes les pièces jointes) ne s'affichent PAS en local** : les fichiers vivent dans le
   volume Docker `uploads_data` du VPS, pas dans `backend/uploads/` du poste → 404 en local, 200 en prod. Pour tester
   un rendu d'avatar en local : injecter une URL `data:` dans le cache (`setAvatarUrl` de

@@ -1,5 +1,5 @@
 
-import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment, CongeJour, CongeType, CongeDemi, CongeDroit } from '../types';
+import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment, CongeJour, CongeType, CongeDemi, CongeDroit, PostIt } from '../types';
 import type { LobbyData, GameSession, GameChallenge, GameType } from '../components/games/gameTypes';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS, LOI_LOM_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
@@ -822,6 +822,20 @@ class DataService {
   /** ⚠️ Retire du planning, ne supprime AUCUN congé. */
   async retirerMembreConges(userId: string) {
     await apiFetch(`/conges/membres/${userId}`, { method: 'DELETE' });
+  }
+
+  // --- Post-it : agenda personnel (la route filtre sur l'utilisateur connecté) ---
+  async getPostIts(): Promise<PostIt[]> {
+    return apiFetch<PostIt[]>('/postits');
+  }
+  async createPostIt(p: Omit<PostIt, 'id' | 'createdAt' | 'updatedAt'>): Promise<PostIt> {
+    return apiFetch<PostIt>('/postits', { method: 'POST', body: JSON.stringify(p) });
+  }
+  async updatePostIt(id: string, p: Partial<Omit<PostIt, 'id' | 'createdAt' | 'updatedAt'>>): Promise<PostIt> {
+    return apiFetch<PostIt>(`/postits/${id}`, { method: 'PUT', body: JSON.stringify(p) });
+  }
+  async deletePostIt(id: string): Promise<void> {
+    await apiFetch(`/postits/${id}`, { method: 'DELETE' });
   }
 
   async updateMe(data: { name?: string; password?: string; avatarColor?: string; avatarUrl?: string | null; birthdate?: string; chatBackground?: string; chatBubble?: string }): Promise<Omit<User, 'loginId'>> {

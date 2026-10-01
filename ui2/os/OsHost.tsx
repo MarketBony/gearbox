@@ -2,6 +2,8 @@ import React, { startTransition, useEffect, useLayoutEffect, useRef, useState } 
 import { createPortal } from 'react-dom';
 import css from './maquette.css?inline';
 import overridesCss from './overrides.css?inline';
+// Rubriques NÉES dans la v2 (sans équivalent dans la maquette) : leur feuille, après celle de la maquette.
+import postitCss from '../apps/todo/postit.css?inline';
 import { boot } from './engine/boot';
 import DataHub from './DataHub';
 import { bridgeStore, useLegacyIds, usePortedMounts, tabOf } from './bridge';
@@ -107,7 +109,7 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
       Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '0' });
       const shadow = host.attachShadow({ mode: 'open' });
       const style = document.createElement('style');
-      style.textContent = `${css}\n${overridesCss}`;
+      style.textContent = `${css}\n${overridesCss}\n${postitCss}`;
       const body = document.createElement('div');
       body.className = 'gx-body';
       shadow.append(style, body);
