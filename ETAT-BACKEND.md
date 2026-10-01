@@ -1,5 +1,12 @@
 # ÉTAT BACKEND — synthèse au 5 août 2026
 
+> **Point au 01/10/2026** : aucun changement backend depuis le **correctif 58** (24/09, dernière migration
+> `20260924150000_social_co2_multi_et_proplus`). Le correctif 59 (interface v2 en bêta) n'a touché que `web`.
+> ⚠️ **Ouvert, relevé par l'audit des droits du 30/09** : `GET /api/budget` (`routes/budget.ts`) et la lecture des
+> dépenses fixes (`routes/fixedExpenses.ts`) n'ont que `authenticateToken` — un External peut lire budgets et
+> dépenses de tout le réseau par appel direct, quelle que soit l'interface. À fermer (`requireRole` + périmètre
+> `budgetScopeOf`) dans un lot backend dédié (`BUGS-CONNUS.md`).
+
 Étape 7 (branchement frontend↔backend) **terminée**. Tous les modules de données **et** la
 gestion des fichiers uploadés sont branchés sur le backend Express/Supabase et **vérifiés en
 base réelle**. Le frontend ne lit/écrit **plus** `localStorage` pour ces entités.

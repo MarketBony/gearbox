@@ -1,9 +1,36 @@
-# ÉTAT PROJET GEARBOX — synthèse au 6 août 2026
+# ÉTAT PROJET GEARBOX — synthèse au 6 août 2026 · point de reprise au 1er octobre 2026
 
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
-## Chantier en cours — refonte « Gearbox OS » (maquette 2.0) · au 29/09/2026
+## ▶ POINT DE REPRISE — 01/10/2026 (lire en premier)
+- **En production : correctif 59 (30/09)** — interface v2 « Gearbox OS » en **BÊTA OUVERTE À TOUS LES RÔLES**
+  (`UI2_BETA_ROLES = null`, `ui2/beta.ts`). L'ancienne interface reste **par défaut** ; bascule par Paramètres ›
+  Application › « Nouvelle interface (bêta) » (retour au même endroit, `?ui=classic`, ou automatique si la coque
+  plante). `master` = `origin/master` = prod (`cccba26`). Déployé : `web` seul, aucune migration.
+- **Ce qui est fait** (détail plus bas) : coque = moteur de la maquette converti (`ui2/os/engine/`, Shadow DOM) ;
+  les 16 rubriques réécrites en React (`ui2/apps/*`, modèle et règles : `ui2/apps/PORTAGE.md`) ; navigation
+  gestuelle (porte unique `engine/gesture.ts`, rendu `engine/winswipe.ts`, calibrée sur le pavé de Théo) ; perf
+  (plus aucune tâche longue au changement de fenêtre) ; audit des droits des 16 rubriques corrigé ; écritures
+  sensibles testées (provisions Budget, Congés). Plan et état du chantier : `maquettes/ux/PLAN-DEPLOIEMENT-V2.md`.
+- **Où on va (dans l'ordre)** :
+  1. **Retours de la bêta** (groupe « Bêta Gearbox OS » du Chat, créé par Théo) : les trier, corriger par lots.
+  2. **Fermer le trou serveur** : `GET /api/budget` et lecture des dépenses fixes sans garde de rôle (External)
+     — lot backend dédié, `ETAT-BACKEND.md` + `BUGS-CONNUS.md`.
+  3. **Rôles restreints vus en vrai** (chef de site, External, Guest) dans la v2 — avec des collègues ou les comptes
+     concernés (aucun compte de test). **Mobile** : testé par Théo lui-même.
+  4. **Arbitrages de `BUGS-CONNUS.md` (30/09)** : glisser du planning Digital, dupliquer une publication, écriture
+     des Campagnes pour le Digital Manager, filtre Site des Dépenses, réservations du Matériel sans `requireRole`,
+     migration des enveloppes du Budget, renommage d'un tag Digital.
+  5. **Bascule** : v2 par défaut, cohabitation ~2 semaines, puis **nettoyage** (retrait des `pages/*`, des copies
+     temporaires `ui2/apps/hello/sources.ts`, `games/logic.ts`, `chat/voice.ts`, des `BESOINS.md` des agents).
+  6. **Plus tard (noté, non planifié)** : gestion des accès par rôle depuis Réglages › Rôles & accès (backlog).
+- **Décidé par Théo, ne pas reproposer** : pas de passage au bureau suivant en bout de liste de fenêtres ; bêta
+  ouverte à tous d'un coup (pas de déploiement Master seul d'abord).
+- **Outils du chantier** : diagnostic du pavé `maquettes/ux/diag-geste.html` (servi par Vite en dev) et
+  `node scripts/gesture-replay.mjs [trace.json]` (jeu de test : `scripts/fixtures/diag-geste-theo-2026-09-30.json`).
+
+## Chantier en cours — refonte « Gearbox OS » (maquette 2.0) · historique du 29/09 au 30/09/2026
 - **Branche `feat/refonte-os-v2`** (poussée sur GitHub, JAMAIS déployée) — `master` et la prod ne sont pas touchés.
 - **Où** : `maquettes/v2/` (maquette vanilla HTML/JS/CSS, sans build ni backend : données fictives dans
   `js/data.js`). Contrat d'une rubrique : `maquettes/v2/APPS.md`. Modèle UX validé par Théo : canevas
@@ -3727,6 +3754,23 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Interface v2 : un rendu d'`OsHost` re-rend tout ce qui n'est pas figé.** Rubriques portées (`DeferredApp`),
+  pages projetées (`LegacyPage`) et `DataHub` sont en `React.memo` : sans ça, chaque changement de fenêtre active
+  (`setTab`) coûtait 125 à 178 ms en build de prod (30/09). Tout nouvel enfant d'`OsHost` doit l'être aussi.
+- **Interface v2 : balayage horizontal = `bindSwipeWheel` / `GX.gesture.register`, JAMAIS un écouteur `wheel` à
+  la main** (porte unique `engine/gesture.ts`). Le lever des doigts se lit sur l'événement à delta NUL de Chrome.
+- **Interface v2 : ouvrir une rubrique puis lui passer une commande = `GX.shell.openWith`**, jamais
+  `(w || GX.wm.active())?.inst?.command(...)` : quand l'ouverture est refusée (rôle), la commande partait vers la
+  fenêtre active — boucle de 60 ms dans Projets pour un chef de site (30/09).
+- **Interface v2 : action globale proposée = `GX.shell.canAction(k)`** (mêmes règles que les rubriques). Données
+  chargées par `DataHub` = seulement celles des rubriques du rôle (un External recevait les budgets du réseau).
+- **Onglet en arrière-plan = plus d'images (`requestAnimationFrame` suspendu)** : une animation testée par script
+  dans un onglet non affiché reste figée ; mettre l'onglet au premier plan avant de mesurer ou de conclure.
+- **Écran de connexion alors que le jeton est valide = API locale bloquée** (« Timed out fetching a new connection
+  from the connection pool » dans `preview_logs` de `gearbox-api`) : redémarrer `gearbox-api`, inutile de se
+  reconnecter (vu 2 fois le 30/09).
+- **Ne pas basculer le thème deux fois de suite par script** (`GX.shell.toggleTheme`) : la 2ᵉ bascule repart du
+  thème d'avant la 1ʳᵉ et laisse le compte dans l'autre thème (arrivé le 30/09, corrigé à la main).
 - **Interface v2 (Shadow DOM) — `document` ne voit RIEN de la coque.** Tout `document.querySelector`,
   `document.head.append` ou `MutationObserver` sur l'hôte du moteur rate la racine fantôme : passer par
   `GX.root` (vignettes des fonds et curseurs des sélecteurs invisibles au lot 1 pour cette raison). Les

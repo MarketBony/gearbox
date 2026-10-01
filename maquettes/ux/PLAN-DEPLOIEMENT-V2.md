@@ -26,6 +26,17 @@ Décidé avec Théo le 29/09/2026. Référence pour toutes les sessions du chant
 - **⚠️ 29/09 (lot 2) : rubriques en React (décision Théo)**, rendues par portail dans la fenêtre du moteur, balisage
   et CSS de la maquette, données par `ui2/store/workspace.ts` (Zustand). Modèle : `ui2/apps/todo/TodoApp.tsx`.
 
+## État au 01/10/2026 — BÊTA OUVERTE À TOUS, EN PRODUCTION (correctif 59, déployé le 30/09)
+- **Faits** : lot 0, lot 1 (coque), lots 2 à 4 (les **16 rubriques portées en React**, regroupées en 4 lots au lieu
+  de 15), navigation gestuelle (balayage 2 doigts entre fenêtres), audit des droits des 16 rubriques corrigé,
+  bascule `UI2_BETA_ROLES = null` (tous les rôles). Détail : `ETAT-PROJET.md` (chantier, puis correctif 59).
+- **Toujours vrai** : l'ancienne interface reste celle PAR DÉFAUT ; chacun bascule dans Paramètres › Application.
+- **Prochaine étape = retours de la bêta** (groupe du Chat créé par Théo), puis **bascule** (v2 par défaut) quand :
+  rôles restreints vus en vrai (chef de site, External, Guest), mobile testé (Théo), retours bloquants traités,
+  arbitrages de `BUGS-CONNUS.md` (30/09) tranchés. Puis cohabitation ~2 semaines et **lot de nettoyage** (retrait
+  des `pages/*` et des copies temporaires `ui2/apps/hello/sources.ts`, `games/logic.ts`, `chat/voice.ts`).
+- Écart au plan : pas de migration `User.uiPrefs` (préférences de coque en localStorage, par compte et par poste).
+
 ## Lots (chacun : branche dédiée → test localhost avec les vrais rôles → 🛑 recette Théo → .md → déploiement `web`)
 - **Lot 0 — préparation (aucun déploiement)** : interrupteur bêta (préférence utilisateur, localStorage
   d'abord), dossier du nouveau code (ex. `ui2/`), point d'entrée dans `App.tsx`, feuille de jetons,

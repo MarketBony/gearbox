@@ -225,6 +225,11 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   navigation). Corrigé le 30/09 : `bindSwipeWheel`, un pas par geste ; ajouté au planning du Matériel.
 - [x] **Interface v2 : interrupteurs des Réglages en carrés, légende de Rôles & accès cassée** — cascade CSS du
   `input[type=checkbox]`. Corrigé le 30/09 (`ui2/os/overrides.css`).
+- [ ] **Interface v2 : erreur console « <rect> attribute height: A negative value is not valid (-1.11) »** — vue le
+  30/09 au chargement de la coque (un graphique SVG avec une valeur négative). Sans effet visible relevé ; non
+  diagnostiqué.
+- [ ] **Interface v2 : `GX.shell.toggleTheme` appelé deux fois de suite** finit sur le mauvais thème (fermeture
+  sur l'ancien thème). Sans effet pour un clic humain ; à corriger si un raccourci le déclenche un jour en rafale.
 - [x] **Interface v2 : budgets et dépenses de tout le réseau chargés pour un External** (DataHub, au démarrage de
   la coque). Corrigé le 30/09 (correctif 59) : chargés seulement pour les rôles qui ont une rubrique qui s'en sert.
 - [ ] **Serveur : `GET /api/budget` et `GET /api/fixed-expenses` sans garde de rôle** (`authenticateToken` seul,

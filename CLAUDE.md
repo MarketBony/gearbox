@@ -7,8 +7,9 @@ fichier suit les lots.
 
 Pour l'état du code :
 - `ETAT-PROJET.md` — mémoire de référence globale. **Il fait ~270 Ko : ne le lis pas
-  en entier.** En début de session, lis la section `## Déploiement` (dernier correctif
-  en ligne, tout en haut) et `## Pièges connus qui font perdre du temps`. Le reste
+  en entier.** En début de session, lis le bloc `## ▶ POINT DE REPRISE` (tout en haut :
+  où on en est, où on va — à remettre à jour en fin de session), la section `## Déploiement`
+  (dernier correctif en ligne) et `## Pièges connus qui font perdre du temps`. Le reste
   (historique, backlog) se consulte au besoin, par le graphe ou par recherche ciblée.
 - `ETAT-BACKEND.md` — état détaillé du backend/API
 - `BUGS-CONNUS.md` — bugs identifiés, corrigés ou non. ⚠️ Une cause écrite dans une
@@ -289,6 +290,18 @@ complète les données du serveur doit se demander si elle a le droit de le fair
 **Et surtout : un rôle ne se vérifie pas sans parcourir son interface.** Des contrôles
 d'API exacts ont laissé passer deux fois une navigation complète visible à un rôle
 restreint. Tester avec un vrai compte, dans le navigateur.
+
+## Interface v2 (Gearbox OS) — portes uniques côté front
+
+En bêta en production depuis le correctif 59. Avant de toucher `ui2/`, lis `ui2/apps/PORTAGE.md`.
+Mêmes principes que `constants.ts` : **une seule porte, jamais de copie locale.**
+- Montants et règles : `services/dashboardStats.ts`, `services/budgetStats.ts`, `services/exportXlsx.ts`,
+  `utils/projet.ts`, `constants.ts` — partagés avec l'ancienne interface (un changement touche les deux).
+- Données : `ui2/store/workspace.ts` et `ui2/store/collections.ts`, chargées par rôle dans `ui2/os/DataHub.tsx`.
+- Droits dans la coque : `GX.shell.canOpen` / `GX.shell.canAction` (lisent `computeNav` et les listes de
+  `constants.ts`) ; une commande vers une rubrique passe par `GX.shell.openWith`.
+- Balayage au pavé : `bindSwipeWheel` / `GX.gesture.register` (porte `ui2/os/engine/gesture.ts`).
+- Tout enfant d'`OsHost.tsx` est figé (`React.memo`) — sinon chaque changement de fenêtre re-rend tout.
 
 ## Historique de contexte (pour comprendre le pourquoi, pas pour agir dessus)
 
