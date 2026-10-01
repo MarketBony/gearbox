@@ -9,6 +9,7 @@ import { statOf, overview, exportRows } from '../stats';
 import { Kpi, QCard, OneResponse, rel } from '../FormsApp';
 import { bonyQuestions, bonyResponses } from './adapter';
 import BonyEditor from './BonyEditor';
+import { TEMPLATES } from './templates';
 
 // =====================================================================
 // Espace « Forms Bony » de la rubrique Forms (lot F1, 01/10/2026) : formulaires MAISON, édités ici
@@ -27,13 +28,14 @@ export default function BonySpace({ win, inst, switcher }: AppProps & { switcher
   const [tab, setTab] = useEngineStore<'forms' | 'stats'>('bony.tab', 'forms');
   const [list, setList] = useState<BonyFormRow[] | null>(null);
   const [ready, setReady] = useState(true);
+  const [workerUrl, setWorkerUrl] = useState<string | null>(null);
   const [err, setErr] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [selId, setSelId] = useEngineStore<string>('bony.sel', '');
   const [q, setQ] = useState('');
   const { open: openSheet, portals } = useSheets(win);
 
-  const load = useCallback(() => db.getBonyForms().then((r) => { setList(r.forms); setReady(r.workerReady); setErr(''); }).catch((e) => { setList((x) => x || []); setErr(e?.message || 'Lecture impossible.'); }), []);
+  const load = useCallback(() => db.getBonyForms().then((r) => { setList(r.forms); setReady(r.workerReady); setWorkerUrl(r.workerUrl || null); setErr(''); }).catch((e) => { setList((x) => x || []); setErr(e?.message || 'Lecture impossible.'); }), []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { const s = getSocket(); s?.on('bonyforms:changed', load); s?.on('bonyforms:response', load); window.addEventListener('gearbox-chat-reconnected', load); return () => { s?.off('bonyforms:changed', load); s?.off('bonyforms:response', load); window.removeEventListener('gearbox-chat-reconnected', load); }; }, [load]);
 
@@ -41,7 +43,7 @@ export default function BonySpace({ win, inst, switcher }: AppProps & { switcher
   const sel = (list || []).find((f) => f.id === selId) || (tab === 'stats' ? (list || [])[0] : undefined);
   const openEditor = (f: BonyFormRow) => { setTab('forms'); setEditId(f.id); };
   const openStats = (f: BonyFormRow) => { setEditId(null); setSelId(f.id); setTab('stats'); };
-  const newSheet = () => openSheet((close) => <NewSheet close={close} onDone={(f) => { close(); load(); openEditor(f); }} />, { width: 480 });
+  const newSheet = () => openSheet((close) => <NewSheet close={close} onDone={(f) => { close(); load(); openEditor(f); }} />, { width: 620 });
   const copyLink = (f: BonyFormRow) => { if (!f.url) return; navigator.clipboard?.writeText(f.url).then(() => hud('Lien du formulaire copié'), () => hud(f.url!)); };
 
   inst.command = (c: string) => { if (c === 'new') newSheet(); };
@@ -54,7 +56,7 @@ export default function BonySpace({ win, inst, switcher }: AppProps & { switcher
     <div className="app frm" ref={rootRef}>
       <div className="app-head">
         <div className="ah-t"><span className="ah-eye">Com digitale</span><h1>Forms</h1>
-          <span className="sub">{list ? plural(list.length, 'formulaire Bony') : 'Chargement…'} · formulaires maison, hébergés chez Cloudflare</span></div>
+          <span className="sub">{list ? `${list.length} formulaire${list.length > 1 ? 's' : ''} Bony` : 'Chargement…'} · formulaires maison, hébergés chez Cloudflare</span></div>
         <div className="ah-f">{switcher}
           <Seg value={tab} onChange={(v) => { setEditId(null); setTab(v); }} options={[['forms', 'Formulaires'], ['stats', 'Réponses']]} />
           <button className="btn primary" onClick={newSheet}><Icon name="plus" size="sm" /><span>Nouveau</span></button>
@@ -64,7 +66,7 @@ export default function BonySpace({ win, inst, switcher }: AppProps & { switcher
         {!ready ? <div className="frm-err">Le Worker Cloudflare n’est pas configuré sur ce serveur (FORMS_WORKER_URL / FORMS_WORKER_SECRET) : la publication est impossible.</div> : null}
         {err ? <div className="frm-err">{err}</div> : null}
         {tab === 'forms' && editId ? (
-          <React.Fragment key={editId}><BonyEditor id={editId} onBack={() => setEditId(null)} onStats={() => { const f = (list || []).find((x) => x.id === editId); if (f) openStats(f); }} onChanged={load} /></React.Fragment>
+          <React.Fragment key={editId}><BonyEditor id={editId} workerUrl={workerUrl} onBack={() => setEditId(null)} onStats={() => { const f = (list || []).find((x) => x.id === editId); if (f) openStats(f); }} onChanged={load} /></React.Fragment>
         ) : tab === 'forms' ? (
           <div className="frm-list scroll">
             <div className="frm-tools"><label className="search"><Icon name="search" size="sm" /><input placeholder="Rechercher un formulaire…" value={q} onChange={(e) => setQ(e.target.value)} /></label></div>
@@ -110,12 +112,18 @@ export default function BonySpace({ win, inst, switcher }: AppProps & { switcher
 
 function NewSheet({ close, onDone }: { close: () => void; onDone: (f: BonyFormRow) => void }) {
   const [title, setTitle] = useState(''), [busy, setBusy] = useState(false), [err, setErr] = useState('');
+  const [tpl, setTpl] = useState('blank');
   const inp = useRef<HTMLInputElement>(null);
   useEffect(() => { inp.current?.focus(); }, []);
   const go = async () => {
     if (!title.trim() || busy) return;
     setBusy(true); setErr('');
-    try { const f = await db.createBonyForm(title.trim()); hud(`« ${f.title} » créé`); onDone(f); }
+    try {
+      const f = await db.createBonyForm(title.trim());
+      const m = TEMPLATES.find((x) => x.id === tpl);
+      if (m && m.id !== 'blank') await db.saveBonyDraft(f.id, m.build(f.title));   // modèle : le brouillon est remplacé aussitôt
+      hud(`« ${f.title} » créé`); onDone(f);
+    }
     catch (e: any) { setErr(e?.message || 'Création impossible.'); setBusy(false); }
   };
   return (
@@ -124,12 +132,36 @@ function NewSheet({ close, onDone }: { close: () => void; onDone: (f: BonyFormRo
       <p className="muted">Créé en <b>brouillon</b> : personne ne le voit tant qu’il n’est pas publié.</p>
       <label className="frm-field"><span className="label">Titre</span>
         <input ref={inp} value={title} maxLength={200} onChange={(e) => { setTitle(e.target.value); setErr(''); }} onKeyDown={(e) => { if (e.key === 'Enter') go(); }} placeholder="Ex. Jeu-concours Salon de l’auto 2026" /></label>
+      <span className="label" style={{ display: 'block', margin: '12px 0 6px' }}>Partir de</span>
+      <div className="frm-tpls">{TEMPLATES.map((m) => (
+        <button key={m.id} className={tpl === m.id ? 'on' : ''} onClick={() => setTpl(m.id)}>
+          <Icon name={m.icon} size="sm" /><b>{m.l}</b><span>{m.d}</span></button>))}</div>
       {err ? <div className="frm-err">{err}</div> : null}
       <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
         <button className="btn" onClick={close}>Annuler</button>
         <button className="btn primary" disabled={!title.trim() || busy} onClick={go}>{busy ? 'Création…' : 'Créer et modifier'}</button>
       </div>
     </div>
+  );
+}
+
+// =====================================================================
+// D'où viennent les réponses (F2b) : utm_source / utm_campaign du lien (onglet « Partager »), sinon le site
+// d'où vient le clic, sinon « Direct ». Lu dans meta, rempli par le Worker.
+// =====================================================================
+const SRC_L: Record<string, string> = { email: 'E-mailing', sms: 'SMS', facebook: 'Facebook', instagram: 'Instagram', linkedin: 'LinkedIn', site: 'Site Bony', qr: 'QR code', showroom: 'Showroom' };
+function Sources({ raw }: { raw: BonyResponse[] }) {
+  const by = (key: (r: BonyResponse) => string) => { const m = new Map<string, number>(); raw.forEach((r) => { const k = key(r); m.set(k, (m.get(k) || 0) + 1); }); return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8); };
+  const src = by((r) => { const u = r.meta?.params?.utm_source; return u ? SRC_L[u] || u : r.meta?.ref ? `Lien depuis ${r.meta.ref}` : 'Direct / inconnu'; });
+  const camp = by((r) => r.meta?.params?.utm_campaign || '').filter(([k]) => k);
+  if (!raw.length || (src.length === 1 && src[0][0] === 'Direct / inconnu' && !camp.length)) return null;
+  const Bars = ({ rows }: { rows: [string, number][] }) => <div className="bfs-src">{rows.map(([k, n], i) => (
+    <div key={k} className="bfs-sr" style={{ '--i': i } as React.CSSProperties}><span className="ellipsis">{k}</span><i style={{ '--w': `${(n / raw.length) * 100}%` } as React.CSSProperties} /><b className="num">{n}</b><span className="faint">{Math.round((n / raw.length) * 100)} %</span></div>))}</div>;
+  return (
+    <section className="frm-block">
+      <div className="frm-bh"><b>D’où viennent les réponses</b><span className="faint">liens de l’onglet « Partager »</span></div>
+      <div className="bfs-srcs"><div><div className="bfe-gt">Source</div><Bars rows={src} /></div>{camp.length ? <div><div className="bfe-gt">Campagne</div><Bars rows={camp} /></div> : null}</div>
+    </section>
   );
 }
 
@@ -160,7 +192,7 @@ function BonyStats({ row, list, compact, onPick, onEdit, onChanged }: { row: Bon
     const { headers, rows } = exportRows(qs, rs);
     const params = [...new Set(rs.flatMap((r) => Object.keys(r.meta?.params || {})))];
     const safe = row.title.replace(/[^\w\- ]+/g, '').trim().slice(0, 40) || 'formulaire';
-    await writeSheetFile(`GEARBOX_FormsBony_${safe}.xlsx`, row.title, [...headers, ...params.map((p) => `Lien : ${p}`)], rows.map((r, k) => [...r, ...params.map((p) => rs[k].meta?.params?.[p] || '')]));
+    await writeSheetFile(`GEARBOX_FormsBony_${safe}.xlsx`, row.title, [...headers, ...params.map((p) => `Lien : ${p}`), 'Site d’origine'], rows.map((r, k) => [...r, ...params.map((p) => rs[k].meta?.params?.[p] || ''), rs[k].meta?.ref || '']));
   };
   const cur = rs[Math.min(idx, rs.length - 1)];
   const eraseOne = (el: HTMLElement) => gx().menu.open([
@@ -185,6 +217,7 @@ function BonyStats({ row, list, compact, onPick, onEdit, onChanged }: { row: Bon
             <div className="frm-kpi" style={{ '--i': 3 } as React.CSSProperties}><span>Dernière réponse</span><b className="sm">{rel(row.lastResponseAt)}</b></div>
           </div>
           <section className="frm-block"><div className="frm-bh"><b>Réponses par jour</b><span className="faint">30 derniers jours · en direct</span></div><div className="frm-chart" dangerouslySetInnerHTML={{ __html: timeline }} /></section>
+          <Sources raw={raw || []} />
           <div className="frm-viewsw"><Seg value={view} onChange={setView} options={[['summary', 'Résumé'], ['one', 'Réponse par réponse']]} /></div>
           {!rs.length ? <div className="frm-empty">{row.status === 'draft' ? 'Formulaire pas encore publié.' : 'Aucune réponse pour l’instant.'}</div>
             : view === 'summary' ? <div className="frm-qs">{stats.map((x, i) => <React.Fragment key={x.q.id}><QCard s={x} total={rs.length} i={i} prevSection={i ? stats[i - 1].q.section : ''} /></React.Fragment>)}</div>

@@ -825,3 +825,27 @@ model BonyFormResponse {
   @@unique([formId, uniqueKey])
   @@index([formId, submittedAt])
 }
+
+/// Kit de marque des Forms Bony (F2a, 01/10/2026) : un thème complet enregistré sous un nom
+/// (« Salon Renault 2026 »), PARTAGÉ par toute l'équipe (décision de Théo), réappliqué en un clic.
+model BonyThemeKit {
+  id        String   @id @default(uuid())
+  name      String
+  theme     Json
+  createdBy String
+  createdAt DateTime @default(now())
+}
+
+/// Police de MARQUE importée par l'équipe (fichier chez Cloudflare, KV du Worker). Partagée par tous.
+model BonyFont {
+  id        String   @id @default(uuid())
+  family    String
+  weight    Int      @default(400)
+  style     String   @default("normal")
+  url       String
+  fileName  String
+  createdBy String
+  createdAt DateTime @default(now())
+
+  @@unique([family, weight, style])
+}

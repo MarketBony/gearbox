@@ -295,3 +295,32 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   tombée dans la liste « Logo » qui avait le focus (non reproduit sans frappe). À surveiller.
 - [ ] **Forms Bony : le brouillon n'a pas de contrôle de version** — deux personnes qui modifient le même formulaire
   en même temps : la dernière sauvegarde l'emporte. Acceptable pour l'équipe (prévu en F4 avec les versions).
+
+<!-- Forms Bony F2a / F2b (studio, partage) — 01/10/2026, correctif 64 -->
+- [x] **Forms (v2) : écran blanc au clic sur un interrupteur** (« Confettis à l'envoi », recette de Théo) — la case
+  cachée était en `position:absolute` sans parent positionné : posée loin de son interrupteur, sa mise au point
+  faisait défiler toute la fenêtre. `.frm-tg` / `.frm-req` positionnés ; **même défaut latent dans le Post-it**
+  (`.pst-all`), corrigé aussi. À retenir : une case cachée se pose SUR son interrupteur.
+- [x] **Forms Bony : carrés dans les coins des cartes avec ombre** (recette) — l'enveloppe du repli animé
+  (`overflow:hidden`) coupait l'ombre au rectangle de la carte. Découpe posée seulement replié ou pendant
+  l'animation (classe `anim`, 520 ms). ⚠️ Écarté : un débord de 64 px autour de l'enveloppe élargissait la page
+  mobile à 423 px pour 375 visibles (le téléphone aurait dézoomé) — mesuré au navigateur, ne pas y revenir.
+- [x] **Forms Bony : cartes en verre illisibles** (recette) — 55 % d'opacité laissait le fond noyer le texte.
+  70 % par défaut, réglage d'opacité, alerte « fond chargé » et contraste calculé sur la couleur VUE.
+- [x] **Forms Bony : bouton dégradé « bugué » (ambiance Nuit)** (recette) — le dégradé étiré à 160 % se répétait
+  sous la bordure transparente (liseré orange à gauche) et le texte était forcé en blanc ; `background-origin`
+  border-box, sans répétition, texte = couleur lisible calculée (`--on-p`).
+- [x] **Forms Bony : thèmes de marque non chartés, Néon** (recette) — ambiances refaites d'après les sites
+  officiels (01/10) ; Néon retiré. Polices officielles : bibliothèque de polices de marque (à alimenter).
+- [x] **Forms Bony : couleurs du thème injectables dans la page publique** (relevé en audit) — elles partaient
+  telles quelles dans une balise `<style>` : une valeur piégée pouvait la refermer et ajouter du HTML. Le Worker
+  filtre couleurs, polices et nombres (`theme.ts`) ; testé avec une valeur malveillante.
+- [x] **Forms Bony : SVG accepté par le Worker** (relevé en audit, jamais envoyé par Gearbox) — un SVG servi depuis
+  le domaine du Worker peut exécuter du script. Refusé, et CSP `default-src 'none'; sandbox` sur `/a/<id>`.
+- [x] **Forms Bony : aperçu du Studio bloqué « en attente »** (relevé en test) — le « prêt » du client pouvait partir
+  avant que l'éditeur écoute (double montage React en dev) ; l'événement `load` de l'iframe sert aussi de signal.
+- [x] **Forms Bony : « 2 formulaire Bonys »** (relevé en test).
+- [ ] **Forms Bony : polices officielles à importer** — NouvelR, Read, Dacia Block, AlpineNewAlps, NissanBrand :
+  à faire par l'équipe depuis les kits de charte (Studio › Polices de marque). D'ici là, polices libres proches.
+- [ ] **Forms Bony : logos de marque en image** — seul le logo Bony est dessiné ; Renault, Dacia… s'affichent en
+  texte tant qu'on n'importe pas le logo (Studio › En-tête › Logo importé).

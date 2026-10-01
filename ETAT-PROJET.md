@@ -4,7 +4,11 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 01/10/2026 (lire en premier)
-- **En production : correctif 63 (01/10)** — **Forms Bony, lot F1** : formulaires MAISON (édités dans Gearbox,
+- **En production : correctif 64 (01/10)** — **Forms Bony, lots F2a + F2b** : studio de personnalisation (aperçu
+  en direct, ambiances chartées Renault / Dacia / Alpine / Nissan, images et **polices de marque** stockées chez
+  Cloudflare, kits partagés) puis écrans d'accueil / de fin, tuiles illustrées, demi-largeur, clavier façon
+  Typeform, onglet **Partager** (liens UTM, QR code, aperçu du partage), modèles, synthèse des sources. Avant lui le
+  **correctif 63 (01/10)** — **Forms Bony, lot F1** : formulaires MAISON (édités dans Gearbox,
   servis au public par le Worker Cloudflare `forms.bonyauto-mobile.workers.dev`). La rubrique Forms a deux
   espaces : Forms Bony et Google Forms. Avant lui le **correctif 62 (01/10)** : Google Forms (création, éditeur
   maison, statistiques). Avant lui le **correctif 61 (01/10)** :
@@ -21,9 +25,10 @@
   sensibles testées (provisions Budget, Congés). Plan et état du chantier : `maquettes/ux/PLAN-DEPLOIEMENT-V2.md`.
 - **Où on va (dans l'ordre)** :
   0. **Chantiers d'octobre (liste de Théo du 01/10, arbitrages dans le backlog § « Chantiers d'octobre 2026 »)** :
-     lot 1 fait (correctif 60), Post-it (61), Google Forms (62), **Forms Bony F1 (63)**. **En cours : Forms Bony
-     F2 → F3 → F4** (plan validé par Théo « de A à Z », toutes les fonctions ; détail au backlog § Forms Bony),
-     avec la **prise d'essai** demandée le 01/10. Ensuite : tâches multi-assignées, prestataire, répartitions,
+     lot 1 fait (correctif 60), Post-it (61), Google Forms (62), Forms Bony F1 (63), **F2a + F2b (64)**.
+     **Suite : Forms Bony F3 → F4** (plan validé par Théo « de A à Z » ; détail au backlog § Forms Bony),
+     avec la **prise d'essai** demandée le 01/10. À faire par l'équipe : importer les polices officielles
+     (NouvelR, Read, Dacia Block, AlpineNewAlps, NissanBrand) dans Studio › Polices de marque. Ensuite : tâches multi-assignées, prestataire, répartitions,
      fichiers maison, mascotte / agent IA.
      Trou serveur `GET /api/budget` : Théo le traite « après » (01/10).
   1. **Retours de la bêta** (groupe « Bêta Gearbox OS » du Chat, créé par Théo) : les trier, corriger par lots.
@@ -415,6 +420,52 @@
     question masquée. Doute non levé : un logo passé à « Renault » pendant les tests, très probablement une frappe
     de l'outil de test tombée dans la liste « Logo » (non reproduit sans frappe).
 
+- **Correctif 64 — 01/10 : Forms Bony, lots F2a (studio) + F2b (écrans, partage, modèles)** (branche
+  `feat/forms-bony-f2a`, `api` ET `web` + **redéploiement du Worker `forms`** AVANT eux : il porte les nouvelles
+  routes ; migrations ADDITIVES `20261002120000_bony_theme_kits` et `20261002130000_bony_fonts` appliquées et
+  inscrites avant le push — leur horodatage dit « 02/10 », elles datent du 01/10 : sans conséquence, l'ordre suffit).
+  - **F2a, studio** : éditeur en trois onglets **Construire | Studio | Partager**. Aperçu EN DIRECT = la vraie page
+    du Worker (`/__preview`, intégrable seulement depuis `PREVIEW_ORIGINS`) alimentée par `postMessage` ; bascule
+    Ordinateur (vraie page de 1280 px réduite à l'échelle, mesurée) / Mobile, écrans Accueil / Formulaire /
+    Remerciement, clic sur une question de l'aperçu → « Modifier ». Réglages : ambiances, couleurs (alerte de
+    lisibilité sur la couleur RÉELLEMENT vue, verre compris), cartes en verre + opacité, fond (uni, dégradé, motif,
+    animé, image), en-tête (bandeau, bannière, plein écran, partagé, aucun), logo (Bony, texte ou **image
+    importée**), typographie (casse normale / MAJUSCULES / minuscules), questions, saisies, arrondi, ombre, boutons
+    (style, casse, libellés), mouvement et confettis.
+  - **Ambiances de marque relevées sur les sites officiels le 01/10** : Renault noir et blanc, angles droits,
+    minuscules (plus de jaune) ; Dacia kaki `#646B52`, titres en capitales ; Alpine noir / bleu nuit, capitales,
+    boutons à contour ; Nissan monochrome, boutons pilule. **Néon retiré** (demande de Théo).
+  - **Polices de marque** : NouvelR, Read, Dacia Block, AlpineNewAlps, NissanBrand sont propriétaires, servies par
+    aucun service libre → **bibliothèque partagée** (Studio › Polices de marque : import WOFF2/WOFF/OTF/TTF, famille
+    et graisse devinées du nom de fichier). Une ambiance prend sa police officielle dès qu'elle est dans la
+    bibliothèque (sinon la libre la plus proche : Red Hat Display, Barlow, Chakra Petch, Montserrat). Le thème
+    EMBARQUE ses fichiers (`theme.fontFiles`) : un formulaire publié ne dépend plus de la bibliothèque.
+  - **Images et polices chez Cloudflare** (KV du Worker, `/a/<empreinte>`, cache d'un an) : images compressées
+    dans Gearbox (WebP, 1920 px ; PNG de 7,4 Mo → 224 Ko au test). Pas de SVG (exécutable depuis le domaine du
+    Worker), CSP `sandbox` sur les fichiers servis. **Kits de marque** partagés (thème enregistré sous un nom).
+  - **F2b** : écran d'accueil ; écran de fin avec image et bouton d'action ; options en **tuiles** (emoji ou image,
+    1 à 4 colonnes) ; questions en **demi-largeur** ; mode « une question par écran » **au clavier** (lettres =
+    options, chiffres = échelles et notes, Entrée = suivant) ; onglet **Partager** : lien de campagne (UTM source /
+    support / campagne / variante + préremplissage), **QR code** PNG / SVG (bibliothèque `qrcode-generator`, MIT,
+    sans dépendance ; décodage vérifié), aperçu du lien partagé (titre, description, image `og:` et `twitter:`) ;
+    **6 modèles** à la création (vierge, jeu-concours, événement, satisfaction après-vente, contact / devis,
+    invitation Alpine) ; synthèse **« D'où viennent les réponses »** (source, campagne, site d'origine) et colonne
+    « Site d'origine » à l'export.
+  - **Recette de Théo sur F2a → défauts corrigés** : écran blanc au clic sur « Confettis » (case cachée hors de son
+    interrupteur : la mise au point faisait défiler toute la fenêtre — même défaut latent corrigé dans le Post-it) ;
+    **carrés dans les coins** des cartes avec ombre (le repli animé découpait l'ombre ; la découpe n'est plus posée
+    que replié ou pendant l'animation — une première version qui débordait de 64 px élargissait la page mobile à
+    423 px, mesurée puis remplacée) ; **verre illisible** (opacité 55 % → 70 % par défaut, réglage d'opacité, alerte) ;
+    **bouton Nuit** (dégradé répété sous la bordure, texte forcé en blanc) ; thèmes de marque non chartés.
+  - **Autres défauts trouvés en test** : couleurs du thème injectées telles quelles dans une balise `<style>` de la
+    page publique (**injection possible**, filtrées côté Worker : couleurs, polices, nombres) ; aperçu bloqué « en
+    attente » (signal « prêt » du client parti avant l'écoute de l'éditeur → l'événement `load` de l'iframe sert de
+    signal) ; « 2 formulaire Bonys ».
+  - **Testé en local avec le compte de Théo** (formulaires « ZZ TEST » créés, publiés, remplis puis supprimés ;
+    police et kit de test supprimés ; « Test forms » de Théo vérifié intact) : ambiances, envoi d'image, kit
+    enregistré / appliqué / supprimé, police importée puis chargée sur la page publique, accueil, tuiles, demi-largeur
+    (empilée sur mobile), clavier de bout en bout, lien QR → réponse avec ses UTM → synthèse des sources.
+
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
   51.83.75.181)
@@ -422,11 +473,13 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 63** (1er octobre 2026) — **Forms Bony F1**.
-  `api` ET `web`, migration `20261002110000_bony_forms` (additive, appliquée avant le push), **plus le premier
-  déploiement du Worker Cloudflare `forms`** (`cd forms-worker && npm run deploy`, secrets `GEARBOX_SECRET` et
-  `TURNSTILE_SECRET`). Variables `FORMS_WORKER_URL` / `FORMS_WORKER_SECRET` au `.env` du VPS et dans
-  `docker-compose.yml`. Push et déploiement après la recette de Théo.
+- master = prod, synchronisés. Dernier lot déployé : **correctif 64** (1er octobre 2026) — **Forms Bony F2a + F2b**.
+  Ordre : **Worker d'abord** (`cd forms-worker && npm run deploy` : routes `/__preview`, `/__gearbox/asset`, `/a/<id>`),
+  puis `api` ET `web`. Migrations `20261002120000_bony_theme_kits` et `20261002130000_bony_fonts` (additives,
+  appliquées et inscrites avant le push). Nouvelle variable du Worker `PREVIEW_ORIGINS` (dans `wrangler.jsonc`).
+  Nouvelle dépendance front `qrcode-generator`. Avant lui le **correctif 63** — Forms Bony F1 : premier
+  déploiement du Worker (secrets `GEARBOX_SECRET`, `TURNSTILE_SECRET` ; `FORMS_WORKER_URL` / `FORMS_WORKER_SECRET`
+  au `.env` du VPS et dans `docker-compose.yml`).
 - Avant lui le **correctif 62** (1er octobre 2026) — rubrique **Forms**
   (Google Forms) dans la v2. **`api` ET `web`, deux migrations** (`20261002090000_google_forms`,
   `20261002100000_google_forms_journal`, additives), appliquées et inscrites AVANT le push. Nouvelles variables
@@ -3742,9 +3795,9 @@
     PUBLIC demande une surface sans connexion sur le VPS (anti-spam, limitation de débit, RGPD, disponibilité).
     → **Retenu le 01/10 sous la forme « Forms Bony » hébergé chez Cloudflare** (correctif 63, F1 fait).
 - **Forms Bony — suite du plan validé par Théo (« tout implémenter »)** :
-  - **F2, l'éditeur poussé** : aperçu EN DIRECT dans l'éditeur (le formulaire tel que le verra le répondant),
-    thème avancé, présentations soignées (une question par écran : transitions, clavier), champs Bony,
-    préremplissage et champs cachés finalisés, consentement.
+  - ~~**F2, l'éditeur poussé**~~ → **fait, correctif 64** (F2a studio + F2b écrans, partage, modèles). Restes
+    notés : écrans de fin SELON la réponse (avec la logique de F3) ; tuiles pour les créneaux (`slot`, F3) ;
+    raccourcis clavier aussi en présentation « page » (volontairement non faits : ambigus avec plusieurs questions).
   - **F3, les fonctions avancées** : logique conditionnelle complète, champs calculés (score, somme), places
     limitées, ouverture / fermeture programmées, une participation par e-mail, fichiers (Cloudflare R2), signature,
     et le **champ « prise d'essai »** (ci-dessous).

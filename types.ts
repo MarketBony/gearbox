@@ -432,6 +432,10 @@ export interface BonyFormRow {
   dirty?: boolean;              // brouillon modifié depuis la dernière publication
 }
 export interface BonyFormDetail extends BonyFormRow { draft: any; published: any | null }
+/** Kit de marque (F2a) : une apparence enregistrée, partagée par toute l'équipe. */
+export interface BonyKit { id: string; name: string; theme: any; createdBy: string; author: string; createdAt: string }
+/** Police de marque de la bibliothèque partagée (F2a) : fichier chez Cloudflare. */
+export interface BonyFont { id: string; family: string; weight: number; style: 'normal' | 'italic'; url: string; fileName: string; createdBy: string; createdAt: string }
 export interface BonyResponse { id: string; version: number; answers: Record<string, any>; meta: Record<string, any> | null; submittedAt: string }
 
 export interface StorageInfo {

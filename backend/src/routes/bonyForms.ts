@@ -68,7 +68,7 @@ router.get('/', authenticateToken, requireRole(FORMS_ROLES), async (_req, res) =
   try {
     const rows = await prisma.bonyForm.findMany({ orderBy: { updatedAt: 'desc' }, select: { ...LIST, draft: true, published: true } });
     res.json({
-      workerReady: workerConfigured(),
+      workerReady: workerConfigured(), workerUrl: workerUrl() || null,
       forms: rows.map(({ draft, published, ...r }) => ({ ...r, url: publicUrl(r.publicId), dirty: !!published && JSON.stringify(draft) !== JSON.stringify(published) })),
     });
   } catch (e) { fail(res, e, 'Lecture des formulaires impossible.'); }
@@ -83,6 +83,90 @@ router.post('/', authenticateToken, requireRole(FORMS_ROLES), async (req: AuthRe
     emitEvent('bonyforms:changed', null);
     res.status(201).json({ ...row, url: publicUrl(row.publicId) });
   } catch (e) { fail(res, e, 'Création impossible.'); }
+});
+
+// ---------------------------------------------------------------- kits de marque et images (F2a)
+// ⚠️ Déclarées AVANT `GET /:id` : sinon Express prendrait « kits » pour un identifiant de formulaire.
+const KIT_MAX = 60_000;
+
+// GET /api/bony-forms/kits — kits de marque, partagés par toute l'équipe.
+router.get('/kits', authenticateToken, requireRole(FORMS_ROLES), async (_req, res) => {
+  try {
+    const rows = await prisma.bonyThemeKit.findMany({ orderBy: { createdAt: 'desc' } });
+    const users = await prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.createdBy))] } }, select: { id: true, name: true } });
+    const name = new Map(users.map((u) => [u.id, u.name]));
+    res.json(rows.map((r) => ({ ...r, author: name.get(r.createdBy) || 'Ancien membre' })));
+  } catch (e) { fail(res, e, 'Lecture des kits impossible.'); }
+});
+
+// POST /api/bony-forms/kits { name, theme }
+router.post('/kits', authenticateToken, requireRole(FORMS_ROLES), async (req: AuthRequest, res) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim().slice(0, 80) : '';
+  const theme = req.body?.theme;
+  if (!name) return res.status(400).json({ error: 'Donnez un nom au kit.' });
+  if (!theme || typeof theme !== 'object' || typeof theme.primary !== 'string' || JSON.stringify(theme).length > KIT_MAX) return res.status(400).json({ error: 'Thème invalide.' });
+  try {
+    const { layout: _l, ...rest } = theme;                       // un kit = l'apparence, pas la présentation
+    const row = await prisma.bonyThemeKit.create({ data: { name, theme: rest, createdBy: req.user!.id } });
+    emitEvent('bonyforms:kits', null);
+    res.status(201).json(row);
+  } catch (e) { fail(res, e, 'Enregistrement du kit impossible.'); }
+});
+
+// DELETE /api/bony-forms/kits/:kid
+router.delete('/kits/:kid', authenticateToken, requireRole(FORMS_ROLES), async (req, res) => {
+  try {
+    const r = await prisma.bonyThemeKit.deleteMany({ where: { id: req.params.kid } });
+    if (!r.count) return res.status(404).json({ error: 'Kit introuvable.' });
+    emitEvent('bonyforms:kits', null);
+    res.sendStatus(204);
+  } catch (e) { fail(res, e, 'Suppression du kit impossible.'); }
+});
+
+// POST /api/bony-forms/assets { type, data } — image (déjà compressée par Gearbox, base64) déposée CHEZ
+// CLOUDFLARE (KV du Worker), jamais sur le VPS : servie au public par le Worker, cache d'un an.
+// Identifiant = empreinte du contenu (la même image envoyée deux fois n'est stockée qu'une fois).
+const ASSET_TYPES = ['image/webp', 'image/png', 'image/jpeg', 'image/gif', 'font/woff2', 'font/woff', 'font/otf', 'font/ttf'];
+router.post('/assets', authenticateToken, requireRole(FORMS_ROLES), async (req, res) => {
+  const { type, data } = req.body || {};
+  if (!ASSET_TYPES.includes(type) || typeof data !== 'string' || !/^[A-Za-z0-9+/=]+$/.test(data)) return res.status(400).json({ error: 'Fichier invalide (image WebP, PNG, JPEG, GIF ou police WOFF2, WOFF, OTF, TTF).' });
+  const bytes = Buffer.from(data, 'base64');
+  if (bytes.length > 1_400_000) return res.status(413).json({ error: 'Fichier trop lourd (1,4 Mo au plus).' });   // base64 ≈ +33 % : reste sous la limite JSON de 2 Mo
+  try {
+    const id = crypto.createHash('sha256').update(bytes).digest('hex').slice(0, 32);
+    const r = await callWorker('/__gearbox/asset', { id, type, data });
+    res.status(201).json({ url: `${workerUrl()}${r.path}` });
+  } catch (e) { fail(res, e, 'Envoi de l’image impossible.'); }
+});
+
+// ---------------------------------------------------------------- polices de marque (bibliothèque partagée)
+// Fichier déjà déposé chez Cloudflare par POST /assets ; on ne garde ici que famille, graisse, style et adresse.
+const FAMILY = /^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$/;
+router.get('/fonts', authenticateToken, requireRole(FORMS_ROLES), async (_req, res) => {
+  try { res.json(await prisma.bonyFont.findMany({ orderBy: [{ family: 'asc' }, { weight: 'asc' }] })); }
+  catch (e) { fail(res, e, 'Lecture des polices impossible.'); }
+});
+router.post('/fonts', authenticateToken, requireRole(FORMS_ROLES), async (req: AuthRequest, res) => {
+  const family = typeof req.body?.family === 'string' ? req.body.family.trim() : '';
+  const weight = Math.round(Number(req.body?.weight) / 100) * 100, style = req.body?.style === 'italic' ? 'italic' : 'normal';
+  const url = typeof req.body?.url === 'string' ? req.body.url : '', fileName = typeof req.body?.fileName === 'string' ? req.body.fileName.slice(0, 120) : 'police';
+  const base = workerUrl();
+  if (!FAMILY.test(family)) return res.status(400).json({ error: 'Nom de police invalide (lettres, chiffres, espaces, 40 caractères).' });
+  if (!(weight >= 100 && weight <= 900)) return res.status(400).json({ error: 'Graisse invalide (100 à 900).' });
+  if (!base || !url.startsWith(`${base}/a/`) || !/^\/a\/[a-z0-9]{16,64}$/.test(url.slice(base.length))) return res.status(400).json({ error: 'Adresse de fichier invalide.' });
+  try {
+    const row = await prisma.bonyFont.upsert({ where: { family_weight_style: { family, weight, style } }, update: { url, fileName, createdBy: req.user!.id }, create: { family, weight, style, url, fileName, createdBy: req.user!.id } });
+    emitEvent('bonyforms:fonts', null);
+    res.status(201).json(row);
+  } catch (e) { fail(res, e, 'Enregistrement de la police impossible.'); }
+});
+router.delete('/fonts/:fid', authenticateToken, requireRole(FORMS_ROLES), async (req, res) => {
+  try {
+    const r = await prisma.bonyFont.deleteMany({ where: { id: req.params.fid } });
+    if (!r.count) return res.status(404).json({ error: 'Police introuvable.' });
+    emitEvent('bonyforms:fonts', null);
+    res.sendStatus(204);
+  } catch (e) { fail(res, e, 'Suppression de la police impossible.'); }
 });
 
 // GET /api/bony-forms/:id — fiche complète (brouillon + version publiée).

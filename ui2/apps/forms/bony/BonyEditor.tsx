@@ -1,16 +1,18 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { BonyFormDetail } from '../../../../types';
 import { db } from '../../../../services/dataService';
-import { gx, hud, Icon, Seg } from '../../ui/kit';
-import { checkDef, isLayout, THEMES, CHOICE_TYPES, FONTS, type BonyFormDef, type Field, type FieldType } from '../../../../shared/bonyform';
+import { gx, hud, Icon, Seg, useEngineStore } from '../../ui/kit';
+import { checkDef, isLayout, CHOICE_TYPES, type BonyFormDef, type Field, type FieldType } from '../../../../shared/bonyform';
 import { TYPES, typeDef, newField, newOption, copyField, bonyOptions } from './catalog';
+import { StudioPanel, StudioPreview, pickImage } from './Studio';
+import Share from './Share';
 
 // =====================================================================
 // Éditeur Forms Bony (lot F1, 01/10/2026). Le BROUILLON s'enregistre tout seul (rien ne change pour
 // le public) ; « Publier » met en ligne une copie figée (Worker Cloudflare). Le serveur refuse une
 // publication incomplète (`checkDef`, même contrôle affiché ici en direct).
 // Colonne de gauche : le formulaire en cartes ; panneau de droite : réglages du champ actif, ou du
-// formulaire (présentation, thème, message de remerciement).
+// formulaire (remerciement, fermeture). Mode « Studio » (F2a) : aperçu en direct + apparence (Studio.tsx).
 // =====================================================================
 
 type Save = 'idle' | 'saving' | 'saved' | 'error';
@@ -19,7 +21,7 @@ const reduced = () => { try { return matchMedia('(prefers-reduced-motion: reduce
 const anim = (el: Element | null | undefined, kf: Keyframe[], o: Record<string, unknown> = {}) => (el && !reduced() ? gx().animate(el, kf, o) : null);
 const STATUS: Record<string, { l: string; c: string }> = { draft: { l: 'Brouillon', c: 'var(--text-3)' }, published: { l: 'En ligne', c: 'var(--ok)' }, closed: { l: 'Fermé', c: 'var(--warn)' } };
 
-export default function BonyEditor({ id, onBack, onStats, onChanged }: { id: string; onBack: () => void; onStats: () => void; onChanged: () => void }) {
+export default function BonyEditor({ id, workerUrl, onBack, onStats, onChanged }: { id: string; workerUrl: string | null; onBack: () => void; onStats: () => void; onChanged: () => void }) {
   const [row, setRow] = useState<BonyFormDetail | null>(null);
   const [def, setDef] = useState<BonyFormDef | null>(null);
   const [err, setErr] = useState('');
@@ -27,6 +29,7 @@ export default function BonyEditor({ id, onBack, onStats, onChanged }: { id: str
   const [focus, setFocus] = useState<string | null>(null);
   const [panel, setPanel] = useState<'field' | 'form'>('form');
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useEngineStore<'build' | 'studio' | 'share'>('bony.mode', 'build');
   const timer = useRef(0), pending = useRef<BonyFormDef | null>(null), changedRef = useRef(onChanged); changedRef.current = onChanged;
   const listRef = useRef<HTMLDivElement>(null), fresh = useRef(new Set<string>());
 
@@ -138,8 +141,9 @@ export default function BonyEditor({ id, onBack, onStats, onChanged }: { id: str
         <b className="ellipsis frm-edt">{def.title || 'Sans titre'}</b>
         <span className="badge" style={{ '--c': st.c } as React.CSSProperties}><i className="dot" />{st.l}</span>
         {dirty ? <span className="badge" style={{ '--c': 'var(--warn)' } as React.CSSProperties}>Modifications non publiées</span> : null}
-        <span className={`frm-save ${save}`}>{save === 'saving' ? <i className="spin" /> : save === 'saved' ? <Icon name="check" size="sm" /> : null}{saveTxt}</span>
+        <span className={`frm-save ${save}`}>{save === 'saving' ? <i className="spin" /> : save === 'saved' ? <Icon name="check" size="sm" /> : null}<span className="frm-savet">{saveTxt}</span></span>
         <span className="grow" />
+        <Seg value={mode} onChange={setMode} options={[['build', 'Construire'], ['studio', 'Studio'], ['share', 'Partager']]} />
         {row.status !== 'draft' && row.url ? <>
           <button className="btn sm" onClick={copyLink} data-tip={row.url}><Icon name="link" size="sm" />Copier le lien</button>
           <button className="btn sm" onClick={() => window.open(row.url!, '_blank', 'noopener')}><Icon name="eye" size="sm" />Ouvrir</button>
@@ -150,6 +154,14 @@ export default function BonyEditor({ id, onBack, onStats, onChanged }: { id: str
           <Icon name="send" size="sm" />{busy ? 'Publication…' : row.status === 'draft' ? 'Publier' : row.status === 'closed' ? 'Rouvrir et publier' : 'Publier les modifications'}{problems.length ? <span className="count">{problems.length}</span> : null}</button>
         <button className="icon-btn sm" aria-label="Plus" onClick={(e) => remove(e.currentTarget)}><Icon name="more" size="sm" /></button>
       </div>
+      {mode === 'share' ? (
+        <div className="bfe-body bsh-body"><Share def={def} row={row} update={update} /></div>
+      ) : mode === 'studio' ? (
+        <div className="bfe-body bst-body">
+          <StudioPreview def={def} workerUrl={workerUrl} onEditField={(fid) => { setMode('build'); setFocus(fid); setPanel('field'); requestAnimationFrame(() => listRef.current?.querySelector(`[data-fid="${fid}"]`)?.scrollIntoView({ block: 'center' })); }} />
+          <aside className="bfe-side scroll"><StudioPanel def={def} update={update} /></aside>
+        </div>
+      ) : (
       <div className="bfe-body">
         <div className="frm-edscroll scroll">
           <div className="frm-edcol">
@@ -174,6 +186,7 @@ export default function BonyEditor({ id, onBack, onStats, onChanged }: { id: str
           {problems.length ? <div className="bfe-probs"><b><Icon name="alert" size="sm" />Avant de publier</b>{problems.map((p, k) => <span key={k}>{p}</span>)}</div> : null}
         </aside>
       </div>
+      )}
     </div>
   );
 }
@@ -288,7 +301,23 @@ function FieldSettings({ f, def, set }: { f: Field; def: BonyFormDef; set: (p: P
       </> : null}
       {f.type === 'scale' || f.type === 'nps' ? <div className="bfe-row"><Txt l="Libellé du bas" v={f.minLabel || ''} on={(v) => set((x) => { if (v) x.minLabel = v; else delete x.minLabel; })} /><Txt l="Libellé du haut" v={f.maxLabel || ''} on={(v) => set((x) => { if (v) x.maxLabel = v; else delete x.maxLabel; })} /></div> : null}
       {f.type === 'rating' ? <div className="bfe-row"><Sel l="Niveaux" v={String(f.max || 5)} opts={[3, 4, 5, 6, 7, 8, 9, 10].map((n) => [String(n), String(n)])} on={(v) => set({ max: Number(v) })} /><Sel l="Symbole" v={f.icon || 'star'} opts={[['star', '★ Étoiles'], ['heart', '♥ Cœurs'], ['thumb', '👍 Pouces']]} on={(v) => set({ icon: v as any })} /></div> : null}
-      {f.type === 'choice' || f.type === 'multi' ? <Chk l="Proposer « Autre » (réponse libre)" v={!!f.allowOther} on={(v) => set({ allowOther: v })} /> : null}
+      {f.type === 'choice' || f.type === 'multi' ? <>
+        <div className="bfe-gt">Présentation des options</div>
+        <Seg value={f.display || 'list'} onChange={(v) => set((x) => { if (v === 'tiles') { x.display = 'tiles'; x.columns = x.columns || 2; } else { delete x.display; delete x.columns; } })} options={[['list', 'Liste'], ['tiles', 'Tuiles illustrées']]} />
+        {f.display === 'tiles' ? <>
+          <Sel l="Colonnes" v={String(f.columns || 2)} opts={[['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']]} on={(v) => set({ columns: Number(v) as any })} />
+          <div className="bfe-tiles">{(f.options || []).map((o, k) => (
+            <div key={o.id} className="bfe-tile">
+              <span className="bfe-tprev" style={o.image ? { backgroundImage: `url("${o.image}")` } : undefined}>{o.image ? null : o.emoji || '·'}</span>
+              <span className="ellipsis bfe-tlab">{o.label || `Option ${k + 1}`}</span>
+              <input className="bfe-in bfe-emoji" value={o.emoji || ''} placeholder="😀" maxLength={8} aria-label="Emoji" onChange={(e) => set((x) => { const v = [...e.target.value].slice(0, 2).join(''); if (v) x.options![k].emoji = v; else delete x.options![k].emoji; })} />
+              <button className="icon-btn sm" aria-label="Image" data-tip={o.image ? 'Remplacer l’image' : 'Ajouter une image'} onClick={async () => { const u = await pickImage(900); if (u) set((x) => { x.options![k].image = u; }); }}><Icon name="image" size="sm" /></button>
+              {o.image ? <button className="icon-btn sm" aria-label="Retirer l’image" onClick={() => set((x) => { delete x.options![k].image; })}><Icon name="close" size="sm" /></button> : null}
+            </div>))}</div>
+          <div className="bfe-hint">Une image l’emporte sur l’emoji. Images recadrées en 4:3 ; sur téléphone, deux colonnes au plus.</div>
+        </> : null}
+        <Chk l="Proposer « Autre » (réponse libre)" v={!!f.allowOther} on={(v) => set({ allowOther: v })} />
+      </> : null}
       {f.type === 'multi' ? <div className="bfe-row"><Num l="Choix minimum" v={f.minChoices} on={(v) => num('minChoices', v)} /><Num l="Choix maximum" v={f.maxChoices} on={(v) => num('maxChoices', v)} /></div> : null}
       {CHOICE_TYPES.includes(f.type) && f.type !== 'concession' && f.type !== 'brand' ? <Chk l="Ordre aléatoire des options" v={!!f.shuffle} on={(v) => set({ shuffle: v })} /> : null}
       {f.type === 'consent' ? <Txt l="Texte légal (RGPD)" multiline v={f.consentText || ''} on={(v) => set({ consentText: v })} /> : null}
@@ -299,6 +328,7 @@ function FieldSettings({ f, def, set }: { f: Field; def: BonyFormDef; set: (p: P
         {f.param ? <div className="bfe-hint">Lien d’e-mailing : <code>…/{'{id}'}?{f.param}=valeur</code>. Avec Sarbacane ou Brevo, mettez la variable du contact (ex. <code>?{f.param}={'{{EMAIL}}'}</code>).</div> : null}
         {f.param && f.type !== 'hidden' ? <Chk l="Valeur préremplie non modifiable" v={!!f.lockPrefill} on={(v) => set({ lockPrefill: v })} /> : null}
       </> : null}
+      {f.type !== 'section' && f.type !== 'hidden' && def.theme.layout !== 'steps' ? <Chk l="Demi-largeur (côte à côte avec la voisine, sur ordinateur)" v={f.width === 'half'} on={(v) => set((x) => { if (v) x.width = 'half'; else delete x.width; })} /> : null}
       <div className="bfe-gt">Afficher seulement si…</div>
       <Logic f={f} prev={prev} set={set} />
     </div>
@@ -330,33 +360,26 @@ function Logic({ f, prev, set }: { f: Field; prev: Field[]; set: (p: Partial<Fie
 
 // ---------------------------------------------------------------- réglages du formulaire
 function FormSettings({ def, update }: { def: BonyFormDef; update: (mut: (d: BonyFormDef) => void, soon?: boolean) => void }) {
-  const t = def.theme, s = def.settings;
+  const s = def.settings;
   return (
     <div className="bfe-set">
-      <div className="bfe-gt">Présentation</div>
-      <Seg value={t.layout} onChange={(v) => update((d) => { d.theme.layout = v as any; })} options={[['page', 'Page complète'], ['steps', 'Une question par écran']]} />
-      <div className="bfe-gt">Thème</div>
-      <div className="bfe-presets">{Object.values(THEMES).map((p) => (
-        <button key={p.preset} className={t.preset === p.preset ? 'on' : ''} style={{ '--a': p.primary, '--b': p.background, '--c': p.surface } as React.CSSProperties} onClick={() => update((d) => { d.theme = { ...d.theme, ...p }; })}>
-          <i /><span>{p.preset[0].toUpperCase() + p.preset.slice(1)}</span></button>))}</div>
-      <div className="bfe-row">
-        <Col l="Principale" v={t.primary} on={(v) => update((d) => { d.theme.primary = v; d.theme.preset = 'perso'; })} />
-        <Col l="Fond" v={t.background} on={(v) => update((d) => { d.theme.background = v; d.theme.preset = 'perso'; })} />
-        <Col l="Cartes" v={t.surface} on={(v) => update((d) => { d.theme.surface = v; d.theme.preset = 'perso'; })} />
-        <Col l="Texte" v={t.text} on={(v) => update((d) => { d.theme.text = v; d.theme.preset = 'perso'; })} />
-      </div>
-      <div className="bfe-row">
-        <Sel l="Police du texte" v={t.font} opts={FONTS.map((x) => [x, x])} on={(v) => update((d) => { d.theme.font = v as any; })} />
-        <Sel l="Police des titres" v={t.headingFont || ''} opts={[['', 'Même que le texte'], ...FONTS.map((x) => [x, x])]} on={(v) => update((d) => { d.theme.headingFont = (v || null) as any; })} />
-      </div>
-      <div className="bfe-row">
-        <Sel l="Logo" v={t.logo || ''} opts={[['', 'Aucun'], ['bony', 'Bony'], ['renault', 'Renault'], ['dacia', 'Dacia'], ['alpine', 'Alpine'], ['nissan', 'Nissan'], ['mobilize', 'Mobilize']]} on={(v) => update((d) => { d.theme.logo = (v || null) as any; })} />
-      </div>
-      <label className="bfe-f"><span>Arrondi des cartes : {t.radius} px</span><input type="range" min={0} max={28} value={t.radius} onChange={(e) => update((d) => { d.theme.radius = Number(e.target.value); })} /></label>
-      <Txt l="Image d’en-tête (adresse https://…)" v={t.headerImage || ''} on={(v) => update((d) => { d.theme.headerImage = /^https:\/\//.test(v) ? v : null; })} />
+      <div className="bfe-hint">Couleurs, fond, images, polices, boutons et animations : onglet <b>Studio</b>, en haut.</div>
+      <div className="bfe-gt">Écran d’accueil</div>
+      <Chk l="Afficher un écran d’accueil avant la première question" v={!!s.welcome?.enabled} on={(v) => update((d) => { d.settings.welcome = { title: d.title, button: 'Commencer', ...(d.settings.welcome || {}), enabled: v }; }, true)} />
+      {s.welcome?.enabled ? <>
+        <Txt l="Titre" v={s.welcome.title || ''} on={(v) => update((d) => { d.settings.welcome!.title = v; })} />
+        <Txt l="Message" multiline v={s.welcome.message || ''} placeholder="ex. 2 minutes pour gagner un week-end en Alpine A290" on={(v) => update((d) => { d.settings.welcome!.message = v; })} />
+        <Txt l="Bouton" v={s.welcome.button || ''} placeholder="Commencer" on={(v) => update((d) => { d.settings.welcome!.button = v.slice(0, 40); })} />
+        <ImgPick l="Image" url={s.welcome.image || null} on={(u) => update((d) => { d.settings.welcome!.image = u; }, true)} />
+      </> : null}
       <div className="bfe-gt">Après l’envoi</div>
       <Txt l="Titre du remerciement" v={s.thankYou.title} on={(v) => update((d) => { d.settings.thankYou.title = v; })} />
       <Txt l="Message" multiline v={s.thankYou.message} on={(v) => update((d) => { d.settings.thankYou.message = v; })} />
+      <ImgPick l="Image (facultatif)" url={s.thankYou.image || null} on={(u) => update((d) => { d.settings.thankYou.image = u; }, true)} />
+      <div className="bfe-row">
+        <Txt l="Bouton (facultatif)" v={s.thankYou.button?.label || ''} placeholder="ex. Voir nos offres" on={(v) => update((d) => { const b = d.settings.thankYou.button || { label: '', url: '' }; b.label = v.slice(0, 40); d.settings.thankYou.button = b.label || b.url ? b : null; })} />
+        <Txt l="Adresse du bouton" v={s.thankYou.button?.url || ''} placeholder="https://…" on={(v) => update((d) => { const b = d.settings.thankYou.button || { label: '', url: '' }; b.url = v.trim(); d.settings.thankYou.button = b.label || b.url ? b : null; })} />
+      </div>
       <Txt l="Rediriger vers (facultatif)" v={s.thankYou.redirectUrl || ''} placeholder="https://www.bonyauto-mobile.com" on={(v) => update((d) => { d.settings.thankYou.redirectUrl = /^https?:\/\//.test(v) ? v : null; })} />
       <div className="bfe-gt">Fermeture</div>
       <Txt l="Message quand le formulaire est fermé" multiline v={s.closedMessage || ''} on={(v) => update((d) => { d.settings.closedMessage = v; })} />
@@ -365,6 +388,16 @@ function FormSettings({ def, update }: { def: BonyFormDef; update: (mut: (d: Bon
 }
 
 // ---------------------------------------------------------------- petits champs
+function ImgPick({ l, url, on }: { l: string; url: string | null; on: (u: string | null) => void }) {
+  return (
+    <div className="bfe-f"><span>{l}</span>
+      <div className="bfe-img" style={url ? { backgroundImage: `url("${url}")` } : undefined}>
+        <button className="btn sm" onClick={async () => { const u = await pickImage(1600); if (u) on(u); }}><Icon name="image" size="sm" />{url ? 'Remplacer' : 'Choisir'}</button>
+        {url ? <button className="icon-btn sm" aria-label="Retirer" onClick={() => on(null)}><Icon name="close" size="sm" /></button> : null}
+      </div>
+    </div>
+  );
+}
 function Txt({ l, v, on, multiline, placeholder }: { l: string; v: string; on: (v: string) => void; multiline?: boolean; placeholder?: string }) {
   return <label className="bfe-f"><span>{l}</span><AutoInput cls="bfe-in" multiline={multiline} value={v} placeholder={placeholder} onChange={on} /></label>;
 }
@@ -376,7 +409,4 @@ function Sel({ l, v, opts, on }: { l: string; v: string; opts: string[][]; on: (
 }
 function Chk({ l, v, on }: { l: string; v: boolean; on: (v: boolean) => void }) {
   return <label className="frm-tg"><input type="checkbox" checked={v} onChange={(e) => on(e.target.checked)} /><span className="sw" /><span>{l}</span></label>;
-}
-function Col({ l, v, on }: { l: string; v: string; on: (v: string) => void }) {
-  return <label className="bfe-col"><input type="color" value={v} onChange={(e) => on(e.target.value)} /><span>{l}</span></label>;
 }
