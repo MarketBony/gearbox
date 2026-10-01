@@ -122,6 +122,9 @@ router.delete('/:id', authenticateToken, requireRole(USER_DELETE_ROLES), async (
   const { id } = req.params;
   try {
     await prisma.user.delete({ where: { id } });
+    // Post-it : données PERSONNELLES, sans FK (style du schéma) — supprimées avec le compte,
+    // sinon orphelines à jamais (personne d'autre ne peut les lire ni les effacer).
+    await prisma.postIt.deleteMany({ where: { userId: id } });
     emitEvent('users:deleted', id);
     notifyUserChanged(id); // purge la présence du compte supprimé
     res.sendStatus(204);

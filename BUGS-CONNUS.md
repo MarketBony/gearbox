@@ -266,3 +266,12 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   bloquant, mais un groupe créé par erreur ou pour un test reste à vie. À arbitrer.
 - [ ] **Sauvegarde du volume `uploads_data` du VPS (photos, pièces jointes) : à vérifier** — le workflow hebdomadaire
   ne pousse qu'un dump Supabase. Prérequis du chantier « fichiers maison ».
+
+<!-- Post-it (To-do v2) — 01/10/2026, correctif 61 -->
+- [x] **Post-it : décalage entre les dates et la grille horaire** (relevé par Théo en recette, jamais en prod) — la
+  barre de défilement de la grille (10 px) rétrécissait ses colonnes, 9 px d'écart sur dimanche. Largeur mesurée
+  (`--pst-sb`) réservée à droite de l'en-tête et de la bande. Même lot : grille ouverte à minuit au lieu de 7 h.
+- [x] **Post-it : créneau d'un jour mal placé en vue mois** (relevé en test, jamais en prod) — la pastille n'était
+  pas un `.paper`, donc sans `position: absolute` : elle tombait sur lundi.
+- [ ] **Post-it : refus d'un External non vérifié avec un vrai compte** (la route a son `requireRole` ; 401 sans
+  jeton et 404 sur le post-it d'un autre vérifiés). À faire au passage des rôles restreints dans la v2.

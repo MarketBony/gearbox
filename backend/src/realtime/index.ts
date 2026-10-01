@@ -146,6 +146,19 @@ export const emitEvent = (event: string, data: any) => {
   base.to(scopedRoom).emit(event, null);
 };
 
+/**
+ * Événement PRIVÉ : envoyé à la seule room personnelle `user:<id>` (tous les onglets de ce
+ * compte), sauf au socket auteur de la requête, comme `emitEvent`. Pour les données qui
+ * n'appartiennent qu'à une personne (post-it) : `emitEvent` les annoncerait à tout le monde.
+ * Payload volontairement nul côté appelant : le client rappelle sa route, filtrée.
+ */
+export const emitToUser = (userId: string, event: string, data: any = null) => {
+  if (!io || !userId) return;
+  const socketId = emitterStore.getStore()?.socketId;
+  const room = io.to(`user:${userId}`);
+  (socketId && io.sockets.sockets.has(socketId) ? room.except(socketId) : room).emit(event, data);
+};
+
 // Helpers chat exposés aux routes REST (création de conversation) —
 // no-op si le serveur socket n'est pas initialisé.
 export const joinConversationRooms = async (conversationId: string, participantIds: string[]) => {

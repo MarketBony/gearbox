@@ -265,8 +265,8 @@ pour `passwordHash`.
 **Les autres portes uniques du backend, à connaître avant d'écrire une route :**
 `utils/publicUser.ts` (jamais l'objet Prisma brut d'un `User`), `utils/gameView.ts`
 (jamais une partie non redactée), `db.ts` (une seule instance de `PrismaClient`), et les
-deux listes blanches d'écriture — `TASK_FIELDS` dans `routes/projects.ts` et, depuis le
-10/09/2026, **`SOCIAL_FIELDS` dans `routes/social.ts`**. ⚠️ Ces listes jettent **en
+listes blanches d'écriture — `TASK_FIELDS` dans `routes/projects.ts`, **`SOCIAL_FIELDS` dans
+`routes/social.ts`** (10/09/2026) et **`POSTIT_FIELDS` dans `routes/postits.ts`** (01/10/2026). ⚠️ Ces listes jettent **en
 silence** tout champ qui n'y figure pas : la valeur part, le serveur répond 200, elle a
 disparu au rechargement, et il n'y a d'erreur ni côté client ni dans les logs. Une colonne
 ajoutée au schéma s'ajoute à la liste **dans le même lot**. Corollaire découvert au

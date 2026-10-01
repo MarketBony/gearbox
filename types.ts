@@ -361,6 +361,21 @@ export interface ChatMessage {
 
 // --- STOCKAGE (GET /api/storage) ---
 // Espace consommé par Gearbox et espace disque du serveur. Lisible par tous les rôles.
+// --- POST-IT (01/10/2026) — agenda PERSONNEL de la To-do (GET /api/postits) ---
+// Lu par son seul auteur, connecté à rien d'autre. Dates en TEXTE LOCAL :
+// créneau 'YYYY-MM-DDTHH:mm' (fin exclusive) ; journée entière 'YYYY-MM-DD' (fin inclusive).
+export type PostItColor = 'yellow' | 'peach' | 'pink' | 'lavender' | 'sky' | 'mint' | 'lime' | 'slate';
+export interface PostIt {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  color: PostItColor;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface StorageInfo {
   disque: { total: number; libre: number; utilise: number };
   uploads: {

@@ -5,6 +5,7 @@ import { BRANDS, SERVICES, TASK_CHANNELS, canEditProjects } from '../../../const
 import { useAuth } from '../../../contexts/AuthContext';
 import { useWorkspace, mutateTask, updateStandalone, createStandalone, deleteStandalone } from '../../store/workspace';
 import { gx, hud, Icon, Chips, Seg, PickerBtn, ServiceBadge, BrandChips, useSheets, useEngineStore, useEngineEvent } from '../ui/kit';
+import PostItBoard from './PostItBoard';
 
 // =====================================================================
 // Rubrique « To-do » — transposition de maquettes/v2/js/apps/todo.js (même balisage, mêmes
@@ -97,7 +98,36 @@ const Card = React.memo(function Card({ it, ro }: { it: Item; ro: boolean }) {
 }, (a, b) => a.it.t === b.it.t && a.it.p === b.it.p && a.ro === b.ro && a.it.ref === b.it.ref);
 
 // ---------------------------------------------------------------- rubrique
+// =====================================================================
+// Enveloppe : deux sous-rubriques, « Tâches » (le tableau ci-dessous) et « Post-it » (agenda
+// PERSONNEL, PostItBoard.tsx, 01/10/2026). Choix mémorisé par poste. Chaque vue est un composant
+// à part entière : la bascule démonte l'autre, ses effets repartent proprement au retour.
+// ⚠️ Post-it ouvert au Guest (ses données personnelles), alors que les Tâches lui restent en
+// lecture seule : deux règles distinctes, la route /api/postits porte la sienne (POSTIT_ROLES).
+// =====================================================================
 export default function TodoApp({ win, inst }: AppProps) {
+  const [sub, setSubRaw] = useEngineStore<'tasks' | 'postit'>('todo.sub', 'tasks');
+  const ref = useRef<HTMLDivElement>(null), first = useRef(true);
+  const setSub = (v: 'tasks' | 'postit') => { if (v !== sub) setSubRaw(v); };
+  // Bascule : la nouvelle vue arrive en fondu glissé, du côté de son onglet.
+  useLayoutEffect(() => {
+    if (first.current) { first.current = false; return; }
+    const el = ref.current?.firstElementChild; if (!el) return;
+    gx().animate(el, [{ opacity: 0, transform: `translateX(${sub === 'postit' ? 26 : -26}px)` }, { opacity: 1, transform: 'none' }], { spring: 'soft' });
+  }, [sub]);
+  if (sub === 'postit') {
+    inst.command = () => {};
+    inst.menus = () => ({ 'Présentation': [{ label: 'Tâches', checked: false, action: () => setSub('tasks') }, { label: 'Post-it', checked: true, action: () => {} }] });
+  }
+  const switcher = <Seg value={sub} onChange={setSub} options={[['tasks', 'Tâches'], ['postit', 'Post-it']]} />;
+  return (
+    <div ref={ref} style={{ display: 'contents' }}>
+      {sub === 'postit' ? <PostItBoard switcher={switcher} /> : <TasksView win={win} inst={inst} switcher={switcher} />}
+    </div>
+  );
+}
+
+function TasksView({ win, inst, switcher }: AppProps & { switcher: React.ReactNode }) {
   const { user } = useAuth();
   const uid = user?.id || '';
   const projects = useWorkspace((s) => s.projects);
@@ -265,7 +295,7 @@ export default function TodoApp({ win, inst }: AppProps) {
   return (
     <div className="app tdo" ref={appRef}>
       <div className="app-head"><div className="ah-t"><span className="ah-eye">Gestion de projets</span><h1>To-do</h1><span className="sub"><b className="num" style={{ color: 'var(--text)' }}>{n}</b> tâche{n !== 1 ? 's' : ''} assignée{n !== 1 ? 's' : ''} · les plus urgentes en haut de chaque colonne</span></div>
-        <div className="ah-f"><span className={`tdo-saving ${saving ? '' : 'hide'}`}>Sauvegarde…</span>
+        <div className="ah-f">{switcher}<span className={`tdo-saving ${saving ? '' : 'hide'}`}>Sauvegarde…</span>
           <button className="btn tdo-fbtn" aria-expanded={open} onClick={toggleOpen}><Icon name="filter" size="sm" />Filtres{active ? <span className="count">{active}</span> : null}<Icon name={open ? 'chevup' : 'chevdown'} size="sm" /></button>
           {ro ? <span className="badge" style={{ '--c': 'var(--danger)' } as React.CSSProperties}><Icon name="lock" size="sm" />Lecture seule</span> : null}
           {canCreate ? <button className="btn primary" data-tip="Nouvelle tâche" onClick={() => taskSheet(null)}><Icon name="plus" size="sm" /><span>Nouvelle tâche</span></button> : null}</div></div>
