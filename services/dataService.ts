@@ -1,5 +1,5 @@
 
-import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment, CongeJour, CongeType, CongeDemi, CongeDroit, PostIt, GoogleStatus, GForm, GFormDetail, GFormLog } from '../types';
+import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment, CongeJour, CongeType, CongeDemi, CongeDroit, PostIt, GoogleStatus, GForm, GFormDetail, GFormLog, BonyFormRow, BonyFormDetail, BonyResponse } from '../types';
 import type { LobbyData, GameSession, GameChallenge, GameType } from '../components/games/gameTypes';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS, LOI_LOM_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
@@ -848,6 +848,17 @@ class DataService {
   async getFormDetail(id: string): Promise<GFormDetail> { return apiFetch<GFormDetail>(`/forms/${id}`); }
   async syncForm(id: string): Promise<GForm> { return apiFetch<GForm>(`/forms/${id}/sync`, { method: 'POST' }); }
   async removeForm(id: string): Promise<void> { await apiFetch(`/forms/${id}`, { method: 'DELETE' }); }
+  // --- Forms Bony : formulaires maison (publiés par le Worker Cloudflare) ---
+  async getBonyForms(): Promise<{ workerReady: boolean; forms: BonyFormRow[] }> { return apiFetch('/bony-forms'); }
+  async createBonyForm(title: string): Promise<BonyFormDetail> { return apiFetch('/bony-forms', { method: 'POST', body: JSON.stringify({ title }) }); }
+  async getBonyForm(id: string): Promise<BonyFormDetail> { return apiFetch(`/bony-forms/${id}`); }
+  async saveBonyDraft(id: string, draft: any): Promise<BonyFormRow> { return apiFetch(`/bony-forms/${id}/draft`, { method: 'PUT', body: JSON.stringify({ draft }) }); }
+  async publishBonyForm(id: string): Promise<BonyFormRow> { return apiFetch(`/bony-forms/${id}/publish`, { method: 'POST' }); }
+  async closeBonyForm(id: string): Promise<BonyFormRow> { return apiFetch(`/bony-forms/${id}/close`, { method: 'POST' }); }
+  async deleteBonyForm(id: string): Promise<void> { await apiFetch(`/bony-forms/${id}`, { method: 'DELETE' }); }
+  async getBonyResponses(id: string): Promise<BonyResponse[]> { return apiFetch(`/bony-forms/${id}/responses`); }
+  async deleteBonyResponse(id: string, rid: string): Promise<void> { await apiFetch(`/bony-forms/${id}/responses/${rid}`, { method: 'DELETE' }); }
+
   async createForm(title: string): Promise<GForm> { return apiFetch<GForm>('/forms', { method: 'POST', body: JSON.stringify({ title }) }); }
   /** Formulaire Google EN DIRECT (éditeur) : objet brut de l'API Forms + dernier auteur Gearbox. */
   async getFormLive(id: string): Promise<{ form: any; lastEditedBy: string | null; lastEditedAt: string | null }> { return apiFetch(`/forms/${id}/form`); }

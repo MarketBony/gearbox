@@ -265,7 +265,9 @@ pour `passwordHash`.
 **Les autres portes uniques du backend, à connaître avant d'écrire une route :**
 `utils/publicUser.ts` (jamais l'objet Prisma brut d'un `User`), `utils/gameView.ts`
 (jamais une partie non redactée), `db.ts` (une seule instance de `PrismaClient`), `google/client.ts`
-(seul module qui parle à Google et touche au jeton, jamais renvoyé au navigateur), la liste blanche
+(seul module qui parle à Google et touche au jeton, jamais renvoyé au navigateur), `bonyforms/worker.ts`
+(seul lien signé avec le Worker Cloudflare des Forms Bony) et le format `shared/bonyform.ts` (recopié dans
+`bonyforms/schema.ts`, contrôlé par `check-bonyform-sync.mjs` : on modifie le canonique, jamais la copie), la liste blanche
 `EDIT_OPS` de `routes/forms.ts` (opérations d'édition Google acceptées), et les
 listes blanches d'écriture — `TASK_FIELDS` dans `routes/projects.ts`, **`SOCIAL_FIELDS` dans
 `routes/social.ts`** (10/09/2026) et **`POSTIT_FIELDS` dans `routes/postits.ts`** (01/10/2026). ⚠️ Ces listes jettent **en

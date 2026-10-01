@@ -62,6 +62,9 @@ export function questionsOf(structure: { items?: any[] } | null | undefined): Qu
 
 /** Valeurs texte d'une réponse à une question (fichiers : leurs noms). */
 export function valuesOf(r: GFormResponse, qid: string): string[] {
+  // Forms Bony (bony/adapter.ts) : valeurs déjà traduites en libellés.
+  const pre = (r as GFormResponse & { values?: Record<string, string[]> }).values;
+  if (pre) return pre[qid] || [];
   const a = r.answers?.[qid];
   if (!a) return [];
   if (a.textAnswers) return (a.textAnswers.answers || []).map((x: any) => String(x.value ?? '')).filter((v: string) => v !== '');

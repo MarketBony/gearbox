@@ -286,3 +286,12 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [ ] **Forms : refus d'un rôle sans accès (Guest, External, chef de site) non vérifié avec un vrai compte** — le
   contrôle `FORMS_ROLES` est sur chaque route ; à faire au passage des rôles restreints dans la v2.
 - [ ] **Forms : secret client Google à renouveler** (passé dans une conversation le 01/10/2026).
+
+<!-- Forms Bony (formulaires maison, Worker Cloudflare) — 01/10/2026, correctif 63 -->
+- [x] **Forms Bony : clic perdu sur une option du formulaire public** (relevé en test, jamais en prod) — la perte de
+  focus d'un champ voisin redessinait toutes les cartes ; une carte ne se redessine plus que si son état change.
+- [x] **Forms Bony : double espace sous une question masquée** (relevé en test).
+- [ ] **Forms Bony : logo passé à « Renault » pendant les tests** — très probablement une frappe de l'outil de test
+  tombée dans la liste « Logo » qui avait le focus (non reproduit sans frappe). À surveiller.
+- [ ] **Forms Bony : le brouillon n'a pas de contrôle de version** — deux personnes qui modifient le même formulaire
+  en même temps : la dernière sauvegarde l'emporte. Acceptable pour l'équipe (prévu en F4 avec les versions).

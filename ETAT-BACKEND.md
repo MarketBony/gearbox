@@ -61,6 +61,26 @@ ne pas les réécrire.
     la section dédiée ci-dessous.
 12. **Fichiers de projet** — `/api/project-files` (mode Expert). Voir la section dédiée.
 
+### 🧾 Forms Bony — `/api/bony-forms` et `src/bonyforms/` (01/10/2026, correctif 63)
+Formulaires MAISON, servis au public par le Worker Cloudflare `forms` (`forms-worker/`). Modèles : `BonyForm`
+(`draft` = brouillon édité, `published` = copie figée servie par le Worker, `publicId` aléatoire de 10 caractères,
+`status` draft | published | closed, `version` = nombre de publications), `BonyFormResponse` (`id` fixé PAR LE
+WORKER → un renvoi depuis sa file ne crée pas de doublon ; `uniqueKey` + index unique (formId, uniqueKey) pour
+« une participation par e-mail » ; **données personnelles**).
+- **Format** : `src/bonyforms/schema.ts` = copie À L'IDENTIQUE de `shared/bonyform.ts` (contrôle
+  `scripts/check-bonyform-sync.mjs`). `validate()` y est la même fonction que dans le Worker et le navigateur.
+- **Porte unique vers le Worker** : `src/bonyforms/worker.ts` — HMAC-SHA256 de `"<ts>.<corps JSON>"`, horodatage
+  ±5 min, comparaison à temps constant ; variables `FORMS_WORKER_URL`, `FORMS_WORKER_SECRET` (≥ 32 caractères).
+- **Routes Gearbox** (JWT + `FORMS_ROLES`) : `GET /`, `POST /`, `GET /:id`, `PUT /:id/draft` (400 Ko max),
+  `POST /:id/publish` (`checkDef` → 422 + `problems` ; listes concession / marque remplies ICI depuis `ALL_SITES` ;
+  le Worker d'abord, puis la base), `POST /:id/close`, `DELETE /:id` (réponses comprises), `GET /:id/responses`,
+  `DELETE /:id/responses/:rid` (droit à l'effacement).
+- **Routes du Worker** (SANS JWT, signature obligatoire, sinon 401) : `POST /ingest` (revalidation complète,
+  fermeture / maximum / créneaux recontrôlés ici ; `queued: true` = réponse venue de la file, enregistrée même si
+  elle ne passe plus, avec `meta.flag`), `POST /state` (places prises des créneaux).
+- Maximum de réponses atteint → le formulaire se ferme tout seul (statut `closed` poussé au Worker).
+- Temps réel : `bonyforms:changed`, `bonyforms:response` (sans charge utile sensible).
+
 ### 📋 Forms — `/api/forms` et `src/google/client.ts` (01/10/2026, correctif 62)
 Google Forms par UN compte Google partagé (marketbony@gmail.com), connecté côté serveur. Modèles : `GoogleConnection`
 (une ligne, jeton de rafraîchissement **chiffré** AES-256-GCM avec `GOOGLE_TOKEN_KEY`), `GoogleForm` (catalogue :

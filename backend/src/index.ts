@@ -35,6 +35,7 @@ import settingsRoutes from './routes/settings';
 import projectFilesRoutes from './routes/projectFiles';
 import postitRoutes from './routes/postits';
 import formsRoutes from './routes/forms';
+import bonyFormsRoutes from './routes/bonyForms';
 import { setupRealtime, withEmitterContext } from './realtime';
 import { startPurgeJob } from './jobs/purge';
 import { chargerReglages } from './settings/appSettings';
@@ -114,6 +115,9 @@ app.use('/api/postits', postitRoutes);
 
 // Forms : Google Forms par le compte partagé (rubrique v2). FORMS_ROLES sur chaque route.
 app.use('/api/forms', formsRoutes);
+
+// Forms Bony : formulaires maison (édition FORMS_ROLES ; /ingest et /state signés par le Worker Cloudflare).
+app.use('/api/bony-forms', bonyFormsRoutes);
 
 // Fichiers uploadés servis en statique (URLs relatives renvoyées par la route).
 //

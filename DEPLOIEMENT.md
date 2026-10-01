@@ -89,6 +89,8 @@ Créer `~/gearbox/.env` (jamais committé, `chmod 600`) — modèle dans `.env.e
 | `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` · `VAPID_SUBJECT` | Notifications push (ajoutées le 30/07/2026) |
 | `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` | Client OAuth « Application Web » du projet Google Cloud `gearbox-forms` (compte marketbony) — rubrique Forms, 01/10/2026 |
 | `GOOGLE_REDIRECT_URI` | `https://<DOMAIN>/api/forms/google/callback` (déclarée à l'identique dans la console Google ; en local `http://localhost:3000/api/forms/google/callback`) |
+| `FORMS_WORKER_URL` | Adresse du Worker Cloudflare des Forms Bony : `https://forms.bonyauto-mobile.workers.dev` (en local `http://localhost:8787`) |
+| `FORMS_WORKER_SECRET` | Secret partagé Gearbox ↔ Worker (64 caractères hexadécimaux). ⚠️ Même valeur dans `backend/.env` du poste, ce `.env`, et le secret `GEARBOX_SECRET` du Worker (`wrangler secret put`) |
 | `GOOGLE_TOKEN_KEY` | Clé de chiffrement du jeton Google, 32 octets en base64 (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`). ⚠️ **IDENTIQUE à celle de `backend/.env` du poste local** : le backend local écrit dans la base de prod, un jeton chiffré en local doit rester lisible en prod |
 
 > ⚠️ Ce guide annonçait « exactement 5 variables » jusqu'au 05/08/2026 : c'était faux
@@ -171,3 +173,18 @@ première connexion.
 - **État des conteneurs** : `sudo docker compose ps`
 - **Base de données** : gérée par Supabase (backups/PITR côté dashboard Supabase —
   pas de `pg_dump` local, il n'y a pas de conteneur db).
+
+## Worker Cloudflare des Forms Bony (`forms-worker/`, 01/10/2026)
+
+Déployé À PART du VPS, depuis ce poste, avec la session `wrangler` de Théo (`npx wrangler login`, compte
+`theo.labonne@bonyauto-mobile.com`). Détail du fonctionnement : `forms-worker/README.md`.
+
+1. Le code partagé `shared/bonyform.ts` a-t-il changé ? Le Worker doit être redéployé EN MÊME TEMPS que `api` (même
+   validation des deux côtés).
+2. `cd forms-worker && npm install && npm run check && npm run deploy` (compile le client, publie le Worker).
+3. Secrets (premier déploiement ou rotation) : `npx wrangler secret put GEARBOX_SECRET` (= `FORMS_WORKER_SECRET`
+   du `.env` du VPS) et `npx wrangler secret put TURNSTILE_SECRET` (clé secrète du widget Turnstile « Forms Bony »).
+4. Contrôle : `curl -s -o /dev/null -w "%{http_code}" https://forms.bonyauto-mobile.workers.dev/` → 200 ;
+   `curl -X POST …/__gearbox/publish` sans signature → 401.
+
+Ne pas toucher aux autres Workers du compte (`forum-2026`, `grid`).

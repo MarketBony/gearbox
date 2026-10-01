@@ -1,0 +1,14 @@
+{
+  // Client du formulaire (navigateur du répondant) : DOM seul.
+  "compilerOptions": {
+    "target": "ES2019",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/client.ts", "../shared/*.ts"]
+}

@@ -1,0 +1,16 @@
+{
+  // Worker (Cloudflare) : types @cloudflare/workers-types. Le client (navigateur) a son propre
+  // tsconfig.client.json : les types Cloudflare redéfinissent une partie du DOM (Element.append…).
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["@cloudflare/workers-types"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/index.ts", "src/svg.d.ts", "../shared/*.ts"]
+}
