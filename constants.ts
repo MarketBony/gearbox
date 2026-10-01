@@ -716,6 +716,10 @@ export const FIXED_EXPENSE_EDIT_ROLES: string[] = ['Master', 'Administrator', 'D
 export const BUDGET_PROVISION_EDIT_ROLES: string[] = ['Master', 'Administrator', 'Director'];
 // Export des données financières (projets + dépenses fixes). Déplacé depuis pages/Export.tsx le 30/09/2026.
 export const EXPORT_ALLOWED_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator'];
+// Rubrique Forms (Google Forms par le compte partagé, interface v2 SEULEMENT, 01/10/2026) — décision de Théo.
+// Alignée sur `FORMS_ROLES` de backend/src/auth/roles.ts, qui est le VRAI refus (chaque route de /api/forms).
+export const FORMS_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+export const canSeeForms = (role: string | undefined | null) => FORMS_ROLES.includes(role ?? '');
 
 // ============================================================================
 // RÔLE « CHEF DE SITE » (Site Manager) — 05/08/2026

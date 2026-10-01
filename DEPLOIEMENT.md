@@ -87,6 +87,9 @@ Créer `~/gearbox/.env` (jamais committé, `chmod 600`) — modèle dans `.env.e
 | `DATABASE_URL` | Pooler **transaction** Supabase, port 6543, avec `?pgbouncer=true` |
 | `DIRECT_URL` | Pooler **session** Supabase, port 5432, sans `?pgbouncer=true` (utilisé par `prisma migrate deploy`) |
 | `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` · `VAPID_SUBJECT` | Notifications push (ajoutées le 30/07/2026) |
+| `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` | Client OAuth « Application Web » du projet Google Cloud `gearbox-forms` (compte marketbony) — rubrique Forms, 01/10/2026 |
+| `GOOGLE_REDIRECT_URI` | `https://<DOMAIN>/api/forms/google/callback` (déclarée à l'identique dans la console Google ; en local `http://localhost:3000/api/forms/google/callback`) |
+| `GOOGLE_TOKEN_KEY` | Clé de chiffrement du jeton Google, 32 octets en base64 (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`). ⚠️ **IDENTIQUE à celle de `backend/.env` du poste local** : le backend local écrit dans la base de prod, un jeton chiffré en local doit rester lisible en prod |
 
 > ⚠️ Ce guide annonçait « exactement 5 variables » jusqu'au 05/08/2026 : c'était faux
 > depuis l'ajout des notifications push. Corrigé.

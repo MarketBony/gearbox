@@ -703,3 +703,77 @@ model PostIt {
 
   @@index([userId])
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GOOGLE FORMS (01/10/2026) — rubrique « Forms » de l'interface v2.
+// Un SEUL compte Google (marketbony@gmail.com, partagé par l'équipe marketing) est connecté
+// côté serveur ; les utilisateurs Gearbox passent par les routes /api/forms (FORMS_ROLES).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Connexion au compte Google : UNE seule ligne (id = "google").
+/// ⚠️ `refreshTokenEnc` est CHIFFRÉ (AES-256-GCM, clé `GOOGLE_TOKEN_KEY` hors base, google/client.ts) :
+/// la base seule ne suffit pas à reconstituer l'accès. Jamais renvoyé au navigateur.
+model GoogleConnection {
+  id              String   @id @default("google")
+  email           String?
+  refreshTokenEnc String
+  scopes          String
+  connectedBy     String // userId Gearbox (Master)
+  connectedAt     DateTime @default(now())
+  lastError       String?
+  updatedAt       DateTime @updatedAt
+}
+
+/// Catalogue des formulaires suivis dans Gearbox. L'API Google Forms ne sait PAS lister les
+/// formulaires d'un compte (il faudrait l'accès Drive, écarté) : un formulaire y entre par
+/// import de son lien d'édition (G1) ou par création depuis Gearbox (G2).
+/// `structure` = dernier `forms.get` (questions), relu à chaque synchronisation.
+model GoogleForm {
+  id                 String    @id @default(uuid())
+  formId             String    @unique // identifiant Google (lien /forms/d/<formId>/edit)
+  title              String
+  description        String?
+  responderUri       String?
+  isPublished        Boolean   @default(false)
+  acceptingResponses Boolean   @default(false)
+  revisionId         String?
+  structure          Json?
+  responseCount      Int       @default(0)
+  lastResponseAt     DateTime?
+  lastSyncedAt       DateTime?
+  syncError          String?
+  addedBy            String // userId Gearbox
+  lastEditedBy       String? // userId Gearbox de la dernière modification faite DEPUIS Gearbox
+  lastEditedAt       DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+/// Cache des réponses (statistiques sans relire Google à chaque ouverture : le quota est
+/// partagé par toute l'équipe, un seul utilisateur pour Google).
+/// ⚠️ DONNÉES PERSONNELLES des répondants : purgées quand le formulaire est retiré de Gearbox,
+/// lisibles par les seuls FORMS_ROLES. `id` = responseId Google.
+model GoogleFormResponse {
+  id              String   @id
+  formId          String // GoogleForm.formId (identifiant Google)
+  submittedAt     DateTime // lastSubmittedTime
+  respondentEmail String?
+  answers         Json
+  createdAt       DateTime @default(now())
+
+  @@index([formId, submittedAt])
+}
+
+/// Journal des modifications faites DEPUIS Gearbox (G2, 01/10/2026). Côté Google, tout apparaît fait par le
+/// compte partagé : c'est ici qu'on sait QUI a modifié quoi. Les changements faits directement dans Google
+/// (thème, couleurs…) n'y figurent pas.
+model GoogleFormLog {
+  id      String   @id @default(uuid())
+  formId  String // GoogleForm.formId (identifiant Google)
+  userId  String
+  action  String // 'create' | 'edit' | 'publish' | 'duplicate' | 'import' | 'remove'
+  detail  String?
+  at      DateTime @default(now())
+
+  @@index([formId, at])
+}

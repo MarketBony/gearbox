@@ -1,5 +1,5 @@
 
-import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment, CongeJour, CongeType, CongeDemi, CongeDroit, PostIt } from '../types';
+import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment, CongeJour, CongeType, CongeDemi, CongeDroit, PostIt, GoogleStatus, GForm, GFormDetail, GFormLog } from '../types';
 import type { LobbyData, GameSession, GameChallenge, GameType } from '../components/games/gameTypes';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS, LOI_LOM_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
@@ -837,6 +837,29 @@ class DataService {
   async deletePostIt(id: string): Promise<void> {
     await apiFetch(`/postits/${id}`, { method: 'DELETE' });
   }
+
+  // --- Forms : Google Forms par le compte partagé (le serveur garde le jeton, FORMS_ROLES sur chaque route) ---
+  async getGoogleStatus(): Promise<GoogleStatus> { return apiFetch<GoogleStatus>('/forms/google/status'); }
+  /** Adresse de l'écran d'autorisation Google (Master) : la page y est redirigée, Google la ramène ensuite. */
+  async connectGoogle(): Promise<string> { return (await apiFetch<{ url: string }>('/forms/google/connect', { method: 'POST' })).url; }
+  async disconnectGoogle(): Promise<void> { await apiFetch('/forms/google/disconnect', { method: 'POST' }); }
+  async getForms(): Promise<GForm[]> { return apiFetch<GForm[]>('/forms'); }
+  async importForm(url: string): Promise<GForm> { return apiFetch<GForm>('/forms/import', { method: 'POST', body: JSON.stringify({ url }) }); }
+  async getFormDetail(id: string): Promise<GFormDetail> { return apiFetch<GFormDetail>(`/forms/${id}`); }
+  async syncForm(id: string): Promise<GForm> { return apiFetch<GForm>(`/forms/${id}/sync`, { method: 'POST' }); }
+  async removeForm(id: string): Promise<void> { await apiFetch(`/forms/${id}`, { method: 'DELETE' }); }
+  async createForm(title: string): Promise<GForm> { return apiFetch<GForm>('/forms', { method: 'POST', body: JSON.stringify({ title }) }); }
+  /** Formulaire Google EN DIRECT (éditeur) : objet brut de l'API Forms + dernier auteur Gearbox. */
+  async getFormLive(id: string): Promise<{ form: any; lastEditedBy: string | null; lastEditedAt: string | null }> { return apiFetch(`/forms/${id}/form`); }
+  /** Modifications de l'éditeur (liste blanche serveur) ; 409 = modifié ailleurs, recharger. */
+  async batchForm(id: string, requests: any[], revisionId: string, summary: string): Promise<{ form: any }> {
+    return apiFetch(`/forms/${id}/batch`, { method: 'POST', body: JSON.stringify({ requests, revisionId, summary }) });
+  }
+  async publishForm(id: string, isPublished: boolean, isAcceptingResponses: boolean): Promise<GForm> {
+    return apiFetch<GForm>(`/forms/${id}/publish`, { method: 'POST', body: JSON.stringify({ isPublished, isAcceptingResponses }) });
+  }
+  async duplicateForm(id: string): Promise<{ form: GForm; skipped: number }> { return apiFetch(`/forms/${id}/duplicate`, { method: 'POST' }); }
+  async getFormLog(id: string): Promise<GFormLog[]> { return apiFetch<GFormLog[]>(`/forms/${id}/log`); }
 
   async updateMe(data: { name?: string; password?: string; avatarColor?: string; avatarUrl?: string | null; birthdate?: string; chatBackground?: string; chatBubble?: string }): Promise<Omit<User, 'loginId'>> {
     return apiFetch('/auth/me', { method: 'PUT', body: JSON.stringify(data) });

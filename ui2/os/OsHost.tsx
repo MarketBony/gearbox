@@ -4,6 +4,7 @@ import css from './maquette.css?inline';
 import overridesCss from './overrides.css?inline';
 // Rubriques NÉES dans la v2 (sans équivalent dans la maquette) : leur feuille, après celle de la maquette.
 import postitCss from '../apps/todo/postit.css?inline';
+import formsCss from '../apps/forms/forms.css?inline';
 import { boot } from './engine/boot';
 import DataHub from './DataHub';
 import { bridgeStore, useLegacyIds, usePortedMounts, tabOf } from './bridge';
@@ -66,7 +67,7 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
   const { theme, toggleTheme } = useTheme();
   const { gamesEnabled } = useAppSettings();
   const { visible: voitConges } = useCongesAcces();
-  const nav = computeNav({ role: user?.role, gamesEnabled, voitConges });
+  const nav = computeNav({ role: user?.role, gamesEnabled, voitConges, ui2: true });
   const { chatUnread, gamesChallenges } = useNavBadges(user, gamesEnabled);
   const feed = useActivityFeed();
   const slotRef = useRef<HTMLDivElement>(null);
@@ -95,6 +96,18 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
     const GX = (window as any).GX; if (GX?.shell?.prefs) GX.shell.prefs.theme = h.dataset.theme;
   }, [theme, booted]);
 
+  // Retour de l'écran d'autorisation Google (rubrique Forms) : `/?gx-google=ok|annule|refus|erreur`.
+  // Le paramètre est retiré de l'adresse aussitôt (un rechargement ne doit pas rejouer le message),
+  // puis la rubrique Forms s'ouvre avec le résultat.
+  useEffect(() => {
+    if (!booted) return;
+    const u = new URL(window.location.href), r = u.searchParams.get('gx-google'); if (!r) return;
+    u.searchParams.delete('gx-google'); window.history.replaceState(null, '', u.pathname + u.search + u.hash);
+    const GX = (window as any).GX;
+    const msg = r === 'ok' ? 'Compte Google connecté' : r === 'annule' ? 'Connexion Google annulée' : r === 'refus' ? 'Connexion Google refusée : recommencez en cochant tous les accès' : 'Connexion Google impossible';
+    setTimeout(() => { GX?.wm?.open?.('forms'); GX?.shell?.hud?.(msg); }, 600);
+  }, [booted]);
+
   // L'hôte est PERSISTANT : le moteur s'installe une seule fois par page (écouteurs globaux), il ne
   // peut pas redémarrer dans un nouvel élément. Si ce composant est démonté puis remonté (App repasse
   // par « INITIALISATION… », rechargement à chaud…), on raccroche le MÊME hôte — sa racine fantôme et
@@ -109,7 +122,7 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
       Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '0' });
       const shadow = host.attachShadow({ mode: 'open' });
       const style = document.createElement('style');
-      style.textContent = `${css}\n${overridesCss}\n${postitCss}`;
+      style.textContent = `${css}\n${overridesCss}\n${postitCss}\n${formsCss}`;
       const body = document.createElement('div');
       body.className = 'gx-body';
       shadow.append(style, body);

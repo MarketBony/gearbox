@@ -145,3 +145,26 @@ export async function writeExportFile(data: ExportData, from: string, to: string
 
   XLSX.writeFile(wb, exportFileName(from, to));
 }
+
+/**
+ * Classeur d'UNE feuille (en-têtes stylés charte Bony, largeurs ajustées) téléchargé par le navigateur.
+ * Ajouté pour la rubrique Forms (export des réponses, 01/10/2026) : même porte d'écriture Excel que
+ * l'export budgétaire, sans recopier la bibliothèque ni le style ailleurs.
+ */
+export async function writeSheetFile(fileName: string, sheetName: string, headers: string[], rows: Cell[][]): Promise<void> {
+  const mod: any = await import('xlsx-js-style');
+  const XLSX = mod.default ?? mod;
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const head = {
+    font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11, name: 'Calibri' },
+    fill: { patternType: 'solid', fgColor: { rgb: '293F74' } },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border: { bottom: { style: 'thin', color: { rgb: 'F75632' } } },
+  };
+  headers.forEach((_, c) => { const ref = XLSX.utils.encode_cell({ r: 0, c }); if (ws[ref]) ws[ref].s = head; });
+  ws['!cols'] = headers.map((h, c) => ({ wch: Math.min(60, Math.max(12, h.length + 2, ...rows.slice(0, 200).map((r) => String(r[c] ?? '').length + 2))) }));
+  const wb = XLSX.utils.book_new();
+  // Nom de feuille Excel : 31 caractères au plus, sans : \ / ? * [ ]
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.replace(/[:\/?*[\]]/g, ' ').slice(0, 31) || 'Réponses');
+  XLSX.writeFile(wb, fileName);
+}

@@ -4,8 +4,9 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 01/10/2026 (lire en premier)
-- **En production : correctif 61 (01/10)** — v2 : **Post-it**, sous-rubrique de la To-do (agenda PERSONNEL façon
-  Outlook, nouvelle table `PostIt`, route `/api/postits`). Avant lui le **correctif 60 (01/10)** : photos de profil
+- **En production : correctif 62 (01/10)** — v2 : rubrique **Forms** (Google Forms du compte marketing : création,
+  éditeur maison, statistiques, compte Google connecté côté serveur). Avant lui le **correctif 61 (01/10)** :
+  **Post-it**, sous-rubrique de la To-do (agenda PERSONNEL façon Outlook). Avant eux le **correctif 60 (01/10)** : photos de profil
   partout et widgets Chat branchés sur le serveur (détail plus bas). Avant eux le **correctif 59 (30/09)** : interface v2 « Gearbox OS » en **BÊTA OUVERTE À TOUS
   LES RÔLES** (`UI2_BETA_ROLES = null`, `ui2/beta.ts`). L'ancienne interface reste **par défaut** ; bascule par
   Paramètres › Application › « Nouvelle interface (bêta) » (retour au même endroit, `?ui=classic`, ou automatique
@@ -18,9 +19,9 @@
   sensibles testées (provisions Budget, Congés). Plan et état du chantier : `maquettes/ux/PLAN-DEPLOIEMENT-V2.md`.
 - **Où on va (dans l'ordre)** :
   0. **Chantiers d'octobre (liste de Théo du 01/10, arbitrages dans le backlog § « Chantiers d'octobre 2026 »)** :
-     lot 1 fait (correctif 60), **Post-it fait (correctif 61)** ; prochain : **intégration Google** (Drive, Sheets,
-     Forms du compte marketbony@gmail.com — cadrage technique fait le 01/10, voir backlog) ; puis tâches
+     lot 1 fait (correctif 60), Post-it (correctif 61), **Forms fait (correctif 62)** ; restent : tâches
      multi-assignées, prestataire sur les dépenses, répartitions personnalisées, fichiers maison, mascotte / agent IA.
+     Idée notée par Théo (01/10) : une plateforme de formulaires MAISON à terme (voir backlog, Forms).
      Trou serveur `GET /api/budget` : Théo le traite « après » (01/10).
   1. **Retours de la bêta** (groupe « Bêta Gearbox OS » du Chat, créé par Théo) : les trier, corriger par lots.
   2. **Fermer le trou serveur** : `GET /api/budget` et lecture des dépenses fixes sans garde de rôle (External)
@@ -342,6 +343,46 @@
     suppression + « Annuler », bascule mois — chaque étape vérifiée côté serveur ; 400 / 404 / 401 sur la route ;
     **0 post-it en base à la fin**. Non vérifié : un External refusé en vrai (403, pas de compte), deux onglets.
 
+- **Correctif 62 — 01/10 : rubrique Forms (Google Forms), lots G1 + G2** (branche `feat/forms-g1`, `api` ET `web`,
+  **deux migrations** additives `20261002090000_google_forms` et `20261002100000_google_forms_journal`, appliquées et
+  inscrites avant le push ; variables `GOOGLE_*` ajoutées au `.env` local, au `.env` du VPS et à `docker-compose.yml`).
+  - **Périmètre arbitré par Théo** : Google Forms SEUL (ni Sheets ni Drive), rubrique « Forms » de la v2, accès
+    Coordinator, Digital Manager, Administrator, Director, Master (`FORMS_ROLES`, front et back).
+  - **Google** : projet Cloud `gearbox-forms` créé par Théo sur marketbony@gmail.com ; accès `forms.body` et
+    `forms.responses.readonly` classés **« sensibles »** (pas « restreints » → pas d'audit annuel) ; application
+    **« En production » non vérifiée** (plus d'expiration à 7 jours ; écran « non validée » passé une fois). Compte
+    connecté par Théo (Master) depuis Gearbox : UN jeton pour toute l'équipe, chiffré en base (AES-256-GCM,
+    `GOOGLE_TOKEN_KEY` identique local / VPS), jamais envoyé au navigateur. Page publique `confidentialite.html`
+    (exigée par Google pour publier l'application).
+  - **Constats qui ont orienté le lot** (vérifiés, ne pas re-tester) : (1) l'API Forms ne liste PAS les formulaires
+    d'un compte → catalogue Gearbox, import par lien d'édition pour l'existant ; (2) l'API ne gère NI thème NI
+    couleurs NI création de question d'envoi de fichier (référence REST et Apps Script vérifiées) ; (3) Google REFUSE
+    son éditeur dans une iframe, même cookies tiers autorisés (test réel de Théo) → éditeur maison + « Thème et
+    couleurs » qui ouvre l'éditeur Google dans une fenêtre, relu à sa fermeture ; (4) l'API ne supprime pas un
+    formulaire (Drive) → « Retirer de Gearbox » seulement.
+  - **Serveur** : porte unique `backend/src/google/client.ts` (OAuth serveur, jeton chiffré, renouvellement, reprises
+    sur 429/5xx) ; `routes/forms.ts` — connexion (Master), catalogue, import, création, structure en direct,
+    modifications par lots (**liste blanche `EDIT_OPS`** + `requiredRevisionId` → 409 si modifié ailleurs),
+    publication, duplication (mêmes identifiants : les aiguillages restent valides), journal, statistiques (réponses
+    en cache `GoogleFormResponse`, synchro au plus toutes les 2 min, complète sur « Actualiser »), retrait (purge
+    réponses ET journal). Création et copie **fermées d'office** (non publiées) : contrairement à la doc Google, un
+    formulaire créé par l'API sortait publié et ouvert.
+  - **Interface** : `ui2/apps/forms/` — `FormsApp.tsx` (liste, import multiple, nouveau, statistiques), `Editor.tsx`
+    (titre, description, 11 types, options, « Autre », ordre aléatoire, obligatoire, sections, aiguillage, glisser,
+    quiz, publication + bandeau « Publier », aperçu intégré, journal), `model.ts` / `stats.ts` (logique pure),
+    `GoogleAccount.tsx` (partagé avec Réglages › Comptes connectés), `forms.css`. Rubrique v2 SEULEMENT
+    (`computeNav({ ui2: true })`, absente de l'ancienne interface). Export Excel par `writeSheetFile`
+    (`services/exportXlsx.ts`).
+  - **Testé en local** (le backend écrit en prod) : sur deux formulaires de test créés pour l'occasion, chaque
+    opération vérifiée côté serveur (création, questions, conversion, obligatoire, aiguillage, duplication,
+    suppression, quiz, déplacement, publication, duplication du formulaire, journal, retrait) + 409 / 400 ; vrais
+    formulaires en lecture seule. Recette de Théo : « c'est du solide ». **Non testés** : « Thème et couleurs » par
+    moi (session Google du navigateur), le bandeau « Publier » sur un formulaire neuf (pas de nouveau formulaire de
+    test créé), un rôle refusé avec un vrai compte, le mobile.
+  - **Défauts trouvés en test et corrigés** : identifiants fabriqués refusés (« Invalid ID ») — ils doivent être des
+    entiers 32 bits POSITIFS en hexadécimal ; éditeur muet en dev (mode strict : drapeau « fermé » jamais remis à zéro) ;
+    journal des formulaires retirés laissé en base.
+
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
   51.83.75.181)
@@ -349,7 +390,12 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 61** (1er octobre 2026) — **Post-it** dans la
+- master = prod, synchronisés. Dernier lot déployé : **correctif 62** (1er octobre 2026) — rubrique **Forms**
+  (Google Forms) dans la v2. **`api` ET `web`, deux migrations** (`20261002090000_google_forms`,
+  `20261002100000_google_forms_journal`, additives), appliquées et inscrites AVANT le push. Nouvelles variables
+  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_TOKEN_KEY` (`.env` du VPS +
+  `docker-compose.yml`). Push et déploiement autorisés par Théo après sa recette.
+- Avant lui le **correctif 61** (1er octobre 2026) — **Post-it** dans la
   To-do v2. **`api` ET `web`, avec migration** `20261001150000_postit` (additive : table `PostIt`), appliquée sur
   Supabase AVANT le push (`db execute` puis `migrate resolve --applied`). Push et déploiement autorisés par Théo après
   sa recette (« fais la modif et déploiement »).
@@ -3651,7 +3697,13 @@
   - **Tâches multi-assignées** (`assignedUserId` → liste) : n'importe qui peut attribuer à n'importe qui, mais
     seulement les rôles qui ont accès à la To-do ; attribution à d'autres dès la création depuis la To-do. KPI du
     mode Expert : coût compté **EN ENTIER pour chacun** (5 000 € chacun). Reprise des données, `TASK_FIELDS`.
-  - **Intégration Google** (marketbony@gmail.com, gmail PERSONNEL partagé par l'équipe) : parcourir le Drive,
+  - ~~**Intégration Google**~~ → **fait, correctif 62**, réduit par Théo à **Google Forms seul** (rubrique Forms).
+    À faire : **renouveler le secret client Google** (passé dans une conversation le 01/10 ; nouveau secret dans la
+    console puis `.env` local + VPS, l'ancien désactivé). **Idée de Théo (01/10)** : une plateforme de formulaires
+    MAISON à terme (éditeur sans les limites de Google, données directement dans Gearbox) — analysée dans la session
+    du 01/10 : pertinente d'abord pour les formulaires INTERNES (répondants connectés à Gearbox) ; un formulaire
+    PUBLIC demande une surface sans connexion sur le VPS (anti-spam, limitation de débit, RGPD, disponibilité).
+    Historique du cadrage Google : (marketbony@gmail.com, gmail PERSONNEL partagé par l'équipe) : parcourir le Drive,
     ouvrir et éditer Sheets et Forms, remonter les réponses des Forms dans une interface maison. Tout le monde agit
     sous l'identité de ce compte ; accès : Coordinator, Digital Manager, Administrator, Director, Master (à
     inscrire dans la matrice Rôles & accès). ⚠️ Expiration à 7 jours des autorisations en mode test OAuth : piste
@@ -3863,6 +3915,14 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Google Forms : un identifiant d'élément / de question fourni à la création doit être un entier 32 bits POSITIF
+  en hexadécimal (8 chiffres, premier 0-7)** — sinon « Invalid ID ». `newId()` de `ui2/apps/forms/model.ts` (01/10).
+- **Google Forms : la doc dit « créé non publié », la réalité dit « publié et ouvert »** : le serveur ferme d'office
+  toute création ou copie (`closeNew`, routes/forms.ts). Et l'API ne SUPPRIME pas un formulaire : tout formulaire
+  créé pour un test reste dans le Drive de marketbony, à supprimer à la main dans Google Forms.
+- **Effet de nettoyage + mode strict de React (dev)** : un drapeau posé dans le nettoyage d'un effet (« composant
+  fermé ») doit être remis à zéro au début de l'effet — React démonte puis remonte chaque effet en dev. L'éditeur
+  Forms n'envoyait plus rien à cause de ça (01/10).
 - **Interface v2 : la feuille de style de la coque n'est posée qu'UNE fois par page** (hôte persistant) : une retouche
   de `maquette.css`, `overrides.css` ou `ui2/apps/todo/postit.css` demande un RECHARGEMENT complet, le HMR ne suffit
   pas (01/10/2026).

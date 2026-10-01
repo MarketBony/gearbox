@@ -16,7 +16,7 @@ import HelloMarketing from './pages/HelloMarketing';
 import Games from './pages/Games';
 import TodoList from './pages/TodoList';
 import Export from './pages/Export';
-import { EXPORT_ALLOWED_ROLES } from './constants';
+import { EXPORT_ALLOWED_ROLES, canSeeForms } from './constants';
 import Conges from './pages/Conges';
 import { useCongesAcces, congesAccesStore } from './services/congesAcces';
 import { canSeeGames, SITE_MANAGER_SECTIONS, isSiteManager } from './constants';
@@ -100,6 +100,8 @@ const InnerApp: React.FC = () => {
     let resolvedTab = (isExternal && !EXTERNAL_ALLOWED_TABS.includes(tab)) ? 'digital' : tab;
     if (resolvedTab === 'games' && !canAccessGames) resolvedTab = 'dashboard';
     if (resolvedTab === 'export' && !canExport) resolvedTab = 'dashboard';
+    // Forms : rôles de la rubrique (le refus réel est côté serveur, chaque route de /api/forms).
+    if (resolvedTab === 'forms' && !canSeeForms(user?.role)) resolvedTab = 'dashboard';
     // ⚠️ Même raison que pour les autres gardes : l'onglet actif est mémorisé en session,
     // une rubrique retirée du menu reste ATTEIGNABLE sans ceci. Le refus réel est de toute
     // façon côté serveur (`routes/conges.ts` rend 403, même sur le GET).

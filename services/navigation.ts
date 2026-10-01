@@ -1,10 +1,10 @@
 import {
   LayoutDashboard, FolderKanban, Megaphone, Package, CalendarDays, PiggyBank, Archive,
-  Globe, Euro, Sparkles, Gamepad2, CheckSquare, MessageSquare, FileSpreadsheet, Palmtree,
+  Globe, Euro, Sparkles, Gamepad2, CheckSquare, MessageSquare, FileSpreadsheet, Palmtree, ClipboardList,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { canSeeGames, SITE_MANAGER_SECTIONS, isSiteManager } from '../constants';
-import { EXPORT_ALLOWED_ROLES } from '../constants';
+import { EXPORT_ALLOWED_ROLES, canSeeForms } from '../constants';
 
 // ============================================================================
 // Navigation : SOURCE UNIQUE des rubriques visibles, partagée par la Sidebar
@@ -22,13 +22,16 @@ export interface NavContext {
   role: string | undefined;
   gamesEnabled: boolean;
   voitConges: boolean;
+  /** Interface v2 (Gearbox OS). Certaines rubriques n'existent QUE dans la v2 (Forms) : l'ancienne
+   *  interface n'a pas de page pour elles, elles n'apparaissent donc ni dans son menu ni dans ses gardes. */
+  ui2?: boolean;
 }
 
 export interface NavGroup { label: string; items: NavItem[] }
 
 const I = (id: string, icon: LucideIcon, label: string): NavItem => ({ id, icon, label });
 
-export function computeNav({ role, gamesEnabled, voitConges }: NavContext) {
+export function computeNav({ role, gamesEnabled, voitConges, ui2 = false }: NavContext) {
   const isExternal = role === 'External';
   const isSm = isSiteManager(role);
   const canAccessGames = canSeeGames(role, gamesEnabled);
@@ -44,6 +47,7 @@ export function computeNav({ role, gamesEnabled, voitConges }: NavContext) {
     I('digital', Globe, 'Digital'),
     I('chat', MessageSquare, 'Chat'),
     I('campaigns', Megaphone, 'Campagnes'),
+    ...(ui2 && canSeeForms(role) ? [I('forms', ClipboardList, 'Forms')] : []),
     I('material', Package, 'Matériel'),
     I('agenda', CalendarDays, 'Agenda'),
     I('budget', PiggyBank, 'Budget'),
@@ -72,7 +76,7 @@ export function computeNav({ role, gamesEnabled, voitConges }: NavContext) {
     : [
         { label: '', items: pick('dashboard') },
         { label: 'GESTION DE PROJETS', items: pick('projects', 'todo') },
-        { label: 'COM DIGITALE', items: pick('digital', 'campaigns') },
+        { label: 'COM DIGITALE', items: pick('digital', 'campaigns', 'forms') },
         { label: 'COMMUNAUTÉ', items: pick('hello-marketing', 'conges', 'games', 'chat') },
         { label: 'OUTILS', items: pick('budget', 'fixed-expenses', 'material', 'agenda', 'export') },
         { label: 'HISTORIQUE', items: [I('archives', Archive, 'Archives')] },

@@ -91,3 +91,14 @@ export const canAssignRole = (actorRole: string | undefined, targetRole: string)
 export const forbiddenRoleMessage = (targetRole: string) =>
   `En tant que Director, vous ne pouvez pas attribuer ni modifier le rôle "${targetRole}". ` +
   `Vous ne gérez que les comptes ${DIRECTOR_ASSIGNABLE_ROLES.join(', ')}.`;
+
+// --- Rubrique Forms (Google Forms, 01/10/2026) -------------------------------------
+//
+// Qui accède à la rubrique Forms (liste, statistiques, et en G2 l'édition) : décision de Théo.
+// ⚠️ Guest, External et chef de site en sont ABSENTS. Tout le monde agit sous l'identité du
+// compte Google partagé (marketbony) : c'est cette liste, contrôlée sur CHAQUE route de
+// /api/forms (lecture comprise), qui fait office de porte. Alignée sur `FORMS_ROLES` de
+// constants.ts (navigation et matrice Rôles & accès).
+export const FORMS_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+// Connexion / déconnexion du compte Google : Master seul.
+export const GOOGLE_CONNECT_ROLES = ['Master'];
