@@ -79,7 +79,18 @@ WORKER → un renvoi depuis sa file ne crée pas de doublon ; `uniqueKey` + inde
   fermeture / maximum / créneaux recontrôlés ici ; `queued: true` = réponse venue de la file, enregistrée même si
   elle ne passe plus, avec `meta.flag`), `POST /state` (places prises des créneaux).
 - Maximum de réponses atteint → le formulaire se ferme tout seul (statut `closed` poussé au Worker).
-- Temps réel : `bonyforms:changed`, `bonyforms:response` (sans charge utile sensible).
+- Temps réel : `bonyforms:changed`, `bonyforms:response`, `bonyforms:kits`, `bonyforms:fonts` (sans charge utile sensible).
+- **Correctif 64 (F2a / F2b, 01/10)** — ⚠️ routes déclarées AVANT `GET /:id` (sinon Express prend « kits » pour un id) :
+  - `GET|POST /kits`, `DELETE /kits/:kid` — modèle **`BonyThemeKit`** (nom, `theme` JSON sans la présentation,
+    60 Ko max) : kits de marque partagés par l'équipe.
+  - `POST /assets {type, data base64}` — image (WebP, PNG, JPEG, GIF) ou police (WOFF2, WOFF, OTF, TTF), **1,4 Mo**
+    au plus (sous la limite JSON de 2 Mo), identifiant = empreinte SHA-256 (32 car.) ; déposée CHEZ CLOUDFLARE par
+    `callWorker('/__gearbox/asset')`, jamais sur le VPS. Pas de SVG. Renvoie l'adresse publique `<worker>/a/<id>`.
+  - `GET|POST /fonts`, `DELETE /fonts/:fid` — modèle **`BonyFont`** (famille, graisse, style, adresse, nom du
+    fichier ; unique par famille + graisse + style → un réimport remplace). La famille est filtrée (elle part dans du
+    CSS) et l'adresse doit être une adresse `/a/` DU Worker.
+  - Réponses : `meta.ref` = nom de domaine du site d'où vient le clic (filtré par le Worker) ; les UTM sont dans
+    `meta.params` comme tout paramètre du lien.
 
 ### 📋 Forms — `/api/forms` et `src/google/client.ts` (01/10/2026, correctif 62)
 Google Forms par UN compte Google partagé (marketbony@gmail.com), connecté côté serveur. Modèles : `GoogleConnection`

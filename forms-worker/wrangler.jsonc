@@ -17,7 +17,9 @@
     "GEARBOX_URL": "https://gearbox.bonyauto-mobile.com",
     // Clé PUBLIQUE du widget Turnstile « Forms Bony » (hôte forms.bonyauto-mobile.workers.dev, créé le 01/10/2026).
     // En local, .dev.vars la remplace par la clé de test officielle (toujours valide).
-    "TURNSTILE_SITE_KEY": "0x4AAAAAAFLXXeGX-H2apLic"
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFLXXeGX-H2apLic",
+    // Origines autorisées à intégrer l'aperçu en direct (/__preview) : l'éditeur de Gearbox.
+    "PREVIEW_ORIGINS": "https://gearbox.bonyauto-mobile.com"
   }
   // Secrets (wrangler secret put …) : GEARBOX_SECRET (= FORMS_WORKER_SECRET de Gearbox), TURNSTILE_SECRET.
 }

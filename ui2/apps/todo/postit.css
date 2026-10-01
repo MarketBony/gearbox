@@ -166,8 +166,8 @@
 .pst-sw button { width: 24px; height: 24px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--e) 55%, transparent); transition: box-shadow .2s, transform .15s; }
 .pst-sw button:hover { transform: scale(1.1); }
 .pst-sw button.on { box-shadow: inset 0 0 0 1.5px var(--e), 0 0 0 2px var(--surface-1), 0 0 0 4px var(--e); }
-.pst-all { display: flex; align-items: center; gap: 9px; font-size: 13px; cursor: pointer; color: var(--text-2); }
-.pst-all input { position: absolute; opacity: 0; pointer-events: none; }
+.pst-all { position: relative; display: flex; align-items: center; gap: 9px; font-size: 13px; cursor: pointer; color: var(--text-2); }
+.pst-all input { position: absolute; left: 0; top: 50%; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
 .pst-all .sw { width: 32px; height: 19px; border-radius: 999px; background: var(--surface-4); position: relative; transition: background .25s; flex: none; }
 .pst-all .sw::after { content: ""; position: absolute; left: 2px; top: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .32s cubic-bezier(.34,1.56,.64,1); }
 .pst-all input:checked + .sw { background: var(--pe); }

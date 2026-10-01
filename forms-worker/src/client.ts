@@ -4,12 +4,19 @@
 // Même format et même validation que le serveur (shared/bonyform.ts) : un message d'erreur affiché
 // ici est exactement celui que renverrait le serveur.
 // Deux présentations : « page » (tout le formulaire) et « steps » (une question par écran).
+// MODE APERÇU (/__preview, F2a) : la définition arrive de l'éditeur de Gearbox par postMessage (origines
+// autorisées seulement) et se redessine à chaque réglage ; aucun envoi, clic sur une question = la
+// sélectionner dans l'éditeur.
 // =====================================================================
-import { validate, visibleFields, calcValue, type BonyFormDef, type Field, type Answers, type Value } from '../../shared/bonyform';
+import { validate, visibleFields, calcValue, resolveTheme, isLayout, type BonyFormDef, type Field, type Answers, type Value } from '../../shared/bonyform';
+import { renderTheme, fontsHref, fontFaces } from './theme';
 
 declare const turnstile: { render: (el: HTMLElement, o: Record<string, unknown>) => string; reset: (id?: string) => void } | undefined;
-const BF = (window as any).__BF as { publicId: string; def: BonyFormDef; siteKey: string; taken: Record<string, Record<string, number>> };
-const def = BF.def;
+const BF = (window as any).__BF as { publicId: string; def: BonyFormDef | null; siteKey: string; taken: Record<string, Record<string, number>>; preview?: boolean; origins?: string[] };
+const PREVIEW = !!BF.preview;
+/** Message vers l'éditeur de Gearbox (aperçu seulement ; branché plus bas). */
+let tellParent: (msg: unknown) => void = () => {};
+let def = BF.def as BonyFormDef;
 const app = document.getElementById('app')!;
 const t0 = Date.now();
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -19,15 +26,35 @@ const answers: Answers = {};
 const touched = new Set<string>();
 let errors: Record<string, string> = {};
 const params: Record<string, string> = {};
+/** F2b : l'écran d'accueil a-t-il été passé ? (aperçu : piloté par l'éditeur) */
+let started = false;
+const welcomeOn = () => !!def?.settings.welcome?.enabled && !started;
+/** Lettre de raccourci d'une option (A, B, C…), une question par écran seulement. */
+const KEYS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const stepsMode = () => def?.theme.layout === 'steps';
+/** Adresse d'image sûre (http(s) ou /a/<id> du Worker). */
+const safeImg = (u?: string | null) => (u && (/^https?:\/\/[^\s"'()<>]+$/.test(u) || /^\/a\/[a-z0-9]+$/.test(u)) ? u : '');
 new URLSearchParams(location.search).forEach((v, k) => { params[k] = v; });
 // Préremplissage depuis le lien de l'e-mailing (?email=…&concession=…).
-def.fields.forEach((f) => {
+const prefill = () => def.fields.forEach((f) => {
   const p = f.param && params[f.param];
-  if (!p) return;
+  if (!p || answers[f.id] !== undefined) return;
   if (f.type === 'multi') answers[f.id] = p.split(',').map((x) => optId(f, x.trim())).filter(Boolean) as string[];
   else if (f.options) answers[f.id] = optId(f, p);
   else answers[f.id] = p;
 });
+if (def) prefill();
+const theme = () => resolveTheme(def.theme);
+/** Thème → variables et attributs sur <html> (rappelé à chaque changement de l'aperçu). */
+function applyTheme() {
+  const { vars, attrs, t } = renderTheme(def.theme);
+  const st = document.getElementById('bf-vars'); if (st) st.textContent = `:root{${vars}}`;
+  const ff = document.getElementById('bf-faces'), faces = fontFaces(t); if (ff && ff.textContent !== faces) ff.textContent = faces;
+  for (const [k, v] of Object.entries(attrs)) { if (v) document.documentElement.setAttribute(k, v); else document.documentElement.removeAttribute(k); }
+  const fl = document.getElementById('bf-fonts') as HTMLLinkElement | null; const href = fontsHref(t);
+  if (fl && fl.getAttribute('href') !== href) fl.setAttribute('href', href);
+  if (PREVIEW) document.documentElement.setAttribute('data-preview', '1');
+}
 function optId(f: Field, v: string) { const o = f.options?.find((x) => x.id === v || x.label.toLowerCase() === v.toLowerCase()); return o ? o.id : f.options ? null : v; }
 
 // ---------------------------------------------------------------- utilitaires DOM
@@ -68,15 +95,18 @@ function control(f: Field, onDone?: () => void): HTMLElement {
         h('option', { value: '' }, f.placeholder || 'Choisir…'), ...(f.options || []).map((o) => h('option', { value: o.id, selected: v === o.id }, o.label)));
     case 'choice': case 'slot': case 'multi': {
       const multi = f.type === 'multi', list = Array.isArray(v) ? v : v ? [String(v)] : [];
-      const wrap = h('div', { class: 'bf-opts', role: multi ? 'group' : 'radiogroup', 'aria-label': f.label });
-      (f.options || []).forEach((o) => {
+      const tiles = f.display === 'tiles' && f.type !== 'slot', keys = stepsMode();
+      const wrap = h('div', { class: `bf-opts ${tiles ? 'tiles' : ''}`, role: multi ? 'group' : 'radiogroup', 'aria-label': f.label, style: tiles ? `--cols:${Math.min(4, Math.max(1, f.columns || 2))}` : null });
+      (f.options || []).forEach((o, k) => {
         const full = f.type === 'slot' && o.capacity !== undefined && (BF.taken[f.id]?.[o.id] || 0) >= o.capacity;
         const left = f.type === 'slot' && o.capacity !== undefined ? o.capacity - (BF.taken[f.id]?.[o.id] || 0) : null;
         const on = list.includes(o.id);
         wrap.append(h('label', { class: `bf-opt ${multi ? 'sq' : ''} ${on ? 'on' : ''}`, style: full ? 'opacity:.45;cursor:not-allowed' : null },
           h('input', { type: multi ? 'checkbox' : 'radio', name: f.id, checked: on, disabled: full || locked(f),
             onchange: () => { if (multi) set(on ? list.filter((x) => x !== o.id) : [...list.filter((x) => x !== o.id), o.id]); else set(o.id, true); } }),
-          h('span', { class: 'bf-mk' }), h('span', { style: 'flex:1' }, o.label),
+          tiles ? (safeImg(o.image) ? h('span', { class: 'bf-tmedia', style: `background-image:url("${safeImg(o.image)}")` }) : o.emoji ? h('span', { class: 'bf-temoji', 'aria-hidden': 'true' }, o.emoji) : null) : null,
+          keys && k < 26 ? h('span', { class: 'bf-key', 'aria-hidden': 'true' }, KEYS[k]) : h('span', { class: 'bf-mk' }),
+          h('span', { class: 'bf-ol' }, o.label),
           left !== null ? h('span', { style: 'font-size:13px;opacity:.7' }, full ? 'Complet' : `${left} place${left > 1 ? 's' : ''}`) : null));
       });
       if (f.allowOther && f.type !== 'slot') {
@@ -127,17 +157,24 @@ function card(f: Field, i: number, onDone?: () => void): HTMLElement {
 }
 
 // ---------------------------------------------------------------- en-tête
-function header(): HTMLElement {
-  const t = def.theme, tpl = document.getElementById('bony-logo') as HTMLTemplateElement | null;
-  const logo = t.logo === 'bony' && tpl ? h('div', { class: 'bf-logo', html: tpl.innerHTML }) : t.logo ? h('div', { class: 'bf-logo', style: 'font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:18px' }, t.logo) : null;
-  return h('div', { class: 'bf-card bf-head bf-in' },
-    t.headerImage ? h('div', { class: 'bf-hero', style: `background-image:url("${encodeURI(t.headerImage)}")` }) : h('div', { class: 'bf-band' }),
-    h('div', { class: 'bf-hin' }, logo, h('h1', {}, def.title), def.description ? h('p', { class: 'bf-desc' }, def.description) : null));
+/**
+ * En-tête selon son style : `outside` (plein écran, au-dessus du formulaire) ou `inside` (carte en tête).
+ * band = liseré ; banner = image en tête de carte ; hero = photo plein écran, titre posé dessus ;
+ * split = photo à gauche (calque .bf-side, CSS) ; none = titre sans carte.
+ */
+function header(): { outside: HTMLElement | null; inside: HTMLElement | null } {
+  const t = theme(), tpl = document.getElementById('bony-logo') as HTMLTemplateElement | null;
+  const style = document.documentElement.getAttribute('data-header') || 'band';
+  const logo = t.logoImage ? h('div', { class: 'bf-logo img' }, h('img', { src: t.logoImage, alt: '' })) : t.logo === 'bony' && tpl ? h('div', { class: 'bf-logo', html: tpl.innerHTML }) : t.logo ? h('div', { class: 'bf-logo txt' }, t.logo) : null;
+  const hin = h('div', { class: 'bf-hin' }, logo, h('h1', {}, def.title), def.description ? h('p', { class: 'bf-desc' }, def.description) : null);
+  if (style === 'hero') return { outside: h('header', { class: 'bf-hero bf-in' }, hin), inside: null };
+  return { outside: null, inside: h('div', { class: 'bf-card bf-head bf-in' }, style === 'banner' ? h('div', { class: 'bf-ban' }) : style === 'band' ? h('div', { class: 'bf-band' }) : null, hin) };
 }
 
 // ---------------------------------------------------------------- captcha + envoi
 let tsToken = '', tsId: string | undefined;
 function captcha(box: HTMLElement) {
+  if (PREVIEW) return;                                       // aperçu : pas de captcha, pas d'envoi
   const go = () => { if (typeof turnstile === 'undefined') return setTimeout(go, 200); tsId = turnstile.render(box, { sitekey: BF.siteKey, callback: (t: string) => { tsToken = t; }, 'expired-callback': () => { tsToken = ''; }, theme: 'auto', language: 'fr', appearance: 'interaction-only' }); };
   go();
 }
@@ -148,10 +185,11 @@ async function send(btn: HTMLButtonElement, gerr: HTMLElement) {
   vis.forEach((f) => touched.add(f.id));
   errors = validate(def, answers, { taken: BF.taken }).errors;
   if (Object.keys(errors).length) { render(); focusFirstError(); return; }
+  if (PREVIEW) return thanks();                               // aperçu : écran de fin, rien n'est envoyé
   if (!tsToken) { gerr.textContent = 'Vérification anti-robot en cours… réessayez dans un instant.'; return; }
   sending = true; btn.disabled = true; btn.innerHTML = '<span class="bf-spin"></span>Envoi…'; gerr.textContent = '';
   try {
-    const r = await fetch(location.pathname, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers, params, t0, token: tsToken, hp: (document.getElementById('bf-hp') as HTMLInputElement)?.value || '' }) });
+    const r = await fetch(location.pathname, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers, params, ref: (() => { try { return document.referrer ? new URL(document.referrer).hostname : ''; } catch { return ''; } })(), t0, token: tsToken, hp: (document.getElementById('bf-hp') as HTMLInputElement)?.value || '' }) });
     const j: any = await r.json().catch(() => ({}));
     if (r.ok) return thanks();
     if (j.errors) { errors = j.errors; Object.keys(errors).forEach((k) => touched.add(k)); render(); focusFirstError(); }
@@ -159,7 +197,7 @@ async function send(btn: HTMLButtonElement, gerr: HTMLElement) {
     if (j.captcha && tsId && typeof turnstile !== 'undefined') { tsToken = ''; turnstile.reset(tsId); }
     if (j.closed) setTimeout(() => location.reload(), 2500);
   } catch { gerr.textContent = 'Connexion impossible : vérifiez votre réseau et réessayez.'; }
-  sending = false; btn.disabled = false; btn.textContent = 'Envoyer';
+  sending = false; btn.disabled = false; btn.textContent = theme().buttons.label || 'Envoyer';
 }
 function focusFirstError() {
   const id = Object.keys(errors).find((k) => visibleFields(def, answers).some((f) => f.id === k)); if (!id) return;
@@ -173,14 +211,18 @@ function thanks() {
   app.innerHTML = '';
   app.append(h('div', { class: 'bf-wrap' }, h('div', { class: 'bf-card bf-thanks bf-in' },
     h('div', { class: 'bf-check', html: '<svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="40"/><path d="M25 43 l12 12 l22 -24"/></svg>' }),
-    h('h1', {}, s.title || 'Merci !'), h('p', { class: 'bf-desc' }, s.message || ''))));
+    safeImg(s.image) ? h('div', { class: 'bf-endimg', style: `background-image:url("${safeImg(s.image)}")` }) : null,
+    h('h1', {}, s.title || 'Merci !'), h('p', { class: 'bf-desc' }, s.message || ''),
+    s.button?.label && /^https?:\/\//.test(s.button.url || '') ? h('div', { class: 'bf-act', style: 'justify-content:center' }, h('a', { class: 'bf-btn', href: s.button.url, target: '_top', rel: 'noopener' }, s.button.label)) : null,
+    PREVIEW ? h('div', { class: 'bf-act', style: 'justify-content:center' }, h('button', { class: 'bf-btn ghost', type: 'button', onclick: () => { render(); tellParent({ type: 'bonyform:screen', screen: 'form' }); } }, '← Revenir au formulaire')) : null)));
   confetti();
   window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
-  if (s.redirectUrl && /^https?:\/\//.test(s.redirectUrl)) setTimeout(() => { location.href = s.redirectUrl!; }, 2600);
+  if (!PREVIEW && s.redirectUrl && /^https?:\/\//.test(s.redirectUrl)) setTimeout(() => { location.href = s.redirectUrl!; }, 2600);
 }
 function confetti() {
-  if (reduced) return;
-  const box = h('div', { class: 'bf-conf' }), cols = [def.theme.primary, '#ffd166', '#06d6a0', '#118ab2', '#ef476f'];
+  const t = theme();
+  if (reduced || !t.motion.confetti || t.motion.level === 'none') return;
+  const box = h('div', { class: 'bf-conf' }), cols = t.motion.confettiColors?.length ? t.motion.confettiColors : [t.primary, '#ffd166', '#06d6a0', '#118ab2', '#ef476f'];
   for (let i = 0; i < 90; i++) box.append(h('i', { style: `left:${Math.random() * 100}%;background:${cols[i % cols.length]};--dx:${(Math.random() - 0.5) * 220}px;--rot:${Math.random() * 720}deg;animation-duration:${1.8 + Math.random() * 1.6}s;animation-delay:${Math.random() * 0.4}s` }));
   document.body.append(box); setTimeout(() => box.remove(), 4200);
 }
@@ -198,12 +240,14 @@ function renderPage() {
   const vis = new Set(visibleFields(def, answers).map((f) => f.id));
   const list = h('div', { class: 'bf-list' });
   let i = 1;
-  def.fields.forEach((f) => { if (f.type === 'hidden') return; sigs.set(f.id, sigOf(f)); const c = card(f, i++); list.append(h('div', { class: `bf-fold ${vis.has(f.id) ? '' : 'off'}`, 'data-w': f.id }, h('div', {}, c))); });
+  def.fields.forEach((f) => { if (f.type === 'hidden') return; sigs.set(f.id, sigOf(f)); const c = card(f, i++); list.append(h('div', { class: `bf-fold ${vis.has(f.id) ? '' : 'off'} ${f.width === 'half' && f.type !== 'section' ? 'half' : ''}`, 'data-w': f.id }, h('div', {}, c))); });
   const gerr = h('div', { class: 'bf-gerr', role: 'alert' });
-  const btn = h('button', { class: 'bf-btn', type: 'button', onclick: () => send(btn, gerr) }, 'Envoyer') as HTMLButtonElement;
+  const btn = h('button', { class: 'bf-btn', type: 'button', onclick: () => send(btn, gerr) }, theme().buttons.label || 'Envoyer') as HTMLButtonElement;
   const ts = h('div', { class: 'bf-ts' });
+  const hd = header();
   app.innerHTML = '';
-  app.append(h('main', { class: 'bf-wrap' }, header(), list, ts, h('input', { id: 'bf-hp', class: 'bf-hp', tabindex: '-1', autocomplete: 'off', 'aria-hidden': 'true' }),
+  if (hd.outside) app.append(hd.outside);
+  app.append(h('main', { class: 'bf-wrap' }, hd.inside, list, ts, h('input', { id: 'bf-hp', class: 'bf-hp', tabindex: '-1', autocomplete: 'off', 'aria-hidden': 'true' }),
     h('div', { class: 'bf-act' }, btn, gerr), h('div', { class: 'bf-foot' }, 'Formulaire Bony Automobiles')));
   captcha(ts);
 }
@@ -213,7 +257,13 @@ function refreshPage(typing: boolean) {
   errors = validate(def, answers, { taken: BF.taken }).errors;
   def.fields.forEach((f) => {
     const w = app.querySelector<HTMLElement>(`[data-w="${f.id}"]`); if (!w) return;
-    w.classList.toggle('off', !vis.has(f.id));
+    // Repli animé : la découpe (overflow:hidden) n'est posée que replié ou PENDANT l'animation. Au repos, une
+    // carte ouverte n'est pas découpée, sinon son ombre l'était aussi (carrés dans les coins, recette du 01/10).
+    const off = !vis.has(f.id);
+    if (w.classList.contains('off') !== off) {
+      w.classList.add('anim'); w.classList.toggle('off', off);
+      window.clearTimeout(Number(w.dataset.t || 0)); w.dataset.t = String(window.setTimeout(() => w.classList.remove('anim'), reduced ? 0 : 520));
+    }
     if (typing && document.activeElement && w.contains(document.activeElement)) return;   // ne pas casser la saisie en cours
     const sg = sigOf(f);
     if (sg !== sigs.get(f.id)) { sigs.set(f.id, sg); const fresh = card(f, 0); fresh.classList.remove('bf-in'); w.firstElementChild!.replaceChildren(fresh); }
@@ -237,12 +287,16 @@ function renderSteps() {
   const st = steps(); step = Math.min(step, Math.max(0, st.length - 1));
   const f = st[step], last = step === st.length - 1, sec = f ? sectionOf(f) : null;
   const gerr = h('div', { class: 'bf-gerr', role: 'alert' });
-  const btn = h('button', { class: 'bf-btn', type: 'button', onclick: () => (last ? send(btn, gerr) : next()) }, last ? 'Envoyer' : 'Suivant ↵') as HTMLButtonElement;
+  const lb = theme().buttons;
+  const btn = h('button', { class: 'bf-btn', type: 'button', onclick: () => (last ? send(btn, gerr) : next()) }, last ? lb.label || 'Envoyer' : `${lb.nextLabel || 'Suivant'} ↵`) as HTMLButtonElement;
   const back = step > 0 ? h('button', { class: 'bf-btn ghost', type: 'button', onclick: () => { dir = -1; step--; render(); } }, '← Précédent') : null;
   const ts = h('div', { class: 'bf-ts' });
+  const hd = step === 0 ? header() : { outside: null, inside: null };
   app.innerHTML = '';
-  app.append(h('div', { class: 'bf-prog' }, h('i', { style: `transform:scaleX(${st.length ? (step + (last ? 1 : 0)) / st.length : 0})` })),
-    h('main', { class: 'bf-wrap' }, step === 0 ? header() : null,
+  app.append(h('div', { class: 'bf-prog' }, h('i', { style: `transform:scaleX(${st.length ? (step + (last ? 1 : 0)) / st.length : 0})` })));
+  if (hd.outside) app.append(hd.outside);
+  app.append(
+    h('main', { class: 'bf-wrap' }, hd.inside,
       h('div', { class: `bf-step ${dir > 0 ? 'bf-slide-in' : 'bf-slide-back'}` },
         h('div', { class: 'bf-stepnav' }, `${step + 1} / ${st.length}${sec ? ` · ${sec.label}` : ''}`),
         f ? card(f, 0, stepDone(f, last)) : null,
@@ -253,8 +307,53 @@ function renderSteps() {
   if (inp && !reduced) setTimeout(() => inp.focus({ preventScroll: true }), 120);
 }
 
+// ---------------------------------------------------------------- écran d'accueil (F2b)
+function renderWelcome() {
+  const w = def.settings.welcome!, hd = header();
+  const go = () => { started = true; render(); };
+  app.innerHTML = '';
+  if (hd.outside) app.append(hd.outside);
+  app.append(h('main', { class: 'bf-wrap' }, hd.inside,
+    h('div', { class: 'bf-card bf-welcome bf-in' },
+      safeImg(w.image) ? h('div', { class: 'bf-endimg', style: `background-image:url("${safeImg(w.image)}")` }) : null,
+      h('h2', {}, w.title || def.title), w.message ? h('p', { class: 'bf-desc' }, w.message) : null,
+      h('div', { class: 'bf-act', style: 'justify-content:center' }, h('button', { class: 'bf-btn', type: 'button', onclick: go }, `${w.button || 'Commencer'}${stepsMode() ? ' ↵' : ''}`)),
+      (() => { const n = def.fields.filter((f) => !isLayout(f) && f.type !== 'hidden' && f.type !== 'consent').length; return h('div', { class: 'bf-hint' }, `${n} question${n > 1 ? 's' : ''} · environ ${Math.max(1, Math.round(n * 0.25))} min`); })()),
+    h('div', { class: 'bf-foot' }, 'Formulaire Bony Automobiles')));
+}
+
+// ---------------------------------------------------------------- clavier (une question par écran, façon Typeform)
+// Lettres = options, chiffres = échelles et notes, Entrée = suivant / envoyer. Jamais pendant une saisie.
+document.addEventListener('keydown', (e) => {
+  if (!def || e.ctrlKey || e.metaKey || e.altKey) return;
+  const tgt = e.target as HTMLElement, typing = /^(INPUT|TEXTAREA|SELECT)$/.test(tgt?.tagName || '') && (tgt as HTMLInputElement).type !== 'radio' && (tgt as HTMLInputElement).type !== 'checkbox';
+  if (welcomeOn()) { if (e.key === 'Enter') { e.preventDefault(); started = true; render(); } return; }
+  if (!stepsMode() || typing) return;
+  const st = steps(), f = st[step]; if (!f) return;
+  const last = step === st.length - 1;
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const btn = app.querySelector<HTMLButtonElement>('.bf-step .bf-act .bf-btn:not(.ghost)');
+    if (last) btn?.click(); else next();
+    return;
+  }
+  const k = e.key.toUpperCase();
+  if (['choice', 'multi', 'slot'].includes(f.type) && /^[A-Z]$/.test(k)) {
+    const o = f.options?.[KEYS.indexOf(k)]; if (!o) return;
+    const lab = app.querySelectorAll<HTMLLabelElement>('.bf-step .bf-opt')[KEYS.indexOf(k)];
+    lab?.querySelector('input')?.click(); lab?.classList.add('kick'); e.preventDefault();
+  } else if (['scale', 'nps', 'rating'].includes(f.type) && /^[0-9]$/.test(e.key)) {
+    const b = [...app.querySelectorAll<HTMLButtonElement>('.bf-step .bf-scale button, .bf-step .bf-stars button')].find((x, i) => (f.type === 'rating' ? String(i + 1) : x.textContent) === e.key);
+    b?.click(); e.preventDefault();
+  }
+});
+
 // ---------------------------------------------------------------- cycle
-function render() { if (def.theme.layout === 'steps') renderSteps(); else renderPage(); }
+function render() {
+  if (!def) { app.innerHTML = '<main class="bf-notice"><div class="bf-card"><p>Aperçu en attente du formulaire…</p></div></main>'; return; }
+  if (welcomeOn()) return renderWelcome();
+  if (def.theme.layout === 'steps') renderSteps(); else renderPage();
+}
 function refresh(typing = false) {
   if (def.theme.layout === 'steps') {
     // Une question par écran : seule la question courante se redessine (hors frappe).
@@ -264,4 +363,35 @@ function refresh(typing = false) {
   }
   refreshPage(typing);
 }
+// ---------------------------------------------------------------- aperçu en direct (éditeur de Gearbox)
+if (PREVIEW) {
+  const allowed = BF.origins || [];
+  let parentOrigin = '';
+  const tell = (msg: unknown) => { if (parentOrigin) window.parent.postMessage(msg, parentOrigin); else allowed.forEach((o) => { try { window.parent.postMessage(msg, o); } catch { /* origine différente */ } }); };
+  window.addEventListener('message', (e) => {
+    if (!allowed.includes(e.origin) || !e.data || typeof e.data !== 'object') return;
+    parentOrigin = e.origin;
+    const m = e.data as { type: string; def?: BonyFormDef; screen?: string; id?: string };
+    if (m.type === 'bonyform:def' && m.def) {
+      const first = !def; def = m.def; applyTheme(); if (first) { prefill(); started = true; }
+      if (def.theme.layout !== 'steps') step = 0;
+      render();
+    } else if (m.type === 'bonyform:screen') {
+      if (m.screen === 'thanks') { started = true; thanks(); }
+      else { started = m.screen !== 'welcome'; render(); }
+    }
+    else if (m.type === 'bonyform:highlight') {
+      app.querySelectorAll('.pv-on').forEach((x) => x.classList.remove('pv-on'));
+      if (!m.id || !def) return;
+      if (def.theme.layout === 'steps') { const i = steps().findIndex((f) => f.id === m.id); if (i >= 0 && i !== step) { dir = i > step ? 1 : -1; step = i; render(); } }
+      const el = app.querySelector<HTMLElement>(`[data-f="${m.id}"]`);
+      if (el) { el.classList.add('pv-on'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    }
+  });
+  // Clic sur une question de l'aperçu : la sélectionner dans l'éditeur.
+  app.addEventListener('click', (e) => { const f = (e.target as HTMLElement).closest<HTMLElement>('[data-f]'); if (f) tell({ type: 'bonyform:focus', id: f.dataset.f }); }, true);
+  tellParent = tell;
+  tell({ type: 'bonyform:ready' });
+}
+if (def) applyTheme();
 render();

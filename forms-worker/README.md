@@ -16,9 +16,17 @@ publier un formulaire = Gearbox dépose sa définition dans le KV du Worker, san
   gardée dans le KV (`q:<id>`, 30 jours) et renvoyée **chaque minute** (cron). Aucune réponse perdue ;
   l'identifiant de réponse est fixé par le Worker, un renvoi ne crée jamais de doublon.
 - Le Worker n'a **aucun accès à la base** de Gearbox.
+- **Thème** (correctif 64) : `src/theme.ts` (thème → variables CSS + attributs, FILTRÉS : couleurs, polices,
+  nombres, adresses — ils partent dans une balise `<style>`) et `src/styles.ts` (feuille unique). Partagés par la
+  page servie et le client.
+- **Aperçu du Studio** : `GET /__preview` (intégrable seulement depuis `PREVIEW_ORIGINS`), piloté par
+  `postMessage` (`bonyform:def`, `bonyform:screen`, `bonyform:highlight` ; le client répond `bonyform:ready`,
+  `bonyform:focus`, `bonyform:screen`). Ni captcha ni envoi en aperçu.
+- **Fichiers** : `POST /__gearbox/asset` (signé ; images WebP/PNG/JPEG/GIF et polices WOFF2/WOFF/OTF/TTF, 3 Mo
+  max, pas de SVG) → servis par `GET /a/<id>` (cache d'un an, CSP `sandbox`).
 
 ## KV `FORMS` (id `48950e3fde4e4e82a923880278b1d766`)
-`form:<publicId>` (définition publiée + statut), `q:<id>` (file d'attente), `st:<publicId>` (places des
+`form:<publicId>` (définition publiée + statut), `asset:<empreinte>` (images et polices), `q:<id>` (file d'attente), `st:<publicId>` (places des
 créneaux, cache 60 s), `rl:…` (limitation de débit, 2 min).
 
 ## Développement local

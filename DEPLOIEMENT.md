@@ -185,6 +185,13 @@ Déployé À PART du VPS, depuis ce poste, avec la session `wrangler` de Théo (
 3. Secrets (premier déploiement ou rotation) : `npx wrangler secret put GEARBOX_SECRET` (= `FORMS_WORKER_SECRET`
    du `.env` du VPS) et `npx wrangler secret put TURNSTILE_SECRET` (clé secrète du widget Turnstile « Forms Bony »).
 4. Contrôle : `curl -s -o /dev/null -w "%{http_code}" https://forms.bonyauto-mobile.workers.dev/` → 200 ;
-   `curl -X POST …/__gearbox/publish` sans signature → 401.
+   `curl -X POST …/__gearbox/publish` sans signature → 401 ; `curl -sI …/__preview` → en-tête
+   `frame-ancestors https://gearbox.bonyauto-mobile.com` (aperçu du Studio, correctif 64).
+5. **Ordre quand un lot ajoute des routes au Worker** (correctif 64 : `/__preview`, `/__gearbox/asset`, `/a/<id>`) :
+   Worker D'ABORD, puis `api` et `web` — sinon Gearbox appelle une route qui n'existe pas encore.
+6. Variable `PREVIEW_ORIGINS` (dans `wrangler.jsonc`, pas un secret) : origines autorisées à intégrer l'aperçu.
+   En local, `.dev.vars` la met à `http://localhost:3000`. Changer de domaine Gearbox = la mettre à jour.
+7. Images et polices des formulaires : dans le KV `FORMS` du Worker (clés `asset:<empreinte>`, offre gratuite
+   1 Go). Aucune n'est sur le VPS : la sauvegarde du VPS ne les contient pas.
 
 Ne pas toucher aux autres Workers du compte (`forum-2026`, `grid`).
