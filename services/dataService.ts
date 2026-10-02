@@ -865,6 +865,13 @@ class DataService {
     if (!res.ok) { const b = await res.json().catch(() => ({} as any)); throw new ApiError(res.status, b.error || `Erreur ${res.status}`); }
     return res.blob();
   }
+  async setBonyMeta(id: string, meta: { projectId: string | null; sites: string[]; brands: string[]; service: string[] }): Promise<BonyFormRow> { return apiFetch(`/bony-forms/${id}/meta`, { method: 'PUT', body: JSON.stringify(meta) }); }
+  async followBonyForm(id: string, on: boolean): Promise<{ followers: string[] }> { return apiFetch(`/bony-forms/${id}/follow`, { method: 'POST', body: JSON.stringify({ on }) }); }
+  async getBonyVersions(id: string): Promise<any[]> { return apiFetch(`/bony-forms/${id}/versions`); }
+  async getBonyVersion(id: string, v: number): Promise<any> { return apiFetch(`/bony-forms/${id}/versions/${v}`); }
+  async restoreBonyVersion(id: string, v: number): Promise<BonyFormRow> { return apiFetch(`/bony-forms/${id}/versions/${v}/restore`, { method: 'POST' }); }
+  async getBonyDraws(id: string): Promise<any[]> { return apiFetch(`/bony-forms/${id}/draws`); }
+  async drawBony(id: string, rules: { winners: number; alternates: number; consentField: string | null; uniqueField: string | null; excludePrevious: boolean }): Promise<any> { return apiFetch(`/bony-forms/${id}/draw`, { method: 'POST', body: JSON.stringify(rules) }); }
   async getBonyKits(): Promise<BonyKit[]> { return apiFetch('/bony-forms/kits'); }
   async saveBonyKit(name: string, theme: any): Promise<BonyKit> { return apiFetch('/bony-forms/kits', { method: 'POST', body: JSON.stringify({ name, theme }) }); }
   async deleteBonyKit(kid: string): Promise<void> { await apiFetch(`/bony-forms/kits/${kid}`, { method: 'DELETE' }); }

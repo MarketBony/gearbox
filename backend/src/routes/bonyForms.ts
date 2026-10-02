@@ -4,9 +4,11 @@ import { Prisma } from '@prisma/client';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { FORMS_ROLES } from '../auth/roles';
 import { ALL_SITES } from '../auth/siteScope';
-import { emitEvent } from '../realtime';
+import { emitEvent, emitToUser } from '../realtime';
+import { sendPushToUsers } from '../utils/pushSender';
+import { getUserIdsOnSection } from '../realtime/presence';
 import { prisma } from '../db';
-import { validate, checkDef, newDef, endingOf, SCHEMA_VERSION, type BonyFormDef, type Answers, type Field } from '../bonyforms/schema';
+import { validate, checkDef, newDef, endingOf, isLayout, SCHEMA_VERSION, type BonyFormDef, type Answers, type Field } from '../bonyforms/schema';
 import { callWorker, verify, verifyMessage, workerConfigured, workerUrl } from '../bonyforms/worker';
 import { savePending, claim, tokenId, pendingExists, readFile, listFiles, removeFiles } from '../bonyforms/files';
 
@@ -45,7 +47,27 @@ const publicUrl = (publicId: string) => (workerUrl() ? `${workerUrl()}/${publicI
 const LIST = {
   id: true, publicId: true, title: true, status: true, version: true, publishedAt: true, syncError: true,
   responseCount: true, lastResponseAt: true, createdBy: true, updatedBy: true, createdAt: true, updatedAt: true,
+  projectId: true, sites: true, brands: true, service: true, followers: true,
 } as const;
+
+// ---------------------------------------------------------------- F4 : projet et tags
+// Un formulaire RATTACHÉ à un projet en hérite les tags, lus EN DIRECT (le projet change, le formulaire suit) ;
+// non rattaché : ses propres tags. Listes alignées sur constants.ts (SITES via ALL_SITES, BRANDS, SERVICES).
+// Holding = tag marque EXCLUSIF (règle de constants.ts) : posé seul ou pas du tout.
+const TAG_BRANDS = ['Renault', 'Dacia', 'Alpine', 'Nissan', 'Mobilize', 'Holding'];
+const TAG_SERVICES = ['VN', 'VO', 'APV', 'PR', 'Tous Services'];
+type Tagged = { projectId: string | null; sites: string[]; brands: string[]; service: string[] };
+/** Tags EFFECTIFS de formulaires (projet rattaché lu en une requête). Ajoute `project` (id, nom) ou null. */
+async function withTags<T extends Tagged>(rows: T[]) {
+  const ids = [...new Set(rows.map((r) => r.projectId).filter(Boolean))] as string[];
+  const projects = ids.length ? await prisma.project.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, sites: true, brands: true, service: true } }) : [];
+  const by = new Map(projects.map((p) => [p.id, p]));
+  return rows.map((r) => {
+    const p = r.projectId ? by.get(r.projectId) : null;
+    return { ...r, project: p ? { id: p.id, name: p.name } : r.projectId ? { id: r.projectId, name: 'Projet supprimé' } : null,
+      tags: p ? { sites: p.sites || [], brands: p.brands || [], service: p.service || [] } : { sites: r.sites, brands: r.brands, service: r.service } };
+  });
+}
 
 function fail(res: Response, e: unknown, def: string) {
   const msg = e instanceof Error ? e.message : def;
@@ -73,10 +95,8 @@ async function takenOf(formId: string, def: BonyFormDef) {
 router.get('/', authenticateToken, requireRole(FORMS_ROLES), async (_req, res) => {
   try {
     const rows = await prisma.bonyForm.findMany({ orderBy: { updatedAt: 'desc' }, select: { ...LIST, draft: true, published: true } });
-    res.json({
-      workerReady: workerConfigured(), workerUrl: workerUrl() || null,
-      forms: rows.map(({ draft, published, ...r }) => ({ ...r, url: publicUrl(r.publicId), dirty: !!published && JSON.stringify(draft) !== JSON.stringify(published) })),
-    });
+    const tagged = await withTags(rows.map(({ draft, published, ...r }) => ({ ...r, url: publicUrl(r.publicId), dirty: !!published && JSON.stringify(draft) !== JSON.stringify(published) })));
+    res.json({ workerReady: workerConfigured(), workerUrl: workerUrl() || null, forms: tagged });
   } catch (e) { fail(res, e, 'Lecture des formulaires impossible.'); }
 });
 
@@ -85,7 +105,7 @@ router.post('/', authenticateToken, requireRole(FORMS_ROLES), async (req: AuthRe
   const title = typeof req.body?.title === 'string' ? req.body.title.trim().slice(0, 200) : '';
   if (!title) return res.status(400).json({ error: 'Donnez un titre au formulaire.' });
   try {
-    const row = await prisma.bonyForm.create({ data: { publicId: publicIdOf(), title, draft: newDef(title) as any, createdBy: req.user!.id, updatedBy: req.user!.id } });
+    const row = await prisma.bonyForm.create({ data: { publicId: publicIdOf(), title, draft: newDef(title) as any, createdBy: req.user!.id, updatedBy: req.user!.id, followers: [req.user!.id] } });
     emitEvent('bonyforms:changed', null);
     res.status(201).json({ ...row, url: publicUrl(row.publicId) });
   } catch (e) { fail(res, e, 'Création impossible.'); }
@@ -175,12 +195,133 @@ router.delete('/fonts/:fid', authenticateToken, requireRole(FORMS_ROLES), async 
   } catch (e) { fail(res, e, 'Suppression de la police impossible.'); }
 });
 
+// ---------------------------------------------------------------- F4 : projet, tags, abonnement, versions, tirages
+// PUT /api/bony-forms/:id/meta { projectId | null, sites, brands, service } — rattachement et tags (champs NOMMÉS).
+router.put('/:id/meta', authenticateToken, requireRole(FORMS_ROLES), async (req: AuthRequest, res) => {
+  const b = req.body || {};
+  const list = (v: unknown, ok: string[]) => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && ok.includes(x)))] : []);
+  const projectId = typeof b.projectId === 'string' && b.projectId ? b.projectId : null;
+  let brands = list(b.brands, TAG_BRANDS);
+  if (brands.includes('Holding') && brands.length > 1) brands = ['Holding'];        // Holding : exclusif
+  try {
+    if (projectId && !(await prisma.project.findUnique({ where: { id: projectId }, select: { id: true } }))) return res.status(404).json({ error: 'Projet introuvable.' });
+    const row = await prisma.bonyForm.update({ where: { id: req.params.id }, data: projectId ? { projectId } : { projectId: null, sites: list(b.sites, ALL_SITES), brands, service: list(b.service, TAG_SERVICES) }, select: LIST });
+    emitEvent('bonyforms:changed', null);
+    res.json((await withTags([row]))[0]);
+  } catch (e: any) {
+    if (e?.code === 'P2025') return res.status(404).json({ error: 'Formulaire introuvable.' });
+    fail(res, e, 'Enregistrement des tags impossible.');
+  }
+});
+
+// POST /api/bony-forms/:id/follow { on } — suivre / ne plus suivre (notifications de réponse).
+router.post('/:id/follow', authenticateToken, requireRole(FORMS_ROLES), async (req: AuthRequest, res) => {
+  try {
+    const row = await prisma.bonyForm.findUnique({ where: { id: req.params.id }, select: { followers: true } });
+    if (!row) return res.status(404).json({ error: 'Formulaire introuvable.' });
+    const me = req.user!.id, set = new Set(row.followers);
+    if (req.body?.on) set.add(me); else set.delete(me);
+    const saved = await prisma.bonyForm.update({ where: { id: req.params.id }, data: { followers: [...set] }, select: { followers: true } });
+    res.json(saved);
+  } catch (e) { fail(res, e, 'Abonnement impossible.'); }
+});
+
+// GET /api/bony-forms/:id/versions — publications successives (sans leur contenu), avec le nombre de réponses.
+router.get('/:id/versions', authenticateToken, requireRole(FORMS_ROLES), async (req, res) => {
+  try {
+    const form = await prisma.bonyForm.findUnique({ where: { id: req.params.id }, select: { id: true, version: true, published: true, publishedAt: true, updatedBy: true } });
+    if (!form) return res.status(404).json({ error: 'Formulaire introuvable.' });
+    // Formulaires publiés avant F4 : la version en ligne est inscrite à la première consultation.
+    if (form.published && form.version > 0 && !(await prisma.bonyFormVersion.findUnique({ where: { formId_version: { formId: form.id, version: form.version } } }))) {
+      await prisma.bonyFormVersion.create({ data: { formId: form.id, version: form.version, def: form.published as any, publishedBy: form.updatedBy, publishedAt: form.publishedAt || new Date() } });
+    }
+    const [rows, counts] = await Promise.all([
+      prisma.bonyFormVersion.findMany({ where: { formId: form.id }, orderBy: { version: 'desc' }, select: { id: true, version: true, publishedAt: true, publishedBy: true } }),
+      prisma.bonyFormResponse.groupBy({ by: ['version'], where: { formId: form.id }, _count: { _all: true } }),
+    ]);
+    const users = await prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.publishedBy))] } }, select: { id: true, name: true } });
+    const name = new Map(users.map((u) => [u.id, u.name])), n = new Map(counts.map((c) => [c.version, c._count._all]));
+    res.json(rows.map((r) => ({ ...r, author: name.get(r.publishedBy) || 'Ancien membre', responses: n.get(r.version) || 0 })));
+  } catch (e) { fail(res, e, 'Lecture des versions impossible.'); }
+});
+// GET /api/bony-forms/:id/versions/:v — contenu d'une version.
+router.get('/:id/versions/:v', authenticateToken, requireRole(FORMS_ROLES), async (req, res) => {
+  try {
+    const v = await prisma.bonyFormVersion.findUnique({ where: { formId_version: { formId: req.params.id, version: Number(req.params.v) || 0 } } });
+    if (!v) return res.status(404).json({ error: 'Version introuvable.' });
+    res.json(v);
+  } catch (e) { fail(res, e, 'Lecture de la version impossible.'); }
+});
+// POST /api/bony-forms/:id/versions/:v/restore — remet une version dans le BROUILLON (rien n'est publié).
+router.post('/:id/versions/:v/restore', authenticateToken, requireRole(FORMS_ROLES), async (req: AuthRequest, res) => {
+  try {
+    const v = await prisma.bonyFormVersion.findUnique({ where: { formId_version: { formId: req.params.id, version: Number(req.params.v) || 0 } } });
+    if (!v) return res.status(404).json({ error: 'Version introuvable.' });
+    const def = v.def as any;
+    const row = await prisma.bonyForm.update({ where: { id: req.params.id }, data: { draft: def, title: String(def?.title || 'Sans titre').slice(0, 200), updatedBy: req.user!.id }, select: LIST });
+    emitEvent('bonyforms:changed', null);
+    res.json(row);
+  } catch (e) { fail(res, e, 'Restauration impossible.'); }
+});
+
+// ---- tirage au sort
+/** Libellé d'un participant pour le procès-verbal : prénom / nom (2 premiers « réponse courte »), sinon e-mail. */
+function labelOf(def: BonyFormDef, a: Record<string, any>) {
+  const short = def.fields.filter((f) => f.type === 'short').slice(0, 2).map((f) => a[f.id]).filter((x) => typeof x === 'string' && x.trim());
+  const email = def.fields.find((f) => f.type === 'email'), em = email && typeof a[email.id] === 'string' ? a[email.id] : '';
+  const masked = em ? em.replace(/^(.{2}).*(@.*)$/, '$1•••$2') : '';
+  return [short.join(' '), masked].filter(Boolean).join(' · ') || 'Participant';
+}
+// GET /api/bony-forms/:id/draws — procès-verbaux.
+router.get('/:id/draws', authenticateToken, requireRole(FORMS_ROLES), async (req, res) => {
+  try {
+    const rows = await prisma.bonyFormDraw.findMany({ where: { formId: req.params.id }, orderBy: { drawnAt: 'desc' } });
+    const users = await prisma.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.drawnBy))] } }, select: { id: true, name: true } });
+    const name = new Map(users.map((u) => [u.id, u.name]));
+    res.json(rows.map((r) => ({ ...r, author: name.get(r.drawnBy) || 'Ancien membre' })));
+  } catch (e) { fail(res, e, 'Lecture des tirages impossible.'); }
+});
+/**
+ * POST /api/bony-forms/:id/draw { winners, alternates, consentField?, uniqueField?, excludePrevious }
+ * Tirage FAIT PAR LE SERVEUR (crypto.randomInt, Fisher-Yates) et inscrit au procès-verbal : règles, nombre
+ * d'éligibles, gagnants puis suppléants, empreinte SHA-256 de la liste des éligibles (preuve qu'elle n'a pas changé).
+ */
+router.post('/:id/draw', authenticateToken, requireRole(FORMS_ROLES), async (req: AuthRequest, res) => {
+  const b = req.body || {};
+  const winners = Math.max(1, Math.min(50, Math.round(Number(b.winners) || 1))), alternates = Math.max(0, Math.min(20, Math.round(Number(b.alternates) || 0)));
+  try {
+    const form = await prisma.bonyForm.findUnique({ where: { id: req.params.id } });
+    if (!form) return res.status(404).json({ error: 'Formulaire introuvable.' });
+    const def = (form.published || form.draft) as unknown as BonyFormDef;
+    const consent = typeof b.consentField === 'string' ? def.fields.find((f) => f.id === b.consentField && f.type === 'consent') : null;
+    const uniq = typeof b.uniqueField === 'string' ? def.fields.find((f) => f.id === b.uniqueField && !isLayout(f)) : null;
+    let pool = await prisma.bonyFormResponse.findMany({ where: { formId: form.id }, orderBy: { submittedAt: 'asc' }, select: { id: true, answers: true, meta: true } });
+    pool = pool.filter((r) => !(r.meta as any)?.flag);                         // réponses signalées (doublon, après fermeture…) écartées
+    if (consent) pool = pool.filter((r) => (r.answers as any)?.[consent.id] === true);
+    if (uniq) { const seen = new Set<string>(); pool = pool.filter((r) => { const k = String((r.answers as any)?.[uniq.id] ?? '').trim().toLowerCase(); if (!k || seen.has(k)) return false; seen.add(k); return true; }); }
+    if (b.excludePrevious) {
+      const prev = await prisma.bonyFormDraw.findMany({ where: { formId: form.id }, select: { winners: true } });
+      const out = new Set(prev.flatMap((d) => ((d.winners as any[]) || []).filter((w) => !w.alternate).map((w) => w.responseId)));
+      pool = pool.filter((r) => !out.has(r.id));
+    }
+    if (!pool.length) return res.status(422).json({ error: 'Aucune participation éligible avec ces règles.' });
+    const ids = pool.map((r) => r.id).sort();
+    const proof = crypto.createHash('sha256').update(ids.join('\n')).digest('hex');
+    const order = pool.slice();
+    for (let i = order.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [order[i], order[j]] = [order[j], order[i]]; }
+    const picked = order.slice(0, winners + alternates).map((r, k) => ({ rank: k + 1, alternate: k >= winners, responseId: r.id, label: labelOf(def, r.answers as any) }));
+    const draw = await prisma.bonyFormDraw.create({ data: { formId: form.id, drawnBy: req.user!.id, rules: { winners, alternates, consentField: consent?.id || null, consentLabel: consent?.label || null, uniqueField: uniq?.id || null, uniqueLabel: uniq?.label || null, excludePrevious: !!b.excludePrevious } as any, eligible: pool.length, winners: picked as any, proof } });
+    // Liste des noms pour l'animation (masqués comme au procès-verbal), sans identifiant de réponse.
+    res.status(201).json({ ...draw, reel: order.slice(0, 60).map((r) => labelOf(def, r.answers as any)) });
+  } catch (e) { fail(res, e, 'Tirage impossible.'); }
+});
+
 // GET /api/bony-forms/:id — fiche complète (brouillon + version publiée).
 router.get('/:id', authenticateToken, requireRole(FORMS_ROLES), async (req, res) => {
   try {
     const row = await prisma.bonyForm.findUnique({ where: { id: req.params.id } });
     if (!row) return res.status(404).json({ error: 'Formulaire introuvable.' });
-    res.json({ ...row, url: publicUrl(row.publicId) });
+    res.json({ ...(await withTags([row]))[0], url: publicUrl(row.publicId) });
   } catch (e) { fail(res, e, 'Lecture impossible.'); }
 });
 
@@ -211,7 +352,10 @@ router.post('/:id/publish', authenticateToken, requireRole(FORMS_ROLES), async (
     const def = enrich(row.draft as any), version = row.version + 1;
     // Le Worker d'abord : s'il est injoignable, rien n'est marqué « en ligne » à tort.
     await callWorker('/__gearbox/publish', { publicId: row.publicId, status: 'open', version, def });
-    const saved = await prisma.bonyForm.update({ where: { id: row.id }, data: { published: def as any, version, status: 'published', publishedAt: new Date(), syncError: null, updatedBy: req.user!.id }, select: LIST });
+    const [saved] = await prisma.$transaction([
+      prisma.bonyForm.update({ where: { id: row.id }, data: { published: def as any, version, status: 'published', publishedAt: new Date(), syncError: null, updatedBy: req.user!.id }, select: LIST }),
+      prisma.bonyFormVersion.upsert({ where: { formId_version: { formId: row.id, version } }, update: { def: def as any, publishedBy: req.user!.id }, create: { formId: row.id, version, def: def as any, publishedBy: req.user!.id } }),
+    ]);
     emitEvent('bonyforms:changed', null);
     res.json({ ...saved, url: publicUrl(saved.publicId) });
   } catch (e) { fail(res, e, 'Publication impossible.'); }
@@ -238,6 +382,8 @@ router.delete('/:id', authenticateToken, requireRole(FORMS_ROLES), async (req, r
     if (row.version > 0) await callWorker('/__gearbox/remove', { publicId: row.publicId });
     await prisma.$transaction([
       prisma.bonyFormResponse.deleteMany({ where: { formId: row.id } }),
+      prisma.bonyFormVersion.deleteMany({ where: { formId: row.id } }),
+      prisma.bonyFormDraw.deleteMany({ where: { formId: row.id } }),
       prisma.bonyForm.delete({ where: { id: row.id } }),
     ]);
     removeFiles(row.id);                                          // fichiers des répondants (volume privé)
@@ -260,6 +406,12 @@ router.delete('/:id/responses/:rid', authenticateToken, requireRole(FORMS_ROLES)
     const r = await prisma.bonyFormResponse.deleteMany({ where: { id: req.params.rid, formId: req.params.id } });
     if (!r.count) return res.status(404).json({ error: 'Réponse introuvable.' });
     removeFiles(req.params.id, req.params.rid);
+    // Droit à l'effacement : le procès-verbal garde le rang, plus l'identité.
+    const draws = await prisma.bonyFormDraw.findMany({ where: { formId: req.params.id } });
+    for (const d of draws) {
+      const w = (d.winners as any[]) || [];
+      if (w.some((x) => x.responseId === req.params.rid)) await prisma.bonyFormDraw.update({ where: { id: d.id }, data: { winners: w.map((x) => (x.responseId === req.params.rid ? { ...x, label: 'Réponse effacée (RGPD)' } : x)) as any } });
+    }
     const agg = await prisma.bonyFormResponse.aggregate({ where: { formId: req.params.id }, _count: { _all: true }, _max: { submittedAt: true } });
     await prisma.bonyForm.update({ where: { id: req.params.id }, data: { responseCount: agg._count._all, lastResponseAt: agg._max.submittedAt } });
     emitEvent('bonyforms:changed', null);
@@ -361,9 +513,29 @@ router.post('/ingest', async (req, res) => {
     }
     emitEvent('bonyforms:response', { formId: form.id });
     emitEvent('bonyforms:changed', null);
+    notifyFollowers(form.id, form.title, form.followers);
     res.json({ ok: true });
   } catch (e) { fail(res, e, 'Enregistrement de la réponse impossible.'); }
 });
+
+/**
+ * F4 — Abonnés prévenus d'une réponse : bannière Gearbox (toujours) et notification push (au plus une par minute et
+ * par formulaire, et jamais à qui a déjà la rubrique Forms ouverte). Best-effort : n'échoue jamais la réception.
+ */
+const lastPush = new Map<string, number>();
+function notifyFollowers(formId: string, title: string, followers: string[]) {
+  if (!followers?.length) return;
+  followers.forEach((u) => emitToUser(u, 'bonyforms:notify', { formId, title }));
+  const now = Date.now();
+  if (now - (lastPush.get(formId) || 0) < 60_000) return;
+  lastPush.set(formId, now);
+  void (async () => {
+    try {
+      const away = followers.filter((u) => !getUserIdsOnSection('forms').has(u));
+      if (away.length) await sendPushToUsers(away, { title: 'Nouvelle réponse', body: title, tag: `bonyform-${formId}`, section: 'forms' });
+    } catch (e) { console.error('[bony-forms] notification push', e); }
+  })();
+}
 
 // POST /api/bony-forms/state { publicId } — places prises (créneaux) et total, pour l'affichage public.
 router.post('/state', async (req, res) => {

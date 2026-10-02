@@ -73,6 +73,7 @@ function DataHubInner() {
   const [chatTick, setChatTick] = useState(0);
   useEffect(() => chatStore.subscribe(() => setChatTick(n => n + 1)), []);
   useChatFeed(uid, allowed.has('chat'));
+  useFormsAlerts(allowed.has('forms'));
 
   // Photos de profil : changées ici ou ailleurs (Réglages, autre onglet via l'API) → USERS re-mappés.
   const [avTick, setAvTick] = useState(0);
@@ -155,6 +156,30 @@ function DataHubInner() {
 // message s'affiche quand le serveur le diffuse : identité, horodatage, non-lus viennent de lui).
 // Droits : appartenance contrôlée par le serveur (403 = fil vide) ; pas de pont sans rubrique Chat.
 // =====================================================================
+// =====================================================================
+// Forms Bony (F4, 02/10/2026) — bannière à chaque réponse d'un formulaire SUIVI. Le serveur n'envoie
+// `bonyforms:notify` qu'aux abonnés (room personnelle) : rien à filtrer ici. Regroupées par formulaire sur
+// 20 s (un jeu-concours peut recevoir dix réponses à la minute). Le push hors Gearbox est côté serveur.
+// =====================================================================
+function useFormsAlerts(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) return;
+    const s = getSocket() ?? connectSocket();
+    const say = (title: string, body: string) => gx()?.shell?.notify?.({ app: 'forms', title, body });
+    const pend = new Map<string, { n: number; t: number }>();
+    // La première réponse s'affiche tout de suite ; celles des 20 s suivantes sont regroupées en une bannière.
+    const on = (d: any) => {
+      const id = d?.formId; if (!id) return;
+      const name = String(d.title || 'Formulaire'), p = pend.get(id);
+      if (p) { p.n++; return; }
+      say('Nouvelle réponse', name);
+      pend.set(id, { n: 0, t: window.setTimeout(() => { const q = pend.get(id); pend.delete(id); if (q?.n) say(q.n > 1 ? `${q.n} nouvelles réponses` : 'Nouvelle réponse', name); }, 20_000) });
+    };
+    s.on('bonyforms:notify', on);
+    return () => { s.off('bonyforms:notify', on); pend.forEach((p) => window.clearTimeout(p.t)); };
+  }, [enabled]);
+}
+
 function useChatFeed(uid: string, enabled: boolean) {
   useEffect(() => {
     const GX = gx(); const D: GXData = GX.data;

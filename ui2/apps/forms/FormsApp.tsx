@@ -49,10 +49,10 @@ export default function FormsApp({ win, inst }: AppProps) {
     gx().animate(ref.current?.firstElementChild, [{ opacity: 0, transform: `translateX(${space === 'google' ? 26 : -26}px)` }, { opacity: 1, transform: 'none' }], { spring: 'soft' });
   }, [space]);
   const switcher = <Seg value={space} onChange={setSpace} options={[['bony', 'Forms Bony'], ['google', 'Google Forms']]} />;
-  return <div ref={ref} style={{ display: 'contents' }}>{space === 'bony' ? <BonySpace win={win} inst={inst} switcher={switcher} /> : <GoogleSpace win={win} inst={inst} switcher={switcher} />}</div>;
+  return <div ref={ref} style={{ display: 'contents' }}>{space === 'bony' ? <BonySpace win={win} inst={inst} switcher={switcher} /> : <GoogleSpace win={win} inst={inst} switcher={switcher} toBony={(c) => { gx().store.set('bony.cmd', c); setSpace('bony'); }} />}</div>;
 }
 
-function GoogleSpace({ win, inst, switcher }: AppProps & { switcher: React.ReactNode }) {
+function GoogleSpace({ win, inst, switcher, toBony }: AppProps & { switcher: React.ReactNode; toBony: (cmd: string) => void }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const compact = useCompact(rootRef, 760);
   const { st, err: stErr, reload: reloadStatus } = useGoogleStatus();
@@ -106,7 +106,8 @@ function GoogleSpace({ win, inst, switcher }: AppProps & { switcher: React.React
     '-', { label: 'Retirer de Gearbox…', icon: 'trash', action: () => remove(f, el) },
   ], el, { align: 'right' });
 
-  inst.command = (c: string) => { if (c === 'new') newSheet(); else if (c === 'import') importSheet(); };
+  // Commande Forms Bony (fiche projet : « Modifier », « Réponses ») reçue alors que l'espace Google est affiché.
+  inst.command = (c: string) => { if (/^(edit|stats):|^bnew$/.test(c)) toBony(c); else if (c === 'new') newSheet(); else if (c === 'import') importSheet(); };
   inst.menus = () => ({
     'Fichier': [{ label: 'Nouveau formulaire…', icon: 'plus', disabled: !st?.connected, action: newSheet }, { label: 'Importer des formulaires…', icon: 'link', disabled: !st?.connected, action: importSheet }],
     'Présentation': [{ label: 'Formulaires', checked: tab === 'forms', action: () => setTab('forms') }, { label: 'Statistiques', checked: tab === 'stats', action: () => setTab('stats') }],

@@ -2,7 +2,9 @@ import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Project, Task, TaskStatus, ServiceType, BrandType } from '../../../types';
 import { PROJECT_TYPES, TASK_CHANNELS, SERVICES, RDM_BRANDS } from '../../../constants';
 import { groupeDuProjet, sitesDuProjet, marqueAutorisee, poserSites, basculerService, basculerMarque, nouvelleTache } from '../../../utils/projet';
-import { mutateProject, useWorkspace } from '../../store/workspace';
+import { mutateProject, useWorkspace, currentRole } from '../../store/workspace';
+import { canSeeForms } from '../../../constants';
+import { LinkedForms } from '../forms/bony/F4';
 import { gx, hud, Icon, Seg, PickerBtn, Avatar, DraftInput } from '../ui/kit';
 import { D, today, marketing, userName, sortTasks, GROUP_LABEL, LABEL_GROUP, type Mode } from './common';
 import { ExpertPanel, TaskFilesBlock } from './ExpertPanel';
@@ -204,6 +206,8 @@ export const ProjectDetail: React.FC<{ p: Project; api: DetailApi }> = ({ p, api
         <div className="prj-total"><span className="muted">Total des tâches</span><b className="num">{gx().fmt.eur(actual)}</b></div>
       </section>
       {expert ? <ExpertPanel p={p} ro={ro} onOpenTask={openTask} /> : null}
+      {/* F4 : formulaires Forms Bony rattachés (rôles Forms seulement, comme la rubrique et l'API). */}
+      {canSeeForms(currentRole()) ? <LinkedForms projectId={p.id} /> : null}
     </div>
   );
 };

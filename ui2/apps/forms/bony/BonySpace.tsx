@@ -11,6 +11,9 @@ import { bonyQuestions, bonyResponses } from './adapter';
 import BonyEditor from './BonyEditor';
 import { TEMPLATES } from './templates';
 import { parseDrive } from '../../../../shared/bonyform';
+import { DrawSheet } from './F4';
+import { SITES, BRANDS, SERVICES } from '../../../../constants';
+import { useWorkspace } from '../../../store/workspace';
 
 // =====================================================================
 // Espace « Forms Bony » de la rubrique Forms (lot F1, 01/10/2026) : formulaires MAISON, édités ici
@@ -40,14 +43,38 @@ export default function BonySpace({ win, inst, switcher }: AppProps & { switcher
   useEffect(() => { load(); }, [load]);
   useEffect(() => { const s = getSocket(); s?.on('bonyforms:changed', load); s?.on('bonyforms:response', load); window.addEventListener('gearbox-chat-reconnected', load); return () => { s?.off('bonyforms:changed', load); s?.off('bonyforms:response', load); window.removeEventListener('gearbox-chat-reconnected', load); }; }, [load]);
 
-  const shown = useMemo(() => (list || []).filter((f) => !q.trim() || f.title.toLowerCase().includes(q.trim().toLowerCase())), [list, q]);
+  // F4 : filtres par projet et par tags (tags EFFECTIFS : ceux du projet rattaché, sinon ceux du formulaire).
+  const [fProj, setFProj] = useEngineStore<string>('bony.fProj', '');
+  const [fSite, setFSite] = useEngineStore<string>('bony.fSite', '');
+  const [fBrand, setFBrand] = useEngineStore<string>('bony.fBrand', '');
+  const [fServ, setFServ] = useEngineStore<string>('bony.fServ', '');
+  const projects = useWorkspace((s) => s.projects);
+  const usedProjects = useMemo(() => { const m = new Map<string, string>(); (list || []).forEach((f) => { if (f.project) m.set(f.project.id, f.project.name); }); return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], 'fr')); }, [list]);
+  const shown = useMemo(() => (list || []).filter((f) => {
+    const t = f.tags || { sites: [], brands: [], service: [] };
+    if (q.trim() && !f.title.toLowerCase().includes(q.trim().toLowerCase())) return false;
+    if (fProj === '__none' ? !!f.projectId : fProj && f.projectId !== fProj) return false;
+    if (fSite && !t.sites.includes(fSite)) return false;
+    if (fBrand && !t.brands.includes(fBrand)) return false;
+    if (fServ && !t.service.includes(fServ)) return false;
+    return true;
+  }), [list, q, fProj, fSite, fBrand, fServ]);
+  const filtering = !!(fProj || fSite || fBrand || fServ);
   const sel = (list || []).find((f) => f.id === selId) || (tab === 'stats' ? (list || [])[0] : undefined);
   const openEditor = (f: BonyFormRow) => { setTab('forms'); setEditId(f.id); };
   const openStats = (f: BonyFormRow) => { setEditId(null); setSelId(f.id); setTab('stats'); };
   const newSheet = () => openSheet((close) => <NewSheet close={close} onDone={(f) => { close(); load(); openEditor(f); }} />, { width: 620 });
   const copyLink = (f: BonyFormRow) => { if (!f.url) return; navigator.clipboard?.writeText(f.url).then(() => hud('Lien du formulaire copié'), () => hud(f.url!)); };
 
-  inst.command = (c: string) => { if (c === 'new') newSheet(); };
+  const runCmd = (c: string) => {
+    if (c === 'new' || c === 'bnew') return newSheet();
+    const m = /^(edit|stats):(.+)$/.exec(c); if (!m) return;
+    const f = (list || []).find((x) => x.id === m[2]);
+    if (m[1] === 'edit') { setTab('forms'); setEditId(m[2]); } else if (f) openStats(f); else { setSelId(m[2]); setTab('stats'); setEditId(null); }
+  };
+  inst.command = runCmd;
+  // Commande laissée par une autre rubrique (fiche projet) avant l'ouverture de cet espace.
+  useEffect(() => { if (!list) return; const c = gx().store.get('bony.cmd', ''); if (c) { gx().store.set('bony.cmd', ''); runCmd(c); } }, [list]); // eslint-disable-line react-hooks/exhaustive-deps
   inst.menus = () => ({
     'Fichier': [{ label: 'Nouveau formulaire Bony…', icon: 'plus', action: newSheet }],
     'Présentation': [{ label: 'Formulaires', checked: tab === 'forms', action: () => setTab('forms') }, { label: 'Réponses', checked: tab === 'stats', action: () => setTab('stats') }],
@@ -67,10 +94,17 @@ export default function BonySpace({ win, inst, switcher }: AppProps & { switcher
         {!ready ? <div className="frm-err">Le Worker Cloudflare n’est pas configuré sur ce serveur (FORMS_WORKER_URL / FORMS_WORKER_SECRET) : la publication est impossible.</div> : null}
         {err ? <div className="frm-err">{err}</div> : null}
         {tab === 'forms' && editId ? (
-          <React.Fragment key={editId}><BonyEditor id={editId} workerUrl={workerUrl} onBack={() => setEditId(null)} onStats={() => { const f = (list || []).find((x) => x.id === editId); if (f) openStats(f); }} onChanged={load} /></React.Fragment>
+          <React.Fragment key={editId}><BonyEditor id={editId} workerUrl={workerUrl} openSheet={openSheet} onBack={() => setEditId(null)} onStats={() => { const f = (list || []).find((x) => x.id === editId); if (f) openStats(f); }} onChanged={load} /></React.Fragment>
         ) : tab === 'forms' ? (
           <div className="frm-list scroll">
-            <div className="frm-tools"><label className="search"><Icon name="search" size="sm" /><input placeholder="Rechercher un formulaire…" value={q} onChange={(e) => setQ(e.target.value)} /></label></div>
+            <div className="frm-tools"><label className="search"><Icon name="search" size="sm" /><input placeholder="Rechercher un formulaire…" value={q} onChange={(e) => setQ(e.target.value)} /></label>
+              <select className="bf4-flt" value={fProj} onChange={(e) => setFProj(e.target.value)}><option value="">Tous les projets</option><option value="__none">Non rattachés</option>{usedProjects.map(([id, n]) => <option key={id} value={id}>{n}</option>)}</select>
+              <select className="bf4-flt" value={fSite} onChange={(e) => setFSite(e.target.value)}><option value="">Toutes concessions</option>{(SITES as string[]).map((s) => <option key={s} value={s}>{s}</option>)}</select>
+              <select className="bf4-flt" value={fBrand} onChange={(e) => setFBrand(e.target.value)}><option value="">Toutes marques</option>{(BRANDS as string[]).map((s) => <option key={s} value={s}>{s}</option>)}</select>
+              <select className="bf4-flt" value={fServ} onChange={(e) => setFServ(e.target.value)}><option value="">Tous services</option>{(SERVICES as string[]).map((s) => <option key={s} value={s}>{s}</option>)}</select>
+              {filtering ? <button className="btn sm" onClick={() => { setFProj(''); setFSite(''); setFBrand(''); setFServ(''); }}>Effacer les filtres</button> : null}
+            </div>
+            {filtering && list?.length && !shown.length ? <div className="frm-empty">Aucun formulaire avec ces filtres.</div> : null}
             {list && !list.length ? (
               <div className="frm-empty big"><span className="frm-emo bony"><Icon name="forms" /></span><b>Aucun formulaire Bony</b>
                 <span>Créez un formulaire à vos couleurs : il sera en ligne sur Cloudflare, prêt à être glissé derrière un bouton d’e-mailing.</span>
@@ -85,6 +119,11 @@ export default function BonySpace({ win, inst, switcher }: AppProps & { switcher
                       {f.dirty ? <span className="badge" style={{ '--c': 'var(--warn)' } as React.CSSProperties} data-tip="Modifications non publiées">●</span> : null}</div>
                     <b className="frm-t">{f.title}</b>
                     <div className="frm-meta"><span><b className="num">{f.responseCount.toLocaleString('fr-FR')}</b> réponse{f.responseCount > 1 ? 's' : ''}</span><span>Dernière : {rel(f.lastResponseAt)}</span></div>
+                    {f.project || f.tags?.sites.length || f.tags?.brands.length || f.tags?.service.length ? <div className="bf4-tags">
+                      {f.project ? <span className="badge" style={{ '--c': 'var(--bony-violet)' } as React.CSSProperties}><Icon name="projects" size="sm" />{f.project.name}</span> : null}
+                      {[...(f.tags?.sites || []).slice(0, 3), ...(f.tags?.brands || []), ...(f.tags?.service || [])].map((t) => <span key={t} className="badge">{t}</span>)}
+                      {(f.tags?.sites.length || 0) > 3 ? <span className="faint">+{(f.tags!.sites.length) - 3}</span> : null}
+                    </div> : null}
                     <div className="frm-act" onClick={(e) => e.stopPropagation()}>
                       <button className="btn sm" onClick={() => openEditor(f)}><Icon name="edit" size="sm" />Modifier</button>
                       <button className="btn sm" onClick={() => openStats(f)}><Icon name="trending" size="sm" />Réponses</button>
@@ -102,7 +141,7 @@ export default function BonySpace({ win, inst, switcher }: AppProps & { switcher
                 <button key={f.id} className={`frm-si ${sel?.id === f.id ? 'on' : ''}`} onClick={() => setSelId(f.id)}><b className="ellipsis">{f.title}</b><span>{plural(f.responseCount, 'réponse')}</span></button>))}
                 {list && !list.length ? <div className="frm-empty">Aucun formulaire.</div> : null}</aside>
             )}
-            {sel ? <React.Fragment key={sel.id}><BonyStats row={sel} list={list || []} compact={compact} onPick={setSelId} onEdit={() => openEditor(sel)} onChanged={load} /></React.Fragment> : <div className="frm-empty">{list ? 'Aucun formulaire à analyser.' : 'Chargement…'}</div>}
+            {sel ? <React.Fragment key={sel.id}><BonyStats win={win} row={sel} list={list || []} compact={compact} onPick={setSelId} onEdit={() => openEditor(sel)} onChanged={load} /></React.Fragment> : <div className="frm-empty">{list ? 'Aucun formulaire à analyser.' : 'Chargement…'}</div>}
           </div>
         )}
       </div>
@@ -213,7 +252,7 @@ function Sources({ raw }: { raw: BonyResponse[] }) {
 // =====================================================================
 // Réponses d'un formulaire Bony
 // =====================================================================
-function BonyStats({ row, list, compact, onPick, onEdit, onChanged }: { row: BonyFormRow; list: BonyFormRow[]; compact: boolean; onPick: (id: string) => void; onEdit: () => void; onChanged: () => void }) {
+function BonyStats({ row, list, compact, onPick, onEdit, onChanged, win }: { row: BonyFormRow; list: BonyFormRow[]; compact: boolean; onPick: (id: string) => void; onEdit: () => void; onChanged: () => void; win: any }) {
   const [d, setD] = useState<BonyFormDetail | null>(null);
   const [raw, setRaw] = useState<BonyResponse[] | null>(null);
   const [view, setView] = useState<'summary' | 'one'>('summary');
@@ -240,16 +279,20 @@ function BonyStats({ row, list, compact, onPick, onEdit, onChanged }: { row: Bon
     await writeSheetFile(`GEARBOX_FormsBony_${safe}.xlsx`, row.title, [...headers, ...params.map((p) => `Lien : ${p}`), 'Site d’origine'], rows.map((r, k) => [...r, ...params.map((p) => rs[k].meta?.params?.[p] || ''), rs[k].meta?.ref || '']));
   };
   const cur = rs[Math.min(idx, rs.length - 1)];
+  const { open: openSheet, portals } = useSheets(win);
+  const openDraw = () => openSheet((close) => <DrawSheet row={row} def={(def as any) || null} close={close} />, { width: 620 });
   const eraseOne = (el: HTMLElement) => gx().menu.open([
     { header: 'Effacer cette réponse ?' }, { label: 'Effacer définitivement (droit à l’effacement)', icon: 'trash', action: async () => { try { await db.deleteBonyResponse(row.id, cur.id); hud('Réponse effacée'); setIdx(Math.max(0, idx - 1)); load(); onChanged(); } catch (e: any) { hud(e?.message || 'Effacement impossible.'); } } },
     { label: 'Annuler', action: () => {} }], el, { align: 'right' });
   const s = STATUS[row.status] || STATUS.draft;
   return (
     <div className="frm-main scroll">
+      {portals}
       <div className="frm-sh">
         {compact ? <select className="frm-pick" value={row.id} onChange={(e) => onPick(e.target.value)}>{list.map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}</select> : <h2 className="ellipsis">{row.title}</h2>}
         <span className="badge" style={{ '--c': s.c } as React.CSSProperties}><i className="dot" />{s.l}</span>
         <span className="grow" />
+        <button className="btn sm" onClick={() => openDraw()}><Icon name="gift" size="sm" />Tirage au sort</button>
         <button className="btn sm" onClick={exportXlsx}><Icon name="download" size="sm" />Excel</button>
         <button className="btn sm" onClick={onEdit}><Icon name="edit" size="sm" />Modifier</button>
       </div>

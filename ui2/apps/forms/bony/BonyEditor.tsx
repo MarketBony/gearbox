@@ -7,6 +7,7 @@ import { TYPES, typeDef, newField, newOption, copyField, bonyOptions } from './c
 import { StudioPanel, StudioPreview, pickImage } from './Studio';
 import Share from './Share';
 import DriveEditor from './DriveEditor';
+import { ProjectTags, VersionsSheet } from './F4';
 
 // =====================================================================
 // Éditeur Forms Bony (lot F1, 01/10/2026). Le BROUILLON s'enregistre tout seul (rien ne change pour
@@ -22,7 +23,7 @@ const reduced = () => { try { return matchMedia('(prefers-reduced-motion: reduce
 const anim = (el: Element | null | undefined, kf: Keyframe[], o: Record<string, unknown> = {}) => (el && !reduced() ? gx().animate(el, kf, o) : null);
 const STATUS: Record<string, { l: string; c: string }> = { draft: { l: 'Brouillon', c: 'var(--text-3)' }, published: { l: 'En ligne', c: 'var(--ok)' }, closed: { l: 'Fermé', c: 'var(--warn)' } };
 
-export default function BonyEditor({ id, workerUrl, onBack, onStats, onChanged }: { id: string; workerUrl: string | null; onBack: () => void; onStats: () => void; onChanged: () => void }) {
+export default function BonyEditor({ id, workerUrl, openSheet, onBack, onStats, onChanged }: { id: string; workerUrl: string | null; openSheet: (render: (close: (v?: unknown) => void) => React.ReactNode, opts?: any) => void; onBack: () => void; onStats: () => void; onChanged: () => void }) {
   const [row, setRow] = useState<BonyFormDetail | null>(null);
   const [def, setDef] = useState<BonyFormDef | null>(null);
   const [err, setErr] = useState('');
@@ -124,7 +125,15 @@ export default function BonyEditor({ id, workerUrl, onBack, onStats, onChanged }
     finally { setBusy(false); }
   };
   const copyLink = () => { if (!row?.url) return; navigator.clipboard?.writeText(row.url).then(() => hud('Lien du formulaire copié'), () => hud(row.url!)); };
+  const me = gx().ctx?.uid as string | undefined, following = !!me && !!row?.followers?.includes(me);
+  const follow = async () => {
+    try { const r = await db.followBonyForm(id, !following); setRow((x) => (x ? { ...x, followers: r.followers } : x)); hud(!following ? 'Vous serez prévenu de chaque réponse' : 'Vous ne suivez plus ce formulaire'); }
+    catch (e: any) { hud(e?.message || 'Abonnement impossible.'); }
+  };
+  const versions = () => openSheet((close) => <VersionsSheet formId={id} close={() => close()} onRestored={() => { load(); changedRef.current(); }} />, { width: 620 });
   const remove = (el: HTMLElement) => gx().menu.open([
+    { label: 'Historique des versions…', icon: 'clock', action: versions },
+    '-',
     { header: `Supprimer « ${def?.title} » ?` },
     { label: `Supprimer définitivement${row?.responseCount ? ` (et ses ${row.responseCount} réponses)` : ''}`, icon: 'trash', action: async () => { try { await db.deleteBonyForm(id); hud('Formulaire supprimé'); onChanged(); onBack(); } catch (e: any) { hud(e?.message || 'Suppression impossible.'); } } },
     { label: 'Annuler', action: () => {} },
@@ -153,6 +162,7 @@ export default function BonyEditor({ id, workerUrl, onBack, onStats, onChanged }
         {row.status === 'published' ? <button className="btn sm" disabled={busy} onClick={close}>Fermer</button> : null}
         <button className="btn sm primary" disabled={busy || (row.status === 'published' && !dirty)} onClick={(e) => publish(e.currentTarget)} data-tip={problems.length ? `${problems.length} point(s) à corriger` : undefined}>
           <Icon name="send" size="sm" />{busy ? 'Publication…' : row.status === 'draft' ? 'Publier' : row.status === 'closed' ? 'Rouvrir et publier' : 'Publier les modifications'}{problems.length ? <span className="count">{problems.length}</span> : null}</button>
+        <button className={`icon-btn sm ${following ? 'on' : ''}`} aria-label={following ? 'Ne plus suivre' : 'Suivre'} aria-pressed={following} data-tip={following ? 'Vous êtes prévenu de chaque réponse (cliquer pour ne plus suivre)' : 'Suivre : être prévenu de chaque réponse'} onClick={follow}><Icon name={following ? 'bell' : 'belloff'} size="sm" /></button>
         <button className="icon-btn sm" aria-label="Plus" onClick={(e) => remove(e.currentTarget)}><Icon name="more" size="sm" /></button>
       </div>
       {mode === 'share' ? (
@@ -183,7 +193,7 @@ export default function BonyEditor({ id, workerUrl, onBack, onStats, onChanged }
         </div>
         <aside className="bfe-side scroll">
           <Seg value={cur && panel === 'field' ? 'field' : 'form'} onChange={(v) => setPanel(v as 'field' | 'form')} options={[['field', 'Champ'], ['form', 'Formulaire']]} />
-          {cur && panel === 'field' ? <FieldSettings f={cur} def={def} set={(p) => setField(cur.id, p)} /> : <FormSettings def={def} update={update} />}
+          {cur && panel === 'field' ? <FieldSettings f={cur} def={def} set={(p) => setField(cur.id, p)} /> : <><ProjectTags row={row} onSaved={(r) => { setRow((x) => (x ? { ...x, ...r } : x)); changedRef.current(); }} /><FormSettings def={def} update={update} /></>}
           {problems.length ? <div className="bfe-probs"><b><Icon name="alert" size="sm" />Avant de publier</b>{problems.map((p, k) => <span key={k}>{p}</span>)}</div> : null}
         </aside>
       </div>

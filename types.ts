@@ -430,6 +430,12 @@ export interface BonyFormRow {
   updatedAt: string;
   url: string | null;           // adresse publique (null si le Worker n'est pas configuré)
   dirty?: boolean;              // brouillon modifié depuis la dernière publication
+  // F4 : projet rattaché (tags hérités, lus en direct) ou tags propres ; abonnés aux notifications.
+  projectId?: string | null;
+  sites?: string[]; brands?: string[]; service?: string[];
+  followers?: string[];
+  project?: { id: string; name: string } | null;
+  tags?: { sites: string[]; brands: string[]; service: string[] };
 }
 export interface BonyFormDetail extends BonyFormRow { draft: any; published: any | null }
 /** Kit de marque (F2a) : une apparence enregistrée, partagée par toute l'équipe. */

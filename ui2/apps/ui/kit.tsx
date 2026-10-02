@@ -162,6 +162,10 @@ export function useSheets(win: EngineWin) {
     setList((L) => [...L, { id, host, render, close: sh.close }]);
     return sh;
   }, [win]);
+  // Un volet appartient au composant qui l'a ouvert : s'il disparaît (changement de vue), le volet se ferme.
+  // Sans ça, le moteur gardait un volet VIDE ouvert sur la fenêtre (constaté le 02/10/2026, Forms › Réponses).
+  const live = useRef<SheetEntry[]>([]); live.current = list;
+  useEffect(() => () => { live.current.forEach((s) => { try { s.close(); } catch { /* déjà fermé */ } }); }, []);
   const portals = list.map((s) => createPortal(<>{s.render(s.close)}</>, s.host, `sheet-${s.id}`));
   return { open, portals };
 }
