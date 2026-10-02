@@ -86,17 +86,33 @@ ${boot ? `<script>window.__BF=${inlineJson(boot)}</script>${(boot as any).previe
 const notice = (title: string, msg: string, theme: Partial<Theme> | null = null, status = 200) =>
   page(title, theme, `<main class="bf-notice"><div class="bf-card bf-in"><div class="bf-ico">!</div><h1>${esc(title)}</h1><p>${esc(msg)}</p></div></main>`, undefined, { status });
 
+// ---------------------------------------------------------------- économie du KV (02/10/2026)
+// ⚠️ Offre gratuite : ~1 000 écritures / suppressions / LISTAGES de KV par jour (lectures : 100 000). Alerte Cloudflare
+// reçue le 02/10 à 50 % : le cron listait la file CHAQUE minute (1 440 / jour à lui seul) et chaque envoi écrivait un
+// compteur. Règle : le KV ne s'écrit plus que pour publier, déposer un fichier ou mettre une réponse en file.
+//  - compteurs anti-abus et cache des places : EN MÉMOIRE de l'isolat (approximatifs d'une instance à l'autre, ce qui
+//    suffit : la vraie barrière est Turnstile, et les places sont revalidées par Gearbox à la réception) ;
+//  - file d'attente : un TÉMOIN `qflag` (une lecture par minute) ; on ne liste que s'il est posé.
+const mem = new Map<string, { v: number; exp: number }>();
+function bump(key: string, ttlMs: number): number {
+  const now = Date.now(), e = mem.get(key);
+  if (mem.size > 5000) for (const [k, x] of mem) if (x.exp < now) mem.delete(k);
+  const live = !!e && e.exp > now, n = live ? e!.v + 1 : 1;
+  mem.set(key, { v: n, exp: live ? e!.exp : now + ttlMs });
+  return n;
+}
+const stateCache = new Map<string, { s: State; exp: number }>();
+
 // ---------------------------------------------------------------- état (places des créneaux), cache 30 s
 async function stateOf(env: Env, publicId: string, def: BonyFormDef): Promise<State | null> {
   if (!def.fields.some((f) => f.type === 'slot' || f.type === 'testdrive') && !def.settings.maxResponses) return null;
-  const k = `st:${publicId}`;
-  const cached = await env.FORMS.get<State>(k, 'json');
-  if (cached) return cached;
+  const hit = stateCache.get(publicId);
+  if (hit && hit.exp > Date.now()) return hit.s;
   try {
     const r = await toGearbox(env, '/api/bony-forms/state', { publicId }, 4000);
     if (!r.ok) return null;
     const s = (await r.json()) as State;
-    await env.FORMS.put(k, JSON.stringify(s), { expirationTtl: 60 });
+    stateCache.set(publicId, { s, exp: Date.now() + 30_000 });
     return s;
   } catch { return null; }                                  // Gearbox indisponible : affichage sans compteur
 }
@@ -114,9 +130,7 @@ const accepts = (f: Field, type: string) => {
 async function upload(req: Request, env: Env, publicId: string, form: Stored) {
   if (form.status !== 'open') return json({ error: 'Ce formulaire n’accepte plus de réponses.' }, 409);
   const ip = req.headers.get('cf-connecting-ip') || 'inconnue';
-  const rk = `rf:${publicId}:${ip}:${Math.floor(Date.now() / 60_000)}`, n = Number((await env.FORMS.get(rk)) || 0);
-  if (n >= FILE_RATE) return json({ error: 'Trop de fichiers envoyés : réessayez dans une minute.' }, 429);
-  await env.FORMS.put(rk, String(n + 1), { expirationTtl: 120 });
+  if (bump(`rf:${publicId}:${ip}`, 60_000) > FILE_RATE) return json({ error: 'Trop de fichiers envoyés : réessayez dans une minute.' }, 429);
   let fd: FormData;
   try { fd = await req.formData(); } catch { return json({ error: 'Envoi invalide.' }, 400); }
   const file = fd.get('file'), field = form.def.fields.find((f) => f.id === fd.get('field') && f.type === 'file');
@@ -152,10 +166,7 @@ async function tokensOk(env: Env, publicId: string, def: BonyFormDef, answers: A
 async function submit(req: Request, env: Env, publicId: string, form: Stored) {
   if (form.status !== 'open') return json({ error: form.def.settings.closedMessage || 'Ce formulaire n’accepte plus de réponses.', closed: true }, 409);
   const ip = req.headers.get('cf-connecting-ip') || 'inconnue';
-  const rk = `rl:${publicId}:${ip}:${Math.floor(Date.now() / 60_000)}`;
-  const n = Number((await env.FORMS.get(rk)) || 0);
-  if (n >= RATE) return json({ error: 'Trop d’envois depuis votre connexion : réessayez dans une minute.' }, 429);
-  await env.FORMS.put(rk, String(n + 1), { expirationTtl: 120 });
+  if (bump(`rl:${publicId}:${ip}`, 60_000) > RATE) return json({ error: 'Trop d’envois depuis votre connexion : réessayez dans une minute.' }, 429);
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: 'Requête invalide.' }, 400); }
@@ -181,10 +192,10 @@ async function submit(req: Request, env: Env, publicId: string, form: Stored) {
   };
   try {
     const r = await toGearbox(env, '/api/bony-forms/ingest', payload);
-    if (r.ok) { await env.FORMS.delete(`st:${publicId}`); return json({ ok: true }); }
+    if (r.ok) { stateCache.delete(publicId); return json({ ok: true }); }
     if (r.status === 409 || r.status === 422 || r.status === 404) {
       // Refus (créneau pris entre-temps, doublon…) : places relues pour que le répondant voie l'état réel.
-      await env.FORMS.delete(`st:${publicId}`);
+      stateCache.delete(publicId);
       const fresh = await stateOf(env, publicId, form.def);
       return json({ ...((await r.json().catch(() => ({ error: 'Réponse refusée.' }))) as object), taken: fresh?.taken }, r.status);
     }
@@ -192,6 +203,7 @@ async function submit(req: Request, env: Env, publicId: string, form: Stored) {
   } catch (e) {
     // Gearbox indisponible (déploiement, panne) : la réponse est GARDÉE et renvoyée par le cron.
     await env.FORMS.put(`q:${payload.responseId}`, JSON.stringify({ ...payload, queued: true }), { expirationTtl: QUEUE_TTL });
+    await env.FORMS.put('qflag', '1', { expirationTtl: QUEUE_TTL });     // témoin lu par le cron
     console.log(`[forms] réponse ${payload.responseId} mise en file (${e instanceof Error ? e.message : e})`);
     return json({ ok: true, queued: true });
   }
@@ -199,7 +211,9 @@ async function submit(req: Request, env: Env, publicId: string, form: Stored) {
 
 /** Cron (chaque minute) : renvoie à Gearbox les réponses restées en file. */
 async function flushQueue(env: Env) {
+  if (!(await env.FORMS.get('qflag'))) return;                        // file vide : une seule LECTURE par minute
   const list = await env.FORMS.list({ prefix: 'q:', limit: 50 });
+  if (!list.keys.length) { await env.FORMS.delete('qflag'); return; }
   for (const k of list.keys) {
     const p = await env.FORMS.get(k.name); if (!p) continue;
     try {
@@ -234,10 +248,10 @@ export default {
       if (path === '/__gearbox/publish') {
         if (msg.status !== 'open' && msg.status !== 'closed') return json({ error: 'Statut invalide.' }, 400);
         await env.FORMS.put(`form:${msg.publicId}`, JSON.stringify({ status: msg.status, version: msg.version, def: msg.def }));
-        await env.FORMS.delete(`st:${msg.publicId}`);
+        stateCache.delete(msg.publicId);
         return json({ ok: true });
       }
-      if (path === '/__gearbox/remove') { await env.FORMS.delete(`form:${msg.publicId}`); await env.FORMS.delete(`st:${msg.publicId}`); return json({ ok: true }); }
+      if (path === '/__gearbox/remove') { await env.FORMS.delete(`form:${msg.publicId}`); stateCache.delete(msg.publicId); return json({ ok: true }); }
       return json({ error: 'Inconnu.' }, 404);
     }
 

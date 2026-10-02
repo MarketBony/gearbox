@@ -4,7 +4,9 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 01/10/2026 (lire en premier)
-- **En production : correctif 66 (02/10)** — **Forms Bony, lot F4** : formulaire relié à un projet (tags hérités en
+- **En production : correctif 67 (02/10)** — **Worker Forms : économie du KV** (alerte Cloudflare « 50 % de la limite
+  journalière » reçue le 02/10 : sans correctif, les formulaires auraient refusé les réponses vers 18 h 30). Avant lui le
+  **correctif 66 (02/10)** — **Forms Bony, lot F4** : formulaire relié à un projet (tags hérités en
   direct, sinon tags libres) et filtres, abonnés notifiés à chaque réponse, tirage au sort avec procès-verbal, versions
   publiées ; plus une **copie nocturne des fichiers SUR le VPS** (décision de Théo : pas de copie hors VPS). Pas
   d'e-mail aux répondants (décision du 02/10). Avant lui le **correctif 65 (02/10)** — **Forms Bony, lot F3** : **prise d'essai** (voiture → jour → créneau,
@@ -523,6 +525,18 @@
     seule sur le projet), Holding, filtres, bannière, tirage (doublon écarté), effacement RGPD au PV, versions et
     restauration, ouverture depuis la fiche projet ; supprimé ensuite, base vérifiée sans reste.
 
+- **Correctif 67 — 02/10 : Worker Forms, économie du KV** (branche `fix/forms-worker-kv`, **Worker seul**, rien côté
+  VPS). Alerte Cloudflare reçue par Théo : 50 % de la limite journalière gratuite de KV (≈ 1 000 écritures / suppressions /
+  LISTAGES par jour ; lectures 100 000). Cause : le cron listait la file CHAQUE minute (1 440 listages / jour à lui seul),
+  chaque envoi écrivait un compteur anti-abus, le cache des places s'écrivait et s'effaçait. À 100 %, les écritures
+  échouent jusqu'à minuit UTC : le compteur anti-abus aurait fait tomber CHAQUE envoi de réponse (l'affichage restait).
+  Correctif : compteurs anti-abus et cache des places en MÉMOIRE de l'isolat (approximatifs entre instances : Turnstile
+  reste la barrière, Gearbox revalide les places) ; file signalée par un témoin `qflag` (une LECTURE par minute, on ne
+  liste que s'il est posé). Le KV ne s'écrit plus qu'à la publication, au dépôt d'image / police et pendant une panne de
+  Gearbox. Testé en local sur le Worker seul (jeton de Théo expiré, aucune écriture en base) : mise en file API arrêtée,
+  témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
+  ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
+
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
   51.83.75.181)
@@ -530,7 +544,8 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 66** (2 octobre 2026) — **Forms Bony F4** + copie
+- master = prod, synchronisés. Dernier lot déployé : **correctif 67** (2 octobre 2026) — économie du KV du Worker
+  (`cd forms-worker && npm run deploy`, rien sur le VPS). Avant lui le **correctif 66** — **Forms Bony F4** + copie
   nocturne des fichiers (crontab root, `scripts/backup-files.sh`). `api` ET `web`, migration `20261002140000_bony_f4`
   (additive, appliquée avant le push), Worker inchangé. Avant lui le **correctif 65** — **Forms Bony F3**. Worker
   d'abord (route `/<id>/file`, places de la prise d'essai), puis `api` ET `web`. Aucune migration. **Nouveau volume
