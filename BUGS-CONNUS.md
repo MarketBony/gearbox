@@ -320,6 +320,12 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [x] **Forms Bony : aperçu du Studio bloqué « en attente »** (relevé en test) — le « prêt » du client pouvait partir
   avant que l'éditeur écoute (double montage React en dev) ; l'événement `load` de l'iframe sert aussi de signal.
 - [x] **Forms Bony : « 2 formulaire Bonys »** (relevé en test).
+<!-- Worker Forms — 02/10/2026, correctif 67 -->
+- [x] **Worker Forms : limite journalière gratuite du KV atteinte à 50 % à 9 h** (alerte Cloudflare reçue par Théo) — cron
+  qui listait la file chaque minute + compteur anti-abus écrit à chaque envoi. À 100 %, tous les envois de réponses
+  auraient échoué jusqu'à minuit UTC. Compteurs et cache en mémoire, témoin de file : le KV n'est plus écrit qu'à la
+  publication, aux dépôts de fichiers et pendant une panne de Gearbox.
+
 <!-- Forms Bony F3 — 02/10/2026, correctif 65 -->
 - [x] **Forms Bony (prise d'essai) : le jour même, passé, affiché « complet »** (relevé en test) — `driveDays` ne
   propose plus qu'un jour ayant au moins un créneau encore réservable (prévenance comprise).

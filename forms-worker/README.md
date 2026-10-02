@@ -26,8 +26,9 @@ publier un formulaire = Gearbox dépose sa définition dans le KV du Worker, san
   max, pas de SVG) → servis par `GET /a/<id>` (cache d'un an, CSP `sandbox`).
 
 ## KV `FORMS` (id `48950e3fde4e4e82a923880278b1d766`)
-`form:<publicId>` (définition publiée + statut), `asset:<empreinte>` (images et polices), `q:<id>` (file d'attente), `st:<publicId>` (places des
-créneaux, cache 60 s), `rl:…` (limitation de débit, 2 min).
+`form:<publicId>` (définition publiée + statut), `asset:<empreinte>` (images et polices), `q:<id>` (file d'attente), `qflag` (témoin : la file n'est pas vide).
+⚠️ Quotas gratuits (~1 000 écritures / listages par jour) : compteurs anti-abus et cache des places sont EN MÉMOIRE
+(correctif 67) ; le cron ne liste la file que si `qflag` est posé.
 
 ## Développement local
 ```

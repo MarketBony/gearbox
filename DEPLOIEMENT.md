@@ -200,4 +200,8 @@ Déployé À PART du VPS, depuis ce poste, avec la session `wrangler` de Théo (
 7. Images et polices des formulaires : dans le KV `FORMS` du Worker (clés `asset:<empreinte>`, offre gratuite
    1 Go). Aucune n'est sur le VPS : la sauvegarde du VPS ne les contient pas.
 
+⚠️ **Quotas de l'offre gratuite du KV** (correctif 67, 02/10/2026) : ~1 000 écritures / suppressions / LISTAGES par jour,
+100 000 lectures. Une alerte Cloudflare par e-mail à 50 % signale un dépassement en vue (remise à zéro à minuit UTC).
+Ne jamais écrire ni lister le KV à chaque requête ou à chaque minute (compteurs, caches → mémoire de l'isolat).
+
 Ne pas toucher aux autres Workers du compte (`forum-2026`, `grid`).
