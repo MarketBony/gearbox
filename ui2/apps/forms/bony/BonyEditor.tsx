@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import type { BonyFormDetail } from '../../../../types';
 import { db } from '../../../../services/dataService';
 import { gx, hud, Icon, Seg, useEngineStore } from '../../ui/kit';
-import { checkDef, isLayout, CHOICE_TYPES, type BonyFormDef, type Field, type FieldType } from '../../../../shared/bonyform';
+import { checkDef, isLayout, CHOICE_TYPES, driveDays, type Condition, type BonyFormDef, type Field, type FieldType } from '../../../../shared/bonyform';
 import { TYPES, typeDef, newField, newOption, copyField, bonyOptions } from './catalog';
 import { StudioPanel, StudioPreview, pickImage } from './Studio';
 import Share from './Share';
+import DriveEditor from './DriveEditor';
 
 // =====================================================================
 // Éditeur Forms Bony (lot F1, 01/10/2026). Le BROUILLON s'enregistre tout seul (rien ne change pour
@@ -258,7 +259,11 @@ function Preview({ f, on, set }: { f: Field; on: boolean; set: (p: Partial<Field
   const refs = useRef<(HTMLInputElement | null)[]>([]), focusNext = useRef<number | null>(null);
   useEffect(() => { if (focusNext.current !== null) { refs.current[focusNext.current]?.focus(); refs.current[focusNext.current]?.select(); focusNext.current = null; } });
   if (f.type === 'concession' || f.type === 'brand') return <div className="frm-fake">{(f.options || bonyOptions(f.type) || []).slice(0, 4).map((o) => o.label).join(' · ')}{(f.options || []).length > 4 ? ' …' : ''} <span className="faint">(liste tenue par Gearbox)</span></div>;
-  if (['choice', 'multi', 'dropdown'].includes(f.type)) {
+  if (f.type === 'testdrive' && f.drive) { const n = driveDays(f.drive).length; return <div className="frm-fake">🚗 {f.drive.cars.map((c) => `${c.label} ×${c.count}`).join(' · ')} — créneaux de {f.drive.slot} min, {n} jour{n > 1 ? 's' : ''} à venir</div>; }
+  if (f.type === 'signature') return <div className="frm-fake paragraph">✍️ Zone de signature</div>;
+  if (f.type === 'file') return <div className="frm-fake">📎 Dépôt de {f.maxFiles || 1} fichier{(f.maxFiles || 1) > 1 ? 's' : ''} ({(f.accept || []).includes('application/pdf') ? 'images ou PDF' : 'images'}, {f.maxSizeMb || 10} Mo au plus)</div>;
+  if (f.type === 'calc') return <div className="frm-fake">{f.formula?.kind === 'sum' ? 'Σ Somme' : '★ Score'} de {(f.formula?.fields || []).length} question{(f.formula?.fields || []).length > 1 ? 's' : ''}{f.calcHidden ? ' · caché au répondant' : ' · affiché'}</div>;
+  if (['choice', 'multi', 'dropdown', 'slot'].includes(f.type)) {
     const opts = f.options || [], mark = f.type === 'multi' ? 'sq' : f.type === 'dropdown' ? 'num' : 'rd';
     return (
       <div className="frm-opts">
@@ -269,6 +274,7 @@ function Preview({ f, on, set }: { f: Field; on: boolean; set: (p: Partial<Field
               onChange={(e) => set((x) => { x.options![j].label = e.target.value; })}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); focusNext.current = j + 1; set((x) => { x.options!.splice(j + 1, 0, newOption(`Option ${x.options!.length + 1}`)); }); } }} />
               : <span className="frm-optv">{o.label}</span>}
+            {f.type === 'slot' ? <span className="faint bfe-cap">{o.capacity ?? '∞'} pl.</span> : null}
             {on && opts.length > 1 ? <button className="icon-btn sm" aria-label="Retirer l’option" onClick={() => set((x) => { x.options!.splice(j, 1); })}><Icon name="close" size="sm" /></button> : null}
           </div>
         ))}
@@ -293,7 +299,7 @@ function FieldSettings({ f, def, set }: { f: Field; def: BonyFormDef; set: (p: P
   return (
     <div className="bfe-set">
       <div className="bfe-gt">{typeDef(f.type).l}</div>
-      {!isLayout(f) && f.type !== 'consent' && f.type !== 'hidden' && !['choice', 'multi', 'scale', 'rating', 'nps'].includes(f.type) ? <Txt l="Texte d’exemple" v={f.placeholder || ''} on={(v) => set((x) => { if (v) x.placeholder = v; else delete x.placeholder; })} /> : null}
+      {!isLayout(f) && f.type !== 'consent' && f.type !== 'hidden' && !['choice', 'multi', 'scale', 'rating', 'nps', 'slot', 'calc', 'file', 'signature', 'testdrive'].includes(f.type) ? <Txt l="Texte d’exemple" v={f.placeholder || ''} on={(v) => set((x) => { if (v) x.placeholder = v; else delete x.placeholder; })} /> : null}
       {f.type === 'short' || f.type === 'long' ? <Num l="Longueur maximale" v={f.maxLength} on={(v) => num('maxLength', v)} /> : null}
       {f.type === 'number' ? <div className="bfe-row"><Num l="Minimum" v={f.min} on={(v) => num('min', v)} /><Num l="Maximum" v={f.max} on={(v) => num('max', v)} /></div> : null}
       {f.type === 'scale' ? <>
@@ -318,11 +324,34 @@ function FieldSettings({ f, def, set }: { f: Field; def: BonyFormDef; set: (p: P
         </> : null}
         <Chk l="Proposer « Autre » (réponse libre)" v={!!f.allowOther} on={(v) => set({ allowOther: v })} />
       </> : null}
+      {f.type === 'testdrive' ? <DriveEditor f={f} set={set} /> : null}
+      {f.type === 'slot' ? <>
+        <div className="bfe-gt">Places par créneau</div>
+        <div className="bfe-tiles">{(f.options || []).map((o, k) => (
+          <div key={o.id} className="bfe-tile"><span className="ellipsis bfe-tlab">{o.label || `Créneau ${k + 1}`}</span>
+            <input className="bfe-in bfe-emoji" type="number" min={1} value={o.capacity ?? ''} placeholder="∞" aria-label="Places" onChange={(e) => set((x) => { const n = Number(e.target.value); if (e.target.value && n >= 1) x.options![k].capacity = n; else delete x.options![k].capacity; })} /></div>))}</div>
+        <div className="bfe-hint">Vide = illimité. Les places restantes s’affichent aux répondants ; un créneau complet est grisé.</div>
+      </> : null}
+      {def.fields.some((x) => x.type === 'calc' && x.formula?.kind === 'score' && x.formula.fields.includes(f.id)) && f.options ? <>
+        <div className="bfe-gt">Points (pour le score)</div>
+        <div className="bfe-tiles">{f.options.map((o, k) => (
+          <div key={o.id} className="bfe-tile"><span className="ellipsis bfe-tlab">{o.label || `Option ${k + 1}`}</span>
+            <input className="bfe-in bfe-emoji" type="number" value={o.score ?? ''} placeholder="0" aria-label="Points" onChange={(e) => set((x) => { const n = Number(e.target.value); if (e.target.value !== '' && Number.isFinite(n)) x.options![k].score = n; else delete x.options![k].score; })} /></div>))}</div>
+      </> : null}
+      {f.type === 'calc' ? <CalcSettings f={f} def={def} set={set} /> : null}
+      {f.type === 'file' ? <>
+        <div className="bfe-row">
+          <Sel l="Types acceptés" v={(f.accept || []).includes('application/pdf') ? 'both' : 'img'} opts={[['both', 'Images et PDF'], ['img', 'Images seulement']]} on={(v) => set({ accept: v === 'both' ? ['image/*', 'application/pdf'] : ['image/*'] })} />
+          <Sel l="Fichiers" v={String(f.maxFiles || 1)} opts={[1, 2, 3, 4, 5].map((n) => [String(n), String(n)])} on={(v) => set({ maxFiles: Number(v) })} />
+          <Sel l="Taille max." v={String(f.maxSizeMb || 10)} opts={[2, 5, 10].map((n) => [String(n), `${n} Mo`])} on={(v) => set({ maxSizeMb: Number(v) })} />
+        </div>
+        <div className="bfe-hint">Les fichiers sont gardés sur le serveur de Gearbox (jamais publics) et téléchargeables dans « Réponses ». Effacés avec la réponse.</div>
+      </> : null}
       {f.type === 'multi' ? <div className="bfe-row"><Num l="Choix minimum" v={f.minChoices} on={(v) => num('minChoices', v)} /><Num l="Choix maximum" v={f.maxChoices} on={(v) => num('maxChoices', v)} /></div> : null}
       {CHOICE_TYPES.includes(f.type) && f.type !== 'concession' && f.type !== 'brand' ? <Chk l="Ordre aléatoire des options" v={!!f.shuffle} on={(v) => set({ shuffle: v })} /> : null}
       {f.type === 'consent' ? <Txt l="Texte légal (RGPD)" multiline v={f.consentText || ''} on={(v) => set({ consentText: v })} /> : null}
       {f.type === 'email' ? <Chk l="Une seule réponse par adresse" v={!!f.unique} on={(v) => set({ unique: v })} /> : null}
-      {!isLayout(f) && f.type !== 'consent' ? <>
+      {!isLayout(f) && !['consent', 'calc', 'file', 'signature', 'testdrive'].includes(f.type) ? <>
         <div className="bfe-gt">Préremplissage depuis le lien</div>
         <Txt l={f.type === 'hidden' ? 'Paramètre du lien (obligatoire)' : 'Paramètre du lien (facultatif)'} v={f.param || ''} placeholder="ex. email, concession, source" on={(v) => set((x) => { const p = v.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 30); if (p) x.param = p; else delete x.param; })} />
         {f.param ? <div className="bfe-hint">Lien d’e-mailing : <code>…/{'{id}'}?{f.param}=valeur</code>. Avec Sarbacane ou Brevo, mettez la variable du contact (ex. <code>?{f.param}={'{{EMAIL}}'}</code>).</div> : null}
@@ -337,24 +366,48 @@ function FieldSettings({ f, def, set }: { f: Field; def: BonyFormDef; set: (p: P
 
 /** Condition d'affichage : règles sur les questions PRÉCÉDENTES (le format refuse les autres). */
 function Logic({ f, prev, set }: { f: Field; prev: Field[]; set: (p: Partial<Field> | ((f: Field) => void)) => void }) {
-  const rules = f.showIf?.rules || [];
   if (!prev.length) return <div className="bfe-hint">Aucune question avant celle-ci : rien à conditionner.</div>;
-  const OPS: [string, string][] = [['eq', 'est'], ['neq', 'n’est pas'], ['filled', 'est rempli'], ['empty', 'est vide'], ['contains', 'contient'], ['gt', 'est supérieur à'], ['lt', 'est inférieur à']];
-  const upd = (fn: (r: NonNullable<Field['showIf']>) => void) => set((x) => { x.showIf = x.showIf || { mode: 'all', rules: [] }; fn(x.showIf); if (!x.showIf.rules.length) delete x.showIf; });
+  return <CondEditor cond={f.showIf} fields={prev} onChange={(c) => set((x) => { if (c) x.showIf = c; else delete x.showIf; })} />;
+}
+const OPS_ALL: [string, string][] = [['eq', 'est'], ['neq', 'n’est pas'], ['in', 'est l’un de'], ['nin', 'n’est aucun de'], ['filled', 'est rempli'], ['empty', 'est vide'], ['contains', 'contient'], ['gt', '>'], ['gte', '≥'], ['lt', '<'], ['lte', '≤']];
+/** Éditeur de condition (toutes / au moins une règle), sur une liste de champs donnée. `null` = aucune règle. */
+function CondEditor({ cond, fields, onChange }: { cond?: Condition; fields: Field[]; onChange: (c: Condition | null) => void }) {
+  const c = cond || { mode: 'all' as const, rules: [] };
+  const upd = (fn: (x: Condition) => void) => { const n: Condition = JSON.parse(JSON.stringify(c)); fn(n); onChange(n.rules.length ? n : null); };
+  const ops = (src?: Field) => OPS_ALL.filter(([v]) => (src?.options ? !['contains', 'gt', 'gte', 'lt', 'lte'].includes(v) : !['in', 'nin'].includes(v)));
   return (
     <div className="bfe-logic">
-      {rules.length > 1 ? <Seg value={f.showIf!.mode} onChange={(v) => upd((c) => { c.mode = v as any; })} options={[['all', 'Toutes les conditions'], ['any', 'Au moins une']]} /> : null}
-      {rules.map((r, k) => { const src = prev.find((x) => x.id === r.field); return (
+      {c.rules.length > 1 ? <Seg value={c.mode} onChange={(v) => upd((x) => { x.mode = v as any; })} options={[['all', 'Toutes les conditions'], ['any', 'Au moins une']]} /> : null}
+      {c.rules.map((r, k) => { const src = fields.find((x) => x.id === r.field); const vals = Array.isArray(r.value) ? r.value.map(String) : []; return (
         <div key={k} className="bfe-rule">
-          <select value={r.field} onChange={(e) => upd((c) => { c.rules[k] = { field: e.target.value, op: 'eq', value: '' }; })}>{prev.map((x) => <option key={x.id} value={x.id}>{x.label || typeDef(x.type).l}</option>)}</select>
-          <select value={r.op} onChange={(e) => upd((c) => { c.rules[k].op = e.target.value as any; })}>{OPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-          {r.op === 'filled' || r.op === 'empty' ? null : src?.options ? (
-            <select value={String(r.value ?? '')} onChange={(e) => upd((c) => { c.rules[k].value = e.target.value; })}><option value="">—</option>{src.options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select>
-          ) : <input value={String(r.value ?? '')} onChange={(e) => upd((c) => { c.rules[k].value = e.target.value; })} placeholder="valeur" />}
-          <button className="icon-btn sm" aria-label="Retirer" onClick={() => upd((c) => { c.rules.splice(k, 1); })}><Icon name="close" size="sm" /></button>
+          <select value={r.field} onChange={(e) => upd((x) => { const nf = fields.find((y) => y.id === e.target.value); x.rules[k] = { field: e.target.value, op: nf?.options ? 'eq' : nf?.type === 'calc' || nf?.type === 'number' ? 'gte' : 'filled', value: '' }; })}>{fields.map((x) => <option key={x.id} value={x.id}>{x.label || typeDef(x.type).l}</option>)}</select>
+          <select value={r.op} onChange={(e) => upd((x) => { x.rules[k].op = e.target.value as any; x.rules[k].value = ['in', 'nin'].includes(e.target.value) ? [] : ''; })}>{ops(src).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+          {r.op === 'filled' || r.op === 'empty' ? <span /> : (r.op === 'in' || r.op === 'nin') && src?.options ? (
+            <span className="bfe-multi">{src.options.map((o) => <label key={o.id} className={vals.includes(o.id) ? 'on' : ''}><input type="checkbox" checked={vals.includes(o.id)} onChange={(e) => upd((x) => { const v = new Set(vals); if (e.target.checked) v.add(o.id); else v.delete(o.id); x.rules[k].value = [...v]; })} />{o.label}</label>)}</span>
+          ) : src?.options ? (
+            <select value={String(r.value ?? '')} onChange={(e) => upd((x) => { x.rules[k].value = e.target.value; })}><option value="">—</option>{src.options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select>
+          ) : <input value={String(r.value ?? '')} inputMode={['gt', 'gte', 'lt', 'lte'].includes(r.op) ? 'decimal' : undefined} onChange={(e) => upd((x) => { x.rules[k].value = e.target.value; })} placeholder="valeur" />}
+          <button className="icon-btn sm" aria-label="Retirer" onClick={() => upd((x) => { x.rules.splice(k, 1); })}><Icon name="close" size="sm" /></button>
         </div>); })}
-      <button className="btn sm" onClick={() => upd((c) => { c.rules.push({ field: prev[prev.length - 1].id, op: prev[prev.length - 1].options ? 'eq' : 'filled', value: '' }); })}><Icon name="plus" size="sm" />Condition</button>
+      <button className="btn sm" onClick={() => upd((x) => { const last = fields[fields.length - 1]; x.rules.push({ field: last.id, op: last.options ? 'eq' : last.type === 'calc' || last.type === 'number' ? 'gte' : 'filled', value: '' }); })}><Icon name="plus" size="sm" />Condition</button>
     </div>
+  );
+}
+
+/** Réglages d'un champ calculé : score (points des options) ou somme (nombres, notes, échelles). */
+function CalcSettings({ f, def, set }: { f: Field; def: BonyFormDef; set: (p: Partial<Field> | ((f: Field) => void)) => void }) {
+  const kind = f.formula?.kind || 'score', ids = f.formula?.fields || [];
+  const src = def.fields.filter((x) => x.id !== f.id && (kind === 'score' ? !!x.options && x.type !== 'concession' && x.type !== 'brand' : ['number', 'scale', 'rating', 'nps'].includes(x.type)));
+  return (
+    <>
+      <Seg value={kind} onChange={(v) => set((x) => { x.formula = { kind: v as any, fields: [] }; })} options={[['score', 'Score (points des réponses)'], ['sum', 'Somme de nombres']]} />
+      <div className="bfe-gt">{kind === 'score' ? 'Questions comptées' : 'Nombres additionnés'}</div>
+      {src.length ? <div className="bfe-multi col">{src.map((x) => <label key={x.id} className={ids.includes(x.id) ? 'on' : ''}><input type="checkbox" checked={ids.includes(x.id)} onChange={(e) => set((y) => { const n = new Set(y.formula?.fields || []); if (e.target.checked) n.add(x.id); else n.delete(x.id); y.formula = { kind, fields: def.fields.filter((z) => n.has(z.id)).map((z) => z.id) }; })} />{x.label || typeDef(x.type).l}</label>)}</div>
+        : <div className="bfe-hint">{kind === 'score' ? 'Ajoutez d’abord une question à choix.' : 'Ajoutez d’abord un nombre, une échelle ou une note.'}</div>}
+      {kind === 'score' && ids.length ? <div className="bfe-hint">Les points se règlent sur chaque question cochée (panneau « Champ » de la question).</div> : null}
+      <Chk l="Cacher le résultat au répondant" v={!!f.calcHidden} on={(v) => set({ calcHidden: v })} />
+      <div className="bfe-hint">Utilisable dans les conditions (« Score ≥ 8 ») et pour choisir l’écran de fin.</div>
+    </>
   );
 }
 
@@ -381,9 +434,48 @@ function FormSettings({ def, update }: { def: BonyFormDef; update: (mut: (d: Bon
         <Txt l="Adresse du bouton" v={s.thankYou.button?.url || ''} placeholder="https://…" on={(v) => update((d) => { const b = d.settings.thankYou.button || { label: '', url: '' }; b.url = v.trim(); d.settings.thankYou.button = b.label || b.url ? b : null; })} />
       </div>
       <Txt l="Rediriger vers (facultatif)" v={s.thankYou.redirectUrl || ''} placeholder="https://www.bonyauto-mobile.com" on={(v) => update((d) => { d.settings.thankYou.redirectUrl = /^https?:\/\//.test(v) ? v : null; })} />
+      <Endings def={def} update={update} />
+      <div className="bfe-gt">Programmation</div>
+      <div className="bfe-row">
+        <label className="bfe-f"><span>Ouverture (facultatif)</span><input className="bfe-in" type="datetime-local" value={toLocal(s.openAt)} onChange={(e) => update((d) => { d.settings.openAt = e.target.value ? new Date(e.target.value).toISOString() : null; })} /></label>
+        <label className="bfe-f"><span>Fermeture (facultatif)</span><input className="bfe-in" type="datetime-local" value={toLocal(s.closeAt)} onChange={(e) => update((d) => { d.settings.closeAt = e.target.value ? new Date(e.target.value).toISOString() : null; })} /></label>
+      </div>
+      <Num l="Nombre maximal de réponses (facultatif)" v={s.maxResponses ?? undefined} on={(v) => update((d) => { const n = Number(v); d.settings.maxResponses = v && n >= 1 ? Math.round(n) : null; })} />
+      {s.openAt && s.closeAt && s.closeAt <= s.openAt ? <div className="bfe-probs"><b><Icon name="alert" size="sm" />La fermeture est avant l’ouverture.</b></div> : null}
+      <div className="bfe-hint">Avant l’ouverture, le lien affiche « Ce formulaire ouvrira le … ». Fermeture ou maximum atteint : le message ci-dessous.</div>
       <div className="bfe-gt">Fermeture</div>
       <Txt l="Message quand le formulaire est fermé" multiline v={s.closedMessage || ''} on={(v) => update((d) => { d.settings.closedMessage = v; })} />
     </div>
+  );
+}
+
+/** datetime-local ← ISO (heure du poste, Paris pour l'équipe). */
+const toLocal = (iso?: string | null) => { if (!iso) return ''; const d = new Date(iso); if (isNaN(d.getTime())) return ''; const p = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+
+/** Écrans de fin SELON la réponse (F3) : le premier dont la condition est remplie s'affiche. */
+function Endings({ def, update }: { def: BonyFormDef; update: (mut: (d: BonyFormDef) => void, soon?: boolean) => void }) {
+  const list = def.settings.endings || [], fields = def.fields.filter((f) => !isLayout(f) && f.type !== 'file' && f.type !== 'signature');
+  const upd = (k: number, fn: (e: NonNullable<BonyFormDef['settings']['endings']>[number]) => void, soon = false) => update((d) => { fn(d.settings.endings![k]); }, soon);
+  return (
+    <>
+      <div className="bfe-gt">Écrans de fin selon la réponse</div>
+      {list.map((e, k) => (
+        <div key={e.id} className="bfe-end">
+          <div className="bfe-endh"><b>{k + 1}.</b><input className="bfe-in" value={e.name || ''} placeholder={`Écran ${k + 1} (nom interne)`} onChange={(ev) => upd(k, (x) => { x.name = ev.target.value.slice(0, 40); })} />
+            <button className="icon-btn sm" aria-label="Monter" disabled={k === 0} onClick={() => update((d) => { const a = d.settings.endings!; [a[k - 1], a[k]] = [a[k], a[k - 1]]; }, true)}><Icon name="arrowup" size="sm" /></button>
+            <button className="icon-btn sm danger" aria-label="Supprimer" onClick={() => update((d) => { d.settings.endings!.splice(k, 1); if (!d.settings.endings!.length) delete d.settings.endings; }, true)}><Icon name="trash" size="sm" /></button></div>
+          <span className="faint" style={{ fontSize: 12 }}>S’affiche si…</span>
+          {fields.length ? <CondEditor cond={e.when} fields={fields} onChange={(c) => upd(k, (x) => { x.when = c || { mode: 'all', rules: [] }; }, true)} /> : <div className="bfe-hint">Ajoutez d’abord des questions.</div>}
+          <Txt l="Titre" v={e.title} on={(v) => upd(k, (x) => { x.title = v; })} />
+          <Txt l="Message" multiline v={e.message} on={(v) => upd(k, (x) => { x.message = v; })} />
+          <div className="bfe-row">
+            <Txt l="Bouton (facultatif)" v={e.button?.label || ''} on={(v) => upd(k, (x) => { const b = x.button || { label: '', url: '' }; b.label = v.slice(0, 40); x.button = b.label || b.url ? b : null; })} />
+            <Txt l="Adresse" v={e.button?.url || ''} placeholder="https://…" on={(v) => upd(k, (x) => { const b = x.button || { label: '', url: '' }; b.url = v.trim(); x.button = b.label || b.url ? b : null; })} />
+          </div>
+        </div>))}
+      <button className="btn sm" onClick={() => update((d) => { d.settings.endings = [...(d.settings.endings || []), { id: 'e' + Date.now().toString(36), when: { mode: 'all', rules: [] }, title: 'Merci !', message: '' }]; }, true)}><Icon name="plus" size="sm" />Écran de fin conditionnel</button>
+      <div className="bfe-hint">Quiz, jeu, qualification : « Score ≥ 8 → Bravo », « Projet = Occasion → message de l’équipe VO ». Aucun ne correspond : le remerciement ci-dessus.</div>
+    </>
   );
 }
 

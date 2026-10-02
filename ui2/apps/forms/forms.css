@@ -385,6 +385,46 @@ textarea.bfe-in { height: auto; min-height: 32px; padding: 7px 10px; resize: non
 .bfs-sr i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); border-radius: inherit; background: linear-gradient(90deg, var(--frm, #f75632), var(--frm-2, #c2185b)); }
 .bfs-sr .faint { text-align: right; }
 @container app (max-width: 900px) { .bsh { grid-template-columns: minmax(0, 1fr); } .bsh-qr { grid-template-columns: 130px minmax(0, 1fr); } }
+.bfe-cap { font-size: 11.5px; flex: none; }
+.bfe-multi { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.bfe-multi.col { display: grid; gap: 4px; }
+.bfe-multi label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 8px; border-radius: 8px; border: 1px solid var(--line-2); cursor: pointer; color: var(--text-2); }
+.bfe-multi label.on { border-color: var(--frm); color: var(--text); background: color-mix(in srgb, var(--frm) 10%, transparent); }
+/* La case est masquée (style d'interrupteur global de la v2) : la pastille porte l'état, la case reste lue au clavier. */
+.bfe-multi { position: relative; }
+.bfe-multi label { position: relative; }
+.bfe-multi input { position: absolute; left: 0; top: 50%; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+.bfe-multi label.on::before { content: "✓"; font-weight: 800; color: var(--frm); }
+.bfe-rule:has(.bfe-multi) { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; }
+.bfe-rule:has(.bfe-multi) .bfe-multi { grid-column: 1 / -1; order: 5; }
+.bfe-end { display: grid; gap: 8px; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); animation: frm-in .25s var(--ease-out); }
+.bfe-endh { display: flex; align-items: center; gap: 6px; }
+.bfe-endh .bfe-in { flex: 1; }
+.bfd { display: grid; gap: 8px; }
+.bfd-car { display: flex; align-items: center; gap: 6px; animation: frm-in .25s var(--ease-out); }
+.bfd-car .bfe-in { flex: 1; }
+.bfd-car .bfd-n { width: 58px; flex: none; text-align: center; }
+.bfd-img { width: 40px; height: 32px; flex: none; border-radius: 8px; border: 1px dashed var(--line-3); background: var(--surface-3) center/cover no-repeat; display: grid; place-items: center; color: var(--text-3); }
+.bfd-week { display: grid; gap: 6px; }
+.bfd-day { display: grid; gap: 4px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); }
+.bfd-day.off { opacity: .65; }
+.bfd-ranges { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bfd-range { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; }
+.bfd-range input { height: 28px; border-radius: 7px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--text); font: inherit; font-size: 12px; padding: 0 4px; }
+.bfd-ex { display: flex; flex-wrap: wrap; gap: 4px; }
+.bfd-ex .badge button { margin-left: 4px; color: inherit; opacity: .7; }
+.bfd-sum { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; font-size: 12.5px; background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.bfd-sum.bad { background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.bfs-extras { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0; }
+.bfs-sig { display: grid; gap: 4px; font-size: 12px; }
+.bfs-sig img { width: 240px; max-width: 100%; border-radius: 10px; background: #fff; border: 1px solid var(--line-2); }
+.bfs-files { display: grid; gap: 6px; font-size: 12px; align-content: start; }
+.bfs-files .btn { justify-content: flex-start; max-width: 320px; }
+.bfs-drives { display: grid; gap: 10px; }
+.bfs-dday { display: grid; gap: 4px; }
+.bfs-dday > b { font-size: 13px; text-transform: capitalize; }
+.bfs-dday.past { opacity: .5; }
+.bfs-dr { display: grid; grid-template-columns: 52px auto minmax(0, 1fr); gap: 8px; align-items: center; font-size: 12.5px; padding: 4px 8px; border-radius: 8px; background: var(--surface-2); }
 @container app (max-width: 900px) {
   .bfe-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
   .bfe-side { border-left: 0; border-top: 1px solid var(--line); max-height: 42%; }

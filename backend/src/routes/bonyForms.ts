@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import express, { Router, Response } from 'express';
 import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
@@ -6,8 +6,9 @@ import { FORMS_ROLES } from '../auth/roles';
 import { ALL_SITES } from '../auth/siteScope';
 import { emitEvent } from '../realtime';
 import { prisma } from '../db';
-import { validate, checkDef, newDef, SCHEMA_VERSION, type BonyFormDef, type Answers, type Field } from '../bonyforms/schema';
-import { callWorker, verify, workerConfigured, workerUrl } from '../bonyforms/worker';
+import { validate, checkDef, newDef, endingOf, SCHEMA_VERSION, type BonyFormDef, type Answers, type Field } from '../bonyforms/schema';
+import { callWorker, verify, verifyMessage, workerConfigured, workerUrl } from '../bonyforms/worker';
+import { savePending, claim, tokenId, pendingExists, readFile, listFiles, removeFiles } from '../bonyforms/files';
 
 const router = Router();
 
@@ -52,13 +53,18 @@ function fail(res: Response, e: unknown, def: string) {
   return res.status(502).json({ error: msg || def });
 }
 
-/** Places prises par option de créneau, et total, à partir des réponses enregistrées. */
+/** Places prises par option de créneau et par créneau d'essai, et total, à partir des réponses enregistrées.
+ *  Prise d'essai : clé `voiture@date` (exemplaires) ET `*@date` (voitures en même temps, tous modèles). */
 async function takenOf(formId: string, def: BonyFormDef) {
-  const slots = def.fields.filter((f) => f.type === 'slot');
+  const slots = def.fields.filter((f) => f.type === 'slot' || f.type === 'testdrive');
   const rows = await prisma.bonyFormResponse.findMany({ where: { formId }, select: { answers: true } });
   const taken: Record<string, Record<string, number>> = {};
   slots.forEach((f) => { taken[f.id] = {}; });
-  rows.forEach((r) => slots.forEach((f) => { const v = (r.answers as any)?.[f.id]; if (typeof v === 'string') taken[f.id][v] = (taken[f.id][v] || 0) + 1; }));
+  rows.forEach((r) => slots.forEach((f) => {
+    const v = (r.answers as any)?.[f.id]; if (typeof v !== 'string') return;
+    taken[f.id][v] = (taken[f.id][v] || 0) + 1;
+    if (f.type === 'testdrive') { const at = v.split('@')[1]; if (at) taken[f.id][`*@${at}`] = (taken[f.id][`*@${at}`] || 0) + 1; }
+  }));
   return { taken, total: rows.length };
 }
 
@@ -234,6 +240,7 @@ router.delete('/:id', authenticateToken, requireRole(FORMS_ROLES), async (req, r
       prisma.bonyFormResponse.deleteMany({ where: { formId: row.id } }),
       prisma.bonyForm.delete({ where: { id: row.id } }),
     ]);
+    removeFiles(row.id);                                          // fichiers des répondants (volume privé)
     emitEvent('bonyforms:changed', null);
     res.sendStatus(204);
   } catch (e) { fail(res, e, 'Suppression impossible.'); }
@@ -243,7 +250,7 @@ router.delete('/:id', authenticateToken, requireRole(FORMS_ROLES), async (req, r
 router.get('/:id/responses', authenticateToken, requireRole(FORMS_ROLES), async (req, res) => {
   try {
     const rows = await prisma.bonyFormResponse.findMany({ where: { formId: req.params.id }, orderBy: { submittedAt: 'desc' }, select: { id: true, version: true, answers: true, meta: true, submittedAt: true } });
-    res.json(rows);
+    res.json(rows.map((r) => ({ ...r, files: listFiles(req.params.id, r.id) })));
   } catch (e) { fail(res, e, 'Lecture des réponses impossible.'); }
 });
 
@@ -252,6 +259,7 @@ router.delete('/:id/responses/:rid', authenticateToken, requireRole(FORMS_ROLES)
   try {
     const r = await prisma.bonyFormResponse.deleteMany({ where: { id: req.params.rid, formId: req.params.id } });
     if (!r.count) return res.status(404).json({ error: 'Réponse introuvable.' });
+    removeFiles(req.params.id, req.params.rid);
     const agg = await prisma.bonyFormResponse.aggregate({ where: { formId: req.params.id }, _count: { _all: true }, _max: { submittedAt: true } });
     await prisma.bonyForm.update({ where: { id: req.params.id }, data: { responseCount: agg._count._all, lastResponseAt: agg._max.submittedAt } });
     emitEvent('bonyforms:changed', null);
@@ -259,7 +267,40 @@ router.delete('/:id/responses/:rid', authenticateToken, requireRole(FORMS_ROLES)
   } catch (e) { fail(res, e, 'Effacement impossible.'); }
 });
 
+// GET /api/bony-forms/:id/responses/:rid/files/:fid — fichier déposé par un répondant (téléchargement forcé).
+router.get('/:id/responses/:rid/files/:fid', authenticateToken, requireRole(FORMS_ROLES), async (req, res) => {
+  try {
+    const f = readFile(req.params.id, req.params.rid, req.params.fid);
+    if (!f) return res.status(404).json({ error: 'Fichier introuvable.' });
+    res.setHeader('Content-Type', f.meta.type || 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(f.meta.name)}`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.sendFile(f.file);
+  } catch (e) { fail(res, e, 'Lecture du fichier impossible.'); }
+});
+
 // ---------------------------------------------------------------- routes du Worker (signature HMAC, sans JWT)
+/**
+ * POST /api/bony-forms/files — fichier déposé par un répondant, relayé par le Worker (corps BINAIRE).
+ * Signature sur `publicId.id.type.nom.sha256` (en-têtes x-bf-*). Rangé « en attente » jusqu'à la réponse.
+ */
+const FILE_TYPES = /^(image\/(jpeg|png|webp|gif|heic|heif)|application\/pdf)$/;
+router.post('/files', express.raw({ type: 'application/octet-stream', limit: '11mb' }), async (req, res) => {
+  const h = (k: string) => String(req.headers[k] || '');
+  const publicId = h('x-bf-form'), id = h('x-bf-id'), type = h('x-bf-type'), name = decodeURIComponent(h('x-bf-name') || 'fichier');
+  const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  const hash = crypto.createHash('sha256').update(body).digest('hex');
+  if (!verifyMessage(req.headers['x-gearbox-ts'], req.headers['x-gearbox-sig'], `${publicId}.${id}.${type}.${h('x-bf-name')}.${hash}`)) return res.status(401).json({ error: 'Signature invalide.' });
+  if (!FILE_TYPES.test(type) || !body.length) return res.status(400).json({ error: 'Type de fichier refusé (images ou PDF).' });
+  try {
+    const form = await prisma.bonyForm.findUnique({ where: { publicId }, select: { id: true, status: true } });
+    if (!form || form.status !== 'published') return res.status(404).json({ error: 'Formulaire fermé ou inconnu.' });
+    savePending(form.id, id, name, type, body);
+    res.status(201).json({ ok: true });
+  } catch (e) { fail(res, e, 'Dépôt du fichier impossible.'); }
+});
+
 const signed = (req: any) => verify(req.headers['x-gearbox-ts'], req.headers['x-gearbox-sig'], req.body);
 
 /**
@@ -284,15 +325,21 @@ router.post('/ingest', async (req, res) => {
     const closed = form.status !== 'published' || (s.closeAt && now > new Date(s.closeAt)) || (s.openAt && now < new Date(s.openAt));
     if (closed) { if (!queued) return res.status(409).json({ error: s.closedMessage || 'Ce formulaire n’accepte plus de réponses.', closed: true }); flags.push('reçue après fermeture'); }
     const { taken, total } = await takenOf(form.id, def);
+    // Fichiers : jeton signé par le Worker ET dépôt présent sur le disque (sinon « fichier inconnu »).
+    const files: Record<string, string[]> = {}, fileIds: string[] = [];
+    def.fields.filter((f) => f.type === 'file').forEach((f) => {
+      const list = Array.isArray((answers as any)[f.id]) ? (answers as any)[f.id] : [];
+      files[f.id] = list.filter((t: unknown) => { const id = tokenId(publicId, t); if (id && pendingExists(form.id, id)) { fileIds.push(id); return true; } return false; });
+    });
     if (s.maxResponses && total >= s.maxResponses) { if (!queued) return res.status(409).json({ error: s.closedMessage || 'Le nombre maximal de réponses est atteint.', closed: true }); flags.push('au-delà du maximum'); }
-    const v = validate(def, answers as Answers, { taken });
+    const v = validate(def, answers as Answers, { taken, files });
     if (!v.ok && !queued) return res.status(422).json({ error: 'Certaines réponses sont invalides.', errors: v.errors });
     if (!v.ok) flags.push('validation échouée à la réception');
     const uniq = def.fields.find((f) => f.unique && v.clean[f.id] !== undefined);
     const data = {
       id: responseId, formId: form.id, version: form.version,
       answers: (v.ok ? v.clean : answers) as any,
-      meta: { ...(meta && typeof meta === 'object' ? meta : {}), ...(flags.length ? { flag: flags.join(' ; ') } : {}) } as any,
+      meta: { ...(meta && typeof meta === 'object' ? meta : {}), ...(flags.length ? { flag: flags.join(' ; ') } : {}), ending: endingOf(def, v.clean)?.name || endingOf(def, v.clean)?.title || null } as any,
       uniqueKey: uniq ? `${uniq.id}:${String(v.clean[uniq.id]).toLowerCase()}` : null,
       submittedAt: submittedAt && !isNaN(new Date(submittedAt).getTime()) ? new Date(submittedAt) : now,
     };
@@ -303,6 +350,8 @@ router.post('/ingest', async (req, res) => {
         await prisma.bonyFormResponse.create({ data: { ...data, uniqueKey: null, meta: { ...data.meta, flag: [data.meta.flag, 'doublon'].filter(Boolean).join(' ; ') } } });
       } else throw e;
     }
+    const missing = claim(form.id, responseId, fileIds);
+    if (missing.length) console.warn(`[bony-forms] réponse ${responseId} : ${missing.length} fichier(s) introuvable(s)`);
     const agg = await prisma.bonyFormResponse.aggregate({ where: { formId: form.id }, _count: { _all: true }, _max: { submittedAt: true } });
     await prisma.bonyForm.update({ where: { id: form.id }, data: { responseCount: agg._count._all, lastResponseAt: agg._max.submittedAt } });
     // Maximum atteint : le formulaire se ferme tout seul (le Worker affiche le message de fermeture).

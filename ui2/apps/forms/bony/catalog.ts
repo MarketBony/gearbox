@@ -19,13 +19,18 @@ export const TYPES: TypeDef[] = [
   { t: 'choice', l: 'Choix unique', icon: 'target', g: 'Choix', hint: 'Une réponse parmi plusieurs' },
   { t: 'multi', l: 'Choix multiples', icon: 'kanban', g: 'Choix', hint: 'Plusieurs réponses' },
   { t: 'dropdown', l: 'Liste déroulante', icon: 'chevdown', g: 'Choix', hint: 'Longue liste compacte' },
+  { t: 'slot', l: 'Créneaux à places limitées', icon: 'clock', g: 'Choix', hint: 'Complet = grisé, places restantes affichées' },
   { t: 'scale', l: 'Échelle', icon: 'sliders', g: 'Échelles', hint: 'De 1 à 5, de 0 à 10…' },
   { t: 'rating', l: 'Note', icon: 'star', g: 'Échelles', hint: 'Étoiles, cœurs, pouces' },
   { t: 'nps', l: 'Recommandation (NPS)', icon: 'trending', g: 'Échelles', hint: '0 à 10, « nous recommanderiez-vous ? »' },
   { t: 'concession', l: 'Concession', icon: 'building', g: 'Bony', hint: 'Liste des sites tenue par Gearbox' },
   { t: 'brand', l: 'Marque', icon: 'car', g: 'Bony', hint: 'Renault, Dacia, Alpine, Nissan, Mobilize' },
+  { t: 'testdrive', l: 'Prise d’essai', icon: 'car', g: 'Bony', hint: 'Voiture → jour → créneau, selon le parc et les horaires' },
   { t: 'consent', l: 'Consentement RGPD', icon: 'lock', g: 'Spécial', hint: 'Case d’accord avec texte légal' },
   { t: 'hidden', l: 'Champ caché', icon: 'eye', g: 'Spécial', hint: 'Rempli par le lien de l’e-mailing' },
+  { t: 'calc', l: 'Calcul (score, somme)', icon: 'pie', g: 'Spécial', hint: 'Points des réponses ou somme de nombres' },
+  { t: 'file', l: 'Fichier', icon: 'file', g: 'Spécial', hint: 'Photo ou PDF déposé par le répondant' },
+  { t: 'signature', l: 'Signature', icon: 'edit', g: 'Spécial', hint: 'Signée au doigt ou à la souris' },
   { t: 'statement', l: 'Texte', icon: 'info', g: 'Mise en page', hint: 'Paragraphe d’information' },
   { t: 'section', l: 'Section', icon: 'layers', g: 'Mise en page', hint: 'Titre de partie (écran suivant en mode étapes)' },
 ];
@@ -59,8 +64,18 @@ export function newField(t: FieldType): Field {
     case 'nps': f.label = 'Recommanderiez-vous Bony à un proche ?'; break;
     case 'concession': f.label = 'Votre concession'; f.options = bonyOptions('concession'); f.param = 'concession'; break;
     case 'brand': f.label = 'Marque'; f.options = bonyOptions('brand'); break;
-    case 'consent': f.label = 'Consentement'; f.required = true; f.consentText = 'J’accepte que Bony Automobiles utilise mes données pour traiter ma demande et me recontacter. Je peux exercer mes droits d’accès, de rectification et d’effacement en écrivant à marketbony@gmail.com.'; break;
+    case 'consent': f.label = 'Consentement'; f.required = true; f.consentText = 'J’accepte que Bony auto-mobile utilise mes données pour traiter ma demande et me recontacter. Je peux exercer mes droits d’accès, de rectification et d’effacement en écrivant à marketbony@gmail.com.'; break;
     case 'hidden': f.label = 'Source'; f.param = 'source'; break;
+    case 'slot': f.label = 'Votre créneau'; f.required = true; f.options = [Object.assign(newOption('Samedi 10 h'), { capacity: 10 }), Object.assign(newOption('Samedi 14 h'), { capacity: 10 })]; break;
+    case 'calc': f.label = 'Score'; f.formula = { kind: 'score', fields: [] }; f.calcHidden = true; break;
+    case 'file': f.label = 'Votre fichier'; f.accept = ['image/*', 'application/pdf']; f.maxFiles = 1; f.maxSizeMb = 10; break;
+    case 'signature': f.label = 'Votre signature'; f.required = true; break;
+    case 'testdrive': {
+      f.label = 'Réservez votre essai'; f.required = true;
+      const wk: [string, string][] = [['09:00', '12:00'], ['14:00', '18:00']];
+      f.drive = { cars: [{ id: rid('c', 5), label: 'Modèle 1', count: 1 }], slot: 30, from: null, to: null, hours: { '1': wk, '2': wk, '3': wk, '4': wk, '5': wk, '6': [['09:00', '12:00'], ['14:00', '17:00']] }, exclude: [], perSlot: null, leadHours: 2 };
+      break;
+    }
     case 'statement': f.label = 'Information'; f.help = 'Texte affiché aux répondants.'; break;
     case 'section': f.label = 'Nouvelle partie'; break;
   }

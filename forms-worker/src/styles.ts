@@ -202,5 +202,32 @@ a.bf-btn{text-decoration:none}
 .bf-welcome h2{font-size:calc(26px*var(--scale));margin:4px 0 10px}
 .bf-endimg{height:180px;margin:-10px -10px 18px;border-radius:calc(var(--r)*.7);background:center/cover no-repeat}
 .bf-hint{margin-top:12px;font-size:13px;opacity:.6}
+/* ---- F3 : prise d'essai */
+.bf-drive{display:grid;gap:12px}
+.bf-dstep{display:flex;align-items:center;gap:8px;font-weight:700;font-size:.92em;margin-top:4px}
+.bf-dstep b{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;background:var(--p);color:var(--on-p)}
+.bf-days{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;scroll-snap-type:x proximity}
+.bf-day{flex:none;scroll-snap-align:start;display:grid;justify-items:center;gap:1px;min-width:62px;padding:8px 6px;border-radius:calc(var(--r)*.6);border:1.5px solid color-mix(in srgb,var(--tx) 14%,transparent);background:transparent;color:var(--tx);font:inherit;cursor:pointer;transition:all .2s}
+.bf-day span{font-size:12px;opacity:.7;text-transform:capitalize}
+.bf-day b{font-size:20px;line-height:1.1}
+.bf-day:hover:not(:disabled){border-color:var(--p)}
+.bf-day.on{background:var(--p);border-color:var(--p);color:var(--on-p)}
+.bf-day.on span{opacity:.9}
+.bf-day:disabled{opacity:.35;cursor:not-allowed}
+.bf-times{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px}
+.bf-time{padding:10px 0;border-radius:calc(var(--r)*.6);border:1.5px solid color-mix(in srgb,var(--tx) 14%,transparent);background:transparent;color:var(--tx);font:inherit;font-weight:600;cursor:pointer;transition:all .2s}
+.bf-time:hover:not(:disabled){border-color:var(--p);transform:translateY(-1px)}
+.bf-time.on{background:var(--p);border-color:var(--p);color:var(--on-p)}
+.bf-time:disabled{opacity:.3;cursor:not-allowed;text-decoration:line-through}
+.bf-dok{padding:10px 12px;border-radius:calc(var(--r)*.6);background:color-mix(in srgb,var(--p) 12%,transparent);font-weight:600;animation:bf-enter calc(.3s*var(--dur)) both}
+/* ---- F3 : signature et fichiers */
+.bf-sigw{display:grid;gap:6px}
+.bf-sig{width:100%;aspect-ratio:3/1;border-radius:calc(var(--r)*.6);border:1.5px dashed color-mix(in srgb,var(--tx) 25%,transparent);background:color-mix(in srgb,var(--tx) 3%,var(--sf));touch-action:none;cursor:crosshair}
+.bf-sigf{display:flex;justify-content:space-between;align-items:center;font-size:13px;opacity:.75}
+.bf-btn.bf-sm{padding:6px 12px;font-size:13px;box-shadow:none}
+.bf-files{display:grid;gap:8px}
+.bf-file{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:calc(var(--r)*.6);background:color-mix(in srgb,var(--tx) 5%,transparent);animation:bf-enter calc(.25s*var(--dur)) both}
+.bf-file.busy{opacity:.7}
+.bf-drop{justify-content:center;border-style:dashed!important;width:100%}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 `;

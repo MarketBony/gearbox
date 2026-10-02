@@ -29,7 +29,7 @@ export const TEMPLATES: Template[] = [
         F('concession', { label: 'Votre concession la plus proche', required: true }),
         F('choice', { label: 'Quel univers vous fait rêver ?', required: true, display: 'tiles', columns: 2, opts: [['⚡', 'Électrique'], ['🏔️', 'Aventure'], ['🏁', 'Sportive'], ['👨‍👩‍👧', 'Famille']] }),
         F('consent', { label: 'Règlement', consentText: 'J’ai lu et j’accepte le règlement du jeu-concours.' }),
-        F('consent', { label: 'Consentement', required: false, consentText: 'J’accepte de recevoir les offres et invitations de Bony Automobiles (facultatif).' }),
+        F('consent', { label: 'Consentement', required: false, consentText: 'J’accepte de recevoir les offres et invitations de Bony auto-mobile (facultatif).' }),
       ];
       d.settings.welcome = { enabled: true, title: 'Participez et gagnez !', message: 'Deux minutes pour tenter votre chance.', button: 'Je participe' };
       d.settings.thankYou = { title: 'Participation enregistrée !', message: 'Bonne chance : le gagnant sera contacté par e-mail.', button: { label: 'Découvrir nos véhicules', url: 'https://www.bonyauto-mobile.com' } };

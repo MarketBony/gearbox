@@ -436,7 +436,9 @@ export interface BonyFormDetail extends BonyFormRow { draft: any; published: any
 export interface BonyKit { id: string; name: string; theme: any; createdBy: string; author: string; createdAt: string }
 /** Police de marque de la bibliothèque partagée (F2a) : fichier chez Cloudflare. */
 export interface BonyFont { id: string; family: string; weight: number; style: 'normal' | 'italic'; url: string; fileName: string; createdBy: string; createdAt: string }
-export interface BonyResponse { id: string; version: number; answers: Record<string, any>; meta: Record<string, any> | null; submittedAt: string }
+export interface BonyResponse { id: string; version: number; answers: Record<string, any>; meta: Record<string, any> | null; submittedAt: string;
+  /** F3 : fichiers déposés par le répondant (volume privé du serveur, lus par une route authentifiée). */
+  files?: { id: string; name: string; type: string; size: number }[] }
 
 export interface StorageInfo {
   disque: { total: number; libre: number; utilise: number };

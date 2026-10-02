@@ -92,6 +92,17 @@ WORKER → un renvoi depuis sa file ne crée pas de doublon ; `uniqueKey` + inde
   - Réponses : `meta.ref` = nom de domaine du site d'où vient le clic (filtré par le Worker) ; les UTM sont dans
     `meta.params` comme tout paramètre du lien.
 
+- **Correctif 65 (F3, 02/10)** :
+  - `takenOf` compte aussi la prise d'essai : clés `voiture@date` (exemplaires) et `*@date` (voitures au même moment).
+  - `POST /files` (Worker, signé sur `publicId.id.type.nom.sha256`, corps binaire `express.raw` 11 Mo) → dépôt « en
+    attente » ; `GET /:id/responses/:rid/files/:fid` (JWT + `FORMS_ROLES`, `attachment`, `nosniff`, `no-store`) ;
+    `GET /:id/responses` ajoute `files` à chaque réponse. **Porte unique `src/bonyforms/files.ts`** : racine
+    `FORMS_FILES_ROOT` ou `<parent d'uploads>/forms-files` (prod : `/app/forms-files`, volume `bonyforms_files` ;
+    local : `backend/forms-files`, ignoré par git). Extensions `.bin` / `.meta` : nodemon redémarre sur tout `.json`.
+  - `/ingest` : jetons de fichier vérifiés (`tokenId` = même HMAC que le Worker) ET dépôt présent, puis rattachés à
+    la réponse (`claim`) ; `meta.ending` = écran de fin obtenu. Suppression d'une réponse / d'un formulaire :
+    `removeFiles`.
+
 ### 📋 Forms — `/api/forms` et `src/google/client.ts` (01/10/2026, correctif 62)
 Google Forms par UN compte Google partagé (marketbony@gmail.com), connecté côté serveur. Modèles : `GoogleConnection`
 (une ligne, jeton de rafraîchissement **chiffré** AES-256-GCM avec `GOOGLE_TOKEN_KEY`), `GoogleForm` (catalogue :

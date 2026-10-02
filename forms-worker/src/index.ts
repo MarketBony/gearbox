@@ -12,7 +12,7 @@
 //     la garder en file (`q:<id>`) et la renvoyer chaque minute (cron) : aucune réponse perdue.
 // Le Worker n'a AUCUN accès à la base de Gearbox.
 // =====================================================================
-import { validate, type BonyFormDef, type Answers, type Theme } from '../../shared/bonyform';
+import { validate, type BonyFormDef, type Answers, type Theme, type Field } from '../../shared/bonyform';
 import { renderTheme, fontsHref, fontFaces } from './theme';
 import { CSS } from './styles';
 import CLIENT from './gen/client.js';
@@ -73,7 +73,7 @@ function page(title: string, theme: Partial<Theme> | null, bodyHtml: string, boo
   // Les robots des messageries veulent une adresse ABSOLUE pour l'image.
   const abs = (u?: string | null) => (!u ? '' : /^https?:\/\//.test(u) ? u : /^\/a\/[a-z0-9]+$/.test(u) && opts.origin ? `${opts.origin}${u}` : '');
   const ogTitle = opts.share?.title?.trim() || title, ogImg = abs(opts.share?.image) || abs(t.header.image) || abs(t.bg.kind === 'image' ? t.bg.image : null);
-  const og = `<meta property="og:type" content="website"><meta property="og:site_name" content="Bony Automobiles"><meta property="og:title" content="${esc(ogTitle)}">${desc}${ogImg ? `<meta property="og:image" content="${esc(ogImg)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${esc(ogImg)}">` : '<meta name="twitter:card" content="summary">'}<meta name="twitter:title" content="${esc(ogTitle)}">`;
+  const og = `<meta property="og:type" content="website"><meta property="og:site_name" content="Bony auto-mobile"><meta property="og:title" content="${esc(ogTitle)}">${desc}${ogImg ? `<meta property="og:image" content="${esc(ogImg)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${esc(ogImg)}">` : '<meta name="twitter:card" content="summary">'}<meta name="twitter:title" content="${esc(ogTitle)}">`;
   const html = `<!doctype html><html lang="fr"${at}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="${esc(/^#/.test(t.background) ? t.background : '#111111')}">${og}
 <link rel="preconnect" href="https://fonts.bunny.net"><link id="bf-fonts" rel="stylesheet" href="${fontsHref(t)}">
@@ -88,7 +88,7 @@ const notice = (title: string, msg: string, theme: Partial<Theme> | null = null,
 
 // ---------------------------------------------------------------- état (places des créneaux), cache 30 s
 async function stateOf(env: Env, publicId: string, def: BonyFormDef): Promise<State | null> {
-  if (!def.fields.some((f) => f.type === 'slot') && !def.settings.maxResponses) return null;
+  if (!def.fields.some((f) => f.type === 'slot' || f.type === 'testdrive') && !def.settings.maxResponses) return null;
   const k = `st:${publicId}`;
   const cached = await env.FORMS.get<State>(k, 'json');
   if (cached) return cached;
@@ -99,6 +99,53 @@ async function stateOf(env: Env, publicId: string, def: BonyFormDef): Promise<St
     await env.FORMS.put(k, JSON.stringify(s), { expirationTtl: 60 });
     return s;
   } catch { return null; }                                  // Gearbox indisponible : affichage sans compteur
+}
+
+// ---------------------------------------------------------------- fichiers des répondants (F3)
+// Décision de Théo (01/10) : stockés sur le VPS. Le Worker ne garde RIEN : il filtre (taille, type, débit),
+// relaie à Gearbox (signé) et rend au navigateur un JETON signé « id.signature », seul admis dans la réponse.
+const FILE_RATE = 20;                          // dépôts par minute, par IP et par formulaire
+const FILE_MAX = 10 * 1024 * 1024;             // 10 Mo par fichier au plus (réglable plus bas par champ)
+const fileSig = async (env: Env, publicId: string, id: string) => (await hmac(env.GEARBOX_SECRET, `file.${publicId}.${id}`)).slice(0, 32);
+const accepts = (f: Field, type: string) => {
+  const list = f.accept?.length ? f.accept : ['image/*', 'application/pdf'];
+  return list.some((a) => (a.endsWith('/*') ? type.startsWith(a.slice(0, -1)) : type === a)) && /^(image\/(jpeg|png|webp|gif|heic|heif)|application\/pdf)$/.test(type);
+};
+async function upload(req: Request, env: Env, publicId: string, form: Stored) {
+  if (form.status !== 'open') return json({ error: 'Ce formulaire n’accepte plus de réponses.' }, 409);
+  const ip = req.headers.get('cf-connecting-ip') || 'inconnue';
+  const rk = `rf:${publicId}:${ip}:${Math.floor(Date.now() / 60_000)}`, n = Number((await env.FORMS.get(rk)) || 0);
+  if (n >= FILE_RATE) return json({ error: 'Trop de fichiers envoyés : réessayez dans une minute.' }, 429);
+  await env.FORMS.put(rk, String(n + 1), { expirationTtl: 120 });
+  let fd: FormData;
+  try { fd = await req.formData(); } catch { return json({ error: 'Envoi invalide.' }, 400); }
+  const file = fd.get('file'), field = form.def.fields.find((f) => f.id === fd.get('field') && f.type === 'file');
+  if (!field || !(file instanceof File)) return json({ error: 'Envoi invalide.' }, 400);
+  const max = Math.min(FILE_MAX, (field.maxSizeMb || 10) * 1024 * 1024);
+  if (file.size > max) return json({ error: `Fichier trop lourd (${Math.round(max / 1048576)} Mo au plus).` }, 413);
+  if (!accepts(field, file.type)) return json({ error: 'Type de fichier refusé (images ou PDF).' }, 415);
+  const id = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
+  const bytes = await file.arrayBuffer();
+  const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const name = encodeURIComponent(file.name.slice(0, 120) || 'fichier'), ts = String(Date.now());
+  try {
+    const r = await fetch(`${env.GEARBOX_URL.replace(/\/+$/, '')}/api/bony-forms/files`, {
+      method: 'POST', body: bytes, signal: AbortSignal.timeout(20_000),
+      headers: { 'Content-Type': 'application/octet-stream', 'x-bf-form': publicId, 'x-bf-id': id, 'x-bf-type': file.type, 'x-bf-name': name,
+        'x-gearbox-ts': ts, 'x-gearbox-sig': await hmac(env.GEARBOX_SECRET, `${ts}.${publicId}.${id}.${file.type}.${name}.${hash}`) },
+    });
+    if (!r.ok) return json({ error: ((await r.json().catch(() => ({}))) as any).error || 'Dépôt refusé.' }, r.status === 401 ? 502 : r.status);
+  } catch { return json({ error: 'Dépôt impossible pour l’instant : réessayez dans quelques minutes.' }, 503); }
+  return json({ token: `${id}.${await fileSig(env, publicId, id)}`, name: file.name.slice(0, 120), size: file.size, type: file.type });
+}
+/** Les jetons de fichier d'une réponse ont-ils bien été délivrés par ce Worker ? */
+async function tokensOk(env: Env, publicId: string, def: BonyFormDef, answers: Answers) {
+  for (const f of def.fields) {
+    if (f.type !== 'file') continue;
+    const list = Array.isArray(answers[f.id]) ? (answers[f.id] as string[]) : [];
+    for (const t of list) { const [id, sig] = String(t).split('.'); if (!id || !sig || !safeEq(await fileSig(env, publicId, id), sig)) return false; }
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------- réception d'une réponse
@@ -123,7 +170,8 @@ async function submit(req: Request, env: Env, publicId: string, form: Stored) {
 
   const state = await stateOf(env, publicId, form.def);
   const v = validate(form.def, (body?.answers || {}) as Answers, { taken: state?.taken });
-  if (!v.ok) return json({ error: 'Certaines réponses sont à corriger.', errors: v.errors }, 422);
+  if (!v.ok) return json({ error: 'Certaines réponses sont à corriger.', errors: v.errors, taken: state?.taken }, 422);
+  if (!(await tokensOk(env, publicId, form.def, v.clean))) return json({ error: 'Un fichier n’a pas été reçu : déposez-le à nouveau.' }, 422);
 
   const params: Record<string, string> = {};
   if (body?.params && typeof body.params === 'object') Object.entries(body.params).slice(0, 20).forEach(([k, x]) => { if (typeof x === 'string') params[k.slice(0, 40)] = x.slice(0, 200); });
@@ -134,7 +182,12 @@ async function submit(req: Request, env: Env, publicId: string, form: Stored) {
   try {
     const r = await toGearbox(env, '/api/bony-forms/ingest', payload);
     if (r.ok) { await env.FORMS.delete(`st:${publicId}`); return json({ ok: true }); }
-    if (r.status === 409 || r.status === 422 || r.status === 404) return json(await r.json().catch(() => ({ error: 'Réponse refusée.' })), r.status);
+    if (r.status === 409 || r.status === 422 || r.status === 404) {
+      // Refus (créneau pris entre-temps, doublon…) : places relues pour que le répondant voie l'état réel.
+      await env.FORMS.delete(`st:${publicId}`);
+      const fresh = await stateOf(env, publicId, form.def);
+      return json({ ...((await r.json().catch(() => ({ error: 'Réponse refusée.' }))) as object), taken: fresh?.taken }, r.status);
+    }
     throw new Error(`Gearbox ${r.status}`);
   } catch (e) {
     // Gearbox indisponible (déploiement, panne) : la réponse est GARDÉE et renvoyée par le cron.
@@ -207,12 +260,13 @@ export default {
     }
     if (path === '/') return notice('Formulaires Bony', 'Ouvrez le lien du formulaire reçu par e-mail.');
     if (path === '/favicon.ico') return new Response(null, { status: 204 });
-    const m = /^\/([a-z0-9]{10})$/.exec(path);
+    const m = /^\/([a-z0-9]{10})(\/file)?$/.exec(path);
     if (!m) return notice('Formulaire introuvable', 'Ce lien ne correspond à aucun formulaire.', null, 404);
     const publicId = m[1];
     const form = await env.FORMS.get<Stored>(`form:${publicId}`, 'json');
     if (!form) return notice('Formulaire introuvable', 'Ce lien ne correspond à aucun formulaire, ou il a été retiré.', null, 404);
 
+    if (m[2]) return req.method === 'POST' ? upload(req, env, publicId, form) : json({ error: 'Méthode non autorisée.' }, 405);
     if (req.method === 'POST') return submit(req, env, publicId, form);
     if (req.method !== 'GET') return json({ error: 'Méthode non autorisée.' }, 405);
 
