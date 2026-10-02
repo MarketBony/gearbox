@@ -320,6 +320,15 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [x] **Forms Bony : aperçu du Studio bloqué « en attente »** (relevé en test) — le « prêt » du client pouvait partir
   avant que l'éditeur écoute (double montage React en dev) ; l'événement `load` de l'iframe sert aussi de signal.
 - [x] **Forms Bony : « 2 formulaire Bonys »** (relevé en test).
+<!-- Forms Bony F3 — 02/10/2026, correctif 65 -->
+- [x] **Forms Bony (prise d'essai) : le jour même, passé, affiché « complet »** (relevé en test) — `driveDays` ne
+  propose plus qu'un jour ayant au moins un créneau encore réservable (prévenance comprise).
+- [x] **Forms Bony : cases d'option déformées dans l'éditeur de conditions** (relevé en test) — style d'interrupteur
+  global de la v2 ; case masquée, la pastille porte l'état.
+- [ ] **Sauvegarde : `uploads_data` (3,2 Go) et `bonyforms_files` ne sont sauvegardés nulle part** (relevé le 01/10
+  à l'audit F3) — seule la base l'est (`backup.yml`). Lot dédié à faire.
+- [ ] **Fichiers de `uploads/` lisibles sans connexion** (relevé le 01/10) — servis par `express.static` à qui connaît
+  l'adresse (noms aléatoires). À arbitrer avec la sauvegarde.
 - [ ] **Forms Bony : polices officielles à importer** — NouvelR, Read, Dacia Block, AlpineNewAlps, NissanBrand :
   à faire par l'équipe depuis les kits de charte (Studio › Polices de marque). D'ici là, polices libres proches.
 - [ ] **Forms Bony : logos de marque en image** — seul le logo Bony est dessiné ; Renault, Dacia… s'affichent en

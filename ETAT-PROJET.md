@@ -4,7 +4,10 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 01/10/2026 (lire en premier)
-- **En production : correctif 64 (01/10)** — **Forms Bony, lots F2a + F2b** : studio de personnalisation (aperçu
+- **En production : correctif 65 (02/10)** — **Forms Bony, lot F3** : **prise d'essai** (voiture → jour → créneau,
+  parc saisi dans le formulaire), écrans de fin selon la réponse, calculs et points, conditions complètes, créneaux à
+  places, programmation, signature, **fichiers des répondants sur le VPS** (volume privé `bonyforms_files`), et le nom
+  « Bony auto-mobile » partout. Avant lui le **correctif 64 (01/10)** — **Forms Bony, lots F2a + F2b** : studio de personnalisation (aperçu
   en direct, ambiances chartées Renault / Dacia / Alpine / Nissan, images et **polices de marque** stockées chez
   Cloudflare, kits partagés) puis écrans d'accueil / de fin, tuiles illustrées, demi-largeur, clavier façon
   Typeform, onglet **Partager** (liens UTM, QR code, aperçu du partage), modèles, synthèse des sources. Avant lui le
@@ -25,8 +28,8 @@
   sensibles testées (provisions Budget, Congés). Plan et état du chantier : `maquettes/ux/PLAN-DEPLOIEMENT-V2.md`.
 - **Où on va (dans l'ordre)** :
   0. **Chantiers d'octobre (liste de Théo du 01/10, arbitrages dans le backlog § « Chantiers d'octobre 2026 »)** :
-     lot 1 fait (correctif 60), Post-it (61), Google Forms (62), Forms Bony F1 (63), **F2a + F2b (64)**.
-     **Suite : Forms Bony F3 → F4** (plan validé par Théo « de A à Z » ; détail au backlog § Forms Bony),
+     lot 1 fait (correctif 60), Post-it (61), Google Forms (62), Forms Bony F1 (63), F2a + F2b (64), **F3 (65)**.
+     **Suite : sauvegarde des fichiers (risque relevé au F3, voir backlog), puis Forms Bony F4** (plan validé par Théo « de A à Z » ; détail au backlog § Forms Bony),
      avec la **prise d'essai** demandée le 01/10. À faire par l'équipe : importer les polices officielles
      (NouvelR, Read, Dacia Block, AlpineNewAlps, NissanBrand) dans Studio › Polices de marque. Ensuite : tâches multi-assignées, prestataire, répartitions,
      fichiers maison, mascotte / agent IA.
@@ -466,6 +469,33 @@
     enregistré / appliqué / supprimé, police importée puis chargée sur la page publique, accueil, tuiles, demi-largeur
     (empilée sur mobile), clavier de bout en bout, lien QR → réponse avec ses UTM → synthèse des sources.
 
+- **Correctif 65 — 02/10 : Forms Bony, lot F3 (fonctions avancées)** (branche `feat/forms-bony-f3`, `api` ET `web`
+  + **Worker redéployé d'abord** ; AUCUNE migration ; **nouveau volume Docker `bonyforms_files`** déclaré dans
+  `docker-compose.yml`, créé au `up`).
+  - **Prise d'essai** (type `testdrive`, demande de Théo du 01/10, cadrée le 01/10 : parc saisi DANS le formulaire,
+    parcours voiture → jour → créneau) : voitures + exemplaires (+ photo), durée 15 min à 2 h, période, plages par
+    jour de semaine, jours fermés, voitures au plus sur un même créneau, prévenance. Heure de PARIS partout
+    (`parisNow`). Réponse `voiture@AAAA-MM-JJTHH:MM` ; places comptées par le serveur (`takenOf` : `voiture@…` et
+    `*@…`), revalidées à la réception ; en cas de refus le Worker renvoie les places à jour. Planning « Essais
+    réservés » dans Réponses. Fonctions partagées : `driveTimes`, `driveDays`, `driveLeft`, `driveOpen` (14 cas testés).
+  - **Écrans de fin selon la réponse** (`settings.endings`, `endingOf`) — le nom de l'écran obtenu est gardé dans
+    `meta.ending`. **Calculs** au catalogue (score / somme, caché ou non, lisibles par les conditions), **points** par
+    option. **Conditions** : « est l'un de », « n'est aucun de », ≥, ≤. **Créneaux à places** (`slot`).
+    **Programmation** (ouverture, fermeture, maximum). **Signature** (dessin → PNG dans la réponse).
+  - **Fichiers des répondants — sur le VPS (décision de Théo)** : navigateur → Worker (taille ≤ 10 Mo, images / PDF,
+    20 dépôts / min / IP) → Gearbox `POST /api/bony-forms/files` (signé, corps binaire) → volume `bonyforms_files`
+    (`/app/forms-files`, porte unique `bonyforms/files.ts`), « en attente » puis rattaché à la réponse ; jeton signé
+    `id.signature` seul admis dans la réponse ; lecture par `GET …/responses/:rid/files/:fid` (JWT + rôle Forms,
+    téléchargement forcé) ; effacé avec la réponse ou le formulaire ; dépôts orphelins purgés après 48 h. ⚠️ JAMAIS
+    sous `uploads/` : tout ce qui y est est public.
+  - **Nom « Bony auto-mobile »** (demande de Théo) : pied de page et `og:site_name` du Worker, consentement par
+    défaut, modèles, `public/confidentialite.html`. Les formulaires déjà créés gardent leur texte.
+  - **Testé en local avec le compte de Théo puis recetté par lui** : formulaire « ZZ TEST » publié, rempli (essai
+    A290 vendredi 10 h, quiz, fichier, signature), créneau ensuite grisé, Scenic encore libre, bon écran de fin,
+    fichier téléchargé, 401 sans connexion, 404 via `/uploads`, fichiers effacés avec le formulaire. Défauts corrigés
+    en route : le jour même passé affiché « complet » ; cases d'option déformées dans l'éditeur de conditions.
+    Erreur d'audit corrigée : le Worker appliquait DÉJÀ l'ouverture différée.
+
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
   51.83.75.181)
@@ -473,8 +503,10 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 64** (1er octobre 2026) — **Forms Bony F2a + F2b**.
-  Ordre : **Worker d'abord** (`cd forms-worker && npm run deploy` : routes `/__preview`, `/__gearbox/asset`, `/a/<id>`),
+- master = prod, synchronisés. Dernier lot déployé : **correctif 65** (2 octobre 2026) — **Forms Bony F3**. Worker
+  d'abord (route `/<id>/file`, places de la prise d'essai), puis `api` ET `web`. Aucune migration. **Nouveau volume
+  `bonyforms_files`** (fichiers des répondants) : déclaré dans `docker-compose.yml`, créé par `up`, PAS SAUVEGARDÉ
+  (comme `uploads_data`, voir backlog). Avant lui le **correctif 64** — Forms Bony F2a + F2b. Ordre : **Worker d'abord** (`cd forms-worker && npm run deploy` : routes `/__preview`, `/__gearbox/asset`, `/a/<id>`),
   puis `api` ET `web`. Migrations `20261002120000_bony_theme_kits` et `20261002130000_bony_fonts` (additives,
   appliquées et inscrites avant le push). Nouvelle variable du Worker `PREVIEW_ORIGINS` (dans `wrangler.jsonc`).
   Nouvelle dépendance front `qrcode-generator`. Avant lui le **correctif 63** — Forms Bony F1 : premier
@@ -3794,15 +3826,28 @@
     du 01/10 : pertinente d'abord pour les formulaires INTERNES (répondants connectés à Gearbox) ; un formulaire
     PUBLIC demande une surface sans connexion sur le VPS (anti-spam, limitation de débit, RGPD, disponibilité).
     → **Retenu le 01/10 sous la forme « Forms Bony » hébergé chez Cloudflare** (correctif 63, F1 fait).
+- **⚠️ Sauvegarde des fichiers — risque relevé le 01/10 (audit F3), lot dédié proposé à Théo** : le volume
+  `gearbox_uploads_data` (3,2 Go de fichiers de projets, photos, pièces jointes du Chat) n'est sauvegardé NULLE PART
+  (aucune tâche planifiée sur le VPS ; `backup.yml` ne sauvegarde que la base). Même chose pour le nouveau volume
+  `bonyforms_files` (fichiers des répondants, F3). Instantanés OVH du VPS : non vérifiés. À faire : copie régulière
+  hors du VPS (chiffrée : données personnelles). Noter aussi que tout fichier de `uploads/` est lisible par quiconque
+  connaît son adresse (noms aléatoires, mais sans connexion requise).
 - **Forms Bony — suite du plan validé par Théo (« tout implémenter »)** :
   - ~~**F2, l'éditeur poussé**~~ → **fait, correctif 64** (F2a studio + F2b écrans, partage, modèles). Restes
     notés : écrans de fin SELON la réponse (avec la logique de F3) ; tuiles pour les créneaux (`slot`, F3) ;
     raccourcis clavier aussi en présentation « page » (volontairement non faits : ambigus avec plusieurs questions).
-  - **F3, les fonctions avancées** : logique conditionnelle complète, champs calculés (score, somme), places
+  - ~~**F3, les fonctions avancées**~~ → **fait, correctif 65**. Pour mémoire : logique conditionnelle complète, champs calculés (score, somme), places
     limitées, ouverture / fermeture programmées, une participation par e-mail, fichiers (Cloudflare R2), signature,
     et le **champ « prise d'essai »** (ci-dessous).
+    **+ demande de Théo (01/10) : le nom s'écrit « Bony auto-mobile », pas « Bony Automobiles »** (pied de page et
+    `og:site_name` du Worker, consentements par défaut, modèles, `public/confidentialite.html`). Les formulaires
+    déjà créés gardent leur texte : à reprendre à la main dans l'éditeur.
   - **F4, côté Gearbox** : notifications à l'équipe, **tirage au sort animé**, accusé de réception par e-mail
     (envoi d'e-mails Cloudflare, droit déjà accordé à la session wrangler), versions (historique des publications).
+    **+ demande de Théo (01/10) : relier un formulaire à un PROJET** — il hérite alors des tags du projet
+    (concession, service, marque…) pour filtrer les formulaires par ces tags ; option « non rattaché à un projet »
+    où l'on choisit librement les tags du formulaire. ⚠️ Rôles cloisonnés à vérifier à ce moment-là (un chef de site
+    ne voit pas Forms aujourd'hui) et règle Holding / Alpine par site / Nissan global à respecter dans les filtres.
   - **Champ « prise d'essai » (demande de Théo, 01/10)** : un vrai formulaire de réservation d'essais clients,
     paramétrable : calendrier avec créneaux, **liste des voitures mises à l'essai et leur nombre**, nombre maximal de
     voitures disponibles sur un même créneau, **durée d'un créneau** (15 min, 30 min, 1 h, 2 h…), plages d'ouverture.

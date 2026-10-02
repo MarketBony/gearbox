@@ -10,6 +10,7 @@ import { Kpi, QCard, OneResponse, rel } from '../FormsApp';
 import { bonyQuestions, bonyResponses } from './adapter';
 import BonyEditor from './BonyEditor';
 import { TEMPLATES } from './templates';
+import { parseDrive } from '../../../../shared/bonyform';
 
 // =====================================================================
 // Espace « Forms Bony » de la rubrique Forms (lot F1, 01/10/2026) : formulaires MAISON, édités ici
@@ -146,6 +147,50 @@ function NewSheet({ close, onDone }: { close: () => void; onDone: (f: BonyFormRo
 }
 
 // =====================================================================
+// F3 — fichiers et signature d'une réponse ; planning des essais réservés.
+// =====================================================================
+function Extras({ def, formId, r }: { def: any; formId: string; r: BonyResponse | null }) {
+  if (!r || !def) return null;
+  const sigs = (def.fields || []).filter((f: any) => f.type === 'signature' && typeof r.answers?.[f.id] === 'string');
+  const files = r.files || [];
+  if (!sigs.length && !files.length) return null;
+  const get = async (fid: string, name: string) => {
+    try { const b = await db.getBonyFile(formId, r.id, fid); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+    catch (e: any) { hud(e?.message || 'Téléchargement impossible.'); }
+  };
+  return (
+    <div className="bfs-extras">
+      {sigs.map((f: any) => <div key={f.id} className="bfs-sig"><span className="faint">{f.label || 'Signature'}</span><img src={r.answers[f.id]} alt="Signature" /></div>)}
+      {files.length ? <div className="bfs-files"><span className="faint">Fichiers déposés</span>{files.map((x) => (
+        <button key={x.id} className="btn sm" onClick={() => get(x.id, x.name)}><Icon name="download" size="sm" /><span className="ellipsis">{x.name}</span><span className="faint">{x.size >= 1048576 ? `${(x.size / 1048576).toFixed(1)} Mo` : `${Math.max(1, Math.round(x.size / 1024))} Ko`}</span></button>))}</div> : null}
+    </div>
+  );
+}
+function Drives({ def, raw }: { def: any; raw: BonyResponse[] }) {
+  const fields = (def?.fields || []).filter((f: any) => f.type === 'testdrive');
+  if (!fields.length) return null;
+  const who = (r: BonyResponse) => {
+    const fs = def.fields || [], txt = (t: string) => fs.filter((f: any) => f.type === t).map((f: any) => r.answers?.[f.id]).filter((v: any) => typeof v === 'string' && v.trim());
+    const name = fs.filter((f: any) => f.type === 'short').slice(0, 2).map((f: any) => r.answers?.[f.id]).filter(Boolean).join(' ');
+    return [name, txt('phone')[0], txt('email')[0]].filter(Boolean).join(' · ') || 'Répondant';
+  };
+  const rows = raw.flatMap((r) => fields.map((f: any) => { const p = parseDrive(r.answers?.[f.id]); return p ? { p, car: f.drive?.cars.find((c: any) => c.id === p.car)?.label || p.car, who: who(r), id: r.id + f.id } : null; }).filter(Boolean) as any[])
+    .sort((a, b) => `${a.p.date}T${a.p.time}`.localeCompare(`${b.p.date}T${b.p.time}`));
+  const today = new Date().toISOString().slice(0, 10);
+  const byDay = new Map<string, any[]>(); rows.forEach((x) => { byDay.set(x.p.date, [...(byDay.get(x.p.date) || []), x]); });
+  return (
+    <section className="frm-block">
+      <div className="frm-bh"><b>Essais réservés</b><span className="faint">{rows.length} réservation{rows.length > 1 ? 's' : ''}</span></div>
+      {!rows.length ? <div className="frm-empty">Aucun essai réservé pour l’instant.</div> : <div className="bfs-drives">{[...byDay.entries()].map(([day, xs]) => (
+        <div key={day} className={`bfs-dday ${day < today ? 'past' : ''}`}>
+          <b>{new Date(`${day}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}</b>
+          {xs.map((x) => <div key={x.id} className="bfs-dr"><span className="num">{x.p.time.replace(':', 'h')}</span><span className="badge">{x.car}</span><span className="ellipsis">{x.who}</span></div>)}
+        </div>))}</div>}
+    </section>
+  );
+}
+
+// =====================================================================
 // D'où viennent les réponses (F2b) : utm_source / utm_campaign du lien (onglet « Partager »), sinon le site
 // d'où vient le clic, sinon « Direct ». Lu dans meta, rempli par le Worker.
 // =====================================================================
@@ -218,12 +263,15 @@ function BonyStats({ row, list, compact, onPick, onEdit, onChanged }: { row: Bon
           </div>
           <section className="frm-block"><div className="frm-bh"><b>Réponses par jour</b><span className="faint">30 derniers jours · en direct</span></div><div className="frm-chart" dangerouslySetInnerHTML={{ __html: timeline }} /></section>
           <Sources raw={raw || []} />
+          <Drives def={def} raw={raw || []} />
           <div className="frm-viewsw"><Seg value={view} onChange={setView} options={[['summary', 'Résumé'], ['one', 'Réponse par réponse']]} /></div>
           {!rs.length ? <div className="frm-empty">{row.status === 'draft' ? 'Formulaire pas encore publié.' : 'Aucune réponse pour l’instant.'}</div>
             : view === 'summary' ? <div className="frm-qs">{stats.map((x, i) => <React.Fragment key={x.q.id}><QCard s={x} total={rs.length} i={i} prevSection={i ? stats[i - 1].q.section : ''} /></React.Fragment>)}</div>
             : <>
                 <OneResponse qs={qs} r={cur} idx={Math.min(idx, rs.length - 1)} n={rs.length} onIdx={setIdx} />
+                <Extras def={def} formId={row.id} r={raw?.find((x) => x.id === cur.id) || null} />
                 <div className="bfs-meta">
+                  {cur.meta?.ending ? <span className="badge" style={{ '--c': 'var(--info)' } as React.CSSProperties}>Fin : {cur.meta.ending}</span> : null}
                   {cur.meta?.flag ? <span className="badge" style={{ '--c': 'var(--warn)' } as React.CSSProperties}>{cur.meta.flag}</span> : null}
                   {Object.entries(cur.meta?.params || {}).map(([k, v]) => <span key={k} className="badge" style={{ '--c': 'var(--bony-violet)' } as React.CSSProperties}>{k} = {String(v)}</span>)}
                   {cur.meta?.durationMs ? <span className="faint">Rempli en {Math.max(1, Math.round(cur.meta.durationMs / 1000))} s</span> : null}

@@ -30,6 +30,9 @@ services:
       PORT: 3000
     volumes:
       - uploads_data:/app/uploads
+      # Forms Bony F3 (01/10/2026) : fichiers déposés par les répondants. Volume À PART, jamais servi en
+      # direct (uploads_data l'est par /uploads/) : lu seulement par une route avec JWT + rôle Forms.
+      - bonyforms_files:/app/forms-files
     networks:
       - app-network
     command: sh -c "npx prisma migrate deploy && node dist/index.js"
@@ -63,6 +66,7 @@ services:
 
 volumes:
   uploads_data:
+  bonyforms_files:
   caddy_data:
   caddy_config:
 

@@ -29,6 +29,15 @@ export function verify(ts: unknown, sig: unknown, body: unknown): boolean {
   return expected.length === got.length && crypto.timingSafeEqual(expected, got);
 }
 
+/** Vérifie la signature d'un message du Worker portant sur une CHAÎNE (dépôt de fichier : le corps est binaire). */
+export function verifyMessage(ts: unknown, sig: unknown, message: string): boolean {
+  if (!workerConfigured() || typeof ts !== 'string' || typeof sig !== 'string' || !/^[0-9a-f]{64}$/.test(sig)) return false;
+  const t = Number(ts);
+  if (!Number.isFinite(t) || Math.abs(Date.now() - t) > SKEW) return false;
+  const expected = Buffer.from(sign(ts, message), 'hex'), got = Buffer.from(sig, 'hex');
+  return expected.length === got.length && crypto.timingSafeEqual(expected, got);
+}
+
 /** Appel signé vers le Worker (`/__gearbox/...`). Rend le JSON de réponse, ou lève une erreur lisible. */
 export async function callWorker(path: string, payload: unknown): Promise<any> {
   if (!workerConfigured()) throw new Error('Le Worker des formulaires n’est pas configuré (FORMS_WORKER_URL / FORMS_WORKER_SECRET).');

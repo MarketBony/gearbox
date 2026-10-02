@@ -858,6 +858,13 @@ class DataService {
   async deleteBonyForm(id: string): Promise<void> { await apiFetch(`/bony-forms/${id}`, { method: 'DELETE' }); }
   async getBonyResponses(id: string): Promise<BonyResponse[]> { return apiFetch(`/bony-forms/${id}/responses`); }
   async deleteBonyResponse(id: string, rid: string): Promise<void> { await apiFetch(`/bony-forms/${id}/responses/${rid}`, { method: 'DELETE' }); }
+  /** Fichier déposé par un répondant (route authentifiée : jamais d'adresse publique). */
+  async getBonyFile(formId: string, rid: string, fid: string): Promise<Blob> {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/bony-forms/${formId}/responses/${rid}/files/${fid}`, { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+    if (!res.ok) { const b = await res.json().catch(() => ({} as any)); throw new ApiError(res.status, b.error || `Erreur ${res.status}`); }
+    return res.blob();
+  }
   async getBonyKits(): Promise<BonyKit[]> { return apiFetch('/bony-forms/kits'); }
   async saveBonyKit(name: string, theme: any): Promise<BonyKit> { return apiFetch('/bony-forms/kits', { method: 'POST', body: JSON.stringify({ name, theme }) }); }
   async deleteBonyKit(kid: string): Promise<void> { await apiFetch(`/bony-forms/kits/${kid}`, { method: 'DELETE' }); }

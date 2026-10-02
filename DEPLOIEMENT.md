@@ -123,6 +123,9 @@ Docker lance les **3 services** :
 Seul caddy expose des ports publics (80/443). Les uploads sont persistés dans le
 volume Docker **nommé** `gearbox_uploads_data` (ils survivent aux rebuilds),
 physiquement `/var/lib/docker/volumes/gearbox_uploads_data/_data` sur le VPS.
+Depuis le correctif 65 (02/10/2026), les fichiers déposés par les répondants des Forms Bony sont dans un
+second volume, `gearbox_bonyforms_files` (`/app/forms-files`), JAMAIS servi en direct (lu par une route avec
+connexion). ⚠️ Aucun des deux volumes n'est sauvegardé à ce jour (seule la base l'est) : voir `BUGS-CONNUS.md`.
 
 ## 6. Premier accès
 

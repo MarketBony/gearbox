@@ -25,6 +25,8 @@ export type FieldType =
   | 'concession' | 'brand'
   // spéciaux
   | 'consent' | 'file' | 'signature' | 'calc' | 'hidden'
+  // F3 : réservation d'essais (voiture → jour → créneau)
+  | 'testdrive'
   // mise en page (pas de réponse)
   | 'statement' | 'section';
 
@@ -90,6 +92,28 @@ export interface Field {
   showIf?: Condition;
   /** F2b : demi-largeur (deux questions côte à côte sur ordinateur, présentation « page »). */
   width?: 'full' | 'half';
+  /** F3 (calc) : calcul gardé pour l'équipe, non affiché au répondant (score d'un quiz, par exemple). */
+  calcHidden?: boolean;
+  /** F3 (testdrive) : parc et calendrier des essais. */
+  drive?: Drive;
+}
+
+/**
+ * F3 — Prise d'essai (demande de Théo, 01/10). Le parc est saisi DANS le formulaire (décision du 01/10).
+ * Réponse = `"<idVoiture>@<AAAA-MM-JJ>T<HH:MM>"`, heure de PARIS. Places : `count` exemplaires par voiture et par
+ * créneau, et au plus `perSlot` voitures en même temps tous modèles confondus (équipe disponible).
+ */
+export interface DriveCar { id: string; label: string; count: number; image?: string | null }
+export interface Drive {
+  cars: DriveCar[];
+  slot: 15 | 30 | 45 | 60 | 90 | 120;   // durée d'un créneau, en minutes
+  from?: string | null;                  // AAAA-MM-JJ : premier jour (vide = aujourd'hui)
+  to?: string | null;                    // AAAA-MM-JJ : dernier jour (vide = 60 jours)
+  /** Plages par jour ISO (1 = lundi … 7 = dimanche) : [["09:00","12:00"], ["14:00","18:30"]]. */
+  hours: Record<string, [string, string][]>;
+  exclude?: string[];                    // jours fermés (AAAA-MM-JJ)
+  perSlot?: number | null;               // voitures au plus sur un même créneau (vide = somme du parc)
+  leadHours?: number;                    // délai de prévenance (défaut 2 h)
 }
 
 /** Polices proposées (servies par Bunny Fonts, sans traceur). Albert Sans et Syncopate = typographies Bony. */
@@ -194,6 +218,8 @@ export interface Settings {
     /** F2b : bouton d'action sous le message (ex. « Voir nos offres »). */
     button?: { label: string; url: string } | null;
     image?: string | null };
+  /** F3 : écrans de fin SELON la réponse — le premier dont la condition est remplie gagne, sinon `thankYou`. */
+  endings?: Ending[];
   /** F2b : écran d'accueil avant la première question. */
   welcome?: { enabled: boolean; title?: string; message?: string; button?: string; image?: string | null };
   /** F2b : aperçu du lien partagé (WhatsApp, Facebook, LinkedIn, SMS…). Vide = titre, description, image d'en-tête. */
@@ -205,6 +231,8 @@ export interface Settings {
   /** Message affiché quand le formulaire est fermé ou complet. */
   closedMessage?: string;
 }
+
+export interface Ending { id: string; name?: string; when: Condition; title: string; message: string; button?: { label: string; url: string } | null; image?: string | null; redirectUrl?: string | null }
 
 export interface BonyFormDef {
   v: number;                  // SCHEMA_VERSION
@@ -286,6 +314,8 @@ const RE_PHONE = /^\+?[0-9 .()-]{8,20}$/;
 const RE_POSTAL = /^\d{5}$/;
 const RE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const RE_TIME = /^\d{2}:\d{2}$/;
+/** Jeton d'un fichier déposé : identifiant aléatoire + signature du Worker (vérifiée par lui et par Gearbox). */
+export const RE_FILE = /^[a-z0-9]{24}\.[a-f0-9]{32}$/;
 
 // ---------------------------------------------------------------- logique d'affichage
 /** Une règle est-elle satisfaite par les réponses courantes ? */
@@ -321,7 +351,7 @@ export function visibleFields(def: BonyFormDef, a: Answers): Field[] {
   for (const f of def.fields) {
     if (f.type === 'section') sectionHidden = !!f.showIf && !condOk(f.showIf, seen);
     const ok = !sectionHidden && (f.type === 'section' || !f.showIf || condOk(f.showIf, seen));
-    if (ok) { out.push(f); if (!isLayout(f)) seen[f.id] = a[f.id] ?? null; }
+    if (ok) { out.push(f); if (f.type === 'calc') seen[f.id] = calcValue(f, def, seen); else if (!isLayout(f)) seen[f.id] = a[f.id] ?? null; }
   }
   return out;
 }
@@ -344,12 +374,68 @@ export function calcValue(f: Field, def: BonyFormDef, a: Answers): number {
   return Math.round(total * 100) / 100;
 }
 
+// ---------------------------------------------------------------- prise d'essai (F3)
+const RE_DRIVE = /^([a-z0-9_-]{2,40})@(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/i;
+const pad = (n: number) => String(n).padStart(2, '0');
+const toMin = (hm: string) => { const m = /^(\d{2}):(\d{2})$/.exec(hm); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
+const fromMin = (n: number) => `${pad(Math.floor(n / 60))}:${pad(n % 60)}`;
+/** Date et heure LOCALES de Paris (même calcul dans le navigateur, le Worker et Node). */
+export function parisNow(ms = Date.now()): string {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
+const addDays = (d: string, n: number) => { const t = new Date(`${d}T12:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+const isoDay = (d: string) => { const w = new Date(`${d}T12:00:00Z`).getUTCDay(); return String(w === 0 ? 7 : w); };
+export function parseDrive(v: unknown): { car: string; date: string; time: string } | null {
+  const m = typeof v === 'string' ? RE_DRIVE.exec(v) : null;
+  return m ? { car: m[1], date: m[2], time: m[3] } : null;
+}
+/** Créneaux d'un jour (heures de début), sans tenir compte des places. */
+export function driveTimes(d: Drive, date: string): string[] {
+  if ((d.exclude || []).includes(date)) return [];
+  const step = Number(d.slot) || 30, out: string[] = [];
+  for (const [a, b] of d.hours?.[isoDay(date)] || []) {
+    const s = toMin(a), e = toMin(b); if (!Number.isFinite(s) || !Number.isFinite(e)) continue;
+    for (let t = s; t + step <= e; t += step) out.push(fromMin(t));
+  }
+  return [...new Set(out)].sort();
+}
+/** Jours proposés : ouverts, dans la période, avec au moins un créneau encore réservable (prévenance comprise). */
+export function driveDays(d: Drive, nowMs = Date.now()): string[] {
+  const today = parisNow(nowMs).slice(0, 10), first = d.from && d.from > today ? d.from : today;
+  const last = d.to || addDays(today, 60), out: string[] = [];
+  for (let x = first, k = 0; x <= last && k < 400; x = addDays(x, 1), k++) if (driveTimes(d, x).some((t) => driveOpen(d, x, t, nowMs))) out.push(x);
+  return out;
+}
+/** Places restantes d'un créneau pour une voiture (`taken` = places prises, clés `voiture@date` et `*@date`). */
+export function driveLeft(d: Drive, carId: string, at: string, taken: Record<string, number> = {}): number {
+  const car = d.cars.find((c) => c.id === carId); if (!car) return 0;
+  const own = (car.count || 1) - (taken[`${carId}@${at}`] || 0);
+  const cap = d.perSlot ? d.perSlot - (taken[`*@${at}`] || 0) : Infinity;
+  return Math.max(0, Math.min(own, cap));
+}
+/** Le créneau est-il encore réservable (délai de prévenance compris) ? */
+export function driveOpen(d: Drive, date: string, time: string, nowMs = Date.now()): boolean {
+  return `${date}T${time}` >= parisNow(nowMs + (d.leadHours ?? 2) * 3_600_000);
+}
+const FR_DAY = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+export const driveLabel = (f: Field, v: unknown) => { const p = parseDrive(v); if (!p) return ''; const car = f.drive?.cars.find((c) => c.id === p.car); return `${car?.label || p.car} · ${FR_DAY(p.date)} à ${p.time.replace(':', 'h')}`; };
+
+/** Écran de fin à montrer pour ces réponses (null = remerciement par défaut). */
+export function endingOf(def: BonyFormDef, a: Answers): Ending | null {
+  const seen: Answers = {};
+  for (const f of visibleFields(def, a)) if (f.type === 'calc') seen[f.id] = calcValue(f, def, a); else if (!isLayout(f)) seen[f.id] = a[f.id] ?? null;
+  return (def.settings.endings || []).find((e) => e.when?.rules?.length && condOk(e.when, seen)) || null;
+}
+
 // ---------------------------------------------------------------- validation
 export interface Ctx {
   /** Places déjà prises par option de créneau : { [fieldId]: { [optionId]: n } }. */
   taken?: Record<string, Record<string, number>>;
   /** Fichiers déjà déposés pour cette réponse (identifiants), par champ. */
   files?: Record<string, string[]>;
+  /** Heure de référence (tests) ; défaut : maintenant. */
+  now?: number;
 }
 export interface Result { ok: boolean; errors: Record<string, string>; clean: Answers }
 
@@ -434,8 +520,18 @@ export function validate(def: BonyFormDef, raw: Answers, ctx: Ctx = {}): Result 
       case 'file': {
         const list = asList(v), known = ctx.files?.[f.id];
         if (list.length > (f.maxFiles || 1)) errors[f.id] = `${f.maxFiles || 1} fichier(s) au maximum.`;
+        else if (list.some((x) => !RE_FILE.test(x))) errors[f.id] = 'Fichier invalide : déposez-le à nouveau.';
         else if (known && list.some((x) => !known.includes(x))) errors[f.id] = 'Fichier inconnu : déposez-le à nouveau.';
         else clean[f.id] = list;
+        break;
+      }
+      case 'testdrive': {
+        const d = f.drive, p = parseDrive(s);
+        if (!d || !p || !d.cars.some((c) => c.id === p.car)) { errors[f.id] = 'Choisissez une voiture, un jour et un créneau.'; break; }
+        if (!driveTimes(d, p.date).includes(p.time) || (d.from && p.date < d.from) || (d.to && p.date > d.to)) { errors[f.id] = 'Ce créneau n’est pas proposé.'; break; }
+        if (!driveOpen(d, p.date, p.time, ctx.now)) { errors[f.id] = 'Ce créneau est trop proche ou déjà passé, choisissez-en un autre.'; break; }
+        if (ctx.taken && driveLeft(d, p.car, `${p.date}T${p.time}`, ctx.taken[f.id]) <= 0) { errors[f.id] = 'Ce créneau vient d’être réservé, choisissez-en un autre.'; break; }
+        clean[f.id] = `${p.car}@${p.date}T${p.time}`;
         break;
       }
       case 'signature':
@@ -463,6 +559,17 @@ export function checkDef(def: BonyFormDef): string[] {
     if (!isLayout(f) && f.type !== 'hidden' && !f.label?.trim()) out.push(`Une question n’a pas d’intitulé (position ${i + 1}).`);
     if (CHOICE_TYPES.includes(f.type) && f.type !== 'concession' && f.type !== 'brand' && !(f.options || []).length) out.push(`« ${name} » n’a aucune option.`);
     if (f.type === 'calc' && !(f.formula?.fields || []).length) out.push(`Le calcul « ${name} » ne lit aucun champ.`);
+    if (f.type === 'calc') (f.formula?.fields || []).forEach((id) => { if (!def.fields.some((x) => x.id === id)) out.push(`Le calcul « ${name} » lit une question supprimée.`); });
+    if (f.type === 'testdrive') {
+      const d = f.drive;
+      if (!d || !d.cars.length) out.push(`« ${name} » : ajoutez au moins une voiture.`);
+      else {
+        if (d.cars.some((c) => !c.label?.trim() || !(c.count >= 1))) out.push(`« ${name} » : chaque voiture a un nom et au moins un exemplaire.`);
+        if (!Object.values(d.hours || {}).some((r) => r.length)) out.push(`« ${name} » : aucune plage d’ouverture.`);
+        if (d.from && d.to && d.to < d.from) out.push(`« ${name} » : la période se termine avant de commencer.`);
+        else if (!driveDays(d).length) out.push(`« ${name} » : aucun créneau à venir (période, jours ou horaires).`);
+      }
+    }
     if (f.showIf) f.showIf.rules.forEach((r) => {
       const at = def.fields.findIndex((x) => x.id === r.field);
       if (at < 0) out.push(`La condition de « ${name} » vise une question supprimée.`);
@@ -473,6 +580,13 @@ export function checkDef(def: BonyFormDef): string[] {
   const b = def.settings.thankYou?.button;
   if (b && (!b.label?.trim() || !/^https?:\/\/\S+$/.test(b.url || ''))) out.push('Le bouton de l’écran de fin doit avoir un libellé et une adresse https://…');
   if (def.settings.welcome?.enabled && !(def.settings.welcome.title || '').trim()) out.push('L’écran d’accueil n’a pas de titre.');
+  (def.settings.endings || []).forEach((e, k) => {
+    const n = e.name || `Écran de fin ${k + 1}`;
+    if (!e.title?.trim()) out.push(`« ${n} » n’a pas de titre.`);
+    if (!e.when?.rules?.length) out.push(`« ${n} » n’a pas de condition.`);
+    e.when?.rules?.forEach((r) => { if (!def.fields.some((x) => x.id === r.field)) out.push(`La condition de « ${n} » vise une question supprimée.`); });
+    if (e.button && (!e.button.label?.trim() || !/^https?:\/\/\S+$/.test(e.button.url || ''))) out.push(`Le bouton de « ${n} » doit avoir un libellé et une adresse https://…`);
+  });
   return out;
 }
 
@@ -481,6 +595,8 @@ export function displayValue(f: Field, v: Value): string {
   if (v === null || v === undefined) return '';
   if (f.type === 'consent') return v ? 'Oui' : '';
   if (f.type === 'signature') return v ? '[signature]' : '';
+  if (f.type === 'testdrive') return driveLabel(f, v);
+  if (f.type === 'file') { const n = Array.isArray(v) ? v.length : v ? 1 : 0; return n ? `${n} fichier${n > 1 ? 's' : ''}` : ''; }
   const label = (x: string) => (x.startsWith('other:') ? `Autre : ${x.slice(6)}` : f.options?.find((o) => o.id === x)?.label ?? x);
   if (Array.isArray(v)) return v.map(label).join(', ');
   return f.options ? label(String(v)) : String(v);

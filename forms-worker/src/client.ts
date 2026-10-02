@@ -8,7 +8,7 @@
 // autorisées seulement) et se redessine à chaque réglage ; aucun envoi, clic sur une question = la
 // sélectionner dans l'éditeur.
 // =====================================================================
-import { validate, visibleFields, calcValue, resolveTheme, isLayout, type BonyFormDef, type Field, type Answers, type Value } from '../../shared/bonyform';
+import { validate, visibleFields, calcValue, resolveTheme, isLayout, endingOf, parseDrive, driveDays, driveTimes, driveLeft, driveOpen, type BonyFormDef, type Field, type Answers, type Value } from '../../shared/bonyform';
 import { renderTheme, fontsHref, fontFaces } from './theme';
 
 declare const turnstile: { render: (el: HTMLElement, o: Record<string, unknown>) => string; reset: (id?: string) => void } | undefined;
@@ -139,14 +139,110 @@ function control(f: Field, onDone?: () => void): HTMLElement {
         h('span', { style: 'white-space:pre-wrap' }, f.consentText || 'J’accepte que mes données soient utilisées pour traiter ma demande.'));
     case 'calc':
       return h('div', { class: 'bf-t', style: 'font-weight:700;font-size:20px' }, String(calcValue(f, def, answers)));
+    case 'testdrive': return testdrive(f, onDone);
+    case 'signature': return signature(f);
+    case 'file': return fileField(f);
     default:
       return h('div', {}, '');
   }
 }
 
+// ---------------------------------------------------------------- prise d'essai : voiture → jour → créneau (F3)
+const FR = (d: string, o: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:00Z`).toLocaleDateString('fr-FR', { ...o, timeZone: 'UTC' });
+const pick: Record<string, { car?: string; day?: string }> = {};
+function testdrive(f: Field, onDone?: () => void): HTMLElement {
+  const d = f.drive!, box = h('div', { class: 'bf-drive' }), taken = () => BF.taken?.[f.id] || {};
+  const cur = parseDrive(answers[f.id]);
+  const st = (pick[f.id] = pick[f.id] || (cur ? { car: cur.car, day: cur.date } : {}));
+  const freeIn = (car: string, day: string) => driveTimes(d, day).some((t) => driveOpen(d, day, t) && driveLeft(d, car, `${day}T${t}`, taken()) > 0);
+  const draw = () => {
+    box.replaceChildren();
+    // 1. voiture
+    box.append(h('div', { class: 'bf-dstep' }, h('b', {}, '1'), 'Le modèle'),
+      h('div', { class: 'bf-opts tiles bf-dcars', style: `--cols:${Math.min(3, Math.max(1, d.cars.length))}` }, ...d.cars.map((c) =>
+        h('label', { class: `bf-opt ${st.car === c.id ? 'on' : ''}` },
+          h('input', { type: 'radio', name: `${f.id}-car`, checked: st.car === c.id, onchange: () => { st.car = c.id; if (st.day && !freeIn(c.id, st.day)) st.day = undefined; if (cur && cur.car !== c.id) { answers[f.id] = null; } draw(); } }),
+          c.image ? h('span', { class: 'bf-tmedia', style: `background-image:url("${c.image}")` }) : h('span', { class: 'bf-temoji', 'aria-hidden': 'true' }, '🚗'),
+          h('span', { class: 'bf-mk' }), h('span', { class: 'bf-ol' }, c.label)))));
+    if (!st.car) return;
+    // 2. jour
+    const days = driveDays(d);
+    box.append(h('div', { class: 'bf-dstep' }, h('b', {}, '2'), 'Le jour'));
+    if (!days.length) { box.append(h('p', { class: 'bf-help' }, 'Aucun jour disponible pour le moment.')); return; }
+    box.append(h('div', { class: 'bf-days', role: 'radiogroup' }, ...days.map((day) => {
+      const free = freeIn(st.car!, day);
+      return h('button', { type: 'button', class: `bf-day ${st.day === day ? 'on' : ''}`, disabled: !free, 'aria-pressed': st.day === day,
+        onclick: () => { st.day = day; draw(); setTimeout(() => box.querySelector('.bf-times')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' }), 30); } },
+        h('span', {}, FR(day, { weekday: 'short' })), h('b', {}, FR(day, { day: 'numeric' })), h('span', {}, free ? FR(day, { month: 'short' }) : 'complet'));
+    })));
+    if (!st.day) return;
+    // 3. créneau
+    const times = driveTimes(d, st.day).filter((t) => driveOpen(d, st.day!, t));
+    box.append(h('div', { class: 'bf-dstep' }, h('b', {}, '3'), 'L’heure'),
+      h('div', { class: 'bf-times', role: 'radiogroup' }, ...times.map((t) => {
+        const left = driveLeft(d, st.car!, `${st.day}T${t}`, taken()), v = `${st.car}@${st.day}T${t}`, on = answers[f.id] === v;
+        return h('button', { type: 'button', class: `bf-time ${on ? 'on' : ''}`, disabled: left <= 0, 'aria-pressed': on, title: left <= 0 ? 'Complet' : `${left} voiture${left > 1 ? 's' : ''} disponible${left > 1 ? 's' : ''}`,
+          onclick: () => { answers[f.id] = v; touched.add(f.id); draw(); refresh(true); if (onDone) setTimeout(onDone, reduced ? 0 : 320); } }, t.replace(':', 'h'));
+      })));
+    const end = typeof answers[f.id] === 'string' ? parseDrive(answers[f.id]) : null;
+    if (end && end.car === st.car && end.date === st.day) box.append(h('div', { class: 'bf-dok' }, '✓ ', `${d.cars.find((c) => c.id === end.car)?.label} · ${FR(end.date, { weekday: 'long', day: 'numeric', month: 'long' })} à ${end.time.replace(':', 'h')} (${d.slot} min)`));
+  };
+  draw();
+  return box;
+}
+
+// ---------------------------------------------------------------- signature au doigt (F3)
+function signature(f: Field): HTMLElement {
+  const cv = h('canvas', { class: 'bf-sig', width: '600', height: '200', 'aria-label': 'Zone de signature' }) as HTMLCanvasElement;
+  const g = cv.getContext('2d')!, tx = getComputedStyle(document.documentElement).getPropertyValue('--tx').trim() || '#111';
+  g.lineWidth = 2.6; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = tx;
+  if (typeof answers[f.id] === 'string') { const im = new Image(); im.onload = () => g.drawImage(im, 0, 0, 600, 200); im.src = answers[f.id] as string; }
+  let drawing = false, last: [number, number] | null = null;
+  const at = (e: PointerEvent): [number, number] => { const r = cv.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * 600, ((e.clientY - r.top) / r.height) * 200]; };
+  cv.onpointerdown = (e: PointerEvent) => { e.preventDefault(); cv.setPointerCapture(e.pointerId); drawing = true; last = at(e); g.beginPath(); g.arc(last[0], last[1], 1.2, 0, 7); g.fillStyle = tx; g.fill(); };
+  cv.onpointermove = (e: PointerEvent) => { if (!drawing || !last) return; const p = at(e); g.beginPath(); g.moveTo(last[0], last[1]); g.lineTo(p[0], p[1]); g.stroke(); last = p; };
+  cv.onpointerup = cv.onpointercancel = () => { if (!drawing) return; drawing = false; last = null; answers[f.id] = cv.toDataURL('image/png'); touched.add(f.id); sigs.set(f.id, sigOf(f)); refresh(true); };
+  const clear = h('button', { type: 'button', class: 'bf-btn ghost bf-sm', onclick: () => { g.clearRect(0, 0, 600, 200); answers[f.id] = null; sigs.set(f.id, sigOf(f)); refresh(true); } }, 'Effacer');
+  return h('div', { class: 'bf-sigw' }, cv, h('div', { class: 'bf-sigf' }, h('span', {}, 'Signez avec le doigt ou la souris'), clear));
+}
+
+// ---------------------------------------------------------------- dépôt de fichiers (F3) : relayés à Gearbox
+const fileNames: Record<string, string> = {};
+function fileField(f: Field): HTMLElement {
+  const list = () => (Array.isArray(answers[f.id]) ? (answers[f.id] as string[]) : []), max = f.maxFiles || 1;
+  const box = h('div', { class: 'bf-files' }), msg = h('div', { class: 'bf-err', role: 'alert', style: 'display:none' });
+  const inp = h('input', { type: 'file', class: 'bf-hp', accept: (f.accept?.length ? f.accept : ['image/*', 'application/pdf']).join(','), multiple: max > 1 }) as HTMLInputElement;
+  const draw = () => {
+    box.replaceChildren(...list().map((t) => h('div', { class: 'bf-file' }, h('span', { class: 'bf-ol' }, '📎 ', fileNames[t] || 'Fichier envoyé'),
+      h('button', { type: 'button', class: 'bf-btn ghost bf-sm', 'aria-label': 'Retirer', onclick: () => { answers[f.id] = list().filter((x) => x !== t); touched.add(f.id); sigs.set(f.id, sigOf(f)); draw(); refresh(true); } }, '✕'))),
+      ...(list().length < max ? [h('button', { type: 'button', class: 'bf-btn ghost bf-drop', onclick: () => inp.click() }, `＋ Ajouter un fichier${max > 1 ? ` (${list().length}/${max})` : ''}`)] : []), inp, msg);
+  };
+  inp.onchange = async () => {
+    msg.style.display = 'none';
+    for (const file of Array.from(inp.files || []).slice(0, max - list().length)) {
+      const row = h('div', { class: 'bf-file busy' }, h('span', { class: 'bf-spin' }), h('span', { class: 'bf-ol' }, file.name)); box.insertBefore(row, box.firstChild);
+      try {
+        let token: string;
+        if (PREVIEW) token = `${'a'.repeat(24)}.${Math.random().toString(16).slice(2).padEnd(32, '0').slice(0, 32)}`;   // aperçu : rien n'est envoyé
+        else {
+          const fd = new FormData(); fd.append('field', f.id); fd.append('file', file);
+          const r = await fetch(`${location.pathname}/file`, { method: 'POST', body: fd }), j: any = await r.json().catch(() => ({}));
+          if (!r.ok || !j.token) throw new Error(j.error || 'Envoi impossible.');
+          token = j.token;
+        }
+        fileNames[token] = file.name; answers[f.id] = [...list(), token]; touched.add(f.id);
+      } catch (e: any) { msg.textContent = `⚠ ${file.name} : ${e?.message || 'envoi impossible.'}`; msg.style.display = ''; }
+    }
+    inp.value = ''; sigs.set(f.id, sigOf(f)); draw(); refresh(true);
+  };
+  draw();
+  return box;
+}
+
 /** Carte d'une question (intitulé, aide, contrôle, erreur). */
 function card(f: Field, i: number, onDone?: () => void): HTMLElement {
   if (f.type === 'section') return h('div', { class: 'bf-sec bf-in', style: `--i:${i}`, 'data-f': f.id }, h('h2', {}, f.label), f.help ? h('p', { class: 'bf-help' }, f.help) : null);
+  if (f.type === 'calc' && f.calcHidden) return h('div', { 'data-f': f.id, hidden: true });
   if (f.type === 'statement') return h('div', { class: 'bf-card bf-q bf-in', style: `--i:${i}`, 'data-f': f.id }, f.label ? h('label', { class: 'bf-l' }, f.label) : null, f.help ? h('div', { class: 'bf-stmt' }, f.help) : null);
   const err = touched.has(f.id) ? errors[f.id] : undefined;
   return h('div', { class: `bf-card bf-q bf-in ${err ? 'bad' : ''}`, style: `--i:${i}`, 'data-f': f.id },
@@ -192,6 +288,7 @@ async function send(btn: HTMLButtonElement, gerr: HTMLElement) {
     const r = await fetch(location.pathname, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answers, params, ref: (() => { try { return document.referrer ? new URL(document.referrer).hostname : ''; } catch { return ''; } })(), t0, token: tsToken, hp: (document.getElementById('bf-hp') as HTMLInputElement)?.value || '' }) });
     const j: any = await r.json().catch(() => ({}));
     if (r.ok) return thanks();
+    if (j.taken) BF.taken = j.taken;                         // places relues : un créneau pris entre-temps apparaît complet
     if (j.errors) { errors = j.errors; Object.keys(errors).forEach((k) => touched.add(k)); render(); focusFirstError(); }
     gerr.textContent = j.error || 'L’envoi a échoué, réessayez.';
     if (j.captcha && tsId && typeof turnstile !== 'undefined') { tsToken = ''; turnstile.reset(tsId); }
@@ -207,7 +304,7 @@ function focusFirstError() {
   el?.classList.remove('shake'); void el?.offsetWidth; el?.classList.add('shake');
 }
 function thanks() {
-  const s = def.settings.thankYou;
+  const e = endingOf(def, answers), s = e ? { ...def.settings.thankYou, ...e } : def.settings.thankYou;
   app.innerHTML = '';
   app.append(h('div', { class: 'bf-wrap' }, h('div', { class: 'bf-card bf-thanks bf-in' },
     h('div', { class: 'bf-check', html: '<svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="40"/><path d="M25 43 l12 12 l22 -24"/></svg>' }),
@@ -248,7 +345,7 @@ function renderPage() {
   app.innerHTML = '';
   if (hd.outside) app.append(hd.outside);
   app.append(h('main', { class: 'bf-wrap' }, hd.inside, list, ts, h('input', { id: 'bf-hp', class: 'bf-hp', tabindex: '-1', autocomplete: 'off', 'aria-hidden': 'true' }),
-    h('div', { class: 'bf-act' }, btn, gerr), h('div', { class: 'bf-foot' }, 'Formulaire Bony Automobiles')));
+    h('div', { class: 'bf-act' }, btn, gerr), h('div', { class: 'bf-foot' }, 'Formulaire Bony auto-mobile')));
   captcha(ts);
 }
 /** Mise à jour sans tout reconstruire : visibilité (repli animé), erreurs, champs calculés. */
@@ -272,7 +369,7 @@ function refreshPage(typing: boolean) {
 
 // ---------------------------------------------------------------- rendu « une question par écran »
 let step = 0, dir = 1;
-const steps = () => visibleFields(def, answers).filter((f) => f.type !== 'hidden' && f.type !== 'section');
+const steps = () => visibleFields(def, answers).filter((f) => f.type !== 'hidden' && f.type !== 'section' && !(f.type === 'calc' && f.calcHidden));
 const sectionOf = (f: Field) => { let s: Field | null = null; for (const x of def.fields) { if (x.type === 'section') s = x; if (x.id === f.id) break; } return s; };
 function next() {
   const st = steps(), f = st[step]; if (!f) return;
@@ -281,7 +378,7 @@ function next() {
   if (step < st.length - 1) { dir = 1; step++; render(); }
 }
 /** Passage automatique à la question suivante après un choix (comme Typeform) ; Entrée pour les saisies. */
-const AUTO = ['choice', 'scale', 'nps', 'rating', 'dropdown', 'concession', 'brand', 'slot'];
+const AUTO = ['choice', 'scale', 'nps', 'rating', 'dropdown', 'concession', 'brand', 'slot', 'testdrive'];
 const stepDone = (f: Field, last: boolean) => (AUTO.includes(f.type) ? () => { if (!last) next(); } : next);
 function renderSteps() {
   const st = steps(); step = Math.min(step, Math.max(0, st.length - 1));
@@ -319,7 +416,7 @@ function renderWelcome() {
       h('h2', {}, w.title || def.title), w.message ? h('p', { class: 'bf-desc' }, w.message) : null,
       h('div', { class: 'bf-act', style: 'justify-content:center' }, h('button', { class: 'bf-btn', type: 'button', onclick: go }, `${w.button || 'Commencer'}${stepsMode() ? ' ↵' : ''}`)),
       (() => { const n = def.fields.filter((f) => !isLayout(f) && f.type !== 'hidden' && f.type !== 'consent').length; return h('div', { class: 'bf-hint' }, `${n} question${n > 1 ? 's' : ''} · environ ${Math.max(1, Math.round(n * 0.25))} min`); })()),
-    h('div', { class: 'bf-foot' }, 'Formulaire Bony Automobiles')));
+    h('div', { class: 'bf-foot' }, 'Formulaire Bony auto-mobile')));
 }
 
 // ---------------------------------------------------------------- clavier (une question par écran, façon Typeform)
