@@ -805,6 +805,41 @@ model BonyForm {
   updatedBy      String
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  /// F4 : projet rattaché — le formulaire en HÉRITE les tags (lus en direct). Vide = tags ci-dessous, choisis librement.
+  projectId      String?
+  sites          String[]  @default([])
+  brands         String[]  @default([])
+  service        String[]  @default([])
+  /// F4 : utilisateurs notifiés à chaque réponse (le créateur d'office).
+  followers      String[]  @default([])
+
+  @@index([projectId])
+}
+
+/// F4 : copie figée de chaque publication (historique, comparaison, restauration dans le brouillon).
+model BonyFormVersion {
+  id          String   @id @default(uuid())
+  formId      String
+  version     Int
+  def         Json
+  publishedBy String
+  publishedAt DateTime @default(now())
+
+  @@unique([formId, version])
+}
+
+/// F4 : procès-verbal d'un tirage au sort (règles, nombre d'éligibles, gagnants, empreinte de la liste tirée).
+model BonyFormDraw {
+  id       String   @id @default(uuid())
+  formId   String
+  drawnBy  String
+  drawnAt  DateTime @default(now())
+  rules    Json
+  eligible Int
+  winners  Json
+  proof    String
+
+  @@index([formId])
 }
 
 /// Réponse reçue du Worker. `id` est fixé PAR LE WORKER (uuid) : un renvoi depuis sa file d'attente

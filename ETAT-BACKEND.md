@@ -103,6 +103,13 @@ WORKER → un renvoi depuis sa file ne crée pas de doublon ; `uniqueKey` + inde
     la réponse (`claim`) ; `meta.ending` = écran de fin obtenu. Suppression d'une réponse / d'un formulaire :
     `removeFiles`.
 
+- **Correctif 66 (F4, 02/10)** — modèles `BonyFormVersion`, `BonyFormDraw` ; colonnes `BonyForm.projectId / sites / brands /
+  service / followers`. Routes (avant `GET /:id`) : `PUT /:id/meta` (champs NOMMÉS, listes contrôlées, Holding exclusif),
+  `POST /:id/follow`, `GET /:id/versions`, `GET /:id/versions/:v`, `POST /:id/versions/:v/restore` (brouillon seulement),
+  `GET /:id/draws`, `POST /:id/draw`. Liste et fiche enrichies de `project` et `tags` EFFECTIFS (`withTags` : lecture seule,
+  jamais réécrits — le brouillon s'écrit par `PUT /:id/draft`, qui ne prend que `draft`). Suppression d'un formulaire :
+  versions et tirages compris ; d'une réponse : son nom remplacé dans les procès-verbaux. `/ingest` → `notifyFollowers`.
+
 ### 📋 Forms — `/api/forms` et `src/google/client.ts` (01/10/2026, correctif 62)
 Google Forms par UN compte Google partagé (marketbony@gmail.com), connecté côté serveur. Modèles : `GoogleConnection`
 (une ligne, jeton de rafraîchissement **chiffré** AES-256-GCM avec `GOOGLE_TOKEN_KEY`), `GoogleForm` (catalogue :

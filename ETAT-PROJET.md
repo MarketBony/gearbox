@@ -4,7 +4,10 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 01/10/2026 (lire en premier)
-- **En production : correctif 65 (02/10)** — **Forms Bony, lot F3** : **prise d'essai** (voiture → jour → créneau,
+- **En production : correctif 66 (02/10)** — **Forms Bony, lot F4** : formulaire relié à un projet (tags hérités en
+  direct, sinon tags libres) et filtres, abonnés notifiés à chaque réponse, tirage au sort avec procès-verbal, versions
+  publiées ; plus une **copie nocturne des fichiers SUR le VPS** (décision de Théo : pas de copie hors VPS). Pas
+  d'e-mail aux répondants (décision du 02/10). Avant lui le **correctif 65 (02/10)** — **Forms Bony, lot F3** : **prise d'essai** (voiture → jour → créneau,
   parc saisi dans le formulaire), écrans de fin selon la réponse, calculs et points, conditions complètes, créneaux à
   places, programmation, signature, **fichiers des répondants sur le VPS** (volume privé `bonyforms_files`), et le nom
   « Bony auto-mobile » partout. Avant lui le **correctif 64 (01/10)** — **Forms Bony, lots F2a + F2b** : studio de personnalisation (aperçu
@@ -29,7 +32,8 @@
 - **Où on va (dans l'ordre)** :
   0. **Chantiers d'octobre (liste de Théo du 01/10, arbitrages dans le backlog § « Chantiers d'octobre 2026 »)** :
      lot 1 fait (correctif 60), Post-it (61), Google Forms (62), Forms Bony F1 (63), F2a + F2b (64), **F3 (65)**.
-     **Suite : sauvegarde des fichiers (risque relevé au F3, voir backlog), puis Forms Bony F4** (plan validé par Théo « de A à Z » ; détail au backlog § Forms Bony),
+     **F4 fait (66).** Forms Bony terminé ; reste noté : accusé de réception par e-mail (refusé pour l'instant).
+     **Suite : tâches multi-assignées, prestataire, répartitions, fichiers maison, mascotte / agent IA** (plan validé par Théo « de A à Z » ; détail au backlog § Forms Bony),
      avec la **prise d'essai** demandée le 01/10. À faire par l'équipe : importer les polices officielles
      (NouvelR, Read, Dacia Block, AlpineNewAlps, NissanBrand) dans Studio › Polices de marque. Ensuite : tâches multi-assignées, prestataire, répartitions,
      fichiers maison, mascotte / agent IA.
@@ -496,6 +500,29 @@
     en route : le jour même passé affiché « complet » ; cases d'option déformées dans l'éditeur de conditions.
     Erreur d'audit corrigée : le Worker appliquait DÉJÀ l'ouverture différée.
 
+- **Correctif 66 — 02/10 : Forms Bony, lot F4 + copie nocturne des fichiers** (branche `feat/forms-bony-f4`, `api` ET
+  `web`, Worker inchangé ; migration ADDITIVE `20261002140000_bony_f4` appliquée et inscrite avant le push).
+  - **Projet et tags** (demande de Théo du 01/10) : `BonyForm.projectId` + `sites` / `brands` / `service` ; rattaché, le
+    formulaire hérite les tags DU PROJET lus en direct (`withTags`) ; non rattaché, tags libres (listes de constants.ts,
+    Holding exclusif). Filtres de la liste Forms ; bloc « Formulaires liés » sur la fiche projet (rôles Forms seulement).
+  - **Notifications** (décision : abonnés) : `BonyForm.followers`, créateur abonné d'office, cloche « Suivre » ; à chaque
+    réponse `bonyforms:notify` aux seuls abonnés (bannière, regroupée sur 20 s, `DataHub.useFormsAlerts`) + push au plus
+    1 / min / formulaire, pas à qui a Forms ouvert.
+  - **Tirage au sort** : fait par le serveur (`crypto.randomInt`), règles (case cochée, une participation par e-mail ou
+    téléphone, exclusion des gagnants précédents, réponses signalées écartées), gagnants + suppléants, **procès-verbal**
+    `BonyFormDraw` (règles, éligibles, empreinte SHA-256 de la liste, adresses masquées) ; effacement RGPD d'une réponse
+    → son nom remplacé au PV ; animation de révélation.
+  - **Versions** : `BonyFormVersion` à chaque publication (inscription rétroactive de la version en ligne à la première
+    consultation), voir / restaurer dans le BROUILLON.
+  - **Copie nocturne des fichiers** : `scripts/backup-files.sh` (crontab de root, 3 h 30) → `/var/backups/gearbox-fichiers`,
+    7 jours, des volumes `gearbox_uploads_data` et `gearbox_bonyforms_files`. Protège des ERREURS, pas d'une panne du
+    disque ni de la perte du VPS (Théo ne veut pas de copie hors VPS — risque assumé, voir BUGS-CONNUS).
+  - **Corrigé en route (porte commune v2)** : `useSheets` (ui2/apps/ui/kit.tsx) laissait un volet VIDE ouvert quand son
+    composant disparaissait (changement de vue) ; il le referme désormais — toutes les rubriques en profitent.
+  - **Testé avec le compte de Théo puis recetté** : formulaire « ZZ TEST F4 » rattaché au projet « VA Massagettes » (lecture
+    seule sur le projet), Holding, filtres, bannière, tirage (doublon écarté), effacement RGPD au PV, versions et
+    restauration, ouverture depuis la fiche projet ; supprimé ensuite, base vérifiée sans reste.
+
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
   51.83.75.181)
@@ -503,7 +530,9 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 65** (2 octobre 2026) — **Forms Bony F3**. Worker
+- master = prod, synchronisés. Dernier lot déployé : **correctif 66** (2 octobre 2026) — **Forms Bony F4** + copie
+  nocturne des fichiers (crontab root, `scripts/backup-files.sh`). `api` ET `web`, migration `20261002140000_bony_f4`
+  (additive, appliquée avant le push), Worker inchangé. Avant lui le **correctif 65** — **Forms Bony F3**. Worker
   d'abord (route `/<id>/file`, places de la prise d'essai), puis `api` ET `web`. Aucune migration. **Nouveau volume
   `bonyforms_files`** (fichiers des répondants) : déclaré dans `docker-compose.yml`, créé par `up`, PAS SAUVEGARDÉ
   (comme `uploads_data`, voir backlog). Avant lui le **correctif 64** — Forms Bony F2a + F2b. Ordre : **Worker d'abord** (`cd forms-worker && npm run deploy` : routes `/__preview`, `/__gearbox/asset`, `/a/<id>`),
@@ -3842,7 +3871,7 @@
     **+ demande de Théo (01/10) : le nom s'écrit « Bony auto-mobile », pas « Bony Automobiles »** (pied de page et
     `og:site_name` du Worker, consentements par défaut, modèles, `public/confidentialite.html`). Les formulaires
     déjà créés gardent leur texte : à reprendre à la main dans l'éditeur.
-  - **F4, côté Gearbox** : notifications à l'équipe, **tirage au sort animé**, accusé de réception par e-mail
+  - ~~**F4, côté Gearbox**~~ → **fait, correctif 66**, SANS l'accusé de réception par e-mail (refusé le 02/10). Pour mémoire : notifications à l'équipe, **tirage au sort animé**, accusé de réception par e-mail
     (envoi d'e-mails Cloudflare, droit déjà accordé à la session wrangler), versions (historique des publications).
     **+ demande de Théo (01/10) : relier un formulaire à un PROJET** — il hérite alors des tags du projet
     (concession, service, marque…) pour filtrer les formulaires par ces tags ; option « non rattaché à un projet »

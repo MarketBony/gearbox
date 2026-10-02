@@ -125,7 +125,10 @@ volume Docker **nommé** `gearbox_uploads_data` (ils survivent aux rebuilds),
 physiquement `/var/lib/docker/volumes/gearbox_uploads_data/_data` sur le VPS.
 Depuis le correctif 65 (02/10/2026), les fichiers déposés par les répondants des Forms Bony sont dans un
 second volume, `gearbox_bonyforms_files` (`/app/forms-files`), JAMAIS servi en direct (lu par une route avec
-connexion). ⚠️ Aucun des deux volumes n'est sauvegardé à ce jour (seule la base l'est) : voir `BUGS-CONNUS.md`.
+connexion). Copie nocturne des deux volumes SUR le VPS depuis le correctif 66 : `scripts/backup-files.sh`, installé
+dans la crontab de root (`30 3 * * * /home/ubuntu/gearbox/scripts/backup-files.sh >> /var/log/gearbox-backup-files.log 2>&1`),
+archives dans `/var/backups/gearbox-fichiers` (root seul, 7 jours). Restauration : voir l'en-tête du script.
+⚠️ Pas de copie HORS du VPS (décision de Théo, 02/10) : une panne du disque emporte fichiers ET copies.
 
 ## 6. Premier accès
 

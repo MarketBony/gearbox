@@ -325,8 +325,12 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   propose plus qu'un jour ayant au moins un créneau encore réservable (prévenance comprise).
 - [x] **Forms Bony : cases d'option déformées dans l'éditeur de conditions** (relevé en test) — style d'interrupteur
   global de la v2 ; case masquée, la pastille porte l'état.
-- [ ] **Sauvegarde : `uploads_data` (3,2 Go) et `bonyforms_files` ne sont sauvegardés nulle part** (relevé le 01/10
-  à l'audit F3) — seule la base l'est (`backup.yml`). Lot dédié à faire.
+- [~] **Sauvegarde : `uploads_data` (3,2 Go) et `bonyforms_files`** (relevé le 01/10 à l'audit F3) — copie nocturne SUR
+  le VPS depuis le correctif 66 (`scripts/backup-files.sh`, 7 jours) : couvre les erreurs. **Risque ASSUMÉ par Théo
+  (02/10)** : aucune copie hors du VPS, donc rien en cas de panne du disque ou de perte du VPS (sauf sauvegarde OVH
+  éventuelle, non vérifiée).
+- [x] **v2 : volet vide resté ouvert au changement de vue** (relevé au test F4, 02/10) — `useSheets` ne refermait pas
+  ses volets au démontage ; corrigé dans le kit (toutes les rubriques).
 - [ ] **Fichiers de `uploads/` lisibles sans connexion** (relevé le 01/10) — servis par `express.static` à qui connaît
   l'adresse (noms aléatoires). À arbitrer avec la sauvegarde.
 - [ ] **Forms Bony : polices officielles à importer** — NouvelR, Read, Dacia Block, AlpineNewAlps, NissanBrand :
