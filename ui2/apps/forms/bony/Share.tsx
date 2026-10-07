@@ -12,6 +12,9 @@ import { pickImage } from './Studio';
 //   ressortent dans l'onglet Réponses (synthèse par source) et dans l'export Excel.
 // - QR code du lien construit (PNG pour l'impression, SVG pour le graphiste).
 // - Aperçu du lien partagé (WhatsApp, Facebook, LinkedIn, SMS) : titre, description, image.
+// - Intégration dans un autre site (07/10/2026) : balise <script> servie par le Worker (forms-worker/src/embed.ts),
+//   qui pose une iframe à la hauteur du contenu ; ou iframe seule pour les sites qui refusent les scripts.
+//   Elle reprend la source, la campagne et le préremplissage du lien ci-dessus.
 // =====================================================================
 
 type Update = (mut: (d: BonyFormDef) => void, soon?: boolean) => void;
@@ -20,6 +23,8 @@ const SOURCES: [string, string, string][] = [
   ['email', 'email', 'E-mailing'], ['sms', 'sms', 'SMS'], ['facebook', 'social', 'Facebook'], ['instagram', 'social', 'Instagram'],
   ['linkedin', 'social', 'LinkedIn'], ['site', 'referral', 'Site Bony'], ['qr', 'print', 'QR code (affiche, flyer)'], ['showroom', 'offline', 'Showroom / tablette'],
 ];
+/** Sources sans page web : remplacées par « Site Bony » dans le code d'intégration. */
+const OFFWEB = ['email', 'sms', 'qr', 'showroom'];
 const clean = (v: string) => v.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 
 export default function Share({ def, row, update }: { def: BonyFormDef; row: BonyFormDetail; update: Update }) {
@@ -29,6 +34,8 @@ export default function Share({ def, row, update }: { def: BonyFormDef; row: Bon
   const [content, setContent] = useState('');
   const [pre, setPre] = useState<Record<string, string>>({});
   const [dark, setDark] = useState(true);
+  const [embedBg, setEmbedBg] = useState<'theme' | 'transparent'>('theme');
+  const [embedKind, setEmbedKind] = useState<'script' | 'iframe'>('script');
   const t = resolveTheme(def.theme), share = def.settings.share || {};
   const prefillable = def.fields.filter((f) => f.param && !isLayout(f));
 
@@ -49,6 +56,20 @@ export default function Share({ def, row, update }: { def: BonyFormDef; row: Bon
     const q = qrcode(0, 'M'); q.addData(link); q.make();
     return q;
   }, [link]);
+  // Code d'intégration : mêmes paramètres que le lien construit (UTM, préremplissage).
+  const embedCode = useMemo(() => {
+    if (!link || !row.url) return '';
+    const u = new URL(link), id = u.pathname.replace(/^\/+|\/+$/g, ''), attr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    // Une source hors web (e-mailing, SMS, QR, showroom — « E-mailing » est le choix par défaut) n'a pas de sens sur une
+    // page : le code d'intégration compte alors « Site Bony ». Le lien de campagne, lui, garde le choix fait.
+    if (OFFWEB.includes(src)) { u.searchParams.set('utm_source', 'site'); u.searchParams.set('utm_medium', 'referral'); }
+    if (embedKind === 'iframe') {
+      u.searchParams.set('embed', '1'); if (embedBg === 'transparent') u.searchParams.set('bg', 'transparent');
+      return `<iframe src="${attr(u.toString())}" title="${attr(def.title)}" style="display:block;width:100%;height:800px;border:0" allow="clipboard-write"></iframe>`;
+    }
+    const params = u.searchParams.toString();
+    return `<script src="${u.origin}/embed.js" data-form="${id}"${params ? ` data-params="${attr(params)}"` : ''}${embedBg === 'transparent' ? ' data-bg="transparent"' : ''} async></script>`;
+  }, [link, row.url, src, embedKind, embedBg, def.title]);
   const fg = dark ? '#111111' : t.primary;
   const svg = useMemo(() => {
     if (!qr) return '';
@@ -117,6 +138,24 @@ export default function Share({ def, row, update }: { def: BonyFormDef; row: Bon
       </div>
 
       <div className="bsh-col">
+        <section className="bsh-card">
+          <h3><Icon name="globe" size="sm" />Intégrer sur un site</h3>
+          <p className="bfe-hint">Collez ce code dans la page d’un site (Bony, concession, partenaire) : le formulaire s’y affiche à sa hauteur, sans barre de défilement. Campagne et préremplissage : ceux du lien de campagne ci-contre ; source « Site Bony », sauf réseau social ou source « Autre » choisis.</p>
+          <div className="bst-chips">
+            <button className={embedKind === 'script' ? 'on' : ''} onClick={() => setEmbedKind('script')}>Balise (recommandée)</button>
+            <button className={embedKind === 'iframe' ? 'on' : ''} onClick={() => setEmbedKind('iframe')}>Iframe seule</button>
+          </div>
+          <div className="bst-chips">
+            <button className={embedBg === 'theme' ? 'on' : ''} onClick={() => setEmbedBg('theme')}>Fond du formulaire</button>
+            <button className={embedBg === 'transparent' ? 'on' : ''} onClick={() => setEmbedBg('transparent')}>Fond du site (transparent)</button>
+          </div>
+          <div className="bsh-link"><code>{embedCode || 'Code indisponible (Worker non configuré).'}</code></div>
+          {embedKind === 'iframe' ? <p className="bfe-hint">L’iframe seule a une hauteur fixe (800 px, à ajuster) : à réserver aux sites qui refusent les scripts.</p> : null}
+          <div className="bsh-acts">
+            <button className="btn sm primary" disabled={!embedCode} onClick={() => copy(embedCode, 'Code d’intégration')}><Icon name="copy" size="sm" />Copier le code</button>
+          </div>
+        </section>
+
         <section className="bsh-card">
           <h3><Icon name="message" size="sm" />Aperçu du lien partagé</h3>
           <p className="bfe-hint">Ce qu’affichent WhatsApp, Facebook, LinkedIn ou Messenger quand on colle le lien. Vide : titre, description et image d’en-tête du formulaire.</p>
