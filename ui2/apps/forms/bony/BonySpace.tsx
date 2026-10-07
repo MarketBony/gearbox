@@ -64,6 +64,8 @@ export default function BonySpace({ win, inst, switcher }: AppProps & { switcher
   const openEditor = (f: BonyFormRow) => { setTab('forms'); setEditId(f.id); };
   const openStats = (f: BonyFormRow) => { setEditId(null); setSelId(f.id); setTab('stats'); };
   const newSheet = () => openSheet((close) => <NewSheet close={close} onDone={(f) => { close(); load(); openEditor(f); }} />, { width: 620 });
+  // Dupliquer en un clic (07/10/2026) : la copie (brouillon, tags repris, sans projet) s'ouvre aussitôt dans l'éditeur.
+  const duplicate = async (f: BonyFormRow) => { try { const c = await db.duplicateBonyForm(f.id); hud('Copie créée'); load(); openEditor(c); } catch (e: any) { hud(e?.message || 'Duplication impossible.'); } };
   const copyLink = (f: BonyFormRow) => { if (!f.url) return; navigator.clipboard?.writeText(f.url).then(() => hud('Lien du formulaire copié'), () => hud(f.url!)); };
 
   const runCmd = (c: string) => {
@@ -94,7 +96,7 @@ export default function BonySpace({ win, inst, switcher }: AppProps & { switcher
         {!ready ? <div className="frm-err">Le Worker Cloudflare n’est pas configuré sur ce serveur (FORMS_WORKER_URL / FORMS_WORKER_SECRET) : la publication est impossible.</div> : null}
         {err ? <div className="frm-err">{err}</div> : null}
         {tab === 'forms' && editId ? (
-          <React.Fragment key={editId}><BonyEditor id={editId} workerUrl={workerUrl} openSheet={openSheet} onBack={() => setEditId(null)} onStats={() => { const f = (list || []).find((x) => x.id === editId); if (f) openStats(f); }} onChanged={load} /></React.Fragment>
+          <React.Fragment key={editId}><BonyEditor id={editId} workerUrl={workerUrl} openSheet={openSheet} onBack={() => setEditId(null)} onStats={() => { const f = (list || []).find((x) => x.id === editId); if (f) openStats(f); }} onChanged={load} onOpenForm={(fid) => setEditId(fid)} /></React.Fragment>
         ) : tab === 'forms' ? (
           <div className="frm-list scroll">
             <div className="frm-tools"><label className="search"><Icon name="search" size="sm" /><input placeholder="Rechercher un formulaire…" value={q} onChange={(e) => setQ(e.target.value)} /></label>
@@ -127,6 +129,7 @@ export default function BonySpace({ win, inst, switcher }: AppProps & { switcher
                     <div className="frm-act" onClick={(e) => e.stopPropagation()}>
                       <button className="btn sm" onClick={() => openEditor(f)}><Icon name="edit" size="sm" />Modifier</button>
                       <button className="btn sm" onClick={() => openStats(f)}><Icon name="trending" size="sm" />Réponses</button>
+                      <button className="icon-btn sm" aria-label="Dupliquer" data-tip="Dupliquer" onClick={() => duplicate(f)}><Icon name="copy" size="sm" /></button>
                       {f.status !== 'draft' && f.url ? <button className="icon-btn sm" aria-label="Copier le lien" data-tip="Copier le lien" onClick={() => copyLink(f)}><Icon name="link" size="sm" /></button> : null}
                     </div>
                   </article>

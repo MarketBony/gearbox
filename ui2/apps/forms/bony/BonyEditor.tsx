@@ -7,6 +7,7 @@ import { TYPES, typeDef, newField, newOption, copyField, bonyOptions } from './c
 import { StudioPanel, StudioPreview, pickImage } from './Studio';
 import Share from './Share';
 import DriveEditor from './DriveEditor';
+import { Framed, FrameEditor, FrameToggle } from './Frame';
 import { ProjectTags, VersionsSheet } from './F4';
 
 // =====================================================================
@@ -23,7 +24,7 @@ const reduced = () => { try { return matchMedia('(prefers-reduced-motion: reduce
 const anim = (el: Element | null | undefined, kf: Keyframe[], o: Record<string, unknown> = {}) => (el && !reduced() ? gx().animate(el, kf, o) : null);
 const STATUS: Record<string, { l: string; c: string }> = { draft: { l: 'Brouillon', c: 'var(--text-3)' }, published: { l: 'En ligne', c: 'var(--ok)' }, closed: { l: 'Fermé', c: 'var(--warn)' } };
 
-export default function BonyEditor({ id, workerUrl, openSheet, onBack, onStats, onChanged }: { id: string; workerUrl: string | null; openSheet: (render: (close: (v?: unknown) => void) => React.ReactNode, opts?: any) => void; onBack: () => void; onStats: () => void; onChanged: () => void }) {
+export default function BonyEditor({ id, workerUrl, openSheet, onBack, onStats, onChanged, onOpenForm }: { id: string; workerUrl: string | null; openSheet: (render: (close: (v?: unknown) => void) => React.ReactNode, opts?: any) => void; onBack: () => void; onStats: () => void; onChanged: () => void; onOpenForm?: (id: string) => void }) {
   const [row, setRow] = useState<BonyFormDetail | null>(null);
   const [def, setDef] = useState<BonyFormDef | null>(null);
   const [err, setErr] = useState('');
@@ -131,7 +132,10 @@ export default function BonyEditor({ id, workerUrl, openSheet, onBack, onStats, 
     catch (e: any) { hud(e?.message || 'Abonnement impossible.'); }
   };
   const versions = () => openSheet((close) => <VersionsSheet formId={id} close={() => close()} onRestored={() => { load(); changedRef.current(); }} />, { width: 620 });
+  // Dupliquer : brouillon en cours enregistré d'abord (la copie part du brouillon du serveur), puis ouverture de la copie.
+  const duplicateForm = async () => { try { await flush(); const c = await db.duplicateBonyForm(id); hud('Copie créée'); onChanged(); onOpenForm?.(c.id); } catch (e: any) { hud(e?.message || 'Duplication impossible.'); } };
   const remove = (el: HTMLElement) => gx().menu.open([
+    { label: 'Dupliquer le formulaire', icon: 'copy', action: duplicateForm },
     { label: 'Historique des versions…', icon: 'clock', action: versions },
     '-',
     { header: `Supprimer « ${def?.title} » ?` },
@@ -306,6 +310,8 @@ function Preview({ f, on, set }: { f: Field; on: boolean; set: (p: Partial<Field
 function FieldSettings({ f, def, set }: { f: Field; def: BonyFormDef; set: (p: Partial<Field> | ((f: Field) => void)) => void }) {
   const num = (k: 'min' | 'max' | 'maxLength' | 'minChoices' | 'maxChoices', v: string) => set((x) => { if (v === '') delete (x as any)[k]; else (x as any)[k] = Number(v); });
   const prev = def.fields.slice(0, def.fields.findIndex((x) => x.id === f.id)).filter((x) => !isLayout(x));
+  const [frK, setFrK] = useState<number | null>(null);     // F5 : tuile dont on règle le cadrage
+  const frO = frK !== null ? f.options?.[frK] : undefined;
   return (
     <div className="bfe-set">
       <div className="bfe-gt">{typeDef(f.type).l}</div>
@@ -324,12 +330,15 @@ function FieldSettings({ f, def, set }: { f: Field; def: BonyFormDef; set: (p: P
           <Sel l="Colonnes" v={String(f.columns || 2)} opts={[['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']]} on={(v) => set({ columns: Number(v) as any })} />
           <div className="bfe-tiles">{(f.options || []).map((o, k) => (
             <div key={o.id} className="bfe-tile">
-              <span className="bfe-tprev" style={o.image ? { backgroundImage: `url("${o.image}")` } : undefined}>{o.image ? null : o.emoji || '·'}</span>
+              {o.image ? <Framed url={o.image} frame={o.frame} ratio={4 / 3} className="bfe-tprev" /> : <span className="bfe-tprev">{o.emoji || '·'}</span>}
               <span className="ellipsis bfe-tlab">{o.label || `Option ${k + 1}`}</span>
               <input className="bfe-in bfe-emoji" value={o.emoji || ''} placeholder="😀" maxLength={8} aria-label="Emoji" onChange={(e) => set((x) => { const v = [...e.target.value].slice(0, 2).join(''); if (v) x.options![k].emoji = v; else delete x.options![k].emoji; })} />
               <button className="icon-btn sm" aria-label="Image" data-tip={o.image ? 'Remplacer l’image' : 'Ajouter une image'} onClick={async () => { const u = await pickImage(900); if (u) set((x) => { x.options![k].image = u; }); }}><Icon name="image" size="sm" /></button>
-              {o.image ? <button className="icon-btn sm" aria-label="Retirer l’image" onClick={() => set((x) => { delete x.options![k].image; })}><Icon name="close" size="sm" /></button> : null}
+              {o.image ? <button className={`icon-btn sm ${frK === k ? 'on' : ''}`} aria-label="Cadrer" data-tip="Cadrer l’image" onClick={() => setFrK(frK === k ? null : k)}><Icon name="target" size="sm" /></button> : null}
+              {o.image ? <button className="icon-btn sm" aria-label="Retirer l’image" onClick={() => set((x) => { delete x.options![k].image; delete x.options![k].frame; })}><Icon name="close" size="sm" /></button> : null}
             </div>))}</div>
+          {frO?.image ? <FrameEditor url={frO.image} frame={frO.frame} ratio={4 / 3} label={`Cadrage — ${frO.label || `Option ${frK! + 1}`}`} onClose={() => setFrK(null)}
+            onChange={(fr) => set((x) => { const o = x.options?.[frK!]; if (!o) return; if (fr) o.frame = fr; else delete o.frame; })} /> : null}
           <div className="bfe-hint">Une image l’emporte sur l’emoji. Images recadrées en 4:3 ; sur téléphone, deux colonnes au plus.</div>
         </> : null}
         <Chk l="Proposer « Autre » (réponse libre)" v={!!f.allowOther} on={(v) => set({ allowOther: v })} />
@@ -433,12 +442,14 @@ function FormSettings({ def, update }: { def: BonyFormDef; update: (mut: (d: Bon
         <Txt l="Titre" v={s.welcome.title || ''} on={(v) => update((d) => { d.settings.welcome!.title = v; })} />
         <Txt l="Message" multiline v={s.welcome.message || ''} placeholder="ex. 2 minutes pour gagner un week-end en Alpine A290" on={(v) => update((d) => { d.settings.welcome!.message = v; })} />
         <Txt l="Bouton" v={s.welcome.button || ''} placeholder="Commencer" on={(v) => update((d) => { d.settings.welcome!.button = v.slice(0, 40); })} />
-        <ImgPick l="Image" url={s.welcome.image || null} on={(u) => update((d) => { d.settings.welcome!.image = u; }, true)} />
+        <ImgPick l="Image" url={s.welcome.image || null} on={(u) => update((d) => { d.settings.welcome!.image = u; delete d.settings.welcome!.frame; }, true)} />
+        <FrameToggle url={s.welcome.image || null} frame={s.welcome.frame} ratio={3.8} label="Cadrage de l’image d’accueil" onChange={(fr, soon) => update((d) => { if (fr) d.settings.welcome!.frame = fr; else delete d.settings.welcome!.frame; }, soon)} />
       </> : null}
       <div className="bfe-gt">Après l’envoi</div>
       <Txt l="Titre du remerciement" v={s.thankYou.title} on={(v) => update((d) => { d.settings.thankYou.title = v; })} />
       <Txt l="Message" multiline v={s.thankYou.message} on={(v) => update((d) => { d.settings.thankYou.message = v; })} />
-      <ImgPick l="Image (facultatif)" url={s.thankYou.image || null} on={(u) => update((d) => { d.settings.thankYou.image = u; }, true)} />
+      <ImgPick l="Image (facultatif)" url={s.thankYou.image || null} on={(u) => update((d) => { d.settings.thankYou.image = u; delete d.settings.thankYou.frame; }, true)} />
+      <FrameToggle url={s.thankYou.image || null} frame={s.thankYou.frame} ratio={3.8} label="Cadrage de l’image de fin" onChange={(fr, soon) => update((d) => { if (fr) d.settings.thankYou.frame = fr; else delete d.settings.thankYou.frame; }, soon)} />
       <div className="bfe-row">
         <Txt l="Bouton (facultatif)" v={s.thankYou.button?.label || ''} placeholder="ex. Voir nos offres" on={(v) => update((d) => { const b = d.settings.thankYou.button || { label: '', url: '' }; b.label = v.slice(0, 40); d.settings.thankYou.button = b.label || b.url ? b : null; })} />
         <Txt l="Adresse du bouton" v={s.thankYou.button?.url || ''} placeholder="https://…" on={(v) => update((d) => { const b = d.settings.thankYou.button || { label: '', url: '' }; b.url = v.trim(); d.settings.thankYou.button = b.label || b.url ? b : null; })} />

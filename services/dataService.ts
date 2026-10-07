@@ -851,6 +851,7 @@ class DataService {
   // --- Forms Bony : formulaires maison (publiés par le Worker Cloudflare) ---
   async getBonyForms(): Promise<{ workerReady: boolean; workerUrl: string | null; forms: BonyFormRow[] }> { return apiFetch('/bony-forms'); }
   async createBonyForm(title: string): Promise<BonyFormDetail> { return apiFetch('/bony-forms', { method: 'POST', body: JSON.stringify({ title }) }); }
+  async duplicateBonyForm(id: string): Promise<BonyFormDetail> { return apiFetch(`/bony-forms/${id}/duplicate`, { method: 'POST' }); }
   async getBonyForm(id: string): Promise<BonyFormDetail> { return apiFetch(`/bony-forms/${id}`); }
   async saveBonyDraft(id: string, draft: any): Promise<BonyFormRow> { return apiFetch(`/bony-forms/${id}/draft`, { method: 'PUT', body: JSON.stringify({ draft }) }); }
   async publishBonyForm(id: string): Promise<BonyFormRow> { return apiFetch(`/bony-forms/${id}/publish`, { method: 'POST' }); }

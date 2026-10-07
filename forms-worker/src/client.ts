@@ -8,7 +8,7 @@
 // autorisées seulement) et se redessine à chaque réglage ; aucun envoi, clic sur une question = la
 // sélectionner dans l'éditeur.
 // =====================================================================
-import { validate, visibleFields, calcValue, resolveTheme, isLayout, endingOf, parseDrive, driveDays, driveTimes, driveLeft, driveOpen, type BonyFormDef, type Field, type Answers, type Value } from '../../shared/bonyform';
+import { validate, visibleFields, calcValue, resolveTheme, frameCss, isLayout, endingOf, parseDrive, driveDays, driveTimes, driveLeft, driveOpen, type BonyFormDef, type Field, type Frame, type Answers, type Value } from '../../shared/bonyform';
 import { renderTheme, fontsHref, fontFaces } from './theme';
 
 declare const turnstile: { render: (el: HTMLElement, o: Record<string, unknown>) => string; reset: (id?: string) => void } | undefined;
@@ -38,6 +38,8 @@ const KEYS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const stepsMode = () => def?.theme.layout === 'steps';
 /** Adresse d'image sûre (http(s) ou /a/<id> du Worker). */
 const safeImg = (u?: string | null) => (u && (/^https?:\/\/[^\s"'()<>]+$/.test(u) || /^\/a\/[a-z0-9]+$/.test(u)) ? u : '');
+/** F5 : image cadrée (tuile, voiture, accueil, fin) → variables lues par le calque ::before (styles.ts). */
+const fimg = (u: string, f?: Frame | null) => { const c = frameCss(f); return `--fi:url("${u}");--fp:${c.pos};--fs:${c.size};--fz:${c.zoom}`; };
 new URLSearchParams(location.search).forEach((v, k) => { params[k] = v; });
 // Préremplissage depuis le lien de l'e-mailing (?email=…&concession=…).
 const prefill = () => def.fields.forEach((f) => {
@@ -58,6 +60,13 @@ function applyTheme() {
   const fl = document.getElementById('bf-fonts') as HTMLLinkElement | null; const href = fontsHref(t);
   if (fl && fl.getAttribute('href') !== href) fl.setAttribute('href', href);
   if (PREVIEW) document.documentElement.setAttribute('data-preview', '1');
+  syncFooter();
+}
+/** F5 « repiquage » : pied de page charté Bony après le formulaire, posé ou retiré selon le thème (aperçu en direct compris). */
+function syncFooter() {
+  const on = theme().bonyFooter, cur = document.getElementById('bf-rq'), tpl = document.getElementById('bony-logo') as HTMLTemplateElement | null;
+  if (!on || !tpl) { cur?.remove(); return; }
+  if (!cur) app.after(h('footer', { id: 'bf-rq', class: 'bf-rq' }, h('div', { class: 'bf-rqlogo', role: 'img', 'aria-label': 'Bony auto-mobile', html: tpl.innerHTML })));
 }
 function optId(f: Field, v: string) { const o = f.options?.find((x) => x.id === v || x.label.toLowerCase() === v.toLowerCase()); return o ? o.id : f.options ? null : v; }
 
@@ -108,7 +117,7 @@ function control(f: Field, onDone?: () => void): HTMLElement {
         wrap.append(h('label', { class: `bf-opt ${multi ? 'sq' : ''} ${on ? 'on' : ''}`, style: full ? 'opacity:.45;cursor:not-allowed' : null },
           h('input', { type: multi ? 'checkbox' : 'radio', name: f.id, checked: on, disabled: full || locked(f),
             onchange: () => { if (multi) set(on ? list.filter((x) => x !== o.id) : [...list.filter((x) => x !== o.id), o.id]); else set(o.id, true); } }),
-          tiles ? (safeImg(o.image) ? h('span', { class: 'bf-tmedia', style: `background-image:url("${safeImg(o.image)}")` }) : o.emoji ? h('span', { class: 'bf-temoji', 'aria-hidden': 'true' }, o.emoji) : null) : null,
+          tiles ? (safeImg(o.image) ? h('span', { class: 'bf-tmedia', style: fimg(safeImg(o.image), o.frame) }) : o.emoji ? h('span', { class: 'bf-temoji', 'aria-hidden': 'true' }, o.emoji) : null) : null,
           keys && k < 26 ? h('span', { class: 'bf-key', 'aria-hidden': 'true' }, KEYS[k]) : h('span', { class: 'bf-mk' }),
           h('span', { class: 'bf-ol' }, o.label),
           left !== null ? h('span', { style: 'font-size:13px;opacity:.7' }, full ? 'Complet' : `${left} place${left > 1 ? 's' : ''}`) : null));
@@ -166,7 +175,7 @@ function testdrive(f: Field, onDone?: () => void): HTMLElement {
       h('div', { class: 'bf-opts tiles bf-dcars', style: `--cols:${Math.min(3, Math.max(1, d.cars.length))}` }, ...d.cars.map((c) =>
         h('label', { class: `bf-opt ${st.car === c.id ? 'on' : ''}` },
           h('input', { type: 'radio', name: `${f.id}-car`, checked: st.car === c.id, onchange: () => { st.car = c.id; if (st.day && !freeIn(c.id, st.day)) st.day = undefined; if (cur && cur.car !== c.id) { answers[f.id] = null; } draw(); } }),
-          c.image ? h('span', { class: 'bf-tmedia', style: `background-image:url("${c.image}")` }) : h('span', { class: 'bf-temoji', 'aria-hidden': 'true' }, '🚗'),
+          safeImg(c.image) ? h('span', { class: 'bf-tmedia', style: fimg(safeImg(c.image), c.frame) }) : h('span', { class: 'bf-temoji', 'aria-hidden': 'true' }, '🚗'),
           h('span', { class: 'bf-mk' }), h('span', { class: 'bf-ol' }, c.label)))));
     if (!st.car) return;
     // 2. jour
@@ -313,7 +322,7 @@ function thanks() {
   app.innerHTML = '';
   app.append(h('div', { class: 'bf-wrap' }, h('div', { class: 'bf-card bf-thanks bf-in' },
     h('div', { class: 'bf-check', html: '<svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="40"/><path d="M25 43 l12 12 l22 -24"/></svg>' }),
-    safeImg(s.image) ? h('div', { class: 'bf-endimg', style: `background-image:url("${safeImg(s.image)}")` }) : null,
+    safeImg(s.image) ? h('div', { class: 'bf-endimg', style: fimg(safeImg(s.image), e && e.image ? e.frame : def.settings.thankYou.frame) }) : null,
     h('h1', {}, s.title || 'Merci !'), h('p', { class: 'bf-desc' }, s.message || ''),
     s.button?.label && /^https?:\/\//.test(s.button.url || '') ? h('div', { class: 'bf-act', style: 'justify-content:center' }, h('a', { class: 'bf-btn', href: s.button.url, target: '_top', rel: 'noopener' }, s.button.label)) : null,
     PREVIEW ? h('div', { class: 'bf-act', style: 'justify-content:center' }, h('button', { class: 'bf-btn ghost', type: 'button', onclick: () => { render(); tellParent({ type: 'bonyform:screen', screen: 'form' }); } }, '← Revenir au formulaire')) : null)));
@@ -418,7 +427,7 @@ function renderWelcome() {
   if (hd.outside) app.append(hd.outside);
   app.append(h('main', { class: 'bf-wrap' }, hd.inside,
     h('div', { class: 'bf-card bf-welcome bf-in' },
-      safeImg(w.image) ? h('div', { class: 'bf-endimg', style: `background-image:url("${safeImg(w.image)}")` }) : null,
+      safeImg(w.image) ? h('div', { class: 'bf-endimg', style: fimg(safeImg(w.image), w.frame) }) : null,
       h('h2', {}, w.title || def.title), w.message ? h('p', { class: 'bf-desc' }, w.message) : null,
       h('div', { class: 'bf-act', style: 'justify-content:center' }, h('button', { class: 'bf-btn', type: 'button', onclick: go }, `${w.button || 'Commencer'}${stepsMode() ? ' ↵' : ''}`)),
       (() => { const n = def.fields.filter((f) => !isLayout(f) && f.type !== 'hidden' && f.type !== 'consent').length; return h('div', { class: 'bf-hint' }, `${n} question${n > 1 ? 's' : ''} · environ ${Math.max(1, Math.round(n * 0.25))} min`); })()),

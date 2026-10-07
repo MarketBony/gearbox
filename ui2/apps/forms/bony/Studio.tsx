@@ -4,6 +4,7 @@ import { db } from '../../../../services/dataService';
 import { getSocket } from '../../../../services/socket';
 import { gx, hud, Icon, Seg } from '../../ui/kit';
 import { THEMES, FONTS, applyAmbiance, resolveTheme, contrast, onColor, type BonyFormDef, type Theme } from '../../../../shared/bonyform';
+import { FrameToggle, headerRatio } from './Frame';
 
 const norm = (f: string) => f.toLowerCase().replace(/[^a-z0-9]/g, '');
 /** Famille de la bibliothèque qui correspond à un nom de police officielle (casse et espaces ignorés). */
@@ -233,7 +234,8 @@ export function StudioPanel({ def, update }: { def: BonyFormDef; update: Update 
         {t.bg.kind === 'pattern' ? <Chips value={t.bg.pattern || 'dots'} onChange={(v) => sub('bg', { pattern: v as any }, true)} options={[['dots', 'Points'], ['grid', 'Grille'], ['chevrons', 'Chevrons'], ['waves', 'Vagues']]} /> : null}
         {t.bg.kind === 'animated' ? <Seg value={t.bg.animation || 'aurora'} onChange={(v) => sub('bg', { animation: v as any }, true)} options={[['aurora', 'Aurore'], ['bubbles', 'Bulles'], ['grain', 'Grain']]} /> : null}
         {t.bg.kind === 'image' ? <>
-          <ImageSlot url={t.bg.image || null} busy={upl === 'bg'} onPick={() => upload('bg')} onClear={() => sub('bg', { image: null }, true)} />
+          <ImageSlot url={t.bg.image || null} busy={upl === 'bg'} onPick={() => upload('bg')} onClear={() => sub('bg', { image: null, frame: null }, true)} />
+          <FrameToggle url={t.bg.image || null} frame={t.bg.frame} ratio={16 / 9} label="Cadrage du fond" onChange={(fr, soon) => sub('bg', { frame: fr }, soon)} />
           <Range l="Voile" v={Math.round((t.bg.overlay ?? 0.35) * 100)} min={0} max={90} unit=" %" on={(v) => sub('bg', { overlay: v / 100 })} />
           <Range l="Flou" v={t.bg.blur ?? 0} min={0} max={20} unit=" px" on={(v) => sub('bg', { blur: v })} />
         </> : null}
@@ -243,7 +245,8 @@ export function StudioPanel({ def, update }: { def: BonyFormDef; update: Update 
       <Group t="En-tête" icon="image" open>
         <Chips value={t.header.style} onChange={(v) => sub('header', { style: v as any }, true)} options={[['band', 'Bandeau'], ['banner', 'Bannière'], ['hero', 'Plein écran'], ['split', 'Partagé'], ['none', 'Aucun']]} />
         {t.header.style === 'banner' || t.header.style === 'hero' || t.header.style === 'split' ? <>
-          <ImageSlot url={t.header.image || null} busy={upl === 'header'} onPick={() => upload('header')} onClear={() => sub('header', { image: null }, true)} />
+          <ImageSlot url={t.header.image || null} busy={upl === 'header'} onPick={() => upload('header')} onClear={() => sub('header', { image: null, frame: null }, true)} />
+          <FrameToggle url={t.header.image || null} frame={t.header.frame} ratio={headerRatio(t.header.style)} label="Cadrage de l’en-tête" onChange={(fr, soon) => sub('header', { frame: fr }, soon)} />
           {!t.header.image ? <div className="bfe-hint">Sans image, l’en-tête s’affiche en bandeau.</div> : null}
           {t.header.style === 'hero' ? <Range l="Voile sous le titre" v={Math.round((t.header.overlay ?? 0.45) * 100)} min={15} max={90} unit=" %" on={(v) => sub('header', { overlay: v / 100 })} /> : null}
           {t.header.style === 'split' ? <div className="bfe-hint">Écran partagé : l’image occupe la moitié gauche sur ordinateur, le haut de page sur mobile.</div> : null}
@@ -255,6 +258,9 @@ export function StudioPanel({ def, update }: { def: BonyFormDef; update: Update 
         <div className="bfe-f"><span>Logo importé (remplace le logo choisi)</span>
           <ImageSlot url={t.logoImage} busy={upl === 'logo'} small onPick={() => upload('logo')} onClear={() => th((x) => { x.logoImage = null; }, true)} />
         </div>
+        {t.logo || t.logoImage ? <Range l="Taille du logo" v={t.logoSize} min={18} max={90} unit=" px" on={(v) => th((x) => { if (v === 30) delete x.logoSize; else x.logoSize = v; })} /> : null}
+        <Chk l="Pied de page Bony (repiquage)" v={t.bonyFooter} on={(v) => th((x) => { if (v) x.bonyFooter = true; else delete x.bonyFooter; }, true)} />
+        {t.bonyFooter ? <div className="bfe-hint">Bandeau sombre aux couleurs de Bony avec le logo du groupe, sous le formulaire.</div> : null}
       </Group>
 
       <Group t="Typographie" icon="edit">

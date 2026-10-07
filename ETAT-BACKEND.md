@@ -72,6 +72,7 @@ WORKER → un renvoi depuis sa file ne crée pas de doublon ; `uniqueKey` + inde
 - **Porte unique vers le Worker** : `src/bonyforms/worker.ts` — HMAC-SHA256 de `"<ts>.<corps JSON>"`, horodatage
   ±5 min, comparaison à temps constant ; variables `FORMS_WORKER_URL`, `FORMS_WORKER_SECRET` (≥ 32 caractères).
 - **Routes Gearbox** (JWT + `FORMS_ROLES`) : `GET /`, `POST /`, `GET /:id`, `PUT /:id/draft` (400 Ko max),
+  `POST /:id/duplicate` (correctif 69 : brouillon « … (copie) », tags repris SANS le projet, ni réponses ni versions),
   `POST /:id/publish` (`checkDef` → 422 + `problems` ; listes concession / marque remplies ICI depuis `ALL_SITES` ;
   le Worker d'abord, puis la base), `POST /:id/close`, `DELETE /:id` (réponses comprises), `GET /:id/responses`,
   `DELETE /:id/responses/:rid` (droit à l'effacement).

@@ -64,7 +64,7 @@ export function newField(t: FieldType): Field {
     case 'nps': f.label = 'Recommanderiez-vous Bony à un proche ?'; break;
     case 'concession': f.label = 'Votre concession'; f.options = bonyOptions('concession'); f.param = 'concession'; break;
     case 'brand': f.label = 'Marque'; f.options = bonyOptions('brand'); break;
-    case 'consent': f.label = 'Consentement'; f.required = true; f.consentText = 'J’accepte que Bony auto-mobile utilise mes données pour traiter ma demande et me recontacter. Je peux exercer mes droits d’accès, de rectification et d’effacement en écrivant à marketbony@gmail.com.'; break;
+    case 'consent': f.label = 'Consentement'; f.required = true; f.consentText = 'J’accepte que Bony auto-mobile utilise mes données pour traiter ma demande et me recontacter. Je peux exercer mes droits d’accès, de rectification et d’effacement en écrivant à contact@bonyauto-mobile.com.'; break;
     case 'hidden': f.label = 'Source'; f.param = 'source'; break;
     case 'slot': f.label = 'Votre créneau'; f.required = true; f.options = [Object.assign(newOption('Samedi 10 h'), { capacity: 10 }), Object.assign(newOption('Samedi 14 h'), { capacity: 10 })]; break;
     case 'calc': f.label = 'Score'; f.formula = { kind: 'score', fields: [] }; f.calcHidden = true; break;

@@ -111,6 +111,22 @@ router.post('/', authenticateToken, requireRole(FORMS_ROLES), async (req: AuthRe
   } catch (e) { fail(res, e, 'Création impossible.'); }
 });
 
+// POST /api/bony-forms/:id/duplicate — copie en un clic (07/10/2026) : le BROUILLON courant, en brouillon, « … (copie) ».
+// Décision de Théo : les tags oui (ceux affichés, donc hérités du projet s'il y en a un), le PROJET non. Ni réponses, ni
+// versions, ni tirages ; abonné = l'auteur seul. Les images restent partagées (adresses /a/<empreinte>, immuables).
+router.post('/:id/duplicate', authenticateToken, requireRole(FORMS_ROLES), async (req: AuthRequest, res) => {
+  try {
+    const src = await prisma.bonyForm.findUnique({ where: { id: req.params.id }, select: { title: true, draft: true, projectId: true, sites: true, brands: true, service: true } });
+    if (!src) return res.status(404).json({ error: 'Formulaire introuvable.' });
+    const [{ tags }] = await withTags([src]);
+    const title = `${src.title} (copie)`.slice(0, 200);
+    const draft = { ...(src.draft as any), title };
+    const row = await prisma.bonyForm.create({ data: { publicId: publicIdOf(), title, draft, sites: tags.sites, brands: tags.brands, service: tags.service, createdBy: req.user!.id, updatedBy: req.user!.id, followers: [req.user!.id] } });
+    emitEvent('bonyforms:changed', null);
+    res.status(201).json({ ...row, url: publicUrl(row.publicId) });
+  } catch (e) { fail(res, e, 'Duplication impossible.'); }
+});
+
 // ---------------------------------------------------------------- kits de marque et images (F2a)
 // ⚠️ Déclarées AVANT `GET /:id` : sinon Express prendrait « kits » pour un identifiant de formulaire.
 const KIT_MAX = 60_000;

@@ -4,7 +4,7 @@
 // Thème → variables CSS (couleurs, polices, tailles…) + attributs sur <html> (fond, en-tête, style
 // des champs, des boutons, mouvement). La feuille de style (index.ts, CSS) lit ces deux sources.
 // =====================================================================
-import { resolveTheme, onColor, isFamily, type Theme, type FullTheme } from '../../shared/bonyform';
+import { resolveTheme, onColor, isFamily, type Theme, type FullTheme, frameCss } from '../../shared/bonyform';
 
 // Polices servies par Bunny Fonts (miroir de Google Fonts sans traceur). Syncopate : 400 et 700 seulement.
 const FONTS: Record<string, { slug: string; w: string }> = {
@@ -70,6 +70,7 @@ export function renderTheme(theme: Partial<Theme> | null | undefined): Rendered 
   const patt = b.kind === 'pattern' ? patternCss(b.pattern || 'dots', alpha(cols[0] || t.primary, 0.14)) : 'none';
   const img = b.kind === 'image' ? safeUrl(b.image) : '';
   const himg = safeUrl(h.image);
+  const hf = frameCss(h.frame), bf = frameCss(b.frame);   // F5 : cadrage (valeurs bornées, sûres)
   const shadows = ['none', '0 1px 2px rgba(0,0,0,.06),0 12px 32px -18px rgba(0,0,0,.35)', '0 2px 6px rgba(0,0,0,.08),0 24px 48px -20px rgba(0,0,0,.45)', `0 0 0 1px ${alpha(t.primary, 0.35)},0 18px 50px -14px ${alpha(t.primary, 0.55)}`];
   const glass = /rgba?\(/.test(t.surface) && !/,\s*1\)$/.test(t.surface);
   const v: Record<string, string> = {
@@ -81,17 +82,18 @@ export function renderTheme(theme: Partial<Theme> | null | undefined): Rendered 
     '--bls': `${clamp(num(t.buttons.spacing, num(ty.headingSpacing, 0) * 0.5), -0.05, 0.3)}em`,
     '--hls': `${clamp(num(ty.headingSpacing, 0), -0.05, 0.25)}em`,
     '--shadow': shadows[num(t.shadow, 1)] || shadows[1],
-    '--bg-layer': bgLayer, '--bg-pattern': patt, '--bg-img': img ? `url("${img}")` : 'none',
+    '--bg-layer': bgLayer, '--bg-pattern': patt, '--bg-img': img ? `url("${img}")` : 'none', '--bg-pos': bf.pos, '--bg-size': bf.size, '--bg-zoom': bf.zoom,
     '--bg-overlay': String(clamp(num(b.overlay, 0.35), 0, 0.92)), '--bg-blur': `${clamp(num(b.blur, 0), 0, 24)}px`,
     '--c1': cols[0] || t.primary, '--c2': cols[1] || t.primary, '--c3': cols[2] || cols[0] || t.primary,
-    '--h-img': himg ? `url("${himg}")` : 'none', '--h-overlay': String(clamp(num(h.overlay, 0.45), 0, 0.92)),
+    '--h-img': himg ? `url("${himg}")` : 'none', '--h-pos': hf.pos, '--h-size': hf.size, '--h-zoom': hf.zoom,
+    '--logo-h': `${clamp(num(t.logoSize, 30), 18, 90)}px`, '--h-overlay': String(clamp(num(h.overlay, 0.45), 0, 0.92)),
     '--grad': `linear-gradient(120deg, ${t.primary}, ${cols[1] && cols[1] !== t.primary ? cols[1] : `color-mix(in srgb, ${t.primary} 55%, #ff3d8b)`})`,
   };
   const vars = Object.entries(v).map(([k, x]) => `${k}:${x}`).join(';');
   const attrs: Record<string, string> = {
     'data-bg': b.kind, 'data-anim': b.kind === 'animated' ? b.animation || 'aurora' : '', 'data-header': (h.style === 'banner' || h.style === 'hero' || h.style === 'split') && !himg ? 'band' : h.style,
     'data-logo': h.logoAlign || 'left', 'data-fields': t.fields, 'data-inputs': t.inputs, 'data-btn': t.buttons.style,
-    'data-motion': t.motion.level, 'data-enter': t.motion.entrance, 'data-glass': glass ? '1' : '', 'data-layout': t.layout,
+    'data-motion': t.motion.level, 'data-enter': t.motion.entrance, 'data-glass': glass ? '1' : '', 'data-layout': t.layout, 'data-rq': t.bonyFooter ? '1' : '',
   };
   return { vars, attrs, t };
 }
