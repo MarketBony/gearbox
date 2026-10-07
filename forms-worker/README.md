@@ -39,6 +39,15 @@ npm run dev            # http://localhost:8787 (KV local, clés Turnstile de TES
 `TURNSTILE_SECRET=1x0000000000000000000000000000000AA` (clé de test officielle, toujours valide).
 Côté Gearbox local : `FORMS_WORKER_URL=http://localhost:8787` dans `backend/.env`.
 Cron en local : `curl http://127.0.0.1:8787/cdn-cgi/local/scheduled`.
+
+## Intégration dans un autre site (correctif 68, 07/10/2026)
+`<script src="https://forms.bonyauto-mobile.workers.dev/embed.js" data-form="<publicId>" async></script>` — code
+fourni par Gearbox › Partager › « Intégrer sur un site ». `src/embed.ts` pose une iframe `/<publicId>?embed=1` à la
+hauteur du contenu (message `bonyform:height`) ; la page intégrée demande à l'hôte de défiler (`bonyform:scroll`) et
+de faire la redirection de fin (`bonyform:redirect`). Options : `data-params`, `data-bg="transparent"`, `data-height`.
+Aucun accès au KV. Test local : une page hôte servie sur une AUTRE origine (ex. 127.0.0.1:4173) et un formulaire déposé
+dans le KV local (`npx wrangler kv key put --binding FORMS --local form:<id> --path def.json`, format
+`{status, version, def}`).
 Vérification des types : `npm run check` (Worker et client, deux tsconfig : les types Cloudflare redéfinissent
 une partie du DOM).
 

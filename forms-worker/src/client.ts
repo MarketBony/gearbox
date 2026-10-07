@@ -14,6 +14,10 @@ import { renderTheme, fontsHref, fontFaces } from './theme';
 declare const turnstile: { render: (el: HTMLElement, o: Record<string, unknown>) => string; reset: (id?: string) => void } | undefined;
 const BF = (window as any).__BF as { publicId: string; def: BonyFormDef | null; siteKey: string; taken: Record<string, Record<string, number>>; preview?: boolean; origins?: string[] };
 const PREVIEW = !!BF.preview;
+/** Intégré dans un autre site (embed.js) : l'iframe n'a pas de défilement propre, c'est la page HÔTE qui défile. */
+const EMBED = document.documentElement.hasAttribute('data-embed');
+/** Amène le point `y` de la page (0 = haut du formulaire) dans la vue — dans l'iframe, demandé à l'hôte. */
+const bringTo = (y: number) => { if (EMBED) parent.postMessage({ type: 'bonyform:scroll', y: Math.max(0, Math.round(y)) }, '*'); else window.scrollTo({ top: y, behavior: reduced ? 'auto' : 'smooth' }); };
 /** Message vers l'éditeur de Gearbox (aperçu seulement ; branché plus bas). */
 let tellParent: (msg: unknown) => void = () => {};
 let def = BF.def as BonyFormDef;
@@ -300,7 +304,8 @@ function focusFirstError() {
   const id = Object.keys(errors).find((k) => visibleFields(def, answers).some((f) => f.id === k)); if (!id) return;
   if (def.theme.layout === 'steps') { const i = steps().findIndex((f) => f.id === id); if (i >= 0) { step = i; render(); } }
   const el = app.querySelector<HTMLElement>(`[data-f="${id}"]`);
-  el?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+  if (EMBED) { if (el) bringTo(el.getBoundingClientRect().top + window.scrollY - 80); }
+  else el?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
   el?.classList.remove('shake'); void el?.offsetWidth; el?.classList.add('shake');
 }
 function thanks() {
@@ -313,8 +318,9 @@ function thanks() {
     s.button?.label && /^https?:\/\//.test(s.button.url || '') ? h('div', { class: 'bf-act', style: 'justify-content:center' }, h('a', { class: 'bf-btn', href: s.button.url, target: '_top', rel: 'noopener' }, s.button.label)) : null,
     PREVIEW ? h('div', { class: 'bf-act', style: 'justify-content:center' }, h('button', { class: 'bf-btn ghost', type: 'button', onclick: () => { render(); tellParent({ type: 'bonyform:screen', screen: 'form' }); } }, '← Revenir au formulaire')) : null)));
   confetti();
-  window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
-  if (!PREVIEW && s.redirectUrl && /^https?:\/\//.test(s.redirectUrl)) setTimeout(() => { location.href = s.redirectUrl!; }, 2600);
+  bringTo(0);
+  // Intégré : la redirection est faite par la page hôte (sinon le site visé s'ouvrirait DANS l'iframe).
+  if (!PREVIEW && s.redirectUrl && /^https?:\/\//.test(s.redirectUrl)) setTimeout(() => { if (EMBED) parent.postMessage({ type: 'bonyform:redirect', url: s.redirectUrl }, '*'); else location.href = s.redirectUrl!; }, 2600);
 }
 function confetti() {
   const t = theme();
@@ -375,7 +381,7 @@ function next() {
   const st = steps(), f = st[step]; if (!f) return;
   touched.add(f.id); errors = validate(def, answers, { taken: BF.taken }).errors;
   if (errors[f.id]) { render(); focusFirstError(); return; }
-  if (step < st.length - 1) { dir = 1; step++; render(); }
+  if (step < st.length - 1) { dir = 1; step++; render(); if (EMBED) bringTo(0); }
 }
 /** Passage automatique à la question suivante après un choix (comme Typeform) ; Entrée pour les saisies. */
 const AUTO = ['choice', 'scale', 'nps', 'rating', 'dropdown', 'concession', 'brand', 'slot', 'testdrive'];
@@ -386,7 +392,7 @@ function renderSteps() {
   const gerr = h('div', { class: 'bf-gerr', role: 'alert' });
   const lb = theme().buttons;
   const btn = h('button', { class: 'bf-btn', type: 'button', onclick: () => (last ? send(btn, gerr) : next()) }, last ? lb.label || 'Envoyer' : `${lb.nextLabel || 'Suivant'} ↵`) as HTMLButtonElement;
-  const back = step > 0 ? h('button', { class: 'bf-btn ghost', type: 'button', onclick: () => { dir = -1; step--; render(); } }, '← Précédent') : null;
+  const back = step > 0 ? h('button', { class: 'bf-btn ghost', type: 'button', onclick: () => { dir = -1; step--; render(); if (EMBED) bringTo(0); } }, '← Précédent') : null;
   const ts = h('div', { class: 'bf-ts' });
   const hd = step === 0 ? header() : { outside: null, inside: null };
   app.innerHTML = '';

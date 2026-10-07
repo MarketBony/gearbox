@@ -15,6 +15,7 @@
 import { validate, type BonyFormDef, type Answers, type Theme, type Field } from '../../shared/bonyform';
 import { renderTheme, fontsHref, fontFaces } from './theme';
 import { CSS } from './styles';
+import { embedJs } from './embed';
 import CLIENT from './gen/client.js';
 import BONY_LOGO from '../../public/logo-bony-white.svg';
 
@@ -64,8 +65,9 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const inlineJson = (x: unknown) => JSON.stringify(x).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 
 /** Page HTML : thème (variables + attributs, theme.ts), calque de fond, client inclus si `boot`. */
-function page(title: string, theme: Partial<Theme> | null, bodyHtml: string, boot?: unknown, opts: { status?: number; frameAncestors?: string; desc?: string; share?: { title?: string; image?: string | null }; origin?: string } = {}) {
+function page(title: string, theme: Partial<Theme> | null, bodyHtml: string, boot?: unknown, opts: { status?: number; frameAncestors?: string; desc?: string; share?: { title?: string; image?: string | null }; origin?: string; embed?: Embed } = {}) {
   const { vars, attrs, t } = renderTheme(theme);
+  if (opts.embed) { attrs['data-embed'] = '1'; if (opts.embed.transparent) attrs['data-embed-bg'] = 'transparent'; }
   const logo = BONY_LOGO.replace(/<\?xml[^>]*>/, '').replace(/fill="#ffffff"/gi, 'fill="currentColor"');
   const at = Object.entries(attrs).filter(([, v]) => v).map(([k, v]) => ` ${k}="${esc(v)}"`).join('');
   const desc = opts.desc ? `<meta name="description" content="${esc(opts.desc)}"><meta property="og:description" content="${esc(opts.desc)}">` : '';
@@ -79,12 +81,20 @@ function page(title: string, theme: Partial<Theme> | null, bodyHtml: string, boo
 <link rel="preconnect" href="https://fonts.bunny.net"><link id="bf-fonts" rel="stylesheet" href="${fontsHref(t)}">
 <style id="bf-faces">${fontFaces(t)}</style><style id="bf-vars">:root{${vars}}</style><style>${CSS}</style>
 ${boot ? `<script>window.__BF=${inlineJson(boot)}</script>${(boot as any).preview ? '' : '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>'}` : ''}
-</head><body><div class="bf-bg" aria-hidden="true"><i></i><i></i><i></i></div><div class="bf-side" aria-hidden="true"></div><template id="bony-logo">${logo}</template><div id="app">${bodyHtml}</div>${boot ? `<script>${CLIENT}</script>` : ''}</body></html>`;
+</head><body><div class="bf-bg" aria-hidden="true"><i></i><i></i><i></i></div><div class="bf-side" aria-hidden="true"></div><template id="bony-logo">${logo}</template><div id="app">${bodyHtml}</div>${boot ? `<script>${CLIENT}</script>` : ''}${opts.embed ? `<script>${EMBED_SIZER}</script>` : ''}</body></html>`;
   const csp = opts.frameAncestors ? `${CSP_BASE}; frame-ancestors ${opts.frameAncestors}` : CSP_BASE;
   return new Response(html, { status: opts.status || 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...SEC_HEADERS, 'content-security-policy': csp } });
 }
-const notice = (title: string, msg: string, theme: Partial<Theme> | null = null, status = 200) =>
-  page(title, theme, `<main class="bf-notice"><div class="bf-card bf-in"><div class="bf-ico">!</div><h1>${esc(title)}</h1><p>${esc(msg)}</p></div></main>`, undefined, { status });
+const notice = (title: string, msg: string, theme: Partial<Theme> | null = null, status = 200, embed?: Embed) =>
+  page(title, theme, `<main class="bf-notice"><div class="bf-card bf-in"><div class="bf-ico">!</div><h1>${esc(title)}</h1><p>${esc(msg)}</p></div></main>`, undefined, { status, embed });
+
+// ---------------------------------------------------------------- intégration dans un autre site (embed.ts)
+/** `?embed=1` (posé par embed.js) : page sans hauteurs liées à l'écran, fond transparent sur demande (`?bg=transparent`). */
+type Embed = { transparent: boolean };
+const embedOf = (url: URL): Embed | undefined => (url.searchParams.get('embed') === '1' ? { transparent: url.searchParams.get('bg') === 'transparent' } : undefined);
+/** Hauteur réelle du contenu → page hôte (aussi sur les avis « fermé », qui n'ont pas le client). Hauteur non sensible : '*'. */
+const EMBED_SIZER = `(function(){var l=0;function s(){var h=Math.ceil(document.body.scrollHeight);if(h!==l){l=h;parent.postMessage({type:'bonyform:height',h:h},'*');}}
+if(window.ResizeObserver)new ResizeObserver(s).observe(document.body);addEventListener('load',s);if(document.fonts)document.fonts.ready.then(s);s();})();`;
 
 // ---------------------------------------------------------------- économie du KV (02/10/2026)
 // ⚠️ Offre gratuite : ~1 000 écritures / suppressions / LISTAGES de KV par jour (lectures : 100 000). Alerte Cloudflare
@@ -272,27 +282,30 @@ export default {
       const origins = (env.PREVIEW_ORIGINS || '').split(',').map((x) => x.trim()).filter(Boolean);
       return page('Aperçu', null, '<div class="bf-boot"></div>', { preview: true, origins, def: null, siteKey: '', taken: {} }, { frameAncestors: origins.join(' ') || "'none'" });
     }
+    // Script d'intégration : le même pour tous les formulaires, mis en cache une heure.
+    if (path === '/embed.js') return new Response(embedJs(url.origin), { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=3600', 'x-content-type-options': 'nosniff', 'access-control-allow-origin': '*' } });
+    const embed = embedOf(url);
     if (path === '/') return notice('Formulaires Bony', 'Ouvrez le lien du formulaire reçu par e-mail.');
     if (path === '/favicon.ico') return new Response(null, { status: 204 });
     const m = /^\/([a-z0-9]{10})(\/file)?$/.exec(path);
-    if (!m) return notice('Formulaire introuvable', 'Ce lien ne correspond à aucun formulaire.', null, 404);
+    if (!m) return notice('Formulaire introuvable', 'Ce lien ne correspond à aucun formulaire.', null, 404, embed);
     const publicId = m[1];
     const form = await env.FORMS.get<Stored>(`form:${publicId}`, 'json');
-    if (!form) return notice('Formulaire introuvable', 'Ce lien ne correspond à aucun formulaire, ou il a été retiré.', null, 404);
+    if (!form) return notice('Formulaire introuvable', 'Ce lien ne correspond à aucun formulaire, ou il a été retiré.', null, 404, embed);
 
     if (m[2]) return req.method === 'POST' ? upload(req, env, publicId, form) : json({ error: 'Méthode non autorisée.' }, 405);
     if (req.method === 'POST') return submit(req, env, publicId, form);
     if (req.method !== 'GET') return json({ error: 'Méthode non autorisée.' }, 405);
 
     const s = form.def.settings, now = Date.now();
-    if (form.status !== 'open' || (s.closeAt && now > Date.parse(s.closeAt))) return notice(form.def.title, s.closedMessage || 'Ce formulaire n’accepte plus de réponses.', form.def.theme);
+    if (form.status !== 'open' || (s.closeAt && now > Date.parse(s.closeAt))) return notice(form.def.title, s.closedMessage || 'Ce formulaire n’accepte plus de réponses.', form.def.theme, 200, embed);
     if (s.openAt && now < Date.parse(s.openAt)) {
       const d = new Date(s.openAt).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Paris' });
-      return notice(form.def.title, `Ce formulaire ouvrira le ${d}.`, form.def.theme);
+      return notice(form.def.title, `Ce formulaire ouvrira le ${d}.`, form.def.theme, 200, embed);
     }
     const state = await stateOf(env, publicId, form.def);
-    if (s.maxResponses && state && state.total >= s.maxResponses) return notice(form.def.title, s.closedMessage || 'Le nombre maximal de réponses est atteint.', form.def.theme);
-    return page(form.def.title, form.def.theme, '<div class="bf-boot"></div>', { publicId, def: form.def, siteKey: env.TURNSTILE_SITE_KEY, taken: state?.taken || {} }, { desc: form.def.settings.share?.description?.trim() || form.def.description || undefined, share: form.def.settings.share, origin: url.origin });
+    if (s.maxResponses && state && state.total >= s.maxResponses) return notice(form.def.title, s.closedMessage || 'Le nombre maximal de réponses est atteint.', form.def.theme, 200, embed);
+    return page(form.def.title, form.def.theme, '<div class="bf-boot"></div>', { publicId, def: form.def, siteKey: env.TURNSTILE_SITE_KEY, taken: state?.taken || {} }, { desc: form.def.settings.share?.description?.trim() || form.def.description || undefined, share: form.def.settings.share, origin: url.origin, embed });
   },
 
   async scheduled(_ev: ScheduledEvent, env: Env, ctx: ExecutionContext) { ctx.waitUntil(flushQueue(env)); },

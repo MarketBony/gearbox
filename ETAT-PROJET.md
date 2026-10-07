@@ -3,8 +3,10 @@
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
-## ▶ POINT DE REPRISE — 01/10/2026 (lire en premier)
-- **En production : correctif 67 (02/10)** — **Worker Forms : économie du KV** (alerte Cloudflare « 50 % de la limite
+## ▶ POINT DE REPRISE — 07/10/2026 (lire en premier)
+- **En production : correctif 68 (07/10)** — **Forms Bony : intégration dans un autre site** (balise
+  `<script src="…/embed.js" data-form="…">` → iframe à la hauteur du contenu ; Gearbox › Partager › « Intégrer sur un
+  site »). Worker + `web`, aucune migration. Avant lui le **correctif 67 (02/10)** — **Worker Forms : économie du KV** (alerte Cloudflare « 50 % de la limite
   journalière » reçue le 02/10 : sans correctif, les formulaires auraient refusé les réponses vers 18 h 30). Avant lui le
   **correctif 66 (02/10)** — **Forms Bony, lot F4** : formulaire relié à un projet (tags hérités en
   direct, sinon tags libres) et filtres, abonnés notifiés à chaque réponse, tirage au sort avec procès-verbal, versions
@@ -34,11 +36,14 @@
 - **Où on va (dans l'ordre)** :
   0. **Chantiers d'octobre (liste de Théo du 01/10, arbitrages dans le backlog § « Chantiers d'octobre 2026 »)** :
      lot 1 fait (correctif 60), Post-it (61), Google Forms (62), Forms Bony F1 (63), F2a + F2b (64), **F3 (65)**.
-     **F4 fait (66).** Forms Bony terminé ; reste noté : accusé de réception par e-mail (refusé pour l'instant).
-     **Suite : tâches multi-assignées, prestataire, répartitions, fichiers maison, mascotte / agent IA** (plan validé par Théo « de A à Z » ; détail au backlog § Forms Bony),
-     avec la **prise d'essai** demandée le 01/10. À faire par l'équipe : importer les polices officielles
-     (NouvelR, Read, Dacia Block, AlpineNewAlps, NissanBrand) dans Studio › Polices de marque. Ensuite : tâches multi-assignées, prestataire, répartitions,
-     fichiers maison, mascotte / agent IA.
+     **F4 fait (66).** Reste noté : accusé de réception par e-mail (refusé pour l'instant).
+     **Forms Bony F5 (demandes de Théo du 07/10, plan validé)** : ~~intégration dans un autre site~~ → **fait, correctif 68
+     (lot 1, priorité de Théo)** ; puis dupliquer un formulaire en un clic, taille du logo, cadrage des images (point de
+     cadrage, zoom, remplir / contenir), **repiquage Bony** activable — ⚠️ sens à préciser par Théo (pied de page de
+     concession ? signature du groupe ? cartouche façon pub repiquée ?). Détail au backlog § Forms Bony.
+     **Ensuite : tâches multi-assignées, prestataire, répartitions, fichiers maison, mascotte / agent IA** (plan validé
+     par Théo « de A à Z »). À faire par l'équipe : importer les polices officielles (NouvelR, Read, Dacia Block,
+     AlpineNewAlps, NissanBrand) dans Studio › Polices de marque.
      Trou serveur `GET /api/budget` : Théo le traite « après » (01/10).
   1. **Retours de la bêta** (groupe « Bêta Gearbox OS » du Chat, créé par Théo) : les trier, corriger par lots.
   2. **Fermer le trou serveur** : `GET /api/budget` et lecture des dépenses fixes sans garde de rôle (External)
@@ -537,6 +542,30 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 68 — 07/10 : Forms Bony, intégration dans un autre site** (branche `feat/forms-bony-embed`, **Worker +
+  `web`**, aucune migration, rien sous `backend/`). Lot 1 des demandes F5 de Théo (le reste : backlog § Forms Bony).
+  - **Le code à coller** : `<script src="https://forms.bonyauto-mobile.workers.dev/embed.js" data-form="<publicId>" async>`.
+    `forms-worker/src/embed.ts` (servi par `/embed.js`, cache 1 h, AUCUNE lecture ni écriture de KV) pose une iframe juste
+    après la balise. Options : `data-params` (UTM et préremplissage), `data-bg="transparent"`, `data-height`.
+  - **Mode intégré** (`?embed=1`, posé par le script) : la page annonce sa hauteur (`bonyform:height`, aussi sur les avis
+    « fermé / pas encore ouvert »), plus aucune hauteur en `vh` (dans une iframe, 100vh = sa propre hauteur : elle ne
+    rapetisserait plus), en-tête plein écran et écran partagé compactés, fond transparent sur demande (`?bg=transparent`).
+  - **Le défilement et la redirection de fin passent par l'HÔTE** (`client.ts`, `bringTo`) : remontée vers la première
+    erreur, à chaque étape (une question par écran), à l'écran de fin ; la redirection de fin ouvre le site visé dans la
+    page hôte (`bonyform:redirect`), pas dans l'iframe. L'hôte n'accepte que les messages de l'origine du Worker ET de
+    son iframe.
+  - **Sources** : la balise reprend l'UTM du lien de campagne ; les UTM / `gclid` / `fbclid` de la page hôte l'emportent ;
+    `embed=1` reste dans les paramètres de la réponse (repérable dans la synthèse). Une source hors web (E-mailing — le
+    choix par défaut —, SMS, QR, Showroom) devient « Site Bony » (`site` / `referral`) dans le code d'intégration ; le
+    lien de campagne garde le choix fait (demande de Théo à la recette).
+  - **Gearbox › Partager** (`ui2/apps/forms/bony/Share.tsx`) : bloc « Intégrer sur un site » — balise (recommandée) ou
+    iframe seule (hauteur fixe 800 px, pour les sites qui refusent les scripts), fond du formulaire ou transparent,
+    « Copier le code ».
+  - **Testé** : Worker local + page hôte d'une autre origine (127.0.0.1:4173) et deux formulaires de test déposés dans le
+    KV LOCAL (rien en base) : hauteur auto (535 → 1 319 px), remontée vers l'erreur, une question par écran sur fond
+    transparent, Turnstile accepté dans l'iframe, écran de fin puis redirection de l'hôte, UTM transmis ; onglet Partager
+    sur un vrai formulaire en lecture seule (que des GET). Page de test et clés de test supprimées ensuite.
+
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
   51.83.75.181)
@@ -544,7 +573,9 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 67** (2 octobre 2026) — économie du KV du Worker
+- master = prod, synchronisés. Dernier lot déployé : **correctif 68** (7 octobre 2026) — Forms Bony, intégration dans
+  un autre site. **Worker d'abord** (`cd forms-worker && npm run deploy` : route `/embed.js`, mode `?embed=1`), puis
+  **`web` seul** sur le VPS. Aucune migration. Avant lui le **correctif 67** (2 octobre 2026) — économie du KV du Worker
   (`cd forms-worker && npm run deploy`, rien sur le VPS). Avant lui le **correctif 66** — **Forms Bony F4** + copie
   nocturne des fichiers (crontab root, `scripts/backup-files.sh`). `api` ET `web`, migration `20261002140000_bony_f4`
   (additive, appliquée avant le push), Worker inchangé. Avant lui le **correctif 65** — **Forms Bony F3**. Worker
@@ -3876,6 +3907,19 @@
   `bonyforms_files` (fichiers des répondants, F3). Instantanés OVH du VPS : non vérifiés. À faire : copie régulière
   hors du VPS (chiffrée : données personnelles). Noter aussi que tout fichier de `uploads/` est lisible par quiconque
   connaît son adresse (noms aléatoires, mais sans connexion requise).
+- **Forms Bony F5 — demandes de Théo du 07/10 (plan validé, par lots, sans migration : tout vit dans la définition JSON)** :
+  - ~~**Intégration dans un autre site**~~ → **fait, correctif 68**.
+  - **Dupliquer un formulaire en un clic** : route `POST /api/bony-forms/:id/duplicate` (`FORMS_ROLES`) — brouillon,
+    « … (copie) », nouveau `publicId`, tags et projet repris, abonné = l'auteur seul ; ni réponses, ni versions, ni
+    tirages ; images partagées (adresses `/a/<id>` immuables). Bouton dans la liste (`BonySpace`) et dans l'éditeur.
+  - **Taille du logo** : `theme.logoSize` (≈ 18 à 90 px, absent = 30 px, rien ne bouge pour l'existant), curseur Studio.
+  - **Cadrage des images** : réglage facultatif par image (point x / y en %, zoom, remplir / contenir) — en-tête, fond,
+    tuiles, voitures de la prise d'essai, accueil, fins ; absent = centré-recadré comme aujourd'hui.
+  - **Repiquage Bony** (interrupteur par formulaire) : ⚠️ **sens à préciser par Théo** — pied de page de concession
+    (coordonnées), signature « Bony auto-mobile », ou cartouche façon pub repiquée. Si coordonnées : vérifier ce qui
+    existe dans `constants.ts`.
+  - ⚠️ Vérifier que les nouvelles clés du thème ne sont pas jetées en silence (`resolveTheme`, nettoyage `theme.ts` du
+    Worker) ; modifier `shared/bonyform.ts` puis recopier dans `backend/src/bonyforms/schema.ts`.
 - **Forms Bony — suite du plan validé par Théo (« tout implémenter »)** :
   - ~~**F2, l'éditeur poussé**~~ → **fait, correctif 64** (F2a studio + F2b écrans, partage, modèles). Restes
     notés : écrans de fin SELON la réponse (avec la logique de F3) ; tuiles pour les créneaux (`slot`, F3) ;
@@ -4108,6 +4152,12 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Forms intégré (iframe d'une autre origine) : Chrome ne la PEINT pas tant qu'elle est hors écran.** Une capture
+  prise juste après un défilement la montre vide (voire avec une barre de défilement) : attendre 1 à 2 s et reprendre
+  la capture avant de conclure à un bug (07/10). Les captures du panneau navigateur ont souvent un temps de retard.
+- **Interface v2 + rechargement à chaud de Vite : une modification en DEUX temps** (un usage, puis la déclaration)
+  peut être rechargée entre les deux → `ReferenceError`, la coque plante et **bascule sur l'ancienne interface**
+  (préférence v2 intacte en `localStorage`). Recharger la page suffit ; ce n'est pas un bug du lot (07/10).
 - **Forms Bony : le format vit en DEUX exemplaires** (`shared/bonyform.ts` canonique, copie
   `backend/src/bonyforms/schema.ts`) — modifier le canonique puis `cp`, sinon `npm run dev` refuse de démarrer
   (`check-bonyform-sync.mjs`). Le Worker et le front importent le canonique.

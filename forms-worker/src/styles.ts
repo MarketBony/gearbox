@@ -230,4 +230,18 @@ a.bf-btn{text-decoration:none}
 .bf-file.busy{opacity:.7}
 .bf-drop{justify-content:center;border-style:dashed!important;width:100%}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* ---------- intégré dans un autre site (?embed=1, embed.ts) : l'iframe prend la hauteur du contenu, donc AUCUNE
+   hauteur en vh (dans une iframe, 100vh = sa propre hauteur : elle ne pourrait plus rapetisser). */
+html[data-embed] body{min-height:0;display:block}
+html[data-embed] .bf-wrap{padding:16px 12px 24px}
+html[data-embed] .bf-notice{min-height:0;padding:24px 12px}
+html[data-embed] .bf-hero{min-height:300px}
+html[data-embed] .bf-hero .bf-hin{padding:32px 20px 84px}
+html[data-embed] .bf-step{min-height:380px}
+html[data-embed][data-header="split"] .bf-side{display:block;position:relative;top:auto;height:220px;background:var(--h-img) center/cover no-repeat}
+html[data-embed][data-header="split"] #app{min-height:0}
+html[data-embed][data-header="split"] .bf-wrap{padding-top:16px}
+html[data-embed-bg="transparent"] body{background:transparent}
+html[data-embed-bg="transparent"] .bf-bg{display:none}
 `;
