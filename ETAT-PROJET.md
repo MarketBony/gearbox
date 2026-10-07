@@ -3,7 +3,13 @@
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
-## ▶ POINT DE REPRISE — 07/10/2026 (lire en premier)
+## ▶ POINT DE REPRISE — 08/10/2026 (lire en premier)
+- **LOT EN COURS DE CADRAGE : ASSISTANT IA** (détail et arbitrages au backlog § « Assistant IA — cadrage du 07-08/10 »).
+  Rien n'est codé. Décidé : tous les usages, **mémoire par utilisateur façon Claude** (notes éditables dans Paramètres),
+  **Gemini 3 Flash** (offre gratuite, clé AI Studio de marketbony@gmail.com) **+ Groq en secours**, accès **équipe
+  marketing seulement** (ni External ni chef de site), mascotte **chat « Piston »** (nom à changer) de
+  `maquettes/ux/mascottes.html`. **Prochaine étape : guider Théo PAS À PAS pour créer la clé Gemini** (et la clé Groq),
+  puis audit + plan de la P0. Retour de Théo sur la navigation téléphone (correctif 70) sur vrais téléphones : attendu.
 - **En production : correctif 70 (07/10)** — **Interface v2 sur TÉLÉPHONE : nouvelle navigation** (proposition C de
   `maquettes/ux/mobile-nav.html`, choisie par Théo) : pilule flottante Accueil · 3 favoris · loupe, retour du téléphone,
   accueil personnalisable (widgets). `web` seul, aucune migration ; ordinateur inchangé. ⚠️ Testée en navigateur
@@ -46,8 +52,8 @@
      **F4 fait (66).** Reste noté : accusé de réception par e-mail (refusé pour l'instant).
      **Forms Bony F5 (demandes de Théo du 07/10) : fait** — intégration (68), duplication, taille du logo, cadrage des
      images, pied de page Bony, adresse de contact (69). Restes : backlog § Forms Bony.
-     **Ensuite : tâches multi-assignées, prestataire, répartitions, fichiers maison, mascotte / agent IA** (plan validé
-     par Théo « de A à Z »). À faire par l'équipe : importer les polices officielles (NouvelR, Read, Dacia Block,
+     **Ensuite : ASSISTANT IA (en cadrage, voir en tête), puis tâches multi-assignées, prestataire, répartitions, fichiers
+     maison** (plan validé par Théo « de A à Z »). À faire par l'équipe : importer les polices officielles (NouvelR, Read, Dacia Block,
      AlpineNewAlps, NissanBrand) dans Studio › Polices de marque.
      Trou serveur `GET /api/budget` : Théo le traite « après » (01/10).
   1. **Retours de la bêta** (groupe « Bêta Gearbox OS » du Chat, créé par Théo) : les trier, corriger par lots.
@@ -4018,7 +4024,34 @@
   - **Fichiers maison** (façon SharePoint, stockage sur le VPS ; droits par fichier gérés par le Master). 179 Go
     libres au 01/10. ⚠️ Avant d'y mettre les documents : la sauvegarde hebdomadaire ne copie que la base Supabase,
     pas le volume `uploads_data` (à vérifier et régler).
-  - **Mascotte / agent IA** : 100 % gratuit, mascotte pixel art mignonne, « vivante » (se balade sur la barre des
+  - **Assistant IA — cadrage du 07-08/10/2026** (remplace l'entrée « Mascotte / agent IA » ci-dessous) :
+    - **Usages : TOUS**, « voire plus » : questions sur les données (budget, retards, absents…), rédaction (posts
+      Digital, textes de Forms, e-mails), résumés (Chat, réponses de Forms), aide à l'usage de Gearbox, actions AVEC
+      confirmation (tâche, post-it, brouillon de projet : carte proposée, l'écriture passe par les routes normales).
+    - **Mémoire PAR UTILISATEUR, comme celle de Claude** : notes que l'IA ajoute en travaillant avec la personne +
+      historique ; Paramètres › Mémoire : pause / effacer, ajouter / modifier / supprimer chaque note. Chacun ne voit
+      que la sienne. → nouvelle(s) table(s) Prisma, **migration manuelle** (db execute puis migrate resolve), hotspot.
+    - **Cerveau : Gemini 3 Flash** (offre gratuite ; plus de modèle Pro gratuit depuis avril 2026 ; ~1 500 req/j, 10 req/min
+      pour toute l'équipe ; une question avec données = 2 à 4 requêtes). **Groq (gpt-oss-120b) en secours automatique**
+      (1 000 req/j, 8 000 tokens/min). Adaptateurs interchangeables côté serveur (`/api/assistant`, porte unique).
+      L'entraînement des fournisseurs sur les données ne gêne pas Théo. ChatGPT (abonnement) : pas d'API, écarté.
+    - **Clés** : Gemini = Google AI Studio (aistudio.google.com) avec **marketbony@gmail.com**, « Get API key », SANS
+      activer la facturation ; Groq = console.groq.com (compte à créer par Théo). Théo veut être **guidé pas à pas**.
+      Clés au `.env` du VPS / `backend/.env`, jamais dans le dépôt ; à ajouter à `docker-compose.yml`.
+    - **Accès : équipe marketing** — PAS External, PAS Site Manager (chef de site). L'IA agit avec les droits de
+      l'interlocuteur (`siteScope`, listes blanches) : elle ne voit que ce que la personne voit.
+    - **Mascotte : le chat « Piston »** (tigré mécano, lunettes d'aviateur, salopette) de `maquettes/ux/mascottes.html` —
+      **nom à trouver** (Théo n'aime pas « Piston »). DA « figurine en pâte » (SVG dessiné par le code, volumes, reflets,
+      ombre de contact) ; moteur d'animation à ressorts (`Rig` : écrasement / étirement, préparation et rebond du saut,
+      inclinaison, regard qui suit la souris, queue en chaîne, oreilles, clignement) et comportement `Buddy` (vit sur le
+      Dock, court après la souris qui longe le Dock, sursaute si elle passe en trombe ou quand une icône rebondit,
+      s'endort après 25 s, plein écran : dort sur le Dock rangé, sursaute quand il remonte, se laisse déplacer, clic =
+      saut + assistant). Sur téléphone : perchée sur la pilule, toucher = volet de l'assistant. Pixel art et vectoriel
+      plat REJETÉS par Théo (« immondes », « vieux vectorart Canva ») ; Capy / Nova / Mochi et les 3 autres chats non retenus.
+    - **Découpage proposé** : P0 cerveau + 3 outils de lecture + panneau de chat + mesure de consommation ; P1 mascotte
+      dans la v2 (bureau + téléphone) ; P2 rédaction (Digital, Forms) ; P3 actions avec confirmation ; mémoire dès P0/P1
+      (à arbitrer au plan). Respecter « Effets économes », « réduire les animations », « Ne pas déranger » (elle dort).
+  - **Mascotte / agent IA** (entrée d'origine, 01/10) : 100 % gratuit, mascotte pixel art mignonne, « vivante » (se balade sur la barre des
     tâches). Cadrage juste après le lot 1. Pistes du cerveau : API gratuites (gpt-oss chez Groq / OpenRouter,
     palier gratuit Gemini — quotas et usage des données à vérifier) ; modèle sur le VPS possible mais lent
     (8 vCPU sans GPU, 22 Go). Prévoir un cerveau interchangeable côté serveur, et l'agent agit avec les droits de

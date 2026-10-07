@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mascottes Gearbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&family=Syncopate:wght@700&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   Maquettes — mascotte de l'assistant IA de Gearbox, 3e version (07/10/2026).
+   DA « figurine en pâte » : volumes (lumière haut-gauche, occlusion en bas, reflets flous, liseré de lumière),
+   ombre de contact. Animation PROCÉDURALE : chaque image est calculée (ressorts) — écrasement / étirement,
+   anticipation, rebond, inclinaison dans le mouvement, regard qui suit la souris, queue et nageoires en chaîne,
+   oreilles qui frémissent, respiration, clignement progressif.
+   ===================================================================== */
+:root{ --page:#f4f2f8; --ink:#1d1a24; --muted:#6b6577; --line:#e3dfeb; --card:#fff; --p:#f75632; --v:#7c4dff; }
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--page:#121016;--ink:#f1eef6;--muted:#a39db0;--line:#2a2633;--card:#1a1720}}
+:root[data-theme="dark"]{--page:#121016;--ink:#f1eef6;--muted:#a39db0;--line:#2a2633;--card:#1a1720}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 'Albert Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:32px 16px 80px}
+.eyebrow{color:var(--p);font-weight:800;font-size:12px;letter-spacing:.16em;text-transform:uppercase}
+h1{font:700 26px/1.15 'Syncopate',sans-serif;text-transform:uppercase;margin:0 0 6px}
+h2{font-size:20px;margin:40px 0 6px}
+.lead{color:var(--muted);max-width:800px;margin:4px 0 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+
+.picks{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:16px}
+.pick{display:flex;gap:14px;align-items:center;cursor:pointer;text-align:left;font:inherit;color:inherit;transition:border-color .2s,transform .2s}
+.pick:hover{transform:translateY(-2px)}
+.pick.on{border-color:var(--p);box-shadow:0 0 0 2px color-mix(in srgb,var(--p) 35%,transparent)}
+.stagebox{flex:none;width:110px;height:110px;border-radius:20px;background:radial-gradient(120% 90% at 50% 100%,#3a2d4f,#18131f 70%);position:relative;overflow:hidden}
+.stagebox .rig{position:absolute;left:5px;bottom:2px}
+.pick b{display:block;font-size:16px}.pick span{color:var(--muted);font-size:13px}
+
+.rig{width:100px;height:100px;position:relative;pointer-events:none}
+.rig svg{width:100%;height:100%;overflow:visible;display:block}
+.flip .rig svg,.rig.flip svg{transform:scaleX(-1)}
+
+/* scène : bureau Gearbox factice */
+.stage{position:relative;margin-top:16px;height:560px;border-radius:20px;overflow:hidden;
+  background:radial-gradient(90% 70% at 15% 0%,rgba(247,86,50,.32),transparent 60%),radial-gradient(80% 60% at 100% 100%,rgba(124,77,255,.38),transparent 60%),#0d0b12;color:#f4f2f8;user-select:none}
+.stage .menubar{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;gap:16px;padding:0 14px;font-size:12px;font-weight:600;background:rgba(20,17,26,.55);backdrop-filter:blur(12px);z-index:5}
+.stage .menubar b{font-family:'Syncopate';font-size:11px}
+.stage .wdg{position:absolute;border-radius:20px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);padding:12px;font-size:12px;color:#cfc9da}
+.stage .wdg b{display:block;font-size:22px;color:#fff;margin-top:6px}
+.stage .win{position:absolute;left:14px;right:14px;top:40px;bottom:14px;border-radius:16px;background:#16131c;border:1px solid rgba(255,255,255,.1);box-shadow:0 30px 60px -20px rgba(0,0,0,.8);opacity:0;pointer-events:none;transition:opacity .3s;padding:14px;font-size:13px;color:#a39db0}
+.stage .win b{display:block;color:#fff;font-size:16px;margin-bottom:6px}
+.stage.fs .win{opacity:1}
+.dock{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:10px;padding:10px 12px;border-radius:22px;background:rgba(34,30,42,.72);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(18px);box-shadow:0 18px 40px -18px rgba(0,0,0,.8);transition:transform .55s cubic-bezier(.22,1,.36,1);z-index:10}
+.stage.fs .dock{transform:translate(-50%,calc(100% + 130px))}
+.stage.fs.peek .dock{transform:translateX(-50%);transition:transform .2s cubic-bezier(.2,1.5,.4,1)}
+.dock i{width:44px;height:44px;border-radius:12px;display:block;box-shadow:inset 0 1px 0 rgba(255,255,255,.35);cursor:pointer;transition:transform .15s}
+.dock i:hover{transform:translateY(-4px) scale(1.08)}
+.dock i.bounce{animation:dk-b .6s cubic-bezier(.3,1.6,.5,1)}
+@keyframes dk-b{40%{transform:translateY(-16px)}}
+.edge{position:absolute;left:0;right:0;bottom:0;height:12px;z-index:9}
+.stage.fs .edge{z-index:40}.stage.fs.peek .edge{z-index:9}
+.buddy{position:absolute;left:0;top:0;cursor:grab;touch-action:none;z-index:20}
+.buddy .rig{pointer-events:none}
+.buddy.drag{cursor:grabbing}
+.fx{position:absolute;pointer-events:none;z-index:25}
+.bubble{position:absolute;z-index:26;pointer-events:none;background:#fff;color:#1d1a24;font:600 12.5px/1.35 'Albert Sans';padding:8px 11px;border-radius:12px;white-space:nowrap;box-shadow:0 8px 20px -8px rgba(0,0,0,.6);transform-origin:50% 100%;animation:pop .28s cubic-bezier(.34,1.56,.64,1) both}
+.bubble::after{content:"";position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:#fff}
+.bubble.dots{font-size:16px;letter-spacing:2px;padding:4px 12px}
+.bubble.bang{font:800 18px/1 'Albert Sans';color:#f75632;padding:6px 12px}
+@keyframes pop{from{transform:scale(.3);opacity:0}}
+@keyframes rise{to{transform:translateY(-44px) scale(1.25);opacity:0}}
+@keyframes zz{0%{transform:translate(0,0) scale(.6);opacity:0}20%{opacity:1}100%{transform:translate(22px,-48px) scale(1.25);opacity:0}}
+
+.chat{position:absolute;z-index:30;width:320px;max-width:calc(100% - 24px);border-radius:20px;background:rgba(28,24,36,.95);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(20px);box-shadow:0 30px 60px -20px rgba(0,0,0,.85);display:flex;flex-direction:column;overflow:hidden;transform-origin:50% 100%;animation:chatin .38s cubic-bezier(.22,1.25,.36,1) both}
+@keyframes chatin{from{transform:translateY(24px) scale(.55);opacity:0}}
+.chat.out{animation:chatout .22s ease-in both}@keyframes chatout{to{transform:translateY(16px) scale(.7);opacity:0}}
+.chat header{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.08)}
+.chat header .rig{width:40px;height:40px}
+.chat header b{flex:1;font-size:13.5px}.chat header span{font-size:11px;color:#a39db0;display:block;font-weight:500}
+.chat header button{background:none;border:0;color:#cfc9da;font-size:18px;cursor:pointer;width:28px;height:28px;border-radius:8px}
+.chat header button:hover{background:rgba(255,255,255,.08)}
+.chat .msgs{padding:10px 12px;display:flex;flex-direction:column;gap:8px;max-height:230px;overflow:auto;font-size:13px}
+.chat .m{max-width:85%;padding:7px 10px;border-radius:14px;line-height:1.4}
+.chat .m.ai{background:rgba(255,255,255,.08);align-self:flex-start;border-bottom-left-radius:4px}
+.chat .m.me{background:linear-gradient(135deg,#f75632,#c2185b);align-self:flex-end;border-bottom-right-radius:4px}
+.chat .m.typing{color:#a39db0;letter-spacing:.2em}
+.chat .chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 8px}
+.chat .chips button{font:600 11.5px 'Albert Sans';color:#f4f2f8;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:5px 9px;cursor:pointer}
+.chat form{display:flex;gap:6px;padding:8px 10px 10px;border-top:1px solid rgba(255,255,255,.08)}
+.chat input{flex:1;min-width:0;background:rgba(255,255,255,.08);border:0;border-radius:999px;padding:8px 12px;color:#fff;font:13px 'Albert Sans';outline:none}
+.chat form button{width:34px;height:34px;border-radius:50%;border:0;background:linear-gradient(135deg,#f75632,#c2185b);color:#fff;font-weight:800;cursor:pointer}
+
+.ctl{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.ctl button{font:600 13px 'Albert Sans';padding:8px 13px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.ctl button:hover{border-color:var(--p)}
+.ctl button.on{background:var(--p);color:#fff;border-color:var(--p)}
+.ctl label{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center;margin-left:auto}
+
+.moods{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:14px}
+.mood{text-align:center;padding:10px 6px}
+.mood .stagebox{margin:0 auto 8px;width:120px;height:120px}
+.mood b{font-size:13px}.mood span{display:block;color:var(--muted);font-size:12px}
+
+.row{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;margin-top:16px}
+.phone{flex:none;width:300px;height:620px;border-radius:44px;padding:10px;background:#0a090c;box-shadow:0 0 0 1.5px #2b2830,0 30px 60px -30px rgba(0,0,0,.6)}
+.screen{position:relative;width:100%;height:100%;border-radius:35px;overflow:hidden;color:#f4f2f8;background:radial-gradient(120% 60% at 0% 0%,rgba(247,86,50,.35),transparent 60%),radial-gradient(100% 60% at 100% 100%,rgba(124,77,255,.35),transparent 60%),#141118}
+.screen .hello{padding:44px 16px 0;font-size:20px;font-weight:800}
+.screen .hello small{display:block;font-size:10px;letter-spacing:.12em;color:#a39db0;font-weight:700}
+.screen .w{margin:12px 12px 0;height:90px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1)}
+.pill{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);display:flex;gap:4px;padding:5px;border-radius:999px;background:rgba(34,30,42,.86);border:1px solid rgba(255,255,255,.12)}
+.pill i{width:42px;height:38px;border-radius:999px;display:block;background:rgba(255,255,255,.06)}
+.pill i.s{width:46px;background:linear-gradient(135deg,#f75632,#c2185b)}
+.sheet{position:absolute;left:0;right:0;bottom:0;height:62%;border-radius:24px 24px 0 0;background:#1d1a24;border-top:1px solid rgba(255,255,255,.12);transform:translateY(105%);transition:transform .38s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;z-index:40}
+.sheet.on{transform:none}
+.sheet .grab{width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.25);margin:8px auto 4px}
+.notes{flex:1 1 320px;min-width:0}
+.notes ul{margin:8px 0 0;padding-left:18px}.notes li{margin:5px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Gearbox OS · assistant IA</div>
+  <h1>Mascottes</h1>
+  <p class="lead">Quatre chats, quatre designs — dont un siamois aux grands yeux étonnés. Même direction : des petites figurines avec du volume (lumière, ombre de contact, reflets, liseré de lumière) et des animations calculées image par image — écrasement à l’atterrissage, préparation avant le saut, corps qui penche dans la course, tête qui suit la souris, queue et nageoires qui suivent le mouvement avec retard, oreilles qui frémissent, respiration. Mêmes comportements pour les quatre ; chacun a ses accessoires animés (grelot, écharpe, pompon).</p>
+
+  <h2>1 · Choisir une mascotte</h2>
+  <p class="lead">Elles vous suivent déjà des yeux.</p>
+  <div class="picks" id="picks"></div>
+
+  <h2>2 · Sur le bureau</h2>
+  <p class="lead">À essayer : bougez la souris autour (elle vous suit du regard), longez le Dock (elle vous court après), passez vite à côté (sursaut), cliquez une icône du Dock, attrapez-la pour la déposer ailleurs, cliquez-la (saut + assistant). Puis « Plein écran » : le Dock se range, elle dort ; souris tout en bas, le Dock remonte d’un coup — réveil en sursaut.</p>
+  <div class="stage" id="stage">
+    <div class="menubar"><b>GEARBOX</b><span>Fichier</span><span>Édition</span><span>Présentation</span><span style="margin-left:auto">mer. 7 oct.  9:41</span></div>
+    <div class="wdg" style="left:24px;top:52px;width:170px;height:120px">Budget 2026<b>108 %</b></div>
+    <div class="wdg" style="left:206px;top:52px;width:170px;height:120px;background:linear-gradient(135deg,#f75632,#c2185b);color:#fff">En retard<b>16</b></div>
+    <div class="wdg" style="left:24px;top:184px;width:352px;height:150px">Derniers messages<b style="font-size:13px;font-weight:600;margin-top:10px">Chat Général · Vous : 📷 Image<br>CA BUG CHEF · un repiquage ?</b></div>
+    <div class="win"><b>Projets — plein écran</b>La fenêtre occupe tout l’écran : le Dock se range. Amenez la souris tout en bas pour le faire revenir.</div>
+    <div class="dock" id="dock"></div>
+    <div class="edge" id="edge"></div>
+  </div>
+  <div class="ctl" id="ctl">
+    <button data-a="fs" id="fsBtn">Plein écran</button>
+    <button data-a="walk">Se promener</button><button data-a="wave">Saluer</button><button data-a="jump">Sauter</button>
+    <button data-a="think">Réfléchir</button><button data-a="alert">Alerte (message)</button><button data-a="love">Câlin</button><button data-a="sleep">Dormir</button>
+    <button data-a="chat">Ouvrir l’assistant</button>
+    <label><input type="checkbox" id="auto" checked> Vie automatique</label>
+  </div>
+
+  <h2>3 · Les mimiques</h2>
+  <p class="lead">Chaque état, en boucle, pour la mascotte choisie.</p>
+  <div class="moods" id="moods"></div>
+
+  <h2>4 · Sur téléphone</h2>
+  <div class="row">
+    <div class="phone"><div class="screen" id="pscreen">
+      <div class="hello"><small>MERCREDI 7 OCTOBRE</small>Bonjour Théo</div>
+      <div class="w"></div><div class="w" style="height:130px"></div>
+      <div class="pill" id="ppill"><i></i><i></i><i></i><i></i><i class="s"></i></div>
+      <div class="sheet" id="psheet"><div class="grab"></div><div id="pchat" style="flex:1;display:flex;flex-direction:column;min-height:0"></div></div>
+    </div></div>
+    <div class="notes">
+      <b>Sur téléphone</b>
+      <ul>
+        <li>Perchée <b>sur la pilule</b> : elle trottine, s’arrête, respire, cligne des yeux ; elle disparaît avec la pilule au défilement et sursaute à son retour.</li>
+        <li><b>Un toucher</b> : préparation, saut, et l’assistant monte depuis le bas.</li>
+      </ul>
+      <b>D’autres idées pour sa vie dans Gearbox</b>
+      <ul>
+        <li>Elle <b>s’assoit devant l’icône</b> de la rubrique ouverte et regarde la fenêtre.</li>
+        <li><b>Un message du Chat arrive</b> : elle court tapoter l’icône du Chat.</li>
+        <li><b>Fin de journée</b> : elle bâille ; <b>vendredi</b> : elle danse ; <b>projet « Terminé »</b> : confettis.</li>
+        <li>« Effets économes » / « réduire les animations » : immobile. « Ne pas déranger » : elle dort.</li>
+        <li>Habillable par saison ou par marque (écharpe de Noël, casquette…).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// OUTILS
+// =====================================================================
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const D = Math.PI / 180;
+/** Ressort amorti : s = {x, v} vers cible */
+function spring(s, target, k, damp, dt) { s.v += ((target - s.x) * k - s.v * damp) * dt; s.x += s.v * dt; return s.x; }
+const T = (el, tf) => el && el.setAttribute('transform', tf);
+const show = (el, on) => el && (el.style.display = on ? '' : 'none');
+const about = (cx, cy, inner) => `translate(${cx} ${cy}) ${inner} translate(${-cx} ${-cy})`;
+const blurDefs = (u) => `<filter id="b1${u}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.4"/></filter><filter id="b3${u}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3"/></filter><filter id="gl${u}" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="1.8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+/** Chaîne (queue, nageoire) : angles qui suivent le précédent avec retard */
+function chain(state, n, len, x0, y0, baseAng, curl, follow, dt) {
+  if (!state.a) state.a = Array(n).fill(baseAng);
+  let x = x0, y = y0, prev = baseAng; const pts = [[x, y]];
+  for (let i = 0; i < n; i++) { const tgt = prev + curl; state.a[i] += (tgt - state.a[i]) * Math.min(1, dt * follow); prev = state.a[i]; x += Math.cos(prev) * len; y += Math.sin(prev) * len; pts.push([x, y]); }
+  return pts;
+}
+const smoothPath = (p) => { let d = `M${p[0][0].toFixed(1)} ${p[0][1].toFixed(1)}`; for (let i = 1; i < p.length - 1; i++) { const mx = (p[i][0] + p[i + 1][0]) / 2, my = (p[i][1] + p[i + 1][1]) / 2; d += ` Q${p[i][0].toFixed(1)} ${p[i][1].toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)}`; } const l = p[p.length - 1]; return d + ` L${l[0].toFixed(1)} ${l[1].toFixed(1)}`; };
+/** Humeur → quelle variante d'yeux / de bouche */
+const EYES = { neutral: 'open', think: 'open', listen: 'open', happy: 'happy', love: 'love', surprised: 'wide', sleep: 'closed', chill: 'open' };
+const MOUTH = { neutral: 'w', think: 'w', listen: 'w', happy: 'open', love: 'open', surprised: 'o', sleep: 'w', chill: 'w' };
+function faces(r, s, def) {
+  const e = EYES[s.mood] || 'open', m = (def?.mouthMap || {})[s.mood] || MOUTH[s.mood] || 'w';
+  for (const k of ['open', 'happy', 'closed', 'wide', 'love']) show(r['eye_' + k], e === k);
+  for (const k of ['w', 'open', 'o']) show(r['mouth_' + k], m === k);
+  if (r.blushL) { const b = s.mood === 'happy' || s.mood === 'love' ? .9 : .4; r.blushL.style.opacity = b; r.blushR.style.opacity = b; }
+}
+/** Clignement d'un œil ouvert (écrase l'œil verticalement autour de son centre) */
+const blinkEye = (el, cx, cy, b, lx, ly) => T(el, `translate(${lx} ${ly}) ` + about(cx, cy, `scale(1 ${Math.max(.08, 1 - b * .94)})`));
+
+// =====================================================================
+// QUATRE CHATS — un même squelette (pose commune), quatre designs : pelage, marques, yeux, accessoires animés
+// viewBox 120 × 120, sol à y = 110
+// =====================================================================
+const MASCOTS = [];
+const EAR = {
+  normal: { L: 'M33 42 Q28.5 17 36 10 Q47.5 18.5 51.5 30Z', Li: 'M37 35 Q34.3 20.6 38.2 16.2 Q45.4 21.8 47.3 30Z', R: 'M87 42 Q91.5 17 84 10 Q72.5 18.5 68.5 30Z', Ri: 'M83 35 Q85.7 20.6 81.8 16.2 Q74.6 21.8 72.7 30Z' },
+  tall: { L: 'M32 43 Q25 12 33 3 Q47 15 52 30Z', Li: 'M36.5 36 Q32 16 35 10 Q44.5 19 47.5 30Z', R: 'M88 43 Q95 12 87 3 Q73 15 68 30Z', Ri: 'M83.5 36 Q88 16 85 10 Q75.5 19 72.5 30Z' },
+  round: { L: 'M32 42 Q27 22 35 14 Q47 17 52 30Z', Li: 'M36.5 35 Q33.5 23 37.5 19 Q45 21 47.5 30Z', R: 'M88 42 Q93 22 85 14 Q73 17 68 30Z', Ri: 'M83.5 35 Q86.5 23 82.5 19 Q75 21 72.5 30Z' },
+};
+function makeCat(o) {
+  const E = o.eye, ex = [60 - E.dx, 60 + E.dx], ey = E.y;
+  const eye = (cx, u) => `<ellipse cx="${cx}" cy="${ey}" rx="${E.rx}" ry="${E.ry}" fill="url(#i${u})"/>
+      <ellipse cx="${cx}" cy="${ey}" rx="${E.rx}" ry="${E.ry}" fill="none" stroke="${E.ring}" stroke-width="1" opacity=".7"/>
+      ${E.pupil === 'slit' ? `<ellipse cx="${cx}" cy="${ey + .4}" rx="${E.pw}" ry="${E.ry * .74}" fill="#07040a"/>` : E.pupil === 'none' ? '' : `<circle cx="${cx}" cy="${ey + .5}" r="${E.pr}" fill="#07040a"/>`}
+      <circle cx="${cx - E.rx * .36}" cy="${ey - E.ry * .4}" r="${E.rx * .38}" fill="#fff"/><circle cx="${cx + E.rx * .36}" cy="${ey + E.ry * .38}" r="${E.rx * .16}" fill="#fff" opacity=".85"/>`;
+  const ears = EAR[o.ears || 'normal'];
+  return {
+    id: o.id, name: o.name, who: o.who, speed: o.speed || 55, mouthMap: o.mouthMap, browsAlways: !!o.brows,
+    svg: (u) => `<defs>${blurDefs(u)}
+      <radialGradient id="f${u}" cx="36%" cy="26%" r="85%"><stop offset="0" stop-color="${o.fur[0]}"/><stop offset=".48" stop-color="${o.fur[1]}"/><stop offset="1" stop-color="${o.fur[2]}"/></radialGradient>
+      <radialGradient id="c${u}" cx="45%" cy="30%" r="75%"><stop offset="0" stop-color="${o.cream[0]}"/><stop offset="1" stop-color="${o.cream[1]}"/></radialGradient>
+      <radialGradient id="i${u}" cx="50%" cy="72%" r="75%"><stop offset="0" stop-color="${E.iris[0]}"/><stop offset=".55" stop-color="${E.iris[1]}"/><stop offset="1" stop-color="${E.iris[2]}"/></radialGradient>
+      <linearGradient id="p${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${o.earIn[0]}"/><stop offset="1" stop-color="${o.earIn[1]}"/></linearGradient>
+      ${o.defs ? o.defs(u) : ''}</defs>
+      <ellipse data-r="shadow" cx="60" cy="111" rx="27" ry="5" fill="#000" opacity=".35" filter="url(#b3${u})"/>
+      <g data-r="root">
+        <path data-r="tail" fill="none" stroke="${o.tail[0]}" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path data-r="tailTip" fill="none" stroke="${o.tail[1]}" stroke-width="9.5" stroke-linecap="round"/>
+        <g data-r="legL"><ellipse cx="49" cy="106" rx="8.6" ry="5.6" fill="${o.paw || `url(#f${u})`}"/><ellipse cx="49" cy="108.6" rx="5.6" ry="1.8" fill="#fff" opacity=".18"/></g>
+        <g data-r="legR"><ellipse cx="71" cy="106" rx="8.6" ry="5.6" fill="${o.paw || `url(#f${u})`}"/><ellipse cx="71" cy="108.6" rx="5.6" ry="1.8" fill="#fff" opacity=".18"/></g>
+        <g data-r="body">
+          <ellipse cx="60" cy="92" rx="21.5" ry="17.5" fill="url(#f${u})"/>
+          ${o.body ? o.body(u) : `<ellipse cx="60" cy="96" rx="12" ry="11" fill="url(#c${u})"/>`}
+          <ellipse cx="60" cy="106.5" rx="17" ry="3.4" fill="#000" opacity=".2" filter="url(#b1${u})"/>
+        </g>
+        ${o.neck ? o.neck(u) : ''}
+        <g data-r="armL"><ellipse cx="39.3" cy="93" rx="6.4" ry="5.8" fill="${o.paw || `url(#f${u})`}"/></g>
+        <g data-r="armR"><ellipse cx="80.7" cy="93" rx="6.4" ry="5.8" fill="${o.paw || `url(#f${u})`}"/></g>
+        <g data-r="head">
+          <g data-r="earL"><path d="${ears.L}" fill="${o.ear ? o.ear(u) : `url(#f${u})`}"/><path d="${ears.Li}" fill="url(#p${u})"/>${o.earMarkL || ''}</g>
+          <g data-r="earR"><path d="${ears.R}" fill="${o.ear ? o.ear(u) : `url(#f${u})`}"/><path d="${ears.Ri}" fill="url(#p${u})"/>${o.earMarkR || ''}</g>
+          <path d="M31.5 59 L22.5 62.5 L31 65 L25.5 70.5 L35.5 67.5Z" fill="${o.fluff}"/><path d="M88.5 59 L97.5 62.5 L89 65 L94.5 70.5 L84.5 67.5Z" fill="${o.fluff}"/>
+          <ellipse cx="60" cy="52" rx="${o.headRx || 31.5}" ry="${o.headRy || 28.5}" fill="url(#f${u})"/>
+          ${o.marks ? o.marks(u) : ''}
+          <ellipse cx="60" cy="64.5" rx="14" ry="9.8" fill="url(#c${u})" opacity="${o.muzzleOp ?? 1}"/>
+          <ellipse cx="45.5" cy="34.5" rx="11.5" ry="6" fill="#fff" opacity="${o.shine ?? .45}" filter="url(#b1${u})" transform="rotate(-22 45.5 34.5)"/>
+          <path d="M80 27.5 Q89.5 34 91.2 47" stroke="${o.rim}" stroke-width="2.2" fill="none" opacity=".65" stroke-linecap="round"/>
+          <ellipse data-r="blushL" cx="39.5" cy="64" rx="5.8" ry="3.3" fill="${o.blush || '#ff86aa'}" filter="url(#b1${u})"/><ellipse data-r="blushR" cx="80.5" cy="64" rx="5.8" ry="3.3" fill="${o.blush || '#ff86aa'}" filter="url(#b1${u})"/>
+          <g data-r="eye_open"><g data-r="eL">${eye(ex[0], u)}</g><g data-r="eR">${eye(ex[1], u)}</g></g>
+          <path data-r="eye_happy" d="M${ex[0] - 6.7} ${ey + 2.5} Q${ex[0]} ${ey - 7} ${ex[0] + 6.7} ${ey + 2.5} M${ex[1] - 6.7} ${ey + 2.5} Q${ex[1]} ${ey - 7} ${ex[1] + 6.7} ${ey + 2.5}" stroke="${o.line}" stroke-width="3.1" fill="none" stroke-linecap="round"/>
+          <path data-r="eye_closed" d="M${ex[0] - 6.7} ${ey + .5} Q${ex[0]} ${ey + 6} ${ex[0] + 6.7} ${ey + .5} M${ex[1] - 6.7} ${ey + .5} Q${ex[1]} ${ey + 6} ${ex[1] + 6.7} ${ey + .5}" stroke="${o.line}" stroke-width="2.7" fill="none" stroke-linecap="round"/>
+          <g data-r="eye_wide"><ellipse cx="${ex[0]}" cy="${ey - 1}" rx="${E.rx + 1.4}" ry="${E.ry + 1.6}" fill="url(#i${u})"/><circle cx="${ex[0]}" cy="${ey}" r="2" fill="#07040a"/><circle cx="${ex[0] - 3}" cy="${ey - 4}" r="2.6" fill="#fff"/>
+            <ellipse cx="${ex[1]}" cy="${ey - 1}" rx="${E.rx + 1.4}" ry="${E.ry + 1.6}" fill="url(#i${u})"/><circle cx="${ex[1]}" cy="${ey}" r="2" fill="#07040a"/><circle cx="${ex[1] - 3}" cy="${ey - 4}" r="2.6" fill="#fff"/></g>
+          <g data-r="eye_love" fill="#ff4f8b"><path d="M${ex[0]} ${ey + 7} C${ex[0] - 10} ${ey - 1} ${ex[0] - 6} ${ey - 9} ${ex[0]} ${ey - 4} C${ex[0] + 6} ${ey - 9} ${ex[0] + 10} ${ey - 1} ${ex[0]} ${ey + 7}Z"/><path d="M${ex[1]} ${ey + 7} C${ex[1] - 10} ${ey - 1} ${ex[1] - 6} ${ey - 9} ${ex[1]} ${ey - 4} C${ex[1] + 6} ${ey - 9} ${ex[1] + 10} ${ey - 1} ${ex[1]} ${ey + 7}Z"/></g>
+          ${o.brows ? `<path data-r="brows" d="M${ex[0] - 5} ${ey - 13} Q${ex[0]} ${ey - 16.5} ${ex[0] + 4} ${ey - 13.5} M${ex[1] - 4} ${ey - 13.5} Q${ex[1]} ${ey - 16.5} ${ex[1] + 5} ${ey - 13}" stroke="${o.brows}" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/>` : ''}
+          <path d="M57.3 60.3 Q60 58.8 62.7 60.3 Q61.7 62.8 60 63.2 Q58.3 62.8 57.3 60.3Z" fill="${o.nose}"/>
+          <path data-r="mouth_w" d="M55.5 64.8 Q57.8 67.4 60 65.1 Q62.2 67.4 64.5 64.8" stroke="${o.line}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+          <g data-r="mouth_open"><path d="M54.3 64.8 Q60 74 65.7 64.8 Q60 66.8 54.3 64.8Z" fill="#6b2236"/><ellipse cx="60" cy="69.6" rx="3.1" ry="1.9" fill="#ff7b98"/></g>
+          <ellipse data-r="mouth_o" cx="60" cy="67" rx="${o.oSmall ? 2 : 3}" ry="${o.oSmall ? 2.5 : 3.6}" fill="#6b2236"/>
+          <path d="M41 62.3 L27 59.8 M41 65.8 L27.5 67.8 M79 62.3 L93 59.8 M79 65.8 L92.5 67.8" stroke="${o.whisker || '#fff'}" stroke-width="1.15" opacity=".85" stroke-linecap="round"/>
+          ${o.hat ? o.hat(u) : ''}
+        </g>
+      </g>`,
+    pose(r, s, dt) {
+      const w = s.walk, ph = s.ph, bob = -Math.abs(Math.sin(ph)) * 1.8 * w + Math.sin(s.t * 2.3) * .45 * (1 - w);
+      T(r.root, `translate(0 ${(-s.jumpY).toFixed(2)}) ` + about(60, 110, `rotate(${s.lean.toFixed(2)}) scale(${s.sx.toFixed(3)} ${s.sy.toFixed(3)})`));
+      const alt = clamp(s.jumpY / 60, 0, .6); T(r.shadow, about(60, 111, `scale(${1 - alt} 1)`)); r.shadow.style.opacity = .35 * (1 - alt);
+      const lift = (p) => -Math.max(0, -Math.cos(p)) * 4 * w;
+      T(r.legL, `translate(${(Math.sin(ph) * 4.5 * w - s.sit * 3).toFixed(2)} ${(lift(ph) + s.sit).toFixed(2)})`);
+      T(r.legR, `translate(${(Math.sin(ph + Math.PI) * 4.5 * w + s.sit * 3).toFixed(2)} ${(lift(ph + Math.PI) + s.sit).toFixed(2)})`);
+      T(r.body, `translate(0 ${(bob + s.sit * 2).toFixed(2)})`);
+      T(r.armL, `translate(0 ${(bob + Math.sin(ph + Math.PI) * 1.6 * w + s.sit * 2).toFixed(2)})`);
+      T(r.armR, `translate(0 ${(bob + Math.sin(ph) * 1.6 * w + s.sit * 2).toFixed(2)}) ` + about(77, 87, `rotate(${(-s.wave * (115 + Math.sin(s.wph) * 26)).toFixed(1)})`));
+      const hx = s.lookX * 2.2, hy = s.lookY * 1.6 + bob * 1.25 + s.sit * 2.5;
+      T(r.head, `translate(${hx.toFixed(2)} ${hy.toFixed(2)}) ` + about(60, 78, `rotate(${(s.lookX * 7 + s.tilt + s.lean * .3).toFixed(2)})`));
+      T(r.earL, about(41, 34, `rotate(${(-s.earL).toFixed(2)})`)); T(r.earR, about(79, 34, `rotate(${(s.earR).toFixed(2)})`));
+      const lx = s.lookX * 2.5, ly = s.lookY * 2;
+      blinkEye(r.eL, ex[0], ey, s.blink, lx, ly); blinkEye(r.eR, ex[1], ey, s.blink, lx, ly); T(r.eye_wide, `translate(${lx} ${ly})`);
+      if (r.brows) { const up = s.mood === 'surprised' ? -3 : s.mood === 'happy' || s.mood === 'love' ? -1 : s.mood === 'sleep' ? 2 : 0; T(r.brows, `translate(${lx * .5} ${up + ly * .4})`); }
+      faces(r, s, this);
+      // queue : part vers le haut, s'enroule ; fouette en courant, se hérisse en sursaut
+      const base = -0.55 + Math.sin(s.t * 1.7) * .25 + Math.sin(ph) * .35 * w - (s.mood === 'surprised' ? .7 : 0) + s.sit * .55;
+      const pts = chain(r.tailS || (r.tailS = {}), 7, 5.2, 77, 99 + bob, base, -0.24 + Math.sin(s.t * 2.3) * .06, 9, dt);
+      r.tail.setAttribute('d', smoothPath(pts)); r.tailTip.setAttribute('d', smoothPath(pts.slice(-3)));
+      // accessoires à ressort : grelot, pans d'écharpe, pompon
+      r.acc = r.acc || { a: { x: 0, v: 0 }, b: { x: 0, v: 0 }, pv: 0 };
+      const jv = s.jumpV || 0, kick = jv - r.acc.pv; r.acc.pv = jv;
+      r.acc.a.v += kick * .35; r.acc.b.v -= kick * .25;
+      const sw = spring(r.acc.a, -s.lean * 2.2 - Math.sin(ph) * 10 * w, 90, 5, dt), sw2 = spring(r.acc.b, s.lean * 1.8 + Math.sin(s.t * 3) * 3, 70, 4, dt);
+      if (r.bell) T(r.bell, `translate(0 ${(bob + s.sit * 2).toFixed(2)}) ` + about(60, 80, `rotate(${sw.toFixed(1)})`));
+      if (r.scarfEnd) T(r.scarfEnd, about(67, 81, `rotate(${(sw * 1.2 + 6).toFixed(1)})`));
+      if (r.scarf) T(r.scarf, `translate(0 ${(bob + s.sit * 2).toFixed(2)})`);
+      if (r.pom) T(r.pom, about(60, 21, `rotate(${(sw2 * 1.6 - s.lookX * 6).toFixed(1)})`));
+    },
+  };
+}
+
+// ---------------------------------------------------------------- MISO — le siamois, grands yeux bleus, toujours un peu étonné
+MASCOTS.push(makeCat({
+  id: 'miso', name: 'Miso', who: 'Le siamois : masque chocolat, immenses yeux bleu glacier, minuscules pupilles. Il a toujours l’air un peu étonné.',
+  ears: 'tall', headRx: 30.5, headRy: 28,
+  fur: ['#fffaf2', '#f1e2cc', '#c9ab88'], cream: ['#e9d3b6', '#b98c66'], earIn: ['#c98f86', '#8d5148'], muzzleOp: .55,
+  fluff: '#ead8bf', rim: '#ffffff', line: '#3b2418', nose: '#4a2c22', whisker: '#fff', paw: '#6a4433', tail: ['#6a4433', '#3f2519'], blush: '#f5a0b4', shine: .55,
+  ear: (u) => `url(#ear${u})`,
+  defs: (u) => `<radialGradient id="ear${u}" cx="50%" cy="20%" r="90%"><stop offset="0" stop-color="#5a3a2c"/><stop offset="1" stop-color="#2f1d15"/></radialGradient>
+    <radialGradient id="mask${u}" cx="50%" cy="64%" r="52%"><stop offset="0" stop-color="#4e3124" stop-opacity="1"/><stop offset=".5" stop-color="#5f3f2f" stop-opacity=".85"/><stop offset=".78" stop-color="#7a5642" stop-opacity=".35"/><stop offset="1" stop-color="#8a6450" stop-opacity="0"/></radialGradient>`,
+  marks: (u) => `<ellipse cx="60" cy="58" rx="25" ry="21.5" fill="url(#mask${u})"/>`,
+  eye: { dx: 13.5, y: 51.5, rx: 8.4, ry: 9.2, iris: ['#e6f7ff', '#6cc1ff', '#1f5fbf'], ring: '#173f86', pupil: 'round', pr: 2.1 },
+  brows: '#2f1d15', oSmall: true, mouthMap: { neutral: 'o', listen: 'o', think: 'o' },
+  neck: (u) => `<g data-r="bell"><path d="M44 79.5 Q60 86 76 79.5" stroke="#f75632" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="60" cy="85.5" r="3.6" fill="#ffcf4a"/><circle cx="58.9" cy="84.4" r="1.2" fill="#fff" opacity=".8"/><path d="M58.3 87 H61.7" stroke="#a87a1a" stroke-width="1"/></g>`,
+}));
+
+// ---------------------------------------------------------------- PISTON — le tigré mécano, lunettes d'aviateur sur le front
+MASCOTS.push(makeCat({
+  id: 'piston', name: 'Piston', who: 'Le tigré mécano, version poussée : lunettes d’aviateur relevées sur le front, salopette, clé dans la poche.',
+  fur: ['#ffdcab', '#f6a650', '#c9651f'], cream: ['#fffdf8', '#f1d6b8'], earIn: ['#ffcad8', '#f08aa8'], fluff: '#e8913f', rim: '#ffe6c4', line: '#5a2f1f', nose: '#ff7c9c', tail: ['#e48c3c', '#c4621f'],
+  marks: () => `<path d="M30.2 49.6 Q34 50.8 36.2 48.8 M29.8 55 Q34 55.6 36.7 53.8 M89.8 49.6 Q86 50.8 83.8 48.8 M90.2 55 Q86 55.6 83.3 53.8" stroke="#c4621f" stroke-width="2.1" fill="none" stroke-linecap="round" opacity=".7"/>`,
+  eye: { dx: 13, y: 53, rx: 7, ry: 8.3, iris: ['#b57a3c', '#43281a', '#160c06'], ring: '#160c06', pupil: 'none' },
+  defs: (u) => `<linearGradient id="o${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d98ff"/><stop offset="1" stop-color="#2350c2"/></linearGradient>
+    <radialGradient id="gl${u}g" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#d9fbff"/><stop offset=".5" stop-color="#6fc7e8"/><stop offset="1" stop-color="#256a8f"/></radialGradient>`,
+  body: (u) => `<path d="M40.3 93 Q41.3 108.8 60 109.8 Q78.7 108.8 79.7 93 Q78.2 87 72 87 L48 87 Q41.8 87 40.3 93Z" fill="url(#o${u})"/>
+    <rect x="50.5" y="81.5" width="19" height="13.5" rx="4.6" fill="url(#o${u})"/>
+    <path d="M46.6 77.5 L51.3 87.2 M73.4 77.5 L68.7 87.2" stroke="#2350c2" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="51.3" cy="87.2" r="1.9" fill="#ffd84d"/><circle cx="68.7" cy="87.2" r="1.9" fill="#ffd84d"/>
+    <rect x="55" y="88.5" width="10" height="7" rx="2.2" fill="#1b46ad" opacity=".55"/>
+    <path d="M60.5 88.3 L64.8 81.5" stroke="#d6dbe6" stroke-width="2.3" stroke-linecap="round"/><path d="M63 80.6 a2.4 2.4 0 1 0 3.6 1.8" fill="none" stroke="#d6dbe6" stroke-width="2"/>`,
+  hat: (u) => `<path d="M29 35 Q60 23 91 35" stroke="#5a3a26" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+    <g><circle cx="49" cy="31" r="8.2" fill="#c9a04a"/><circle cx="49" cy="31" r="6.2" fill="url(#gl${u}g)"/><path d="M45.5 28.5 Q48 26.5 51 27.5" stroke="#fff" stroke-width="1.6" fill="none" opacity=".85" stroke-linecap="round"/>
+      <circle cx="71" cy="31" r="8.2" fill="#c9a04a"/><circle cx="71" cy="31" r="6.2" fill="url(#gl${u}g)"/><path d="M67.5 28.5 Q70 26.5 73 27.5" stroke="#fff" stroke-width="1.6" fill="none" opacity=".85" stroke-linecap="round"/>
+      <path d="M57.2 31 Q60 29 62.8 31" stroke="#c9a04a" stroke-width="2.4" fill="none"/></g>`,
+}));
+
+// ---------------------------------------------------------------- RÉGLISSE — le chat noir, yeux d'or, écharpe Bony
+MASCOTS.push(makeCat({
+  id: 'reglisse', name: 'Réglisse', who: 'Le chat noir élégant : reflets violets, yeux vert-or en amande, écharpe tricotée aux couleurs Bony qui flotte au vent.',
+  ears: 'normal', fur: ['#5d5670', '#2a2535', '#100d16'], cream: ['#3d3749', '#24202e'], earIn: ['#c98aa6', '#8e4e6c'], fluff: '#2a2535', rim: '#b79cff', line: '#e9e2ff', nose: '#c97a99', tail: ['#262131', '#141119'], blush: '#d06b98', shine: .3, muzzleOp: .9,
+  eye: { dx: 13.5, y: 52, rx: 7.6, ry: 7.4, iris: ['#fbffc2', '#c7e04a', '#5f8a14'], ring: '#3c5a0c', pupil: 'slit', pw: 1.7 },
+  neck: (u) => `<g data-r="scarf"><path d="M40 79 Q60 89 80 79 L79 85 Q60 94 41 85Z" fill="#f75632"/><path d="M44 81.5 Q60 89.5 76 81.5" stroke="#ffb07a" stroke-width="1.4" fill="none" stroke-dasharray="2 2.4"/><path d="M41 84.5 Q60 92.5 79 84.5" stroke="#c43d1d" stroke-width="1.2" fill="none"/>
+    <g data-r="scarfEnd"><path d="M64 84 Q70 92 67 104 L74 103 Q77 92 70 83Z" fill="#f75632"/><path d="M67.5 99 H73.5 M67.8 102 H74" stroke="#7c4dff" stroke-width="1.8"/><path d="M67 104 l.5 2.5 M69.5 103.8 l.2 2.6 M72 103.6 l.5 2.5" stroke="#f75632" stroke-width="1.3" stroke-linecap="round"/></g></g>`,
+}));
+
+// ---------------------------------------------------------------- TRICOT — la calico au bonnet à pompon
+MASCOTS.push(makeCat({
+  id: 'tricot', name: 'Tricot', who: 'La calico tricolore, bonnet violet Bony à pompon orange qui ballotte, yeux ambre tout ronds. La plus douce.',
+  ears: 'round', fur: ['#ffffff', '#f4efe9', '#d3cbc1'], cream: ['#ffffff', '#efe6dc'], earIn: ['#ffc8d6', '#f08aa8'], fluff: '#efe8e0', rim: '#ffffff', line: '#5a3a2a', nose: '#ff8fa6', tail: ['#f2a04e', '#3d3a42'], shine: .6,
+  defs: (u) => `<linearGradient id="bn${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a72ff"/><stop offset="1" stop-color="#5a2fd6"/></linearGradient>
+    <radialGradient id="pp${u}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#ffc08a"/><stop offset="1" stop-color="#f2621f"/></radialGradient>`,
+  marks: () => `<path d="M30 40 Q34 26 48 25 Q50 36 44 46 Q36 50 30 47Z" fill="#f2a04e" opacity=".95"/><path d="M73 26 Q86 28 90 42 Q86 49 78 46 Q72 38 73 26Z" fill="#3d3a42" opacity=".92"/><ellipse cx="82" cy="60" rx="7" ry="5" fill="#f2a04e" opacity=".8"/>`,
+  earMarkL: '', earMarkR: '',
+  body: (u) => `<ellipse cx="60" cy="96" rx="12" ry="11" fill="url(#c${u})"/><path d="M41 86 Q46 80 54 82 Q50 92 42 95Z" fill="#3d3a42" opacity=".9"/><path d="M70 98 Q78 92 81 99 Q76 106 69 104Z" fill="#f2a04e" opacity=".9"/>`,
+  eye: { dx: 13, y: 53, rx: 7.2, ry: 8, iris: ['#ffe3a0', '#e39a2e', '#7a4310'], ring: '#5a300a', pupil: 'round', pr: 3.7 },
+  hat: (u) => `<path d="M33 37 Q33 14 60 13 Q87 14 87 37 Q60 30 33 37Z" fill="url(#bn${u})"/>
+    <path d="M40 22 V34 M46 18 V32 M53 15.5 V31 M60 15 V30.5 M67 15.5 V31 M74 18 V32 M80 22 V34" stroke="#4a24b8" stroke-width="1.3" opacity=".5"/>
+    <path d="M31 37.5 Q60 28 89 37.5 L89.5 42 Q60 33.5 30.5 42Z" fill="#7c4dff"/><path d="M33 39.5 Q60 31 87 39.5" stroke="#b49bff" stroke-width="1.2" stroke-dasharray="2 2" fill="none"/>
+    <g data-r="pom"><circle cx="60" cy="10" r="6.5" fill="url(#pp${u})"/><circle cx="58" cy="8" r="2" fill="#fff" opacity=".5"/></g>`,
+}));
+
+
+// =====================================================================
+// RIG — moteur commun : ressorts (écrasement, inclinaison, regard, oreilles), saut avec préparation, clignement
+// =====================================================================
+let UID = 0;
+class Rig {
+  constructor(def, size = 100) {
+    this.el = document.createElement('div'); this.el.className = 'rig'; this.el.style.width = this.el.style.height = size + 'px';
+    this.set(def);
+    this.s = { t: Math.random() * 10, ph: 0, walk: 0, lean: 0, sx: 1, sy: 1, jumpY: 0, jumpV: 0, lookX: 0, lookY: 0, blink: 0, wave: 0, wph: 0, sit: 0, tilt: 0, earL: 0, earR: 0, mood: 'neutral' };
+    this.k = { sq: { x: 1, v: 0 }, lean: { x: 0, v: 0 }, earL: { x: 0, v: 0 }, earR: { x: 0, v: 0 }, tilt: { x: 0, v: 0 } };
+    this.air = false; this.crouch = 0; this.nextBlink = 1 + Math.random() * 2; this.blinkT = 0; this.nextTwitch = 2; this.nextTilt = 3; this.tiltTarget = 0;
+  }
+  set(def) {
+    this.def = def; const u = ++UID;
+    this.el.innerHTML = `<svg viewBox="0 0 120 120">${def.svg(u)}</svg>`;
+    this.r = {}; this.el.querySelectorAll('[data-r]').forEach((n) => (this.r[n.dataset.r] = n));
+  }
+  jump(power = 230) { if (this.air || this.crouch > 0) return; this.crouch = .13; this.power = power; }
+  startle() { this.air = true; this.s.jumpV = 170; this.k.sq.v += 3; this.k.earL.v -= 260; this.k.earR.v -= 260; }
+  update(dt, inp = {}) {
+    const s = this.s, k = this.k; s.t += dt;
+    const speed = Math.abs(inp.vx || 0);
+    s.walk = lerp(s.walk, clamp(speed / 40, 0, 1), Math.min(1, dt * 8));
+    s.ph += speed * dt * .2;
+    s.lean = spring(k.lean, clamp((inp.vx || 0) * .09, -10, 10) * (inp.facing || 1), 90, 12, dt);
+    s.lookX = lerp(s.lookX, clamp(inp.lx || 0, -1, 1), Math.min(1, dt * 7)); s.lookY = lerp(s.lookY, clamp(inp.ly || 0, -1, 1), Math.min(1, dt * 7));
+    s.mood = inp.mood || 'neutral';
+    // saut : préparation (accroupi) → envol (étiré) → atterrissage (écrasé, rebond)
+    let sqT = 1 + Math.sin(s.t * 2.4) * .012;
+    if (this.crouch > 0) { this.crouch -= dt; sqT = .76; if (this.crouch <= 0) { this.air = true; s.jumpV = this.power; } }
+    if (this.air) { s.jumpV -= 900 * dt; s.jumpY += s.jumpV * dt; sqT = 1 + clamp(s.jumpV / 1600, -.06, .14); if (s.jumpY <= 0) { s.jumpY = 0; this.air = false; k.sq.v -= Math.min(4.5, Math.abs(s.jumpV) / 70); s.jumpV = 0; k.earL.v += 200; k.earR.v += 200; } }
+    sqT -= s.sit * .05 + (inp.mood === 'sleep' ? .03 : 0);
+    s.sy = spring(k.sq, sqT, 260, 13, dt); s.sx = 1 + (1 - s.sy) * .75;
+    // clignement
+    if (s.t > this.nextBlink && inp.mood !== 'sleep') { this.blinkT = .17; this.nextBlink = s.t + (this.def.chill ? 3.5 : 2) + Math.random() * 3.5; if (Math.random() < .2) this.nextBlink = s.t + .3; }
+    if (this.blinkT > 0) { this.blinkT -= dt; s.blink = Math.sin(Math.PI * clamp(1 - this.blinkT / .17, 0, 1)); } else s.blink = 0;
+    // salut, assis
+    s.wave = lerp(s.wave, inp.wave ? 1 : 0, Math.min(1, dt * 9)); s.wph += dt * 15;
+    s.sit = lerp(s.sit, inp.sit ? 1 : 0, Math.min(1, dt * 6));
+    // oreilles : frémissement aléatoire, couchées en dormant, dressées en surprise
+    if (s.t > this.nextTwitch) { (Math.random() < .5 ? k.earL : k.earR).v += 300 * (Math.random() < .5 ? 1 : -1); this.nextTwitch = s.t + 2.5 + Math.random() * 4; }
+    const earT = inp.mood === 'sleep' ? 10 : inp.mood === 'surprised' ? -8 : 0;
+    s.earL = spring(k.earL, earT, 140, 9, dt); s.earR = spring(k.earR, earT, 140, 9, dt);
+    // petite inclinaison de tête curieuse de temps en temps
+    if (s.t > this.nextTilt) { this.tiltTarget = this.tiltTarget ? 0 : (Math.random() < .5 ? -1 : 1) * (6 + Math.random() * 6); this.nextTilt = s.t + (this.tiltTarget ? 1.4 : 3 + Math.random() * 5); }
+    s.tilt = spring(k.tilt, inp.mood === 'think' ? 9 : this.tiltTarget, 60, 9, dt);
+    this.def.pose(this.r, s, dt);
+  }
+}
+
+// =====================================================================
+// BUDDY — la mascotte qui fait sa vie sur une piste (le Dock, ou la pilule du téléphone)
+// =====================================================================
+class Buddy {
+  constructor(host, track, opts = {}) {
+    this.host = host; this.track = track; this.size = opts.size || 100; this.onClick = opts.onClick;
+    this.def = MASCOTS[0]; this.x = opts.x || 0; this.dir = 1; this.vx = 0; this.target = null; this.mode = 'idle'; this.mood = 'neutral';
+    this.until = 0; this.auto = true; this.lastInteract = performance.now(); this.mouse = null; this.lastMouse = null; this.lastT = performance.now();
+    this.el = document.createElement('div'); this.el.className = 'buddy'; this.el.style.width = this.el.style.height = this.size + 'px';
+    this.rig = new Rig(this.def, this.size); this.el.append(this.rig.el); host.append(this.el);
+    this.bind(); requestAnimationFrame((t) => this.loop(t));
+  }
+  set(def) { this.def = def; this.rig.set(def); }
+  center() { const r = this.el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height * .55 }; }
+  bounds() { const h = this.host.getBoundingClientRect(), t = this.track.getBoundingClientRect(); return { left: t.left - h.left - this.size * .12, right: t.right - h.left - this.size * .88, top: t.top - h.top - this.size * .915 }; }
+  say(text, ms = 1800, cls = '') {
+    this.bubble?.remove(); const b = document.createElement('div'); b.className = 'bubble ' + cls; b.textContent = text; this.host.append(b);
+    const r = this.el.getBoundingClientRect(), h = this.host.getBoundingClientRect(), hover = this.def.hover ? this.size * .14 : 0;
+    b.style.left = (r.left - h.left + this.size / 2 - b.offsetWidth / 2) + 'px'; b.style.top = (r.top - h.top + this.size * .12 - hover - b.offsetHeight) + 'px';
+    this.bubble = b; clearTimeout(this.bt); if (ms) this.bt = setTimeout(() => b.remove(), ms);
+  }
+  fx(html, dx, anim, dy = 0) { const r = this.el.getBoundingClientRect(), h = this.host.getBoundingClientRect(), n = document.createElement('div'); n.className = 'fx'; n.innerHTML = html; n.style.left = (r.left - h.left + this.size / 2 + dx) + 'px'; n.style.top = (r.top - h.top + this.size * .2 + dy) + 'px'; n.style.animation = anim; this.host.append(n); setTimeout(() => n.remove(), 2400); }
+  hearts() { [-20, 0, 20].forEach((d, i) => setTimeout(() => this.fx('<svg width="18" height="16" viewBox="0 0 18 16"><path d="M9 15C-3 7 2-2 9 4c7-6 12 3 0 11z" fill="#ff4f8b"/></svg>', d - 9, 'rise 1.1s ease-out forwards'), i * 110)); }
+  act(mode, o = {}) {
+    const now = performance.now(); this.lastInteract = now; if (!o.keep) this.bubble?.remove(); this.mode = mode; this.until = 0;
+    const set = (mood, ms) => { this.mood = mood; if (ms) this.until = now + ms; };
+    if (mode === 'idle') set('neutral');
+    if (mode === 'walk') { const b = this.bounds(); this.target = o.to ?? b.left + Math.random() * (b.right - b.left); set('neutral'); }
+    if (mode === 'wave') { set('happy', 1800); this.say(o.text || 'Coucou Théo !'); }
+    if (mode === 'jump') { set('happy', 900); this.rig.jump(o.power || 230); if (o.hearts !== false) setTimeout(() => this.hearts(), 160); }
+    if (mode === 'love') { set('love', 1800); this.rig.jump(150); this.hearts(); }
+    if (mode === 'think') { set('think', 2600); this.say('• • •', 2600, 'dots'); }
+    if (mode === 'alert') { set('surprised', 2400); this.rig.startle(); this.say('!', 2400, 'bang'); this.mode = 'wave'; }
+    if (mode === 'startle') { set('surprised', 1000); this.rig.startle(); this.say(o.text || '!', 1000, o.text ? '' : 'bang'); }
+    if (mode === 'sleep') { set('sleep'); this.zzz(); }
+    if (mode === 'drag') { set('surprised'); this.say('Hééé !', 900); }
+    if (mode === 'listen') set('neutral');
+    if (mode === 'chase') set('happy');
+  }
+  zzz() { if (this.mode !== 'sleep') return; this.fx('<b style="font:800 15px Albert Sans;color:#d6ceff">z</b>', 16, 'zz 1.9s ease-out forwards', -10); setTimeout(() => this.zzz(), 950); }
+  wakeJolt(text) { this.forcedSleep = false; this.act('startle', { text: this.mode === 'sleep' ? text || 'Hein ?!' : '' }); }
+  bind() {
+    let down = null;
+    this.el.addEventListener('pointerenter', () => { this.hover = true; });
+    this.el.addEventListener('pointerleave', () => { this.hover = false; });
+    this.el.addEventListener('pointerdown', (e) => { down = { x: e.clientX, x0: this.x, moved: false }; this.el.setPointerCapture(e.pointerId); });
+    this.el.addEventListener('pointermove', (e) => {
+      if (!down) return; const dx = e.clientX - down.x;
+      if (!down.moved && Math.abs(dx) > 6) { down.moved = true; this.el.classList.add('drag'); this.act('drag'); }
+      if (down.moved) { const nx = down.x0 + dx; this.vx = (nx - this.x) * 30; this.dir = nx >= this.x ? 1 : -1; this.x = nx; }
+    });
+    this.el.addEventListener('pointerup', () => {
+      if (!down) return; const moved = down.moved; down = null; this.el.classList.remove('drag');
+      if (moved) { this.act('idle'); this.rig.k.sq.v -= 3.5; this.mood = 'surprised'; this.until = performance.now() + 500; return; }
+      if (this.mode === 'sleep') { this.act('startle', { text: 'Hein ? Je ne dormais pas !' }); return; }
+      this.act('jump'); setTimeout(() => this.onClick?.(this), 420);
+    });
+    this.host.addEventListener('pointermove', (e) => {
+      const now = performance.now(), p = { x: e.clientX, y: e.clientY, t: now };
+      const v = this.lastMouse ? Math.hypot(p.x - this.lastMouse.x, p.y - this.lastMouse.y) / Math.max(1, now - this.lastMouse.t) : 0;
+      this.lastMouse = p; this.mouse = p;
+      const c = this.center();
+      if (v > 3 && Math.hypot(p.x - c.x, p.y - c.y) < 120 && ['idle', 'walk', 'chase'].includes(this.mode) && now - (this.startledAt || 0) > 4000) { this.startledAt = now; this.act('startle', { text: 'Wouah !' }); }
+    });
+    this.host.addEventListener('pointerleave', () => { this.mouse = null; });
+  }
+  loop(t) {
+    const dt = Math.min(.05, (t - this.lastT) / 1000); this.lastT = t;
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (this.until && t > this.until) { this.until = 0; this.act(document.querySelector('.chat') && this.host.id === 'stage' ? 'listen' : 'idle'); }
+    // poursuite : la souris longe le Dock
+    let want = 0;
+    if (this.mouse && this.auto && !reduced && !this.hover && !this.forcedSleep && ['idle', 'walk', 'chase'].includes(this.mode)) {
+      const tr = this.track.getBoundingClientRect(), near = this.mouse.y > tr.top - 80 && this.mouse.y < tr.bottom + 10 && this.mouse.x > tr.left - 30 && this.mouse.x < tr.right + 30;
+      if (near) { const h = this.host.getBoundingClientRect(), tx = this.mouse.x - h.left - this.size / 2; if (Math.abs(tx - this.x) > 22) { if (this.mode !== 'chase') this.act('chase'); this.target = tx; } else if (this.mode === 'chase') { this.act('idle'); this.mood = 'happy'; } }
+      else if (this.mode === 'chase') this.act('idle');
+    }
+    if ((this.mode === 'walk' || this.mode === 'chase') && this.target != null) {
+      const d = this.target - this.x, sp = this.def.speed * (this.mode === 'chase' ? 2.4 : 1);
+      want = Math.abs(d) < 3 ? 0 : Math.sign(d) * Math.min(sp, Math.abs(d) * 4);
+      if (this.mode === 'walk' && Math.abs(d) < 3) this.act('idle');
+    }
+    if (this.mode !== 'drag') { this.vx = lerp(this.vx, want, Math.min(1, dt * 6)); this.x += this.vx * dt; }
+    if (Math.abs(this.vx) > 4) this.dir = this.vx > 0 ? 1 : -1;
+    // regard : vers la souris (repère local, donc inversé si elle regarde à gauche)
+    let lx = 0, ly = 0;
+    if (this.mouse && this.mood !== 'sleep') { const c = this.center(), dx = this.mouse.x - c.x, dy = this.mouse.y - c.y, d = Math.hypot(dx, dy) || 1; lx = clamp(dx / Math.max(80, d), -1, 1) * this.dir; ly = clamp(dy / Math.max(80, d), -1, 1); }
+    if (this.hover && ['idle', 'listen'].includes(this.mode) && !this.until) this.mood = 'happy';
+    else if (!this.hover && this.mood === 'happy' && this.mode === 'idle' && !this.until) this.mood = 'neutral';
+    // vie automatique
+    if (this.auto && !this.hover && this.mode === 'idle' && !reduced && !this.forcedSleep) {
+      if (t - this.lastInteract > 25000) this.act('sleep');
+      else if (Math.random() < dt / 4.5) { const r = Math.random(); if (r < .58) this.act('walk'); else if (r < .72) this.act('wave', { text: ['On bosse sur quoi ?', 'Il fait beau, non ?', 'Coucou !', 'Besoin d’un coup de patte ?'][Math.floor(Math.random() * 4)] }); else if (r < .86) this.act('think'); else this.act('jump', { hearts: false, power: 170 }); }
+    }
+    const b = this.bounds(); this.x = clamp(this.x, b.left, b.right);
+    this.el.style.transform = `translate(${this.x.toFixed(1)}px, ${b.top.toFixed(1)}px)`; this.rig.el.classList.toggle('flip', this.dir < 0);
+    this.rig.update(dt, { vx: this.mode === 'drag' ? this.vx * .3 : this.vx, facing: this.dir, lx, ly, mood: this.mood, wave: this.mode === 'wave' && !!this.until, sit: this.mode === 'sleep' || this.mode === 'listen' });
+    requestAnimationFrame((tt) => this.loop(tt));
+  }
+}
+
+// =====================================================================
+// PAGE
+// =====================================================================
+const APPS = [['#f75632', '#c2185b'], ['#8f12ab', '#5b1bd1'], ['#34c77b', '#12806b'], ['#2f7cf6', '#293f74'], ['#ff8a3d', '#f75632'], ['#a78bfa', '#673ab7'], ['#34c7ff', '#1e6fd9'], ['#ff5fa2', '#8f12ab'], ['#ff5d5d', '#d62f5b'], ['#f5a524', '#f75632'], ['#7c8aa5', '#3b4863']];
+const dock = document.getElementById('dock'); dock.innerHTML = APPS.map((c) => `<i style="background:linear-gradient(135deg,${c[0]},${c[1]})"></i>`).join('');
+const stage = document.getElementById('stage');
+let chatEl = null, chatRig = null;
+const answers = [
+  [/retard/i, 'Vous avez 16 projets en retard. Les plus urgents : VP Le Puy (échéance dépassée de 3 j) et Trailer Stricker. Je vous ouvre la liste ?'],
+  [/budget|clermont/i, 'Budget Clermont 2026 : 412 k€ engagés sur 380 k€ prévus (108 %). Le poste le plus lourd : OP Clients.'],
+  [/post|publi|rédig/i, 'Proposition : « Portes ouvertes Renault Clermont ce samedi 🚗 Essais de la nouvelle R5 E-Tech, café offert ! » — je l’ajoute en brouillon dans Digital ?'],
+];
+function openChat(b) {
+  if (chatEl) return;
+  chatEl = document.createElement('div'); chatEl.className = 'chat';
+  chatEl.innerHTML = `<header><span class="hav"></span><b>${b.def.name}<span>Assistant Gearbox · se souvient de vous</span></b><button data-x aria-label="Fermer">×</button></header>
+    <div class="msgs"><div class="m ai">Bonjour Théo 👋 Hier on parlait du salon de Rouchy. On reprend, ou autre chose ?</div></div>
+    <div class="chips"><button>Projets en retard</button><button>Budget Clermont</button><button>Rédiger un post</button></div>
+    <form><input placeholder="Demandez-moi quelque chose…"><button aria-label="Envoyer">↑</button></form>`;
+  stage.append(chatEl);
+  chatRig = new Rig(b.def, 40); chatEl.querySelector('.hav').replaceWith(chatRig.el);
+  const r = b.el.getBoundingClientRect(), h = stage.getBoundingClientRect();
+  chatEl.style.left = clamp(r.left - h.left + b.size / 2 - chatEl.offsetWidth / 2, 12, h.width - chatEl.offsetWidth - 12) + 'px';
+  chatEl.style.top = (r.top - h.top - chatEl.offsetHeight + b.size * .05) + 'px';
+  b.act('listen');
+  const msgs = chatEl.querySelector('.msgs'), input = chatEl.querySelector('input');
+  const send = (q) => {
+    if (!q.trim()) return; msgs.insertAdjacentHTML('beforeend', '<div class="m me"></div>'); msgs.lastChild.textContent = q; input.value = '';
+    msgs.insertAdjacentHTML('beforeend', '<div class="m ai typing">• • •</div>'); msgs.scrollTop = 1e6; b.act('think');
+    setTimeout(() => { msgs.querySelector('.typing')?.remove(); const a = answers.find(([re]) => re.test(q)); msgs.insertAdjacentHTML('beforeend', '<div class="m ai"></div>'); msgs.lastChild.textContent = a ? a[1] : 'Je regarde ça dans Gearbox… (maquette : réponse fictive)'; msgs.scrollTop = 1e6; b.act('jump', { hearts: false, power: 150 }); }, 1300);
+  };
+  chatEl.querySelector('form').onsubmit = (e) => { e.preventDefault(); send(input.value); };
+  chatEl.querySelectorAll('.chips button').forEach((c) => (c.onclick = () => send(c.textContent)));
+  chatEl.querySelector('[data-x]').onclick = () => { const c = chatEl; chatEl = null; chatRig = null; c.classList.add('out'); setTimeout(() => c.remove(), 220); b.act('wave', { text: 'À plus tard !' }); };
+}
+const buddy = new Buddy(stage, dock, { size: 100, x: 260, onClick: openChat });
+
+dock.addEventListener('click', (e) => {
+  const i = e.target.closest('i'); if (!i) return;
+  i.classList.remove('bounce'); void i.offsetWidth; i.classList.add('bounce');
+  const ir = i.getBoundingClientRect(), c = buddy.center(); buddy.dir = ir.left + ir.width / 2 > c.x ? 1 : -1;
+  if (Math.abs(ir.left + ir.width / 2 - c.x) < 160) buddy.act('startle', { text: 'Oh !' }); else buddy.act('jump', { hearts: false, power: 160 });
+});
+let fs = false, peekT = 0;
+const fsBtn = document.getElementById('fsBtn');
+function setFs(on) {
+  fs = on; stage.classList.toggle('fs', on); stage.classList.remove('peek'); fsBtn.classList.toggle('on', on); fsBtn.textContent = on ? 'Quitter le plein écran' : 'Plein écran';
+  if (chatEl) chatEl.querySelector('[data-x]').click();
+  if (on) { buddy.forcedSleep = true; buddy.act('sleep'); } else buddy.wakeJolt('Me revoilà !');
+}
+document.getElementById('edge').addEventListener('pointerenter', () => {
+  if (!fs || stage.classList.contains('peek')) return;
+  stage.classList.add('peek'); setTimeout(() => buddy.wakeJolt('Hein ?!'), 110);
+});
+stage.addEventListener('pointermove', (e) => {
+  if (!fs || !stage.classList.contains('peek')) return;
+  const h = stage.getBoundingClientRect(); clearTimeout(peekT);
+  if (e.clientY < h.bottom - 130) peekT = setTimeout(() => { stage.classList.remove('peek'); buddy.forcedSleep = true; buddy.act('sleep'); }, 700);
+});
+
+// choix (chaque carte a sa mascotte vivante, qui suit la souris des yeux)
+const picks = document.getElementById('picks'), pickRigs = [];
+let gMouse = null; addEventListener('pointermove', (e) => { gMouse = { x: e.clientX, y: e.clientY }; });
+MASCOTS.forEach((m, i) => {
+  const b = document.createElement('button'); b.className = 'card pick' + (i === 0 ? ' on' : '');
+  b.innerHTML = `<span class="stagebox"></span><div><b>${m.name}</b><span>${m.who}</span></div>`;
+  const rig = new Rig(m, 100); b.querySelector('.stagebox').append(rig.el); pickRigs.push(rig);
+  b.onclick = () => { picks.querySelectorAll('.pick').forEach((x) => x.classList.toggle('on', x === b)); buddy.set(m); phoneBuddy.set(m); buildMoods(m); buddy.act('jump'); rig.jump(); };
+  picks.append(b);
+});
+document.getElementById('ctl').addEventListener('click', (e) => {
+  const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+  if (a === 'fs') return setFs(!fs);
+  if (a === 'chat') return openChat(buddy);
+  buddy.forcedSleep = false; buddy.act(a);
+});
+document.getElementById('auto').onchange = (e) => { buddy.auto = e.target.checked; };
+
+// mimiques : chaque carte joue un état en boucle
+const MOODS = [
+  ['Marche', 'fait sa vie sur le Dock', (r, t) => ({ vx: 40 })],
+  ['Repos', 'respire, cligne, curieux', () => ({ mood: 'neutral' })],
+  ['Course', 'après la souris', () => ({ vx: 120, mood: 'happy' })],
+  ['Salut', 'au survol, à l’arrivée', () => ({ mood: 'happy', wave: true })],
+  ['Saut', 'préparation, envol, rebond', (r, t, st) => { if (t - st.last > 1.5) { st.last = t; r.jump(); } return { mood: 'happy' }; }],
+  ['Câlin', 'après un clic', (r, t, st) => { if (t - st.last > 1.8) { st.last = t; r.jump(140); } return { mood: 'love' }; }],
+  ['Réflexion', 'pendant la réponse', (r, t) => ({ mood: 'think', lx: Math.sin(t * .9) * .6, ly: -.8 })],
+  ['Sursaut', 'Dock qui remonte, souris en trombe', (r, t, st) => { if (t - st.last > 2) { st.last = t; r.startle(); } return { mood: t - st.last < .9 ? 'surprised' : 'neutral' }; }],
+  ['Dodo', 'oublié, plein écran, Ne pas déranger', () => ({ mood: 'sleep', sit: true })],
+  ['Écoute', 'assistant ouvert', (r, t) => ({ mood: 'neutral', sit: true, lx: .5, ly: -.3 })],
+];
+let moodRigs = [];
+function buildMoods(m) {
+  const box = document.getElementById('moods'); box.innerHTML = '';
+  moodRigs = MOODS.map(([title, d, fn]) => { const c = document.createElement('div'); c.className = 'card mood'; c.innerHTML = `<span class="stagebox"></span><b>${title}</b><span>${d}</span>`; const r = new Rig(m, 108); c.querySelector('.stagebox').append(r.el); box.append(c); return { r, fn, st: { last: -9 } }; });
+}
+buildMoods(MASCOTS[0]);
+let lastT = performance.now();
+function tick(t) {
+  const dt = Math.min(.05, (t - lastT) / 1000); lastT = t;
+  pickRigs.forEach((rig) => { let lx = 0, ly = 0; if (gMouse) { const r = rig.el.getBoundingClientRect(), dx = gMouse.x - (r.left + r.width / 2), dy = gMouse.y - (r.top + r.height / 2), d = Math.hypot(dx, dy) || 1; lx = clamp(dx / Math.max(90, d), -1, 1); ly = clamp(dy / Math.max(90, d), -1, 1); } rig.update(dt, { lx, ly }); });
+  moodRigs.forEach((m) => { const inp = m.fn(m.r, m.r.s.t, m.st) || {}; m.r.update(dt, inp); });
+  if (chatRig) chatRig.update(dt, { mood: 'happy' });
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+const psheet = document.getElementById('psheet');
+const phoneBuddy = new Buddy(document.getElementById('pscreen'), document.getElementById('ppill'), {
+  size: 64, x: 110,
+  onClick: (b) => {
+    document.getElementById('pchat').innerHTML = `<div style="padding:6px 16px 8px;font-weight:700">${b.def.name} <span style="color:#a39db0;font-weight:500;font-size:12px">· assistant</span></div>
+      <div style="padding:0 14px;font-size:12.5px"><div style="background:rgba(255,255,255,.08);padding:8px 10px;border-radius:14px;max-width:85%">Bonjour Théo 👋 Que puis-je faire pour vous ?</div></div>
+      <div style="margin-top:auto;padding:10px;display:flex;gap:6px;border-top:1px solid rgba(255,255,255,.08)"><span style="flex:1;background:rgba(255,255,255,.08);border-radius:999px;padding:8px 12px;color:#a39db0;font-size:12px">Demandez-moi…</span><span style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#f75632,#c2185b)"></span></div>`;
+    psheet.classList.add('on'); setTimeout(() => document.addEventListener('pointerdown', function close(e) { if (!psheet.contains(e.target)) { psheet.classList.remove('on'); document.removeEventListener('pointerdown', close); } }), 50);
+  },
+});
+</script>
+</body>
+</html>
