@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Icon } from '../../ui/kit';
 import { driveDays, driveTimes, type Drive, type Field } from '../../../../shared/bonyform';
 import { pickImage } from './Studio';
+import { FrameEditor } from './Frame';
 
 // =====================================================================
 // Réglages du champ « Prise d'essai » (F3, 01/10/2026). Le parc est saisi DANS le formulaire (décision de
@@ -17,6 +18,8 @@ export default function DriveEditor({ f, set }: { f: Field; set: Set }) {
   const d = f.drive!;
   const up = (fn: (x: Drive) => void) => set((x) => { fn(x.drive!); });
   const [ex, setEx] = useState('');
+  const [frK, setFrK] = useState<number | null>(null);    // F5 : voiture dont on règle le cadrage de la photo
+  const frC = frK !== null ? d.cars[frK] : undefined;
   const days = driveDays(d), slots = days.reduce((n, day) => n + driveTimes(d, day).length, 0);
   const fleet = d.cars.reduce((n, c) => n + (c.count || 0), 0);
   return (
@@ -25,11 +28,14 @@ export default function DriveEditor({ f, set }: { f: Field; set: Set }) {
       {d.cars.map((c, k) => (
         <div key={c.id} className="bfd-car">
           <button className="bfd-img" style={c.image ? { backgroundImage: `url("${c.image}")` } : undefined} aria-label="Photo" data-tip="Photo (facultatif)"
-            onClick={async () => { const u = await pickImage(900); if (u) up((x) => { x.cars[k].image = u; }); }}>{c.image ? null : <Icon name="image" size="sm" />}</button>
+            onClick={async () => { const u = await pickImage(900); if (u) up((x) => { x.cars[k].image = u; delete x.cars[k].frame; }); }}>{c.image ? null : <Icon name="image" size="sm" />}</button>
+          {c.image ? <button className="icon-btn sm" aria-label="Cadrer" data-tip="Cadrer la photo" onClick={() => setFrK(frK === k ? null : k)}><Icon name="target" size="sm" /></button> : null}
           <input className="bfe-in" value={c.label} placeholder="ex. Renault 5 E-Tech" maxLength={60} onChange={(e) => up((x) => { x.cars[k].label = e.target.value; })} />
           <input className="bfe-in bfd-n" type="number" min={1} max={50} value={c.count} aria-label="Exemplaires" data-tip="Exemplaires disponibles" onChange={(e) => up((x) => { x.cars[k].count = Math.max(1, Math.min(50, Number(e.target.value) || 1)); })} />
           {d.cars.length > 1 ? <button className="icon-btn sm" aria-label="Retirer" onClick={() => up((x) => { x.cars.splice(k, 1); })}><Icon name="close" size="sm" /></button> : null}
         </div>))}
+      {frC?.image ? <FrameEditor url={frC.image} frame={frC.frame} ratio={4 / 3} label={`Cadrage — ${frC.label}`} onClose={() => setFrK(null)}
+        onChange={(fr) => up((x) => { const c = x.cars[frK!]; if (!c) return; if (fr) c.frame = fr; else delete c.frame; })} /> : null}
       <button className="btn sm" onClick={() => up((x) => { x.cars.push({ id: rid(), label: `Modèle ${x.cars.length + 1}`, count: 1 }); })}><Icon name="plus" size="sm" />Voiture</button>
       <div className="bfe-hint">Le nombre = exemplaires : 2 exemplaires = deux clients peuvent essayer ce modèle sur le même créneau.</div>
 

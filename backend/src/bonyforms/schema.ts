@@ -44,7 +44,24 @@ export interface Option {
   /** F2b : tuile illustrée — un emoji, ou une image (servie par le Worker). L'image l'emporte. */
   emoji?: string;
   image?: string | null;
+  /** F5 : cadrage de l'image (voir Frame). */
+  frame?: Frame | null;
 }
+
+/**
+ * F5 (07/10/2026) — cadrage d'une image dans son cadre imposé : point de cadrage en % de l'image (50/50 = centre), il
+ * reste en vue et sert de centre au zoom ; zoom de 1 à 3 ; « remplir » (recadre) ou « contenir » (image entière).
+ * Absent = centré, rempli, sans zoom : l'aspect d'avant F5.
+ */
+export interface Frame { x?: number; y?: number; zoom?: number; fit?: 'cover' | 'contain' }
+/** Cadrage → valeurs CSS SÛRES (nombres bornés, liste fermée) : position, taille, zoom. Une seule porte (Worker et Gearbox). */
+export function frameCss(f?: Frame | null) {
+  const n = (v: unknown, d: number, a: number, b: number) => { const x = Number(v); return Number.isFinite(x) ? Math.max(a, Math.min(b, x)) : d; };
+  const x = Math.round(n(f?.x, 50, 0, 100) * 10) / 10, y = Math.round(n(f?.y, 50, 0, 100) * 10) / 10;
+  return { pos: `${x}% ${y}%`, size: f?.fit === 'contain' ? 'contain' : 'cover', zoom: String(Math.round(n(f?.zoom, 1, 1, 3) * 100) / 100) };
+}
+/** Le cadrage change-t-il quelque chose ? (sinon on ne l'écrit pas) */
+export const isFramed = (f?: Frame | null) => !!f && (f.fit === 'contain' || (f.zoom ?? 1) !== 1 || (f.x ?? 50) !== 50 || (f.y ?? 50) !== 50);
 
 export type Op = 'eq' | 'neq' | 'in' | 'nin' | 'contains' | 'gt' | 'gte' | 'lt' | 'lte' | 'filled' | 'empty';
 export interface Rule { field: string; op: Op; value?: string | number | (string | number)[] }
@@ -103,7 +120,7 @@ export interface Field {
  * Réponse = `"<idVoiture>@<AAAA-MM-JJ>T<HH:MM>"`, heure de PARIS. Places : `count` exemplaires par voiture et par
  * créneau, et au plus `perSlot` voitures en même temps tous modèles confondus (équipe disponible).
  */
-export interface DriveCar { id: string; label: string; count: number; image?: string | null }
+export interface DriveCar { id: string; label: string; count: number; image?: string | null; frame?: Frame | null }
 export interface Drive {
   cars: DriveCar[];
   slot: 15 | 30 | 45 | 60 | 90 | 120;   // durée d'un créneau, en minutes
@@ -135,6 +152,7 @@ export interface Background {
   colors?: string[];          // dégradé : 2 ou 3 couleurs ; motif / animé : couleur des formes
   angle?: number;             // dégradé, en degrés
   image?: string | null;      // image : adresse (servie par le Worker, /a/<id>)
+  frame?: Frame | null;       // F5 : cadrage de l'image
   overlay?: number;           // image : voile de la couleur de fond, 0 à 0.9
   blur?: number;              // image : flou, 0 à 20 px
   pattern?: 'dots' | 'grid' | 'chevrons' | 'waves';
@@ -144,6 +162,7 @@ export interface Background {
 export interface Header {
   style: 'band' | 'banner' | 'hero' | 'split' | 'none';
   image?: string | null;      // bannière / plein écran / écran partagé
+  frame?: Frame | null;       // F5 : cadrage de l'image
   overlay?: number;           // plein écran : voile sous le titre, 0 à 0.9
   logoAlign?: 'left' | 'center';
 }
@@ -173,6 +192,10 @@ export interface Theme {
   logo?: Logo;
   /** Logo importé (image servie par le Worker) : remplace `logo` quand il est posé. */
   logoImage?: string | null;
+  /** F5 : hauteur du logo en px (18 à 90) ; absente = 30 px, la taille d'avant F5. */
+  logoSize?: number;
+  /** F5 : « repiquage » — pied de page charté Bony (logo Bony sur bandeau sombre). Absent = non. */
+  bonyFooter?: boolean;
   layout: 'page' | 'steps';   // page classique ou une question par écran
   // --- F2a : studio de personnalisation (tout est facultatif : resolveTheme complète)
   bg?: Background;
@@ -201,7 +224,7 @@ export function resolveTheme(t: Partial<Theme> | null | undefined): FullTheme {
   if (!x.header && x.headerImage) { header.style = 'banner'; header.image = x.headerImage; }
   return {
     preset: x.preset || 'bony', primary: x.primary || b.primary!, background: x.background || b.background!, surface: x.surface || b.surface!, text: x.text || b.text!,
-    font: x.font || 'Albert Sans', headingFont: x.headingFont ?? null, fontFiles: Array.isArray(x.fontFiles) ? x.fontFiles.slice(0, 8) : [], radius: x.radius ?? 16, logo: x.logo === undefined ? 'bony' : x.logo, logoImage: x.logoImage ?? null, layout: x.layout || 'page',
+    font: x.font || 'Albert Sans', headingFont: x.headingFont ?? null, fontFiles: Array.isArray(x.fontFiles) ? x.fontFiles.slice(0, 8) : [], radius: x.radius ?? 16, logo: x.logo === undefined ? 'bony' : x.logo, logoImage: x.logoImage ?? null, logoSize: x.logoSize ?? 30, bonyFooter: !!x.bonyFooter, layout: x.layout || 'page',
     bg: { ...DEF_BG, ...(x.bg || {}) }, header, typo: { ...DEF_TYPO, ...(x.typo || {}) },
     fields: x.fields || 'cards', inputs: x.inputs || 'outline', shadow: x.shadow ?? 1,
     buttons: { ...DEF_BUTTONS, ...(x.buttons || {}) }, motion: { ...DEF_MOTION, ...(x.motion || {}) },
@@ -217,11 +240,11 @@ export interface Settings {
   thankYou: { title: string; message: string; redirectUrl?: string | null;
     /** F2b : bouton d'action sous le message (ex. « Voir nos offres »). */
     button?: { label: string; url: string } | null;
-    image?: string | null };
+    image?: string | null; frame?: Frame | null };
   /** F3 : écrans de fin SELON la réponse — le premier dont la condition est remplie gagne, sinon `thankYou`. */
   endings?: Ending[];
   /** F2b : écran d'accueil avant la première question. */
-  welcome?: { enabled: boolean; title?: string; message?: string; button?: string; image?: string | null };
+  welcome?: { enabled: boolean; title?: string; message?: string; button?: string; image?: string | null; frame?: Frame | null };
   /** F2b : aperçu du lien partagé (WhatsApp, Facebook, LinkedIn, SMS…). Vide = titre, description, image d'en-tête. */
   share?: { title?: string; description?: string; image?: string | null };
   /** Accusé de réception par e-mail (F4) : champ e-mail destinataire. */
@@ -232,7 +255,7 @@ export interface Settings {
   closedMessage?: string;
 }
 
-export interface Ending { id: string; name?: string; when: Condition; title: string; message: string; button?: { label: string; url: string } | null; image?: string | null; redirectUrl?: string | null }
+export interface Ending { id: string; name?: string; when: Condition; title: string; message: string; button?: { label: string; url: string } | null; image?: string | null; frame?: Frame | null; redirectUrl?: string | null }
 
 export interface BonyFormDef {
   v: number;                  // SCHEMA_VERSION
@@ -275,7 +298,7 @@ export const THEMES: Record<string, Partial<Theme> & { l: string; bf?: string; b
 /** Applique une ambiance à un thème (garde la présentation choisie). */
 export function applyAmbiance(t: Theme, id: string): Theme {
   const { l: _l, bf: _bf, bhf: _bhf, ...a } = THEMES[id] || THEMES.bony;
-  return { ...t, ...a, fontFiles: [], headerImage: null, header: { ...DEF_HEADER, ...(a.header || {}), image: t.header?.image ?? t.headerImage ?? null }, bg: { ...DEF_BG, ...(a.bg || {}), image: t.bg?.image ?? null }, layout: t.layout } as Theme;
+  return { ...t, ...a, fontFiles: [], headerImage: null, header: { ...DEF_HEADER, ...(a.header || {}), image: t.header?.image ?? t.headerImage ?? null, frame: t.header?.frame ?? null }, bg: { ...DEF_BG, ...(a.bg || {}), image: t.bg?.image ?? null, frame: t.bg?.frame ?? null }, layout: t.layout } as Theme;
 }
 
 // ---------------------------------------------------------------- couleurs

@@ -4,9 +4,12 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 07/10/2026 (lire en premier)
-- **En production : correctif 68 (07/10)** — **Forms Bony : intégration dans un autre site** (balise
-  `<script src="…/embed.js" data-form="…">` → iframe à la hauteur du contenu ; Gearbox › Partager › « Intégrer sur un
-  site »). Worker + `web`, aucune migration. Avant lui le **correctif 67 (02/10)** — **Worker Forms : économie du KV** (alerte Cloudflare « 50 % de la limite
+- **En production : correctif 69 (07/10)** — **Forms Bony F5** : dupliquer un formulaire en un clic (tags oui, projet
+  non), taille du logo, cadrage des images (point, zoom, remplir / contenir), pied de page Bony (« repiquage »),
+  adresse de contact `contact@bonyauto-mobile.com`. Worker + `api` + `web`, aucune migration. Avant lui le
+  **correctif 68 (07/10)** — **Forms Bony : intégration dans un autre site** (balise `<script src="…/embed.js"
+  data-form="…">` → iframe à la hauteur du contenu ; Gearbox › Partager › « Intégrer sur un site »). Avant lui le
+  **correctif 67 (02/10)** — **Worker Forms : économie du KV** (alerte Cloudflare « 50 % de la limite
   journalière » reçue le 02/10 : sans correctif, les formulaires auraient refusé les réponses vers 18 h 30). Avant lui le
   **correctif 66 (02/10)** — **Forms Bony, lot F4** : formulaire relié à un projet (tags hérités en
   direct, sinon tags libres) et filtres, abonnés notifiés à chaque réponse, tirage au sort avec procès-verbal, versions
@@ -37,10 +40,8 @@
   0. **Chantiers d'octobre (liste de Théo du 01/10, arbitrages dans le backlog § « Chantiers d'octobre 2026 »)** :
      lot 1 fait (correctif 60), Post-it (61), Google Forms (62), Forms Bony F1 (63), F2a + F2b (64), **F3 (65)**.
      **F4 fait (66).** Reste noté : accusé de réception par e-mail (refusé pour l'instant).
-     **Forms Bony F5 (demandes de Théo du 07/10, plan validé)** : ~~intégration dans un autre site~~ → **fait, correctif 68
-     (lot 1, priorité de Théo)** ; puis dupliquer un formulaire en un clic, taille du logo, cadrage des images (point de
-     cadrage, zoom, remplir / contenir), **repiquage Bony** activable — ⚠️ sens à préciser par Théo (pied de page de
-     concession ? signature du groupe ? cartouche façon pub repiquée ?). Détail au backlog § Forms Bony.
+     **Forms Bony F5 (demandes de Théo du 07/10) : fait** — intégration (68), duplication, taille du logo, cadrage des
+     images, pied de page Bony, adresse de contact (69). Restes : backlog § Forms Bony.
      **Ensuite : tâches multi-assignées, prestataire, répartitions, fichiers maison, mascotte / agent IA** (plan validé
      par Théo « de A à Z »). À faire par l'équipe : importer les polices officielles (NouvelR, Read, Dacia Block,
      AlpineNewAlps, NissanBrand) dans Studio › Polices de marque.
@@ -542,6 +543,30 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 69 — 07/10 : Forms Bony F5** (branche `feat/forms-bony-f5`, **Worker + `api` + `web`**, aucune
+  migration : tout vit dans la définition JSON). Demandes de Théo du 07/10, livrées en un lot.
+  - **Dupliquer en un clic** : `POST /api/bony-forms/:id/duplicate` — brouillon courant, « … (copie) », nouveau
+    `publicId`, **tags repris (ceux affichés, donc hérités du projet s'il y en a un) mais PAS le projet** (décision de
+    Théo), abonné = l'auteur ; ni réponses, ni versions, ni tirages ; images partagées. Icône dans la liste
+    (`BonySpace`) et « Dupliquer le formulaire » dans le menu « … » de l'éditeur (brouillon enregistré d'abord) ; la
+    copie s'ouvre aussitôt.
+  - **Taille du logo** : `theme.logoSize` (18 à 90 px, absent = 30), variable `--logo-h` ; curseur Studio › En-tête.
+  - **Cadrage des images** : type `Frame` (point x / y en %, zoom 1 à 3, `fit` cover | contain) et **porte unique
+    `frameCss()`** dans `shared/bonyform.ts` (valeurs bornées, sûres en CSS) ; `isFramed()` = rien n'est écrit tant que
+    le cadrage ne change rien. Sur : en-tête (`header.frame`), fond (`bg.frame`), tuiles (`Option.frame`), voitures
+    (`DriveCar.frame`), accueil, remerciement, écrans de fin. Rendu : un CALQUE (`::before` / `::after`) porte l'image,
+    sa position, sa taille et son zoom (`transform: scale` centré sur le point) — le fond `center/cover` ne peut pas
+    zoomer. Éditeur : `ui2/apps/forms/bony/Frame.tsx` (image entière cliquable + rendu dans le cadre réel), panneau
+    dépliable sous l'image (pas de fenêtre flottante : Shadow DOM). `applyAmbiance` garde le cadrage des images.
+  - **Pied de page Bony (« repiquage »)** : `theme.bonyFooter` — bandeau sombre, liseré orange-violet, logo Bony, rien
+    de plus (précision de Théo) ; posé par le client (`syncFooter`) après `#app`, donc aussi dans l'aperçu ; remplace
+    la mention « Formulaire Bony auto-mobile ».
+  - **Adresse de contact** : `contact@bonyauto-mobile.com` dans le consentement par défaut (`catalog.ts`) et dans
+    `public/confidentialite.html`. `marketbony@gmail.com` reste là où il désigne le compte Google connecté.
+  - **Testé avec le compte de Théo** sur une copie de « Visite Ateliers Clermont » (`projectId: null`, tags Clermont /
+    Renault / Dacia / APV), cadrages et réglages relus côté serveur, rendu public via le Worker local en bannière,
+    plein écran et écran partagé « image entière » ; copie supprimée ensuite, base et KV local sans reste.
+
 - **Correctif 68 — 07/10 : Forms Bony, intégration dans un autre site** (branche `feat/forms-bony-embed`, **Worker +
   `web`**, aucune migration, rien sous `backend/`). Lot 1 des demandes F5 de Théo (le reste : backlog § Forms Bony).
   - **Le code à coller** : `<script src="https://forms.bonyauto-mobile.workers.dev/embed.js" data-form="<publicId>" async>`.
@@ -573,7 +598,9 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 68** (7 octobre 2026) — Forms Bony, intégration dans
+- master = prod, synchronisés. Dernier lot déployé : **correctif 69** (7 octobre 2026) — Forms Bony F5 (duplication,
+  logo, cadrage, pied de page). **Worker d'abord** (`npm run deploy`), puis **`api` ET `web`** (route de duplication).
+  Aucune migration. Avant lui le **correctif 68** (7 octobre 2026) — Forms Bony, intégration dans
   un autre site. **Worker d'abord** (`cd forms-worker && npm run deploy` : route `/embed.js`, mode `?embed=1`), puis
   **`web` seul** sur le VPS. Aucune migration. Avant lui le **correctif 67** (2 octobre 2026) — économie du KV du Worker
   (`cd forms-worker && npm run deploy`, rien sur le VPS). Avant lui le **correctif 66** — **Forms Bony F4** + copie
@@ -3907,19 +3934,10 @@
   `bonyforms_files` (fichiers des répondants, F3). Instantanés OVH du VPS : non vérifiés. À faire : copie régulière
   hors du VPS (chiffrée : données personnelles). Noter aussi que tout fichier de `uploads/` est lisible par quiconque
   connaît son adresse (noms aléatoires, mais sans connexion requise).
-- **Forms Bony F5 — demandes de Théo du 07/10 (plan validé, par lots, sans migration : tout vit dans la définition JSON)** :
-  - ~~**Intégration dans un autre site**~~ → **fait, correctif 68**.
-  - **Dupliquer un formulaire en un clic** : route `POST /api/bony-forms/:id/duplicate` (`FORMS_ROLES`) — brouillon,
-    « … (copie) », nouveau `publicId`, tags et projet repris, abonné = l'auteur seul ; ni réponses, ni versions, ni
-    tirages ; images partagées (adresses `/a/<id>` immuables). Bouton dans la liste (`BonySpace`) et dans l'éditeur.
-  - **Taille du logo** : `theme.logoSize` (≈ 18 à 90 px, absent = 30 px, rien ne bouge pour l'existant), curseur Studio.
-  - **Cadrage des images** : réglage facultatif par image (point x / y en %, zoom, remplir / contenir) — en-tête, fond,
-    tuiles, voitures de la prise d'essai, accueil, fins ; absent = centré-recadré comme aujourd'hui.
-  - **Repiquage Bony** (interrupteur par formulaire) : ⚠️ **sens à préciser par Théo** — pied de page de concession
-    (coordonnées), signature « Bony auto-mobile », ou cartouche façon pub repiquée. Si coordonnées : vérifier ce qui
-    existe dans `constants.ts`.
-  - ⚠️ Vérifier que les nouvelles clés du thème ne sont pas jetées en silence (`resolveTheme`, nettoyage `theme.ts` du
-    Worker) ; modifier `shared/bonyform.ts` puis recopier dans `backend/src/bonyforms/schema.ts`.
+- ~~**Forms Bony F5 — demandes de Théo du 07/10**~~ → **fait** : intégration (correctif 68) ; duplication, taille du
+  logo, cadrage des images, pied de page Bony, adresse de contact (correctif 69). Restes notés : choisir une IMAGE pour
+  un écran de fin conditionnel (rendu et cadrage prêts, pas de bouton dans l'éditeur, manque d'avant F5) ; le texte de
+  consentement des formulaires DÉJÀ créés garde l'ancienne adresse (« Test-Drive Bony x Limagrain » : Théo s'en charge).
 - **Forms Bony — suite du plan validé par Théo (« tout implémenter »)** :
   - ~~**F2, l'éditeur poussé**~~ → **fait, correctif 64** (F2a studio + F2b écrans, partage, modèles). Restes
     notés : écrans de fin SELON la réponse (avec la logique de F3) ; tuiles pour les créneaux (`slot`, F3) ;
