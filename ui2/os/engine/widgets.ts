@@ -236,7 +236,10 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   W.app = (w) => CAT[w.type].app;
 
   /* ---------------- Disposition ---------------- */
-  const KEY = () => 'widgets'; /* [GEARBOX] le stockage est déjà propre à chaque compte (GX.store) */
+  /* [GEARBOX] le stockage est déjà propre à chaque compte (GX.store). Coque TÉLÉPHONE (07/10/2026) : disposition
+     à part (`widgets.m`), une simple LISTE ORDONNÉE (y = rang, x = 0) aux tailles du téléphone, éditée par W.m. */
+  const isPhone = () => GX.host?.dataset.shell === 'mobile';
+  const KEY = () => (isPhone() ? 'widgets.m' : 'widgets');
   const DEFAULT = [
     { type: 'budget-ring', size: 'S', x: 0, y: 0 }, { type: 'late', size: 'S', x: 2, y: 0 }, { type: 'posts', size: 'M', x: 0, y: 2 },
     { type: 'conges-off', size: 'S', x: 0, y: 4 }, { type: 'chat', size: 'S', x: 2, y: 4 }, { type: 'weather', size: 'S', x: 0, y: 6 }, { type: 'clock', size: 'S', x: 2, y: 6 },
@@ -245,8 +248,13 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   let layout = null, box = null, editing = false;
   /* Disposition par défaut : un widget qui dépasserait d'un bureau étroit est replacé dans un emplacement libre */
   const fresh = () => { layout = []; DEFAULT.forEach((d) => { const w = { ...d, id: GX.uid('wg') }; if (w.x + dim(w.size)[0] > cols() || layout.some((o) => overlap(rectOf(w), rectOf(o)))) Object.assign(w, freeSpot(w.size, w)); layout.push(w); }); return layout; };
-  const load = () => { const saved = GX.store.get(KEY()); layout = (saved || fresh()).filter((w) => CAT[w.type]); };
-  const save = () => GX.store.set(KEY(), layout);
+  /* Téléphone : budget et retards en petit, derniers messages du Chat, échéances, absents, météo. Un widget non
+     autorisé au rôle reste masqué à l'affichage (allowed), comme au bureau. */
+  const DEFAULT_M = [['budget-ring', 'S'], ['late', 'S'], ['chat', 'M'], ['deadlines', 'M'], ['conges-off', 'S'], ['weather', 'S']];
+  const freshM = () => (layout = DEFAULT_M.map(([type, size], i) => ({ id: GX.uid('wg'), type, size, x: 0, y: i })));
+  const load = () => { const saved = GX.store.get(KEY()); layout = (Array.isArray(saved) ? saved : isPhone() ? freshM() : fresh()).filter((w) => w && CAT[w.type]); };
+  /* `widgets:saved` : l'accueil du téléphone se redessine (le bureau, lui, passe par W.render). */
+  const save = () => { GX.store.set(KEY(), layout); GX.emit('widgets:saved'); };
   const rectOf = (w) => { const [cw, ch] = dim(w.size); return { x: w.x, y: w.y, w: cw, h: ch }; };
   const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
   /* [GEARBOX] Marge du bureau PROPORTIONNELLE à l'écran (1,6 % de la largeur, bornée 10–28 px) au lieu
@@ -381,6 +389,50 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     if (!box.classList.contains('settled')) { clearTimeout(W._st); W._st = setTimeout(() => box && box.classList.add('settled'), 900); }
     wire();
   };
+  /* ---------------- Actions d'un widget (hors mode édition) — PARTAGÉES par le bureau et l'accueil du téléphone ---------------- */
+  /* Clic dans le widget `el` (.wdg[data-id]) : projet, conversation, raccourci, sinon la rubrique du widget. */
+  function actOn(e, el) {
+    if (e.target.closest('input,textarea,button[data-play]')) return;
+    const pr = e.target.closest('[data-proj]'); if (pr) { const p = D.project(pr.dataset.proj); return p && GX.openProject(p.id); }
+    const cv = e.target.closest('[data-conv]'); if (cv) { const win = GX.wm.open('chat', {}, { origin: cv }); if (!win) return; /* [GEARBOX] refusé : rien (pas la fenêtre active) */ return setTimeout(() => win.inst?.command?.('conv:' + cv.dataset.conv), 420); }
+    const op = e.target.closest('[data-open]'); if (op) return GX.wm.open(op.dataset.open, {}, { origin: op.querySelector('.app-ico') });
+    if (el.dataset.app) { if (GX.wm.desktopShown?.()) GX.wm.showDesktop(false); GX.wm.open(el.dataset.app, {}, { origin: el }); }
+  }
+  function onChange(e) {
+    /* [GEARBOX] cocher une tâche ÉCRIRAIT en base : on ouvre la To-do (la case reste décochée) */
+    const cb = e.target.closest('[data-task]'); if (cb) { cb.checked = false; GX.wm.open('todo'); }
+  }
+  function onInput(e) { const n = e.target.closest('[data-note]'); if (n) { const w = layout?.find((x) => x.id === n.closest('.wdg')?.dataset.id); if (!w) return; w.cfg = { ...(w.cfg || {}), text: n.value }; save(); } }
+  const wirePlay = (scope) => scope.querySelectorAll('[data-play]').forEach((b) => (b.onclick = () => { const on = b.classList.toggle('on'); b.innerHTML = GX.icon(on ? 'pause' : 'play'); }));
+  W.act = actOn; W.onChange = onChange; W.onInput = onInput; W.wirePlay = wirePlay;
+
+  /* ---------------- Accueil du TÉLÉPHONE : édition de la liste (07/10/2026) ----------------
+     Trois tailles côté téléphone, chacune servie par la PREMIÈRE taille du bureau que le widget accepte :
+     Petit (½ largeur), Large (pleine largeur, bas), Grand (pleine largeur, haut). Le rendu reste celui du
+     catalogue (CAT.render), avec la taille du bureau correspondante. */
+  const TIERS = { P: ['S'], L: ['M', 'XL', 'W'], G: ['M3', 'L', 'T', 'X3', 'XXL', 'XXW'] };
+  const TIER_L = { P: 'Petit', L: 'Large', G: 'Grand' };
+  const tiersOf = (type) => Object.keys(TIERS).map((t) => [t, TIERS[t].find((s) => CAT[type]?.sizes.includes(s))]).filter(([, s]) => s);
+  const tierOf = (size) => Object.keys(TIERS).find((t) => TIERS[t].includes(size)) || 'L';
+  const mList = () => { if (!layout) load(); return layout; };
+  const mRank = () => { layout.sort((a, b) => a.y - b.y).forEach((w, i) => { w.x = 0; w.y = i; }); };
+  W.m = {
+    TIER_L,
+    tierOf, tiers: tiersOf,
+    /** Widgets visibles, dans l'ordre (rôle appliqué). */
+    items: () => mList().filter((w) => allowed(w.type)).sort((a, b) => a.y - b.y),
+    /** Catalogue autorisé au rôle : [type, nom, rubrique, tailles téléphone]. */
+    catalog: () => Object.entries(CAT).filter(([t]) => allowed(t)).map(([t, c]) => ({ type: t, name: c.name, app: c.app, tiers: tiersOf(t) })).filter((x) => x.tiers.length),
+    add(type) { if (!CAT[type] || !allowed(type)) return null; mList(); const s = tiersOf(type)[0]; if (!s) return null; const w = { id: GX.uid('wg'), type, size: s[1], x: 0, y: layout.length ? Math.max(...layout.map((x) => x.y)) + 1 : 0 }; layout.push(w); mRank(); save(); return w; },
+    remove(id) { mList(); layout = layout.filter((w) => w.id !== id); mRank(); save(); },
+    /** Déplace d'un cran parmi les widgets VISIBLES (un widget masqué au rôle ne bloque pas). */
+    move(id, dir) { const vis = W.m.items(), i = vis.findIndex((w) => w.id === id), j = i + dir; if (i < 0 || j < 0 || j >= vis.length) return; const a = vis[i], b = vis[j], y = a.y; a.y = b.y; b.y = y; mRank(); save(); },
+    size(id, size) { const w = mList().find((x) => x.id === id); if (!w || !CAT[w.type].sizes.includes(size)) return; w.size = size; save(); },
+    configurable: (type) => !!CAT[type]?.cfg,
+    configure(id, el) { const w = mList().find((x) => x.id === id); if (w && CAT[w.type].cfg) configure(w, el); },
+    reset() { freshM(); save(); },
+  };
+
   function wire() {
     box.onclick = (e) => {
       const el = e.target.closest('.wdg'); if (!el || e.target.closest('[data-rz]')) return; const w = layout.find((x) => x.id === el.dataset.id); if (!w) return;
@@ -389,18 +441,11 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
         if (e.target.closest('[data-size]')) { const s = CAT[w.type].sizes; return applySize(w, s[(s.indexOf(w.size) + 1) % s.length]); }
         return;
       }
-      if (e.target.closest('input,textarea,button[data-play]')) return;
-      const pr = e.target.closest('[data-proj]'); if (pr) { const p = D.project(pr.dataset.proj); return GX.openProject(p.id); }
-      const cv = e.target.closest('[data-conv]'); if (cv) { const win = GX.wm.open('chat', {}, { origin: cv }); if (!win) return; /* [GEARBOX] refusé : rien (pas la fenêtre active) */ return setTimeout(() => win.inst?.command?.('conv:' + cv.dataset.conv), 420); }
-      const op = e.target.closest('[data-open]'); if (op) return GX.wm.open(op.dataset.open, {}, { origin: op.querySelector('.app-ico') });
-      if (el.dataset.app) { if (GX.wm.desktopShown?.()) GX.wm.showDesktop(false); GX.wm.open(el.dataset.app, {}, { origin: el }); }
+      actOn(e, el);
     };
-    box.onchange = (e) => {
-      /* [GEARBOX] cocher une tâche ÉCRIRAIT en base : on ouvre la To-do (la case reste décochée) */
-      const cb = e.target.closest('[data-task]'); if (cb) { cb.checked = false; GX.wm.open('todo'); }
-    };
-    box.oninput = (e) => { const n = e.target.closest('[data-note]'); if (n) { const w = layout.find((x) => x.id === n.closest('.wdg').dataset.id); w.cfg = { ...(w.cfg || {}), text: n.value }; save(); } };
-    box.querySelectorAll('[data-play]').forEach((b) => (b.onclick = () => { const on = b.classList.toggle('on'); b.innerHTML = GX.icon(on ? 'pause' : 'play'); }));
+    box.onchange = onChange;
+    box.oninput = onInput;
+    wirePlay(box);
     box.oncontextmenu = (e) => {
       const el = e.target.closest('.wdg'); if (!el) return; e.preventDefault(); e.stopPropagation();
       if (gesture || Date.now() - lastGesture < 500) return;   // appui long tactile : c'est un déplacement, pas un menu
@@ -566,7 +611,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     });
   }
   /* Un widget affiche-t-il cette conversation, visible (bureau non estompé par une fenêtre) ? */
-  const chShown = (convId) => [...GX.root.querySelectorAll('.wch[data-wid]')].some((el) => { const w = layout?.find((x) => x.id === el.dataset.wid); return w && chConv(w.cfg)?.id === convId && el.offsetParent && !el.closest('.dim'); });
+  const chShown = (convId) => [...GX.root.querySelectorAll('.wch[data-wid]')].some((el) => { const w = layout?.find((x) => x.id === el.dataset.wid); return w && chConv(w.cfg)?.id === convId && el.offsetParent && !el.closest('.dim') && !el.closest('.away'); });   /* .away : accueil du téléphone caché sous une rubrique */
   const chChatOpen = () => (GX.wm?.list?.() || []).some((x) => x.appId === 'chat' || x.app?.id === 'chat');
   function chOpen(c, origin) {
     if (!c) return;

@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import type { OsHostProps as Ui2RootProps } from './os/OsHost';
+import { setFitCover } from './os/viewport';
 
 // Porte d'entrée de l'interface v2, chargée avec l'ancienne. Tout le reste (coque, CSS)
 // est en différé : l'ancien bundle ne grossit pas, et la feuille v2 n'est chargée que
@@ -16,6 +17,7 @@ class Ui2Boundary extends React.Component<BoundaryProps, { failed: boolean }> {
   static getDerivedStateFromError() { return { failed: true }; }
   componentDidCatch(error: unknown) {
     console.error('[ui2] la nouvelle interface a planté, retour à l\'ancienne', error);
+    setFitCover(false);   // posé par la coque téléphone ; l'ancienne interface ne gère pas les marges de sécurité
     this.props.onFail();
   }
   render() { return this.state.failed ? null : this.props.children; }

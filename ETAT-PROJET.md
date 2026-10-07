@@ -4,7 +4,11 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 07/10/2026 (lire en premier)
-- **En production : correctif 69 (07/10)** — **Forms Bony F5** : dupliquer un formulaire en un clic (tags oui, projet
+- **En production : correctif 70 (07/10)** — **Interface v2 sur TÉLÉPHONE : nouvelle navigation** (proposition C de
+  `maquettes/ux/mobile-nav.html`, choisie par Théo) : pilule flottante Accueil · 3 favoris · loupe, retour du téléphone,
+  accueil personnalisable (widgets). `web` seul, aucune migration ; ordinateur inchangé. ⚠️ Testée en navigateur
+  (taille téléphone, tactile simulé) : à confirmer par Théo sur iPhone et Pixel. Avant lui le **correctif 69 (07/10)** —
+  **Forms Bony F5** : dupliquer un formulaire en un clic (tags oui, projet
   non), taille du logo, cadrage des images (point, zoom, remplir / contenir), pied de page Bony (« repiquage »),
   adresse de contact `contact@bonyauto-mobile.com`. Worker + `api` + `web`, aucune migration. Avant lui le
   **correctif 68 (07/10)** — **Forms Bony : intégration dans un autre site** (balise `<script src="…/embed.js"
@@ -47,6 +51,8 @@
      AlpineNewAlps, NissanBrand) dans Studio › Polices de marque.
      Trou serveur `GET /api/budget` : Théo le traite « après » (01/10).
   1. **Retours de la bêta** (groupe « Bêta Gearbox OS » du Chat, créé par Théo) : les trier, corriger par lots.
+     **D'abord : retour de Théo sur la navigation téléphone (correctif 70) testée sur ses vrais téléphones** (marges de
+     l'iPhone en appli installée, geste retour d'Android, clavier).
   2. **Fermer le trou serveur** : `GET /api/budget` et lecture des dépenses fixes sans garde de rôle (External)
      — lot backend dédié, `ETAT-BACKEND.md` + `BUGS-CONNUS.md`.
   3. **Rôles restreints vus en vrai** (chef de site, External, Guest) dans la v2 — avec des collègues ou les comptes
@@ -543,6 +549,40 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 70 — 07/10 : interface v2 sur téléphone, nouvelle navigation** (branche `feat/mobile-c`, **`web` seul**,
+  aucune migration, rien sous `backend/`). Demande de Théo : « moins OS » sur téléphone, la barre gestuelle maison
+  faisait doublon avec celle du téléphone. Trois maquettes (`maquettes/ux/mobile-nav.html`), Théo choisit la C.
+  - **Coque téléphone réécrite** (`ui2/os/engine/mobile.ts`) : plus de fausse barre d'état, de barre d'accueil maison,
+    de sélecteur d'apps façon iOS, de centres tirés du haut, d'ouverture « zoom depuis l'icône ».
+  - **Pilule flottante** : Accueil · 3 favoris (**Projets, To-do, Chat** par défaut, complétés selon le rôle,
+    modifiables) · loupe. Pastille des non-lus sur Chat (`bridge.chatUnread`) et Jeux. Elle s'efface quand
+    l'UTILISATEUR fait défiler vers le bas (doigt, molette — pas les défilements du code), revient vers le haut, se
+    retire sous le clavier, sous un volet, dans une conversation du Chat (barre de saisie fixe, sélecteur `DOCKED`).
+    Elle FLOTTE au-dessus du contenu (pas de bande réservée, retour de Théo) : chaque liste qui défile reçoit en bas la
+    place de la pilule (`padScroller`). Toucher la rubrique affichée = retour à sa racine.
+  - **Retour du téléphone** (historique) : une entrée au-dessus de l'accueil tant que quelque chose est ouvert ; le
+    retour ferme dans l'ordre menu, couche (loupe…), mode édition, volet, page interne (`.stack`), écran empilé,
+    rubrique. Retrait de l'entrée DIFFÉRÉ d'un tic (voir Pièges).
+  - **Un seul en-tête** : la rubrique garde le sien (l'« œil » `ah-eye` masqué), bouton « … » flottant ; une fiche
+    (projet) a une barre « ‹ Projets ». Menus nettoyés des entrées d'ordinateur (nouvelle fenêtre, aperçu rapide,
+    raccourcis clavier) — enveloppe de `GX.menu.open` sur téléphone.
+  - **Accueil** : salutation, cloche (fil d'activité), avatar (thème, effets économes, ne pas déranger, réglages, fond
+    d'écran, ancienne interface, déconnexion), widgets, toutes les rubriques en grille. **Personnalisable** (bouton
+    ou appui long) : retirer, taille Petit / Large / Grand, monter / descendre, configurer, ajouter (catalogue des 25
+    widgets filtré par rôle), 3 favoris de la pilule, disposition par défaut. Textes clairs sur fond sombre (`.on-dark`),
+    widgets presque opaques en thème clair sur fond sombre.
+  - **Widgets** (`widgets.ts`) : disposition du téléphone À PART (`widgets.m`, liste ordonnée, défaut : budget, retards,
+    derniers messages, échéances, absents, météo), API `W.m` ; actions de clic PARTAGÉES bureau / téléphone
+    (`W.act`, `W.onChange`, `W.onInput`) ; événement `widgets:saved`.
+  - **`viewport-fit=cover`** (marges de l'iPhone) posé SEULEMENT par la coque téléphone (`ui2/os/viewport.ts`) et retiré
+    si la v2 plante (`Ui2Gate`) : l'ancienne interface ne gère aucune marge de sécurité.
+  - Corrigés en route : bannières de notification (`notify` lisait une variable hors de portée) ; pastilles des icônes
+    jamais affichées (les rubriques portées n'ont pas de `badge()`).
+  - **Testé en navigateur, taille téléphone, tactile simulé, compte de Théo** : pilule, pastille (7 / 12), retour système
+    sur 4 enchaînements, volet « Nouveau projet » ouvert puis refermé (rien créé), mode édition complet, loupe →
+    fiche → retour, notifications, menu de l'avatar, thème clair, lien `?app=chat`, bureau sans régression (widgets,
+    `viewport` inchangé). Recette de Théo en navigateur. **Non vérifiable ici : vrais téléphones.**
+
 - **Correctif 69 — 07/10 : Forms Bony F5** (branche `feat/forms-bony-f5`, **Worker + `api` + `web`**, aucune
   migration : tout vit dans la définition JSON). Demandes de Théo du 07/10, livrées en un lot.
   - **Dupliquer en un clic** : `POST /api/bony-forms/:id/duplicate` — brouillon courant, « … (copie) », nouveau
@@ -598,7 +638,8 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 69** (7 octobre 2026) — Forms Bony F5 (duplication,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 70** (7 octobre 2026) — nouvelle navigation de la v2 sur
+  téléphone. **`web` seul**, aucune migration. Avant lui le **correctif 69** (7 octobre 2026) — Forms Bony F5 (duplication,
   logo, cadrage, pied de page). **Worker d'abord** (`npm run deploy`), puis **`api` ET `web`** (route de duplication).
   Aucune migration. Avant lui le **correctif 68** (7 octobre 2026) — Forms Bony, intégration dans
   un autre site. **Worker d'abord** (`cd forms-worker && npm run deploy` : route `/embed.js`, mode `?embed=1`), puis
@@ -4170,6 +4211,15 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Coque téléphone : `history.back()` puis `pushState` dans la même tâche ramène SOUS l'accueil** (Chrome résout le
+  retour au moment de l'appel) : le retour suivant QUITTE Gearbox. Cas réel : fermer un menu puis ouvrir une rubrique.
+  D'où le retrait différé d'un tic dans `hSync` (mobile.ts). Tester l'historique avec des enchaînements, pas un geste seul.
+- **Coque téléphone : `showDesktop(false)` veut dire « quitter le bureau »**, pas « aller à l'accueil » — les widgets
+  l'appellent avant d'ouvrir une rubrique. L'interpréter comme « accueil » masquait la rubrique ouverte (07/10).
+- **Tester la coque téléphone dans le panneau navigateur** : `resize_window` preset `mobile` (375 × 812, tactile simulé),
+  puis recharger (la coque est choisie au démarrage). Une taille plus grande que le panneau est réduite à l'écran et
+  les clics par coordonnées tombent alors à côté. Défilement « utilisateur » = action `scroll` (molette), pas
+  `scrollTop` en script (ignoré par la pilule, à dessein).
 - **Forms intégré (iframe d'une autre origine) : Chrome ne la PEINT pas tant qu'elle est hors écran.** Une capture
   prise juste après un défilement la montre vide (voire avec une barre de défilement) : attendre 1 à 2 s et reprendre
   la capture avant de conclure à un bug (07/10). Les captures du panneau navigateur ont souvent un temps de retard.
