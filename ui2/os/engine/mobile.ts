@@ -51,7 +51,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const tone = () => root.classList.toggle('on-dark', GX.host.dataset.theme !== 'light' || !!GX.wall?.is(GX.shell.prefs.wallpaper));
     tone(); GX.on('prefs', tone);
     new MutationObserver(tone).observe(GX.host, { attributes: true, attributeFilter: ['data-theme', 'data-wallpaper'] });
-    GX.on('badges', refreshBadges); GX.on('presence', refreshPresence);
+    GX.on('badges', refreshBadges); GX.on('presence', refreshPresence); GX.on('data:users', refreshPresence);
     /* [GEARBOX] les VRAIES données arrivent après le démarrage : l'accueil suit leurs changements et le rôle. */
     GX.on('data:projects', () => buildHome()); GX.on('data:users', () => buildHome());
     GX.on('ctx', () => { buildHome(); buildPill(); });
@@ -252,7 +252,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   function refreshPresence() {
     const P = D.PRESENCE || {};
     const put = (b, id, max) => {
-      const uids = P[id] || [], key = uids.join(','); let el = b.querySelector('.gx-pres');
+      const uids = P[id] || [], key = GX.r.presKey(uids); let el = b.querySelector('.gx-pres');
       if ((el?.dataset.k || '') === key) return;
       el?.remove();
       if (uids.length) { b.insertAdjacentHTML('beforeend', GX.r.presStack(uids, max)); b.querySelector('.gx-pres').dataset.k = key; }

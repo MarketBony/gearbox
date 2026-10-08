@@ -20,14 +20,16 @@
   locales `feat/assistant-p0` et `fix/chat-envoi-fiable` mergées : supprimables.
 - **Lot B demandé par Théo (08/10) : fonds d'écran v2** — trop gourmands (shaders WebGL plein écran à 30 i/s sous ~21
   panneaux `backdrop-filter`, pause seulement si fenêtre agrandie / > 92 % couvert) et jugés moches. Arbitré : fonds FIXES
-  par défaut, quelques fonds animés au choix de Théo en option, et chercher une techno d'affichage moins coûteuse.
+  par défaut (nouvelle série, planche à montrer d'abord), animés gardés en option : **Bony · Trait, Magma, Rétro** seulement,
+  arrêtés dès qu'une fenêtre est ouverte, et chercher une techno d'affichage moins coûteuse (vidéo en boucle ou 15 i/s).
 - **Ensuite, dans l'ordre** : corrections issues des retours ci-dessus ; puis **mIAouss P2** (rédaction guidée : posts
   Digital, Forms, e-mails) et **P3** (actions avec confirmation) ; puis la suite de la liste d'octobre (tâches
   multi-assignées, prestataire, répartitions, fichiers maison — backlog § « Chantiers d'octobre 2026 »).
 - **À savoir pour la session suivante** : Bony ne paiera JAMAIS un service d'IA (aucune option payante à proposer). Le
   garde-fou de la session a bloqué une fois `git push` et le SSH malgré l'accord de Théo ; Théo a élargi les
   permissions (`.claude/settings.local.json`, non commité) et redonné son accord : ça passe désormais.
-- **En production : correctif 73 (08/10)** — **v2 : présence (mini-avatars sur le Dock / la pilule / la grille) et compteurs
+- **En production : correctif 74 (08/10)** — v2 : plus de « ? » à la place des avatars de présence (`web` seul). Avant lui le
+  **correctif 73 (08/10)** — **v2 : présence (mini-avatars sur le Dock / la pilule / la grille) et compteurs
   de non-lus sur le Dock du bureau** (`web` seul, aucune migration). Avant lui le **correctif 72 (08/10)** — **Chat : envoi fiable** (boîte d'envoi, renvoi automatique, photos réduites,
   connexion morte détectée en < 20 s ; `api` ET `web`, aucune migration). Avant lui le **correctif 71 (08/10)** — **assistant IA mIAouss** (`api` ET `web`, migration `20261008120000_assistant_p0`,
   3 variables d'environnement nouvelles). Avant lui le **correctif 70 (07/10)** — **Interface v2 sur TÉLÉPHONE : nouvelle navigation** (proposition C de
@@ -575,6 +577,14 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 74 — 08/10 : v2, « ? » à la place de certains avatars de présence** (branche
+  `fix/v2-presence-avatars-inconnus`, **`web` seul**, aucune migration). Vu par Théo en prod juste après le 73 : la présence
+  arrive souvent AVANT la liste des utilisateurs → pile dessinée en « Ancien membre » (« ? »), jamais redessinée car
+  l'empreinte ne comparait que les ids. Empreinte `GX.r.presKey` (ids + initiales + photo + couleur) dans `shell.ts` et
+  `mobile.ts`, et le téléphone écoute aussi `data:users`. Testé en local en reproduisant l'ordre d'arrivée (bureau et
+  téléphone : « ? » → « L »). Même jour : couleurs de Morgane Barthe (`#08cc7d`) et Ali Abou El Jinane (`#0715e7`) réparées
+  en base avec l'accord de Théo — plus aucune couleur invalide sur les 16 comptes.
+
 - **Correctif 73 — 08/10 : v2, présence et pastilles de notification sur les icônes** (branche
   `feat/v2-presence-pastilles`, **`web` seul**, aucune migration). Demandé par Théo : deux fonctions de l'ancienne interface
   absentes de la v2.
@@ -746,7 +756,8 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 73** (8 octobre 2026) — v2 : présence et compteurs sur les
+- master = prod, synchronisés. Dernier lot déployé : **correctif 74** (8 octobre 2026) — « ? » à la place des avatars de présence, **`web` seul**,
+  aucune migration. Avant lui le **correctif 73** (8 octobre 2026) — v2 : présence et compteurs sur les
   icônes. **`web` seul**, aucune migration. Avant lui le **correctif 72** (8 octobre 2026) — Chat, envoi fiable. **`api` ET `web`**,
   aucune migration, aucune variable. Avant lui le **correctif 71** (8 octobre 2026) — assistant IA mIAouss. **`api` ET
   `web`**, migration `20261008120000_assistant_p0` (additive, 4 tables, appliquée et inscrite AVANT le push). Nouvelles

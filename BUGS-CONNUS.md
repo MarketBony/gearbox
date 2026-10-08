@@ -4,9 +4,10 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 
 - [x] **v2 : aucune pastille de non-lus sur le Dock du bureau, aucune bulle de présence** (Théo, 08/10). Le Dock demandait le
   compteur à des rubriques qui ne le fournissaient pas ; la présence arrivait mais n'était dessinée nulle part. Correctif 73.
-- [ ] **Couleurs d'avatar à 5 chiffres en base** (fond transparent dans la v2) : cause corrigée au correctif 73
-  (`pages/Settings.tsx` sans `padStart`), Zakaria réparé ; **restent Morgane Barthe `#8cc7d` et Ali Abou El Jinane `#715e7`**
-  (correction = zéro de tête : `#08cc7d`, `#0715e7`), en attente de l'accord de Théo pour l'écriture en base.
+- [x] **Couleurs d'avatar à 5 chiffres en base** (fond transparent dans la v2) : cause corrigée au correctif 73
+  (`pages/Settings.tsx` sans `padStart`) ; Zakaria, Morgane Barthe et Ali Abou El Jinane réparés en base le 08/10 (zéro de tête).
+- [x] **v2 : « ? » à la place de certains avatars de présence** (Théo, 08/10, juste après le correctif 73) : pile dessinée avant
+  l'arrivée de la liste des utilisateurs et jamais redessinée. Correctif 74.
 
 - [x] **Chat : messages qui disparaissaient à l'envoi, images qui ne partaient pas** (PC et téléphone, signalé par Théo le
   08/10). Les messages n'atteignaient jamais le serveur (socket à moitié mort, `emitWithAck` sans délai, champ vidé avant
