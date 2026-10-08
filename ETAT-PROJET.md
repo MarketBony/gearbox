@@ -4,11 +4,26 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 08/10/2026 (lire en premier)
-- **ASSISTANT IA « mIAouss » LIVRÉ (correctif 71, 08/10)** — P0 + P1 : Qwen3.8 27B chez Groq puis Cloudflare (gratuit,
-  un seul modèle), « Gearbox calcule, l'IA rédige », mémoire par utilisateur, plafonds par personne, mascotte sur le Dock /
-  la pilule avec volet de discussion. Détail au correctif 71 et au backlog § « Assistant IA ». **Suite** : retours de Théo et
-  de l'équipe en usage réel ; P2 rédaction guidée (posts Digital, Forms, e-mails) ; P3 actions avec confirmation. Retour de
-  Théo sur la navigation téléphone (correctif 70) sur vrais téléphones : toujours attendu.
+- **ÉTAT AU SOIR DU 08/10 — EN ATTENTE DES RETOURS DE THÉO ET DE L'ÉQUIPE (tout est en prod, rien en cours de code)** :
+  1. **Chat, correctif 72** (envoi fiable) : vérifier en usage réel que plus aucun message ne disparaît, que les photos
+     partent (progression visible en 4G), PC et téléphones. En cas de nouveau message perdu : regarder s'il est en base
+     et lire `sudo docker compose logs api` AVANT tout redéploiement (un redémarrage efface les journaux du conteneur).
+  2. **mIAouss, correctif 71** : justesse des réponses (comparer aux écrans), plafonds et consommation réels
+     (Paramètres › mIAouss), et **sensation de la mascotte** (hauteur des sauts, force du lancer, seuil des secousses,
+     fréquence des bulles) — réglages dans `ui2/apps/assistant/mascot.ts` (`G_ACC`, `HARD_FALL`, `SOFT_FALL`, envol
+     des icônes, `PHRASES`). Théo : « pour l'instant c'est vraiment du lourd ».
+  3. **Navigation téléphone, correctif 70** : retour sur iPhone et Pixel toujours attendu.
+- **Points ouverts connus (non urgents)** : `BUGS-CONNUS.md` — widget « Absents » à 0 alors qu'un CP existe lundi 05/10 ;
+  aperçu « dernier message » d'une conversation après suppression du dernier message. Clés Gemini, Groq et Cloudflare
+  passées en clair dans le chat de la session du 08/10 : à régénérer un jour (remplacer dans `backend/.env` ET le `.env`
+  du VPS, puis `up -d api`). Poignée de débogage `el.__buddy` dans `mascot.ts` (inoffensive, sert aux tests). Branches
+  locales `feat/assistant-p0` et `fix/chat-envoi-fiable` mergées : supprimables.
+- **Ensuite, dans l'ordre** : corrections issues des retours ci-dessus ; puis **mIAouss P2** (rédaction guidée : posts
+  Digital, Forms, e-mails) et **P3** (actions avec confirmation) ; puis la suite de la liste d'octobre (tâches
+  multi-assignées, prestataire, répartitions, fichiers maison — backlog § « Chantiers d'octobre 2026 »).
+- **À savoir pour la session suivante** : Bony ne paiera JAMAIS un service d'IA (aucune option payante à proposer). Le
+  garde-fou de la session a bloqué une fois `git push` et le SSH malgré l'accord de Théo ; Théo a élargi les
+  permissions (`.claude/settings.local.json`, non commité) et redonné son accord : ça passe désormais.
 - **En production : correctif 72 (08/10)** — **Chat : envoi fiable** (boîte d'envoi, renvoi automatique, photos réduites,
   connexion morte détectée en < 20 s ; `api` ET `web`, aucune migration). Avant lui le **correctif 71 (08/10)** — **assistant IA mIAouss** (`api` ET `web`, migration `20261008120000_assistant_p0`,
   3 variables d'environnement nouvelles). Avant lui le **correctif 70 (07/10)** — **Interface v2 sur TÉLÉPHONE : nouvelle navigation** (proposition C de
