@@ -534,7 +534,7 @@ const Settings: React.FC = () => {
           loginId: editForm.loginId,
           password: editForm.password || 'admin',
           role: editForm.role as UserRole,
-          avatarColor: '#' + Math.floor(Math.random() * 16777215).toString(16),
+          avatarColor: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'), // sans le zéro de tête, 1 couleur sur 16 sortait à 5 chiffres (invalide)
           // L'anniversaire part au serveur avec le compte ; seule la ville reste locale.
           birthdate: editForm.birthdate || undefined,
           // Périmètre du chef de site. Le serveur revalide contre la liste des sites

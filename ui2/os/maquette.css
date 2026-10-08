@@ -507,6 +507,15 @@ svg.i.sm { width: 14px; height: 14px; } svg.i.lg { width: 20px; height: 20px; } 
 .dk .run { position: absolute; left: 50%; bottom: -6px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--text); opacity: 0; transition: opacity var(--t-med); }
 .dk.running .run { opacity: .75; }
 .dk .count { position: absolute; top: -4px; right: -4px; z-index: 2; box-shadow: 0 1px 4px rgba(0,0,0,.4); animation: ui-pop var(--t-med) var(--spring-bouncy) both; }
+/* [GEARBOX] Présence (08/10/2026) : mini-avatars des collègues présents sur la rubrique (engine/r.ts presStack). */
+.gx-pres { position: absolute; z-index: 2; display: inline-flex; align-items: center; pointer-events: auto; --ps: 18px; }
+.gx-pres .av { --s: var(--ps); box-shadow: 0 0 0 1.5px var(--surface-1), 0 1px 3px rgba(0,0,0,.35); }
+.gx-pres .av + .av { margin-left: calc(var(--ps) * -.35); }
+.gx-pres-more { margin-left: 2px; min-width: calc(var(--ps) * .9); height: calc(var(--ps) * .9); padding: 0 3px; border-radius: 99px; display: inline-grid; place-items: center;
+  font-size: calc(var(--ps) * .5); font-weight: 700; color: var(--text); background: var(--surface-3); box-shadow: 0 0 0 1.5px var(--surface-1); }
+.dk .gx-pres { left: -5px; bottom: -5px; --ps: calc(var(--dock-icon) * var(--m, 1) * .36); }
+.m-ico .gx-pres { top: 40px; left: calc(50% - 36px); --ps: 20px; }
+.m-pill .gx-pres { left: 3px; bottom: 2px; --ps: 15px; pointer-events: none; }
 .dk .tip { position: absolute; left: 50%; bottom: calc(100% + 12px); transform: translateX(-50%) translateY(4px); padding: 4px 10px; border-radius: 7px; font-weight: 600; font-size: var(--fs-12);
   white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity var(--t-fast), transform var(--t-fast) var(--ease-out); }
 .dk:hover .tip { opacity: 1; transform: translateX(-50%); }

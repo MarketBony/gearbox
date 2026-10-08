@@ -2,6 +2,12 @@
 
 Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec référence du commit).
 
+- [x] **v2 : aucune pastille de non-lus sur le Dock du bureau, aucune bulle de présence** (Théo, 08/10). Le Dock demandait le
+  compteur à des rubriques qui ne le fournissaient pas ; la présence arrivait mais n'était dessinée nulle part. Correctif 73.
+- [ ] **Couleurs d'avatar à 5 chiffres en base** (fond transparent dans la v2) : cause corrigée au correctif 73
+  (`pages/Settings.tsx` sans `padStart`), Zakaria réparé ; **restent Morgane Barthe `#8cc7d` et Ali Abou El Jinane `#715e7`**
+  (correction = zéro de tête : `#08cc7d`, `#0715e7`), en attente de l'accord de Théo pour l'écriture en base.
+
 - [x] **Chat : messages qui disparaissaient à l'envoi, images qui ne partaient pas** (PC et téléphone, signalé par Théo le
   08/10). Les messages n'atteignaient jamais le serveur (socket à moitié mort, `emitWithAck` sans délai, champ vidé avant
   l'accusé). Correctif 72 : boîte d'envoi `services/chatOutbox.ts` (affichage immédiat, renvoi, anti-doublon serveur),

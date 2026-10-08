@@ -87,6 +87,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     GX.on('wm:change', () => { refreshDock(); S.widgetsDim(); applyDock(); buildMenubar(); });
     GX.on('wm:title', () => buildMenubar());
     GX.on('badges', refreshDock);
+    GX.on('presence', refreshDockPresence); GX.on('data:users', refreshDockPresence);
     tick(); setInterval(tick, 15000);
     start(); /* [GEARBOX] écran verrouillé retiré (décision Théo) */
   };
@@ -268,8 +269,24 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const run = new Set(GX.wm.list().map((w) => w.app.parent || w.appId));
     GX.root.querySelectorAll('#dock .dk').forEach((it) => {
       const id = it.dataset.app; it.classList.toggle('running', run.has(id));
-      const n = GX.app(id)?.badge?.() || 0; let c = it.querySelector('.count');
-      if (n && !c) { it.insertAdjacentHTML('beforeend', `<span class="count">${n}</span>`); } else if (n && c) { if (c.textContent != n) { c.textContent = n; GX.animate(c, [{ transform: 'scale(1.4)' }, { transform: 'scale(1)' }], { spring: 'bouncy' }); } } else if (!n && c) c.remove();
+      const n = GX.app(id)?.badge?.() || 0, t = n > 99 ? '99+' : String(n); let c = it.querySelector('.count');
+      if (n && !c) { it.insertAdjacentHTML('beforeend', `<span class="count">${t}</span>`); } else if (n && c) { if (c.textContent != t) { c.textContent = t; GX.animate(c, [{ transform: 'scale(1.4)' }, { transform: 'scale(1)' }], { spring: 'bouncy' }); } } else if (!n && c) c.remove();
+    });
+    refreshDockPresence();
+  }
+  /* [GEARBOX] Présence (08/10/2026) : qui est sur quelle rubrique, en mini-avatars sous l'icône, comme les bulles
+     de la barre latérale de l'ancienne interface. Les rubriques absentes du Dock se regroupent sur le Launchpad. */
+  function refreshDockPresence() {
+    if (!$('#dock')) return;
+    const P = D.PRESENCE || {}, items = [...GX.root.querySelectorAll('#dock .dk')];
+    const inDock = new Set(items.map((it) => it.dataset.app));
+    const rest = [...new Set(Object.keys(P).filter((a) => !inDock.has(a)).flatMap((a) => P[a]))];
+    items.forEach((it) => {
+      const id = it.dataset.app, uids = id === 'launchpad' ? rest : P[id] || [], key = uids.join(',');
+      let el = it.querySelector('.gx-pres');
+      if ((el?.dataset.k || '') === key) return;
+      el?.remove();
+      if (uids.length) { it.insertAdjacentHTML('beforeend', GX.r.presStack(uids)); it.querySelector('.gx-pres').dataset.k = key; }
     });
   }
   S.refreshDock = refreshDock;

@@ -51,7 +51,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const tone = () => root.classList.toggle('on-dark', GX.host.dataset.theme !== 'light' || !!GX.wall?.is(GX.shell.prefs.wallpaper));
     tone(); GX.on('prefs', tone);
     new MutationObserver(tone).observe(GX.host, { attributes: true, attributeFilter: ['data-theme', 'data-wallpaper'] });
-    GX.on('badges', refreshBadges);
+    GX.on('badges', refreshBadges); GX.on('presence', refreshPresence);
     /* [GEARBOX] les VRAIES données arrivent après le démarrage : l'accueil suit leurs changements et le rôle. */
     GX.on('data:projects', () => buildHome()); GX.on('data:users', () => buildHome());
     GX.on('ctx', () => { buildHome(); buildPill(); });
@@ -107,7 +107,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     if (!Array.isArray(saved)) for (const id of FAV_FILL) { if (ok.length >= 3) break; if (!ok.includes(id) && GX.app(id) && GX.shell.canOpen(id)) ok.push(id); }
     return ok;
   }
-  const badgeOf = (id) => { const b = GX.bridge(); return id === 'chat' ? b.chatUnread || 0 : id === 'games' ? b.gamesChallenges || 0 : 0; };
+  const badgeOf = (id) => GX.app(id)?.badge?.() || 0; // [GEARBOX] même source que le Dock (engine/boot.ts)
   const badgeTxt = (n) => (n > 99 ? '99+' : String(n));
 
   /* ---------------- Accueil ---------------- */
@@ -246,6 +246,19 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       b.setAttribute('aria-label', (GX.app(b.dataset.go)?.name || '') + (n ? ` (${n} non lus)` : ''));
     });
     $('#mDot')?.classList.toggle('hide', !unreadFeed());
+    refreshPresence();
+  }
+  /* [GEARBOX] Présence (08/10/2026) : mini-avatars sur les icônes de la grille et sur les favoris de la pilule. */
+  function refreshPresence() {
+    const P = D.PRESENCE || {};
+    const put = (b, id, max) => {
+      const uids = P[id] || [], key = uids.join(','); let el = b.querySelector('.gx-pres');
+      if ((el?.dataset.k || '') === key) return;
+      el?.remove();
+      if (uids.length) { b.insertAdjacentHTML('beforeend', GX.r.presStack(uids, max)); b.querySelector('.gx-pres').dataset.k = key; }
+    };
+    GX.root.querySelectorAll('.m-ico').forEach((b) => put(b, b.dataset.app, 2));
+    pill?.querySelectorAll('[data-go]').forEach((b) => put(b, b.dataset.go, 1)); // bouton de 52 px : un avatar + « +N »
   }
 
   /* ---------------- Pilule ---------------- */

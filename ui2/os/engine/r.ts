@@ -11,6 +11,13 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       const u = GX.data.user(uid), st = `--c:${u.color}${o.s ? `;--s:${o.s}px` : ''}${u.photo ? `;background:${GX.esc(GX.data.avBg(u.photo))}` : ''}`;
       return `<span class="av ${cls}" style="${st}"${o.tip === false ? '' : ` data-tip="${GX.esc(u.name)}"`}>${u.photo ? '' : u.initials}${o.pres && u.online ? '<i class="pres"></i>' : ''}</span>`;
     },
+    /* Pastilles de présence (Dock, pilule, grille) : 2 avatars max puis « +N » ; infobulle = tous les noms. */
+    presStack: (uids, max = 2) => {
+      if (!uids?.length) return '';
+      const names = uids.map((id) => GX.data.user(id).name).join(', ');
+      const more = uids.length > max ? `<span class="gx-pres-more">+${uids.length - max}</span>` : '';
+      return `<span class="gx-pres" data-tip="${GX.esc(names)}">${uids.slice(0, max).map((id) => GX.r.av(id, '', { tip: false })).join('')}${more}</span>`;
+    },
     brandDots: (brands) => brands.map((b) => `<i class="brand-dot" style="--c:${GX.data.brand(b)?.hex}" data-tip="${b}"></i>`).join(''),
     /* Étiquettes de marque PLEINES comme dans Gearbox (lisibilité) : texte foncé sur Renault */
     brandChips: (brands) => brands.map((b) => `<span class="badge brand" style="--c:${GX.data.brand(b)?.hex};${b === 'Renault' ? 'color:#1b1604' : ''}">${b}</span>`).join(' '),
