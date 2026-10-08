@@ -282,7 +282,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const inDock = new Set(items.map((it) => it.dataset.app));
     const rest = [...new Set(Object.keys(P).filter((a) => !inDock.has(a)).flatMap((a) => P[a]))];
     items.forEach((it) => {
-      const id = it.dataset.app, uids = id === 'launchpad' ? rest : P[id] || [], key = uids.join(',');
+      const id = it.dataset.app, uids = id === 'launchpad' ? rest : P[id] || [], key = GX.r.presKey(uids);
       let el = it.querySelector('.gx-pres');
       if ((el?.dataset.k || '') === key) return;
       el?.remove();
