@@ -2,6 +2,13 @@
 
 Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec référence du commit).
 
+- [x] **mIAouss inventait des données quand il répondait sans outil** (« Céline B., Marc D. » absents, 08/10). Verrou serveur
+  `DATA_INTENT` + prompt durci, correctif 71. Même lot : comptage faux (« 4 actifs » suivis de 5) → sous-totaux calculés par
+  l'outil ; « plaque centre » incomprise → plaques résolues par l'outil et organisation envoyée au modèle.
+- [ ] **À vérifier (08/10) : le widget « Absents » du bureau v2 affichait « 0 cette semaine »** alors qu'un CP de Bastien
+  Fuziol existe le lundi 05/10 (mIAouss et l'API le donnent). Peut-être voulu (le widget ne compte qu'à partir
+  d'aujourd'hui ?) : non diagnostiqué, revérifier dans `engine/widgets.ts` avant d'y toucher.
+
 - [x] Dashboard n'agrège pas les FixedExpense dans "Budget Consommé" — corrigé sur la branche `fix/dashboard-fixed-expenses` (bloc "3bis. Process FIXED EXPENSES" dans pages/Dashboard.tsx, concordance Dashboard/Budget vérifiée)
 - [x] Page `Expenses.tsx` appelait `db.saveExpense`/`db.deleteExpense` inexistants (+ type `OneOffExpense` absent de `../types`). **Corrigé le 29 juillet 2026** (branche `feat/expenses-branchement`). Le diagnostic initial était incomplet : la page n'était en réalité **routée nulle part** (aucun `case 'expenses'` dans `App.tsx`, aucune entrée Sidebar) — c'était du code mort inatteignable, d'où l'absence de plainte utilisateur. Les dépenses ponctuelles étaient le dernier module encore sur localStorage alors que la route `/api/expenses` et le modèle Prisma `OneOffExpense` existaient déjà et fonctionnaient. Voir correctif 10 dans `ETAT-PROJET.md`.
 - [x] `backend/src/routes/projects.ts` : le PUT recrée les tâches (`deleteMany` + `createMany`) au lieu de les mettre à jour — perte des IDs de tâches à chaque sauvegarde. **Corrigé** (branche `feat/backend-projects-put-fix`) : diff transactionnel update/create/delete, IDs stables vérifiés sur 2 PUT successifs.

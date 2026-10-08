@@ -331,7 +331,9 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       const prj = t && S.canOpen('projects') ? D.PROJECTS.filter((p) => has(p.name + ' ' + p.sites.join(' '))).slice(0, 5).map((p) => ({ g: 'Projets', icon: GX.icon('projects'), l: p.name, sub: p.sites.join(', '), run: () => GX.wm.open('project', { id: p.id, title: p.name }) })) : [];
       const posts = t && S.canOpen('digital') ? D.POSTS.filter((p) => has(p.title)).slice(0, 3).map((p) => ({ g: 'Publications', icon: GX.icon('digital'), l: p.title, sub: GX.fmt.date(p.date), run: () => S.openWith('digital', 'post:' + p.id) })) : [];
       const ppl = t && S.canOpen('chat') ? D.USERS.filter((u) => u.id !== GX.ctx.uid && has(u.name)).slice(0, 3).map((u) => ({ g: 'Personnes', icon: GX.r.av(u.id, 'sm'), l: u.name, sub: D.ROLES[u.role].l, run: () => S.openWith('chat', 'dm:' + u.id) })) : [];
-      items = [...acts, ...prj, ...apps.slice(0, t ? 5 : 8), ...posts, ...ppl]; sel = Math.min(sel, Math.max(0, items.length - 1));
+      /* [GEARBOX] mIAouss (P1) : « Demander à mIAouss » pour toute recherche, ou ouvrir le volet. */
+      const mia = GX.assistant?.available ? [{ g: 'mIAouss', icon: GX.appGlyph('assistant'), l: t ? `Demander à mIAouss : « ${q.value.trim()} »` : 'Parler à mIAouss', sub: 'Assistant', run: () => GX.assistant.open(t ? q.value.trim() : undefined) }] : [];
+      items = [...acts, ...prj, ...apps.slice(0, t ? 5 : 8), ...posts, ...ppl, ...mia]; sel = Math.min(sel, Math.max(0, items.length - 1));
       let g = ''; res.innerHTML = items.length ? items.map((it, i) => (it.g !== g ? `<div class="sp-g label">${(g = it.g)}</div>` : '') + `<div class="sp-r ${i === sel ? 'on' : ''}" data-i="${i}">${it.icon}<span class="ellipsis">${GX.esc(it.l)}</span><span class="sub">${GX.esc(it.sub)}</span></div>`).join('') : `<div class="empty">${GX.icon('search')}Aucun résultat pour « ${GX.esc(q.value)} »</div>`;
     };
     S.spotlight = (on = !spot.classList.contains('on')) => { spot.classList.toggle('on', on); veil.classList.toggle('on', on); if (on) { q.value = ''; sel = 0; render(); setTimeout(() => q.focus(), 30); } else q.blur(); };

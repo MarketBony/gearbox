@@ -549,7 +549,10 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
         const apps = appsAllowed().filter((a) => has(a.name)).slice(0, 6).map((a) => ({ i: GX.appIcon(a, 34), l: a.name, s: 'Rubrique', run: () => M.open(a.id) }));
         const pr = GX.shell.canOpen('projects') ? D.PROJECTS.filter((p) => has(p.name)).slice(0, 6).map((p) => ({ i: GX.appIcon(GX.app('projects'), 34), l: p.name, s: p.sites?.[0] || 'Projet', run: () => M.open('project', { id: p.id, title: p.name }) })) : [];
         const pp = GX.shell.canOpen('chat') ? D.USERS.filter((u) => u.id !== GX.ctx.uid && has(u.name)).slice(0, 4).map((u) => ({ i: GX.r.av(u.id), l: u.name, s: 'Message', run: () => { const w = M.open('chat'); setTimeout(() => w?.inst?.command?.('dm:' + u.id), 450); } })) : [];
-        items = [...apps, ...pr, ...pp];
+        /* [GEARBOX] mIAouss (P1) : poser la recherche telle quelle à l'assistant. */
+        const raw = el.querySelector('input').value.trim();
+        const mia = GX.assistant?.available ? [{ i: `<span class="sp-plus">${GX.appGlyph('assistant')}</span>`, l: `Demander à mIAouss : « ${raw} »`, s: 'Assistant', run: () => GX.assistant.open(raw) }] : [];
+        items = [...apps, ...pr, ...pp, ...mia];
         res.innerHTML = items.map(row).join('') || `<div class="empty">${GX.icon('search')}Aucun résultat</div>`;
       }
     };

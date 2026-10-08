@@ -36,6 +36,7 @@ import projectFilesRoutes from './routes/projectFiles';
 import postitRoutes from './routes/postits';
 import formsRoutes from './routes/forms';
 import bonyFormsRoutes from './routes/bonyForms';
+import assistantRoutes from './routes/assistant';
 import { setupRealtime, withEmitterContext } from './realtime';
 import { startPurgeJob } from './jobs/purge';
 import { chargerReglages } from './settings/appSettings';
@@ -118,6 +119,9 @@ app.use('/api/forms', formsRoutes);
 
 // Forms Bony : formulaires maison (édition FORMS_ROLES ; /ingest et /state signés par le Worker Cloudflare).
 app.use('/api/bony-forms', bonyFormsRoutes);
+
+// Assistant IA « mIAouss » : équipe marketing seulement (ASSISTANT_ROLES sur chaque route), données de l'interlocuteur.
+app.use('/api/assistant', assistantRoutes);
 
 // Fichiers uploadés servis en statique (URLs relatives renvoyées par la route).
 //

@@ -74,6 +74,7 @@ function DataHubInner() {
   useEffect(() => chatStore.subscribe(() => setChatTick(n => n + 1)), []);
   useChatFeed(uid, allowed.has('chat'));
   useFormsAlerts(allowed.has('forms'));
+  useAssistantFeed(uid, allowed.has('assistant'));
 
   // Photos de profil : changées ici ou ailleurs (Réglages, autre onglet via l'API) → USERS re-mappés.
   const [avTick, setAvTick] = useState(0);
@@ -178,6 +179,32 @@ function useFormsAlerts(enabled: boolean) {
     s.on('bonyforms:notify', on);
     return () => { s.off('bonyforms:notify', on); pend.forEach((p) => window.clearTimeout(p.t)); };
   }, [enabled]);
+}
+
+// =====================================================================
+// GX.assistantFeed — PONT UNIQUE du widget « mIAouss » vers le serveur (le moteur n'appelle jamais l'API).
+// PARESSEUX : rien n'est chargé tant qu'aucun widget n'appelle `get()` ; `get()` ne relance que si la donnée a
+// plus de 2 min, et jamais plus d'une lecture toutes les 30 s (même après un échec). Le moteur appelle
+// `refresh()` au retour sur l'onglet et sur son minuteur de 2 min. Émet `assistant:usage` à chaque lecture.
+// Le serveur ne renvoie l'équipe et les plafonds qu'aux rôles qui y ont droit : le widget n'utilise que `capacity`.
+// =====================================================================
+function useAssistantFeed(uid: string, enabled: boolean) {
+  useEffect(() => {
+    const GX = gx();
+    if (!enabled) { GX.assistantFeed = null; return; }
+    let view: any = null, at = 0, tried = 0, busy = false, alive = true;
+    const pull = (minGap: number) => {
+      const now = Date.now();
+      if (busy || now - tried < minGap) return;
+      busy = true; tried = now;
+      db.assistantUsage().then((v) => { if (!alive) return; view = v; at = Date.now(); GX.emit('assistant:usage'); }).catch(() => {}).finally(() => { busy = false; });
+    };
+    GX.assistantFeed = {
+      get: () => { if (Date.now() - at > 120_000) pull(30_000); return view; },
+      refresh: () => { if (!document.hidden) pull(30_000); },
+    };
+    return () => { alive = false; GX.assistantFeed = null; };
+  }, [uid, enabled]);
 }
 
 function useChatFeed(uid: string, enabled: boolean) {

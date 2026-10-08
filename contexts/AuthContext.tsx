@@ -3,6 +3,7 @@ import { User } from '../types';
 import { db, getToken, setToken, clearToken, ApiError } from '../services/dataService';
 import { connectSocket, disconnectSocket } from '../services/socket';
 import { setAvatarUrl } from '../services/avatarCache';
+import { canUseAssistant } from '../constants';
 
 interface AuthContextType {
   user: User | null;
@@ -93,6 +94,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    // mIAouss : une DÉCONNEXION VOLONTAIRE efface la discussion (décision de Théo, 08/10/2026) — la
+    // mémoire, elle, reste. Lancé AVANT clearToken : apiFetch lit le jeton au moment de l'appel.
+    if (canUseAssistant(user?.role)) db.assistantReset().catch(() => {});
     disconnectSocket(); // fermeture propre du socket : pas de connexion fantôme
     clearToken();
     sessionStorage.clear();

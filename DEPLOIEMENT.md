@@ -91,6 +91,8 @@ Créer `~/gearbox/.env` (jamais committé, `chmod 600`) — modèle dans `.env.e
 | `GOOGLE_REDIRECT_URI` | `https://<DOMAIN>/api/forms/google/callback` (déclarée à l'identique dans la console Google ; en local `http://localhost:3000/api/forms/google/callback`) |
 | `FORMS_WORKER_URL` | Adresse du Worker Cloudflare des Forms Bony : `https://forms.bonyauto-mobile.workers.dev` (en local `http://localhost:8787`) |
 | `FORMS_WORKER_SECRET` | Secret partagé Gearbox ↔ Worker (64 caractères hexadécimaux). ⚠️ Même valeur dans `backend/.env` du poste, ce `.env`, et le secret `GEARBOX_SECRET` du Worker (`wrangler secret put`) |
+| `GROQ_API_KEY` | Assistant IA mIAouss (08/10/2026) : clé Groq, projet `gearbox-assistant` de console.groq.com (offre gratuite). Fournisseur principal |
+| `CLOUDFLARE_ACCOUNT_ID` · `CLOUDFLARE_AI_TOKEN` | Assistant IA, secours : identifiant du compte Cloudflare (celui du Worker Forms) et jeton **limité à Workers AI** (modèle « Workers AI » de My Profile › API Tokens). Offre gratuite : 10 000 neurones/jour, refus au-delà, jamais de facture |
 | `GOOGLE_TOKEN_KEY` | Clé de chiffrement du jeton Google, 32 octets en base64 (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`). ⚠️ **IDENTIQUE à celle de `backend/.env` du poste local** : le backend local écrit dans la base de prod, un jeton chiffré en local doit rester lisible en prod |
 
 > ⚠️ Ce guide annonçait « exactement 5 variables » jusqu'au 05/08/2026 : c'était faux

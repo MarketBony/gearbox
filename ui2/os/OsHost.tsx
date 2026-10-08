@@ -5,8 +5,10 @@ import overridesCss from './overrides.css?inline';
 // Rubriques NÉES dans la v2 (sans équivalent dans la maquette) : leur feuille, après celle de la maquette.
 import postitCss from '../apps/todo/postit.css?inline';
 import formsCss from '../apps/forms/forms.css?inline';
+import assistantCss from '../apps/assistant/assistant.css?inline';
 import { boot } from './engine/boot';
 import DataHub from './DataHub';
+import MascotLayer from '../apps/assistant/MascotLayer';
 import { bridgeStore, useLegacyIds, usePortedMounts, tabOf } from './bridge';
 import { PORTED_APPS } from '../apps/registry';
 import { useAuth } from '../../contexts/AuthContext';
@@ -122,7 +124,7 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
       Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '0' });
       const shadow = host.attachShadow({ mode: 'open' });
       const style = document.createElement('style');
-      style.textContent = `${css}\n${overridesCss}\n${postitCss}\n${formsCss}`;
+      style.textContent = `${css}\n${overridesCss}\n${postitCss}\n${formsCss}\n${assistantCss}`;
       const body = document.createElement('div');
       body.className = 'gx-body';
       shadow.append(style, body);
@@ -143,6 +145,7 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
   return (
     <div ref={slotRef}>
       {booted && <Hub />}
+      {booted && <MascotLayer />}
       {booted && ported.map(m => { const App = PORTED_APPS[m.appId]; return App ? createPortal(<DeferredApp App={App} win={m.win} inst={m.inst} />, m.host, m.key) : null; })}
       {booted && legacy.map(id => createPortal(
         <div key={id} slot={`app-${id}`} className="gx2-legacy text-bony-text font-sans" style={{ height: '100%', overflow: 'hidden' }}>
