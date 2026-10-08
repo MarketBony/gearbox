@@ -46,6 +46,11 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
+  // Détection des connexions MORTES (08/10/2026) : 25 s + 20 s par défaut, soit jusqu'à 45 s pendant lesquelles un
+  // téléphone sorti de veille ou un PC qui change de réseau croit son socket vivant — et y perd ses messages.
+  // 10 s + 8 s : une coupure est constatée en moins de 20 s (le client renvoie alors ses messages en attente).
+  pingInterval: 10_000,
+  pingTimeout: 8_000,
   cors: {
     origin: '*', // In production, set this to the frontend domain
     methods: ['GET', 'POST', 'PUT', 'DELETE']

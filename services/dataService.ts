@@ -464,6 +464,31 @@ class DataService {
   // Upload d'un fichier (chat|avatar|calendar|project) via POST /api/uploads/:type.
   // multipart/form-data : on NE fixe PAS Content-Type (le navigateur ajoute la
   // boundary). Renvoie l'URL relative servie par le backend.
+  /**
+   * Dépôt AVEC PROGRESSION (XHR : `fetch` ne remonte pas l'avancement de l'envoi). Utilisé par la boîte d'envoi du
+   * Chat (services/chatOutbox.ts). Mêmes règles que `uploadFile` : JWT, 401 = session expirée, message du serveur.
+   */
+  uploadFileWithProgress(type: 'chat', file: File, onProgress: (p: number) => void): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const form = new FormData(); form.append('file', file);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_BASE}/uploads/${type}`);
+      const token = getToken(); if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+      xhr.onerror = () => reject(new ApiError(0, 'Connexion perdue pendant l’envoi du fichier.'));
+      xhr.ontimeout = () => reject(new ApiError(0, 'Envoi du fichier trop long, réessaie.'));
+      xhr.timeout = 5 * 60_000;
+      xhr.onload = () => {
+        if (xhr.status === 401) { clearToken(); window.dispatchEvent(new CustomEvent('gearbox-auth-expired')); return reject(new ApiError(401, 'Session expirée')); }
+        let body: any = {}; try { body = JSON.parse(xhr.responseText || '{}'); } catch { /* corps non JSON */ }
+        if (xhr.status < 200 || xhr.status >= 300) return reject(new ApiError(xhr.status, body.error || body.message || `Erreur ${xhr.status}`));
+        if (!body.url) return reject(new ApiError(500, 'Réponse du serveur incomplète.'));
+        resolve(body.url);
+      };
+      xhr.send(form);
+    });
+  }
+
   async uploadFile(type: 'chat' | 'avatar' | 'calendar' | 'project' | 'chatbg', file: File): Promise<string> {
     const form = new FormData();
     form.append('file', file);

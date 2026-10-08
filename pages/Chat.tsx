@@ -14,6 +14,7 @@ import { db, ApiError } from '../services/dataService';
 import { formatPoids } from '../utils/fichiers';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { getSocket, connectSocket, emitWithAck } from '../services/socket';
+import { sendChatMessage, sendChatFile, retryChatMessage, cancelChatMessage, useOutbox } from '../services/chatOutbox';
 import { chatStore } from '../services/chatStore';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -508,14 +509,18 @@ const Chat: React.FC = () => {
       const id = activeConvIdRef.current;
       if (id) db.getMessages(id).then(setMessages).catch(() => {});
     };
+    // Accusé de la boîte d'envoi (services/chatOutbox.ts) : même traitement qu'une diffusion, dédoublonné par id.
+    const onDelivered = (e: Event) => onNew((e as CustomEvent<ChatMessage>).detail);
     s.on('chat:message:new', onNew);
     s.on('chat:message:updated', onUpdated);
     window.addEventListener('gearbox-chat-reconnected', onReconnect);
+    window.addEventListener('gearbox-chat-delivered', onDelivered);
     return () => {
       unsub();
       s.off('chat:message:new', onNew);
       s.off('chat:message:updated', onUpdated);
       window.removeEventListener('gearbox-chat-reconnected', onReconnect);
+      window.removeEventListener('gearbox-chat-delivered', onDelivered);
     };
   }, []);
 
@@ -594,6 +599,8 @@ const Chat: React.FC = () => {
    * dégradé Bony (`bulleDe`).
    */
   const maBulle = bulleDe(convTheme?.bubble);
+  // Boîte d'envoi (services/chatOutbox.ts) : messages de cette conversation pas encore accusés par le serveur.
+  const outbox = useOutbox(activeConvId);
   /** Ancre des menus GIF et « citer un projet » : la BARRE, pas leur picto — celui-ci
    *  n'existe plus sur mobile, où l'action est déclenchée depuis le menu « + ». */
   const barreSaisieRef = useRef<HTMLDivElement>(null);
@@ -848,11 +855,10 @@ const Chat: React.FC = () => {
     const replyToId = replyTo?.id;
     setReplyTo(null);
     setInput('');
-    // Envoi via socket : l'ajout à la liste se fait à la réception de
-    // chat:message:new (l'émetteur est dans la room et reçoit sa diffusion).
-    // Le backend gère identité/timestamp/unread/lastMessage. Erreur via l'ack.
-    emitWithAck('chat:message:send', { conversationId: activeConvId, content, type, replyToId, ...piece })
-      .catch(err => alert(err instanceof Error ? err.message : "Échec de l'envoi du message."));
+    // Boîte d'envoi (services/chatOutbox.ts, 08/10/2026) : le message s'affiche tout de suite en « Envoi… »,
+    // il est renvoyé si la connexion lâche, et « Non envoyé · Réessayer » sinon — il ne disparaît plus.
+    // Le backend gère identité/timestamp/unread/lastMessage.
+    sendChatMessage(activeConvId, content, type, { replyToId, ...piece });
   }, [activeConvId, me, replyTo]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -945,13 +951,11 @@ const Chat: React.FC = () => {
     // Un fichier vide passerait le contrôle de taille mais produirait un message
     // inutilisable (et `content` vide est refusé par le serveur).
     if (file.size === 0) { alert('Fichier vide.'); return; }
-    try {
-      const url = await db.uploadFile('chat', file);
-      const estImage = CHAT_IMAGE_TYPES.includes(file.type);
-      sendMessage(url, estImage ? 'image' : 'file', { fileName: file.name, fileSize: file.size });
-    } catch (e) {
-      alert(e instanceof ApiError ? e.message : "Échec de l'envoi du fichier.");
-    }
+    if (!activeConvId) return;
+    // Boîte d'envoi : aperçu immédiat, progression, photo réduite si grosse, renvoi si la connexion lâche.
+    const estImage = CHAT_IMAGE_TYPES.includes(file.type);
+    const replyToId = replyTo?.id; setReplyTo(null);
+    sendChatFile(activeConvId, file, estImage ? 'image' : 'file', { replyToId });
   };
 
   // Coller : on prend le premier fichier quel qu'il soit, plus seulement une image.
@@ -1642,6 +1646,22 @@ const Chat: React.FC = () => {
                       </span>
                     </div>
                   )}
+                  {/* Boîte d'envoi : messages pas encore accusés par le serveur */}
+                  {outbox.map(o => (
+                    <div key={o.clientId} className="flex flex-col items-end mb-2">
+                      <div className={`max-w-[70%] ${o.status === 'failed' ? '' : 'opacity-60'}`}>
+                        {o.type === 'image' && (o.preview || o.content)
+                          ? <img src={o.preview || o.content} alt="" className="max-h-56 rounded-2xl" />
+                          : <div className={`px-3 py-2 rounded-2xl rounded-br-sm text-sm whitespace-pre-wrap break-words text-white ${o.status === 'failed' ? 'ring-2 ring-red-500' : ''}`} style={{ background: maBulle.css, color: maBulle.texteSombre ? '#0f172a' : undefined }}>
+                              {o.type === 'text' ? o.content : o.type === 'audio' ? '🎤 Message vocal' : `📎 ${o.fileName || 'Pièce jointe'}`}
+                            </div>}
+                      </div>
+                      <span className={`text-[10px] mt-0.5 ${o.status === 'failed' ? 'text-red-500' : 'text-bony-muted'}`}>
+                        {o.status === 'failed' ? `Non envoyé${o.error ? ` · ${o.error}` : ''}` : o.status === 'uploading' ? `Envoi du fichier… ${Math.round((o.progress || 0) * 100)} %` : 'Envoi…'}
+                        {o.status === 'failed' && <> · <button className="underline text-bony-orange" onClick={() => retryChatMessage(o.clientId)}>Réessayer</button> · <button className="underline" onClick={() => cancelChatMessage(o.clientId)}>Annuler</button></>}
+                      </span>
+                    </div>
+                  ))}
                   <div ref={bottomRef} />
                 </div>
 
@@ -1660,8 +1680,7 @@ const Chat: React.FC = () => {
                         // Même chemin d'upload que les pièces jointes : le vocal est un
                         // fichier de conversation comme un autre, et hérite donc de la
                         // purge à 180 jours (type 'audio' ajouté au filtre du job).
-                        const url = await db.uploadFile('chat', fichier);
-                        sendMessage(url, 'audio', { fileName: duree, fileSize: fichier.size });
+                        if (activeConvId) sendChatFile(activeConvId, fichier, 'audio', { fileName: duree });
                       }}
                     />
                   )}
