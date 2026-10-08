@@ -70,6 +70,38 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const us = c.members.filter((u) => u !== GX.ctx.uid).slice(0, 2).map((u) => D.user(u));
     return `<span class="wch-duo" style="--d:${s}px">${us.map((u) => GX.r.av(u.id, '', { tip: false })).join('')}</span>`;
   }
+  /* ---------------- Widget mIAouss : bloc d'information (re-rendu seul, le champ de saisie n'est jamais touché) ---------------- */
+  let awDraft = '';
+  const awHhmm = (ms) => new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  function awInfo() {
+    const v = GX.assistantFeed?.get();
+    if (!v?.capacity) return `<div class="faint" style="font-size:12px">${GX.assistantFeed ? 'Chargement…' : 'Indisponible'}</div>`;
+    const ps = (v.capacity.providers || []).filter((p) => p.configured);
+    const pct = ps.length ? ps.reduce((s, p) => s + Math.max(0, Math.min(1, p.share || 0)), 0) / ps.length : 0;
+    const col = pct > 0.5 ? 'var(--ok)' : pct >= 0.2 ? 'var(--warn)' : 'var(--danger)';
+    const left = Math.max(0, Math.round(v.capacity.questionsLeft || 0));
+    const rest = ps.length > 0 && ps.every((p) => p.resting), until = rest ? Math.min(...ps.map((p) => p.until || Infinity)) : 0;
+    return `<div class="aw-gauge"><i style="width:${Math.round(pct * 100)}%;background:${col}"></i></div>
+      <div class="aw-n"><b class="num">~${F.n(left)}</b> question${left > 1 ? 's' : ''} restante${left > 1 ? 's' : ''} aujourd’hui</div>
+      ${rest && Number.isFinite(until) ? `<div class="faint" style="font-size:11.5px">Repart vers ${awHhmm(until)}</div>` : ''}`;
+  }
+  GX.on('assistant:usage', () => { GX.root.querySelectorAll('.aw[data-aw] .aw-info').forEach((el) => { el.innerHTML = awInfo(); }); });
+  /* Au plus une lecture toutes les 2 min (le pont refuse en dessous de 30 s) ; rien si aucun widget affiché ou onglet caché. */
+  const awTick = () => { if (!document.hidden && GX.root.querySelector('.aw[data-aw]')) GX.assistantFeed?.refresh(); };
+  setInterval(awTick, 120000);
+  GX.win(document, 'visibilitychange', awTick);
+  GX.win(document, 'input', (e) => { const i = e.target.closest?.('.aw [data-aq]'); if (i) awDraft = i.value; });
+  /* Un clic sur le widget (hors champ, hors mode édition) ouvre le volet de la mascotte. */
+  GX.win(document, 'click', (e) => { const w = e.target.closest?.('.aw[data-aw]'); if (!w || e.target.closest('input') || w.closest('.editing')) return; GX.assistant?.open(); });
+  GX.win(document, 'keydown', (e) => {
+    const i = e.target.closest?.('.aw [data-aq]'); if (!i) return;
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault(); e.stopPropagation();
+      const q = i.value.trim(); if (!q || !GX.assistant?.available) return;
+      GX.assistant.open(q);   /* le volet de la mascotte (déjà ouvert : la question part tout de suite) */
+      awDraft = ''; i.value = '';
+    } else if (e.key === 'Escape') { e.stopPropagation(); i.blur(); }
+  }, true);
   function chatLive(sz, cfg = {}, w) {
     const all = chOrder(), c = chConv(cfg), n = all.reduce((s, x) => s + (x.unread || 0), 0);
     if (!c) return `<div class="wch">${head('chat', 'Chat')}<div class="faint" style="margin:auto">Aucune conversation</div></div>`;
@@ -168,6 +200,12 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
          auteur → avatar de la conversation). Avant le 01/10/2026 : faux message sans auteur, avatar de soi-même. */
       const last = chVisible().map((c) => ({ c, m: chLast(c) })).filter((x) => x.m).sort((a, b) => b.m.at - a.m.at).slice(0, fit(sz));
       return `${head('chat', 'Derniers messages', n ? `<span class="count">${n}</span>` : '')}<div class="wl">${last.map(({ c, m }) => `<div class="wr" data-conv="${c.id}">${m.u ? GX.r.av(m.u, 'sm') : chAv(c, 22)}<span class="ellipsis grow"><b>${GX.esc(c.name)}</b> <span class="muted">${GX.esc(m.t || (m.type === 'image' ? '📷 Photo' : '📎 Pièce jointe'))}</span></span></div>`).join('')}</div>`;
+    } },
+    /* [GEARBOX] Widget mIAouss (08/10/2026) : capacité de l'équipe du jour + champ de question. Données : GX.assistantFeed
+       (DataHub, paresseux, 1 lecture / 2 min au plus). La question ouvre le VOLET de la mascotte (GX.assistant, P1). */
+    assistant: { app: null, name: 'mIAouss', sizes: ['W', 'M', 'M3'], render() {
+      return `<div class="aw" data-aw>${head('assistant', 'mIAouss')}<div class="aw-info">${awInfo()}</div>
+        <input class="aw-in" data-aq placeholder="Pose ta question…" maxlength="2000" autocomplete="off" value="${GX.esc(awDraft)}" aria-label="Poser une question à mIAouss" /></div>`;
     } },
     'chat-live': { app: 'chat', name: 'Chat interactif', sizes: ['L', 'M3', 'XL', 'X3', 'XXL', 'XXW'], live: true, render: (sz, c = {}, w) => chatLive(sz, c, w) },
     birthdays: { app: 'hello', name: 'Anniversaires', sizes: ['S', 'M', 'M3', 'T'], render(sz) {
@@ -287,6 +325,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   }
   const allowed = (type) => {
     const a = CAT[type].app; if (a && !GX.shell.canOpen(a)) return false;
+    if (type === 'assistant' && !GX.assistant?.available) return false;   /* [GEARBOX] mIAouss : équipe marketing (MascotLayer) */
     /* [GEARBOX] mêmes règles que les pages */
     if (['budget-sites', 'campaigns'].includes(type) && GX.ctx.role === 'Site Manager') return false;
     if (['birthdays', 'music', 'chat-live'].includes(type) && !GX.bridge().showSocial) return false;
@@ -378,12 +417,14 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const sx = SX(), sy = SY(); box.style.width = cols() * sx - GAP + 'px'; box.style.left = M() + 'px'; box.style.top = Math.round(area().top + M()) + 'px'; box.style.height = maxY * sy + 'px'; /* [GEARBOX] marge proportionnelle */
     /* Le widget Chat se re-rend à chaque message : on garde le champ de saisie actif (focus + curseur) */
     const ae = GX.root.activeElement, keep = ae && box.contains(ae) && ae.matches('[data-wc-in]') ? { id: ae.closest('.wch')?.dataset.wid, pos: ae.selectionStart } : null;
+    const keepAw = ae && box.contains(ae) && ae.matches('[data-aq]') ? ae.selectionStart : null;   /* champ « Pose ta question… » de mIAouss */
     box.innerHTML = vis.map((w, i) => {
       const c = CAT[w.type], [cw, ch] = dim(w.size);
       let inner = ''; try { inner = c.render(w.size, w.cfg || {}, w); } catch (e) { inner = `<div class="faint">${GX.esc(e.message)}</div>`; }
       return `<div class="wdg ${c.accent ? 'accent' : c.sky ? 'sky' : 'glass'}${c.live ? ' live' : ''} sz-${w.size}" data-id="${w.id}" data-app="${c.app || ''}" style="left:${XL(w.x, cw)}px;top:${w.y * sy}px;width:${cw * STEP - GAP}px;height:${ch * STEP - GAP}px;animation-delay:${i * 30}ms">
         ${inner}${editing ? `<button class="wx" data-rm title="Retirer">${GX.icon('minus', 'sm')}</button><button class="wsz" data-size title="Taille suivante">${dimL(w.size).replace(' × ', '×')}</button>` : ''}${c.sizes.length > 1 ? '<button class="wrz" data-rz tabindex="-1" aria-label="Redimensionner" title="Tirer pour redimensionner"></button>' : ''}</div>`;
     }).join('');
+    if (keepAw != null) { const i = box.querySelector('.aw [data-aq]'); if (i) { i.focus({ preventScroll: true }); i.setSelectionRange(keepAw, keepAw); } }
     if (keep) { const i = box.querySelector(`.wch[data-wid="${keep.id}"] [data-wc-in]`); if (i) { i.focus({ preventScroll: true }); if (keep.pos != null) i.setSelectionRange(keep.pos, keep.pos); } }
     /* L'entrée « pop » ne se joue qu'à l'apparition du bureau, pas à chaque re-rendu (pastilles, messages…) */
     if (!box.classList.contains('settled')) { clearTimeout(W._st); W._st = setTimeout(() => box && box.classList.add('settled'), 900); }

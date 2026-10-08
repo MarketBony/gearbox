@@ -4,13 +4,13 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 08/10/2026 (lire en premier)
-- **LOT EN COURS DE CADRAGE : ASSISTANT IA** (détail et arbitrages au backlog § « Assistant IA — cadrage du 07-08/10 »).
-  Rien n'est codé. Décidé : tous les usages, **mémoire par utilisateur façon Claude** (notes éditables dans Paramètres),
-  **Gemini 3 Flash** (offre gratuite, clé AI Studio de marketbony@gmail.com) **+ Groq en secours**, accès **équipe
-  marketing seulement** (ni External ni chef de site), mascotte **chat « Piston »** (nom à changer) de
-  `maquettes/ux/mascottes.html`. **Prochaine étape : guider Théo PAS À PAS pour créer la clé Gemini** (et la clé Groq),
-  puis audit + plan de la P0. Retour de Théo sur la navigation téléphone (correctif 70) sur vrais téléphones : attendu.
-- **En production : correctif 70 (07/10)** — **Interface v2 sur TÉLÉPHONE : nouvelle navigation** (proposition C de
+- **ASSISTANT IA « mIAouss » LIVRÉ (correctif 71, 08/10)** — P0 + P1 : Qwen3.8 27B chez Groq puis Cloudflare (gratuit,
+  un seul modèle), « Gearbox calcule, l'IA rédige », mémoire par utilisateur, plafonds par personne, mascotte sur le Dock /
+  la pilule avec volet de discussion. Détail au correctif 71 et au backlog § « Assistant IA ». **Suite** : retours de Théo et
+  de l'équipe en usage réel ; P2 rédaction guidée (posts Digital, Forms, e-mails) ; P3 actions avec confirmation. Retour de
+  Théo sur la navigation téléphone (correctif 70) sur vrais téléphones : toujours attendu.
+- **En production : correctif 71 (08/10)** — **assistant IA mIAouss** (`api` ET `web`, migration `20261008120000_assistant_p0`,
+  3 variables d'environnement nouvelles). Avant lui le **correctif 70 (07/10)** — **Interface v2 sur TÉLÉPHONE : nouvelle navigation** (proposition C de
   `maquettes/ux/mobile-nav.html`, choisie par Théo) : pilule flottante Accueil · 3 favoris · loupe, retour du téléphone,
   accueil personnalisable (widgets). `web` seul, aucune migration ; ordinateur inchangé. ⚠️ Testée en navigateur
   (taille téléphone, tactile simulé) : à confirmer par Théo sur iPhone et Pixel. Avant lui le **correctif 69 (07/10)** —
@@ -52,7 +52,7 @@
      **F4 fait (66).** Reste noté : accusé de réception par e-mail (refusé pour l'instant).
      **Forms Bony F5 (demandes de Théo du 07/10) : fait** — intégration (68), duplication, taille du logo, cadrage des
      images, pied de page Bony, adresse de contact (69). Restes : backlog § Forms Bony.
-     **Ensuite : ASSISTANT IA (en cadrage, voir en tête), puis tâches multi-assignées, prestataire, répartitions, fichiers
+     **Assistant IA : livré (correctif 71, P0 + P1).** Ensuite : tâches multi-assignées, prestataire, répartitions, fichiers
      maison** (plan validé par Théo « de A à Z »). À faire par l'équipe : importer les polices officielles (NouvelR, Read, Dacia Block,
      AlpineNewAlps, NissanBrand) dans Studio › Polices de marque.
      Trou serveur `GET /api/budget` : Théo le traite « après » (01/10).
@@ -555,6 +555,48 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 71 — 08/10 : assistant IA « mIAouss » (P0 + P1 en un seul lot)** (branche `feat/assistant-p0`, **`api` ET
+  `web`**, migration additive `20261008120000_assistant_p0` — 4 tables — appliquée et inscrite AVANT le push ; 3 variables
+  nouvelles `GROQ_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_TOKEN` au `.env` du VPS et dans `docker-compose.yml`).
+  Interface v2 SEULEMENT, équipe marketing seulement (ni Guest, ni External, ni chef de site).
+  - **Cerveau : Qwen3.8 27B, UN SEUL modèle** (Théo veut une IA constante), chez **Groq** (~1 s) puis **Cloudflare Workers
+    AI** en secours (même modèle, réponses mesurées quasi identiques). Gratuit et le restera : Gemini gratuit écarté (5 req/min,
+    20 req/jour par modèle, 503 à répétition), OpenRouter écarté (Qwen n'y est plus gratuit), gpt-oss écarté (indice 12).
+    Porte unique `backend/src/assistant/providers.ts` (bascule automatique, fournisseur « au repos » après un 429/503).
+    Toujours SANS réflexion : Groq plafonne la SORTIE à 1 000 jetons/min (limite non documentée, mesurée).
+  - **Règle d'architecture : Gearbox calcule, l'IA rédige.** Mesuré : sans réflexion, Qwen se trompe dans les chiffres
+    qu'il calcule lui-même. Les outils de LECTURE (`projets`, `budget`, `absences`) s'exécutent DANS LE NAVIGATEUR
+    (`ui2/apps/assistant/tools.ts`) avec les mêmes portes que les écrans (`computeDashboardStats` pour « en retard »,
+    `computeBudgetStats`, `recalculerProjet`, ressource `conges`) — le backend ne compile pas `constants.ts`. Le serveur
+    garde l'état du tour (`POST /chat` → outils → `POST /chat/tools`). Sous-totaux et écarts calculés par l'outil (le
+    modèle recomptait mal). Vérifié identique aux écrans : 16 en retard (Dashboard), budget Clermont 444 000 / 420 246 /
+    23 754 € (écran Budget), absences, projets actifs Vichy / Rodez.
+  - **Garde-fou anti-invention** : à « Qui est absent cette semaine ? », Qwen a répondu sans outil avec deux collègues
+    INVENTÉS. Prompt durci + verrou serveur (`DATA_INTENT`, routes/assistant.ts) : une réponse sans outil à une question de
+    données est jetée et redemandée avec `tool_choice: required`.
+  - **Contexte métier** : glossaire dans le prompt (RDM, VN/VO/APV/PR, PRO+, statuts, en retard, enveloppe / consommé,
+    Holding, GROUPE BONY) ; l'organisation du groupe (plaques, concessions, Alpine, Nissan, regroupements) est construite
+    depuis `constants.ts` par le navigateur et envoyée avec chaque question ; les outils comprennent « plaque Centre »,
+    « Sud-Ouest », « tout le réseau » (retour de Théo : « plaque centre » n'était pas comprise).
+  - **Mémoire par utilisateur façon Claude** (outil `retenir`, seule écriture, dans SA mémoire ; bandeau « retenu » +
+    Annuler) ; Paramètres › mIAouss : consommation, capacité du jour par fournisseur, mémoire (pause, ajout, modification,
+    suppression, tout effacer), équipe (Master/Admin) avec **plafond quotidien par personne réglé par le Master** (25 par
+    défaut, Master sans limite). Discussion conservée sur tous les appareils ; « Nouvelle discussion » ou une déconnexion
+    VOLONTAIRE l'effacent (`AuthContext.logout`), la mémoire reste.
+  - **P1 : pas de fenêtre** (décision de Théo) — la **mascotte** (le chat mécano de `maquettes/ux/mascottes.html`, moteur
+    porté dans `ui2/apps/assistant/mascot.ts`) vit sur le Dock (`#dockWrap`) ou perchée sur la pilule (`#mpill`) ; clic =
+    petit volet au-dessus d'elle (feuille depuis le bas sur téléphone). Porte unique `GX.assistant.open(question?)` : mascotte,
+    widget « mIAouss » (jauge de capacité + champ de question), recherche (« Demander à mIAouss : « … » »). Physique (retours
+    de Théo) : le Dock est un SOL (debout sur les icônes agrandies, projetée en l'air quand une icône grossit sous elle),
+    attrapée elle va partout (pattes pendantes, la bulle la suit), lâchée elle tombe / est lancée / rebondit, chute haute =
+    à la renverse avec étoiles, secouée = tournis, ronronne au survol prolongé.
+  - **Économie** (PC qui chauffent) : boucle arrêtée Dock rangé / onglet caché / Effets économes (mesuré 0 image/s), ~21-30
+    éveillée, 60 seulement en mouvement, 8 en dormant ; verrou contre une double boucle (`inLoop`).
+  - Testé sur localhost avec le compte Master de Théo, dans le navigateur (ordinateur + taille téléphone). ⚠️ Non vérifiés
+    en interface : External / Guest / chef de site (refus en place navigation + routage + `requireRole` API, vérifiés au
+    code), vrais téléphones, sensation du lancer à la main. Clés Gemini / Groq / Cloudflare passées en clair dans le chat
+    de session : à régénérer un jour (Gemini gardée sans usage).
+
 - **Correctif 70 — 07/10 : interface v2 sur téléphone, nouvelle navigation** (branche `feat/mobile-c`, **`web` seul**,
   aucune migration, rien sous `backend/`). Demande de Théo : « moins OS » sur téléphone, la barre gestuelle maison
   faisait doublon avec celle du téléphone. Trois maquettes (`maquettes/ux/mobile-nav.html`), Théo choisit la C.
@@ -644,7 +686,10 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 70** (7 octobre 2026) — nouvelle navigation de la v2 sur
+- master = prod, synchronisés. Dernier lot déployé : **correctif 71** (8 octobre 2026) — assistant IA mIAouss. **`api` ET
+  `web`**, migration `20261008120000_assistant_p0` (additive, 4 tables, appliquée et inscrite AVANT le push). Nouvelles
+  variables `GROQ_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_TOKEN` (`.env` du VPS + `docker-compose.yml`). Avant lui le
+  **correctif 70** (7 octobre 2026) — nouvelle navigation de la v2 sur
   téléphone. **`web` seul**, aucune migration. Avant lui le **correctif 69** (7 octobre 2026) — Forms Bony F5 (duplication,
   logo, cadrage, pied de page). **Worker d'abord** (`npm run deploy`), puis **`api` ET `web`** (route de duplication).
   Aucune migration. Avant lui le **correctif 68** (7 octobre 2026) — Forms Bony, intégration dans
@@ -4024,7 +4069,15 @@
   - **Fichiers maison** (façon SharePoint, stockage sur le VPS ; droits par fichier gérés par le Master). 179 Go
     libres au 01/10. ⚠️ Avant d'y mettre les documents : la sauvegarde hebdomadaire ne copie que la base Supabase,
     pas le volume `uploads_data` (à vérifier et régler).
-  - **Assistant IA — cadrage du 07-08/10/2026** (remplace l'entrée « Mascotte / agent IA » ci-dessous) :
+  - **Assistant IA « mIAouss » — P0 + P1 LIVRÉES au correctif 71 (08/10/2026).** Reste : **P2 rédaction guidée** (posts
+    Digital, textes de Forms, e-mails : consignes par type de texte — Qwen respecte mal les longueurs, ton un peu plat) ;
+    **P3 actions avec confirmation** (tâche, post-it, brouillon de projet : carte proposée, écriture par les routes normales) ;
+    idées de la maquette non faites (assis devant la rubrique ouverte, tapote le Chat à l'arrivée d'un message, danse le
+    vendredi, tenues de saison) ; régénérer les clés passées dans le chat ; mesurer la consommation réelle de l'équipe
+    (Paramètres › mIAouss) avant tout réglage de plafond. ⚠️ Bony ne paiera JAMAIS (Théo) : aucune option payante.
+    Nom choisi : **mIAouss**. Le cadrage d'origine ci-dessous est conservé pour l'historique (le choix du modèle a changé :
+    Gemini → Qwen, voir correctif 71).
+  - **Assistant IA — cadrage du 07-08/10/2026** (historique ; remplace l'entrée « Mascotte / agent IA » ci-dessous) :
     - **Usages : TOUS**, « voire plus » : questions sur les données (budget, retards, absents…), rédaction (posts
       Digital, textes de Forms, e-mails), résumés (Chat, réponses de Forms), aide à l'usage de Gearbox, actions AVEC
       confirmation (tâche, post-it, brouillon de projet : carte proposée, l'écriture passe par les routes normales).
@@ -4244,6 +4297,17 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Interface v2 : `GX.css(...)` du moteur est une fonction VIDE** (`engine/core.ts`) : les styles du moteur ont été extraits
+  une fois pour toutes dans `maquette.css`. Une règle écrite dans un `GX.css` n'existe pas — le widget mIAouss était sans style
+  (08/10). Les rubriques nées dans la v2 ont leur feuille injectée par `OsHost.tsx` (`assistant.css`, `forms.css`…), et le
+  thème clair s'y écrit `:host([data-theme="light"])`, jamais `:root[…]`.
+- **Coque téléphone : la pilule est RECONSTRUITE (`pill.innerHTML = …`) à chaque mise à jour des favoris** — tout élément posé
+  dedans disparaît. La mascotte est raccrochée par un `MutationObserver` (MascotLayer.tsx).
+- **mIAouss / Groq : les paramètres d'outil sont validés STRICTEMENT** — `"true"` au lieu de `true` fait refuser tout l'appel
+  (400). Schémas tolérants (`['boolean', 'string']`, sans enum) + normalisation dans `tools.ts`. Et Groq plafonne la SORTIE à
+  1 000 jetons/min : jamais de réflexion (`reasoning_effort: none`).
+- **mIAouss : Qwen INVENTE si on le laisse répondre sans outil** (deux collègues absents fictifs, 08/10). Le verrou
+  `DATA_INTENT` de `routes/assistant.ts` n'est pas décoratif : ne pas le retirer « parce que le prompt suffit ».
 - **Coque téléphone : `history.back()` puis `pushState` dans la même tâche ramène SOUS l'accueil** (Chrome résout le
   retour au moment de l'appel) : le retour suivant QUITTE Gearbox. Cas réel : fermer un menu puis ouvrir une rubrique.
   D'où le retrait différé d'un tic dans `hSync` (mobile.ts). Tester l'historique avec des enchaînements, pas un geste seul.

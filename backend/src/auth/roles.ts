@@ -102,3 +102,14 @@ export const forbiddenRoleMessage = (targetRole: string) =>
 export const FORMS_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
 // Connexion / déconnexion du compte Google : Master seul.
 export const GOOGLE_CONNECT_ROLES = ['Master'];
+
+// --- Assistant IA « mIAouss » (08/10/2026) ------------------------------------------
+//
+// Qui parle à mIAouss : l'ÉQUIPE MARKETING seulement (décision de Théo). ⚠️ Guest, External et
+// chef de site en sont ABSENTS — contrôlé sur CHAQUE route de /api/assistant. Alignée sur
+// `ASSISTANT_ROLES` de constants.ts (navigation v2) et sur `MARKETING_TEAM_ROLES`.
+export const ASSISTANT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+// Voir la consommation de TOUTE l'équipe : Master et Administrator.
+export const ASSISTANT_TEAM_ROLES = ['Master', 'Administrator'];
+// Fixer le plafond quotidien de chacun : Master seul (décision de Théo, 08/10/2026).
+export const ASSISTANT_CAP_ROLES = ['Master'];

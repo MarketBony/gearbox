@@ -36,10 +36,12 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     settings: F(`${GEAR}M15.3 12a3.3 3.3 0 1 0-6.6 0 3.3 3.3 0 0 0 6.6 0z`, 'fill-rule="evenodd" stroke="var(--gf)" stroke-width=".9" stroke-linejoin="round"'),
     launchpad: [3.4, 9.5, 15.6].flatMap((y, j) => [3.4, 9.5, 15.6].map((x, i) => `<rect x="${x}" y="${y}" width="5" height="5" rx="1.5" fill="var(--gf)" opacity="${[1, .8, .6][(i + j) % 3]}"></rect>`)).join(''),
   };
+  // [GEARBOX] mIAouss (08/10/2026) : tête de chat. Plus une rubrique (P1 : c'est la mascotte) ; glyphe du widget et de la recherche.
+  G.assistant = F('M4.5 3.6 9 7.7a8.6 8.6 0 0 1 6 0l4.5-4.1c.4-.36 1-.06 1 .5V12a8.5 8.5 0 0 1-17 0V4.1c0-.56.6-.86 1-.5z') + A('M9 11.3a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6zm6 0a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6zM10.9 15.4h2.2L12 16.7z');
   G.project = G.projects; G.about = F('M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zm-1 7.5v6.3h2v-6.3zm1-4a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5z', 'fill-rule="evenodd"');
   /* Teintes façon iOS : dégradé vertical, plus clair en haut */
   const HUE = {
-    dashboard: ['#ff7a52', '#e8412c'], projects: ['#5aa9ff', '#1d6ef2'], todo: ['#ffffff', '#f2f2f5'], digital: ['#ff6aa6', '#e2327c'], campaigns: ['#ffab4a', '#f5701f'], forms: ['#a78bfa', '#673ab7'],
+    dashboard: ['#ff7a52', '#e8412c'], projects: ['#5aa9ff', '#1d6ef2'], todo: ['#ffffff', '#f2f2f5'], digital: ['#ff6aa6', '#e2327c'], campaigns: ['#ffab4a', '#f5701f'], forms: ['#a78bfa', '#673ab7'], assistant: ['#ffb36b', '#f0713a'],
     chat: ['#62e873', '#24b43c'], hello: ['#ffd65a', '#ff9f1c'], agenda: ['#ffffff', '#f2f2f5'], budget: ['#3fd0b0', '#0f9a80'], fixed: ['#3a3a3f', '#141416'],
     material: ['#b08f67', '#7b5b38'], conges: ['#5fd0ff', '#1b8cf0'], export: ['#3fd26a', '#1c9a42'], games: ['#9b7bff', '#5a33e8'], archives: ['#b0b0b8', '#74747c'],
     settings: ['#bdbdc4', '#74747e'], launchpad: ['#48484f', '#1f1f23'], about: ['#48484f', '#1f1f23'],

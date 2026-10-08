@@ -1290,6 +1290,28 @@ nulle la plus récente par conversation, jamais sur le Général) : 7 conversati
 `User.chatBackground` / `chatBubble` ne sont plus lus par le Chat (toujours acceptés par
 `PUT /api/auth/me`).
 
+### 🐱 Assistant IA « mIAouss » — `/api/assistant` (08/10/2026, correctif 71)
+Migration additive `20261008120000_assistant_p0` : `AssistantMessage` (la discussion), `AssistantNote` (la mémoire,
+`source` 'ia' | 'user'), `AssistantUsage` (chaque appel à un fournisseur ; `kind` 'question' au premier appel RÉUSSI d'un
+tour = ce que compte le plafond), `AssistantUser` (`memoryPaused`, `dailyCap` : null = défaut 25, −1 = sans limite).
+Références libres sans FK, index sur `userId`.
+
+- **Garde** : `router.use(authenticateToken, requireRole(ASSISTANT_ROLES))` — Master, Administrator, Director, Coordinator,
+  Digital Manager (`auth/roles.ts`). Tout est filtré sur `req.user.id`, même pour le Master (qui ne voit que les COMPTEURS
+  de l'équipe). Plafonds : `PUT /caps/:userId`, `ASSISTANT_CAP_ROLES` = Master seul ; vue équipe `ASSISTANT_TEAM_ROLES`.
+- **Routes** : `POST /chat { message, orga }` → `{status:'done', message}` ou `{status:'tools', turnId, calls}` ;
+  `POST /chat/tools { turnId, results }` (l'état du tour reste en mémoire serveur, 3 min, par process) ;
+  `GET|DELETE /conversation` ; `GET|POST /notes`, `PUT|DELETE /notes/:id`, `DELETE /notes` ; `GET /me` ; `PUT /prefs` ;
+  `GET /usage` ; `PUT /caps/:userId`. Temps réel : `emitToUser` `assistant:conversation` et `assistant:notes`.
+- **Portes uniques** : `assistant/providers.ts` (seul module qui parle aux IA et lit les clés `GROQ_API_KEY`,
+  `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_TOKEN` — jamais renvoyées au navigateur), `assistant/prompt.ts` (prompt de base,
+  glossaire, schémas des outils), `assistant/usage.ts` (compteur, plafonds, capacité estimée). Seul outil exécuté côté
+  serveur : `retenir` (n'écrit que dans la mémoire de l'interlocuteur, jamais en pause, 40 notes max).
+- **Verrou `DATA_INTENT`** : une réponse sans outil à une question de données est jetée et redemandée avec
+  `tool_choice: required` (Qwen inventait des noms). `orga` (organisation du groupe, construite depuis `constants.ts` par le
+  navigateur) est bornée à 1 500 caractères et n'engage que la session de l'interlocuteur.
+- Sans clé configurée : `POST /chat` répond 503 « pas configuré ».
+
 ## ⚠️ Route DORMANTE — `/api/expenses` (modèle `OneOffExpense`)
 
 Route CRUD complète et fonctionnelle (émissions `expense:*` incluses), mais

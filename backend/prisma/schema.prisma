@@ -884,3 +884,67 @@ model BonyFont {
 
   @@unique([family, weight, style])
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ASSISTANT IA « mIAouss » (P0, 08/10/2026). Tout appartient à UN utilisateur : chaque
+// requête filtre sur `userId = req.user.id` (références libres, pas de FK, style du schéma).
+// Porte unique : backend/src/assistant/.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// La discussion en cours. Conservée sur tous les appareils ; effacée par « Nouvelle
+/// discussion » ou par une DÉCONNEXION volontaire (décision de Théo, 08/10/2026).
+model AssistantMessage {
+  id        String   @id @default(uuid())
+  userId    String
+  /// 'user' | 'assistant'
+  role      String
+  content   String
+  /// Outils utilisés, note retenue, fournisseur — affichage seulement.
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// La mémoire, façon Claude : notes lues à chaque question. Survit à la déconnexion.
+model AssistantNote {
+  id        String   @id @default(uuid())
+  userId    String
+  content   String
+  /// 'ia' (retenue par mIAouss en travaillant) | 'user' (écrite dans Paramètres)
+  source    String   @default("user")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// Un appel à un fournisseur d'IA. Sert au compteur ET au plafond quotidien (kind = 'question'
+/// au premier appel d'un tour) : effacer la discussion n'efface PAS le compteur.
+model AssistantUsage {
+  id        String   @id @default(uuid())
+  userId    String
+  /// 'groq' | 'cloudflare'
+  provider  String
+  model     String
+  /// 'question' (premier appel d'un tour) | 'suite' (après un outil)
+  kind      String
+  inTokens  Int      @default(0)
+  outTokens Int      @default(0)
+  ms        Int      @default(0)
+  ok        Boolean  @default(true)
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+/// Réglages par personne. Absence de ligne = mémoire active, plafond par défaut.
+model AssistantUser {
+  userId       String   @id
+  memoryPaused Boolean  @default(false)
+  /// Questions par jour fixées par le Master : null = défaut, -1 = sans limite.
+  dailyCap     Int?
+  updatedAt    DateTime @updatedAt
+}

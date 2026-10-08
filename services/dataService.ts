@@ -1,5 +1,5 @@
 
-import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment, CongeJour, CongeType, CongeDemi, CongeDroit, PostIt, GoogleStatus, GForm, GFormDetail, GFormLog, BonyFormRow, BonyFormDetail, BonyResponse, BonyKit, BonyFont } from '../types';
+import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment, CongeJour, CongeType, CongeDemi, CongeDroit, PostIt, GoogleStatus, GForm, GFormDetail, GFormLog, BonyFormRow, BonyFormDetail, BonyResponse, BonyKit, BonyFont, AssistantMessage, AssistantTurn, AssistantNote, AssistantMe, AssistantUsageView } from '../types';
 import type { LobbyData, GameSession, GameChallenge, GameType } from '../components/games/gameTypes';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS, LOI_LOM_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
@@ -837,6 +837,25 @@ class DataService {
   async deletePostIt(id: string): Promise<void> {
     await apiFetch(`/postits/${id}`, { method: 'DELETE' });
   }
+
+  // --- Assistant IA « mIAouss » (équipe marketing ; tout est filtré sur l'utilisateur connecté) ---
+  async assistantConversation(): Promise<AssistantMessage[]> { return apiFetch<AssistantMessage[]>('/assistant/conversation'); }
+  /** `orga` : l'organisation du groupe lue dans constants.ts (le serveur ne la connaît pas). */
+  async assistantAsk(message: string, orga?: string): Promise<AssistantTurn> { return apiFetch<AssistantTurn>('/assistant/chat', { method: 'POST', body: JSON.stringify({ message, orga }) }); }
+  async assistantToolResults(turnId: string, results: { id: string; content: string }[]): Promise<AssistantTurn> {
+    return apiFetch<AssistantTurn>('/assistant/chat/tools', { method: 'POST', body: JSON.stringify({ turnId, results }) });
+  }
+  async assistantReset(): Promise<void> { await apiFetch('/assistant/conversation', { method: 'DELETE' }); }
+  async assistantNotes(): Promise<AssistantNote[]> { return apiFetch<AssistantNote[]>('/assistant/notes'); }
+  async assistantAddNote(content: string): Promise<AssistantNote> { return apiFetch<AssistantNote>('/assistant/notes', { method: 'POST', body: JSON.stringify({ content }) }); }
+  async assistantEditNote(id: string, content: string): Promise<AssistantNote> { return apiFetch<AssistantNote>(`/assistant/notes/${id}`, { method: 'PUT', body: JSON.stringify({ content }) }); }
+  async assistantDeleteNote(id: string): Promise<void> { await apiFetch(`/assistant/notes/${id}`, { method: 'DELETE' }); }
+  async assistantClearNotes(): Promise<void> { await apiFetch('/assistant/notes', { method: 'DELETE' }); }
+  async assistantMe(): Promise<AssistantMe> { return apiFetch<AssistantMe>('/assistant/me'); }
+  async assistantSetPrefs(p: { memoryPaused: boolean }): Promise<AssistantMe> { return apiFetch<AssistantMe>('/assistant/prefs', { method: 'PUT', body: JSON.stringify(p) }); }
+  async assistantUsage(): Promise<AssistantUsageView> { return apiFetch<AssistantUsageView>('/assistant/usage'); }
+  /** Master seul. `cap` : null = défaut, -1 = sans limite, 0..500. */
+  async assistantSetCap(userId: string, cap: number | null): Promise<void> { await apiFetch(`/assistant/caps/${userId}`, { method: 'PUT', body: JSON.stringify({ cap }) }); }
 
   // --- Forms : Google Forms par le compte partagé (le serveur garde le jeton, FORMS_ROLES sur chaque route) ---
   async getGoogleStatus(): Promise<GoogleStatus> { return apiFetch<GoogleStatus>('/forms/google/status'); }

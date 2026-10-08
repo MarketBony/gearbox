@@ -26,6 +26,11 @@ services:
       # `wrangler secret put GEARBOX_SECRET` du Worker). Valeurs dans le .env du VPS.
       FORMS_WORKER_URL: ${FORMS_WORKER_URL:-}
       FORMS_WORKER_SECRET: ${FORMS_WORKER_SECRET:-}
+      # Assistant IA mIAouss (08/10/2026) : Qwen3.8 27B chez Groq puis Cloudflare Workers AI, offres GRATUITES.
+      # Valeurs dans le .env du VPS. Absentes, la rubrique répond « pas configuré » (503).
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_AI_TOKEN: ${CLOUDFLARE_AI_TOKEN:-}
       NODE_ENV: production
       PORT: 3000
     volumes:

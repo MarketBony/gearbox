@@ -720,6 +720,13 @@ export const EXPORT_ALLOWED_ROLES: string[] = ['Master', 'Administrator', 'Direc
 // Alignée sur `FORMS_ROLES` de backend/src/auth/roles.ts, qui est le VRAI refus (chaque route de /api/forms).
 export const FORMS_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
 export const canSeeForms = (role: string | undefined | null) => FORMS_ROLES.includes(role ?? '');
+// Assistant IA « mIAouss » (interface v2 SEULEMENT, 08/10/2026) : équipe marketing seulement — ni Guest, ni External,
+// ni chef de site (décision de Théo). Alignée sur `ASSISTANT_ROLES` de backend/src/auth/roles.ts, le VRAI refus.
+export const ASSISTANT_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+export const canUseAssistant = (role: string | undefined | null) => ASSISTANT_ROLES.includes(role ?? '');
+// Voir la consommation de toute l'équipe / fixer les plafonds : miroir d'ASSISTANT_TEAM_ROLES / ASSISTANT_CAP_ROLES.
+export const ASSISTANT_TEAM_ROLES: string[] = ['Master', 'Administrator'];
+export const ASSISTANT_CAP_ROLES: string[] = ['Master'];
 
 // ============================================================================
 // RÔLE « CHEF DE SITE » (Site Manager) — 05/08/2026

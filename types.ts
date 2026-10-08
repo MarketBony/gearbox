@@ -528,3 +528,24 @@ export interface CongeDroit {
   periode: number;
   jours: number;
 }
+
+// --- Assistant IA « mIAouss » (08/10/2026) — contrat de /api/assistant ---------------------
+export interface AssistantMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  /** Réponses : fournisseur, outils consultés, notes retenues (ids). */
+  meta?: { provider?: string; tools?: string[]; noted?: string[] } | null;
+  createdAt: string;
+}
+export interface AssistantToolCall { id: string; name: 'projets' | 'budget' | 'absences'; args: Record<string, any> }
+/** Un tour : soit la réponse, soit des outils de lecture à exécuter dans le navigateur. */
+export type AssistantTurn =
+  | { status: 'done'; userMessageId?: string; message: AssistantMessage }
+  | { status: 'tools'; userMessageId?: string; turnId: string; calls: AssistantToolCall[] };
+export interface AssistantNote { id: string; content: string; source: 'ia' | 'user'; createdAt: string; updatedAt: string }
+export interface AssistantMe { memoryPaused: boolean; cap: number; today: number; month: number; tokensToday: number; remaining: number | null }
+export interface AssistantProviderStatus { id: string; name: string; model: string; configured: boolean; resting: boolean; until: number | null; reason: string | null; questionsLeft: number; share: number }
+export interface AssistantCapacity { questionsLeft: number; avgTokensPerQuestion: number; measured: boolean; providers: AssistantProviderStatus[] }
+export interface AssistantTeamRow { userId: string; name: string; role: string; cap: number; customCap: number | null; today: number; last30: number; tokens30: number }
+export interface AssistantUsageView { capacity: AssistantCapacity; team?: AssistantTeamRow[]; canSetCaps?: boolean }
