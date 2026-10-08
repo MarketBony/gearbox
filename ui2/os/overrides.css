@@ -40,14 +40,6 @@
   --box-bg: rgba(255,255,255,.68); --box-line: rgba(20,16,30,.12);
 }
 
-/* Fonds Bony « Trame » et « Tracés » (ajoutés le 30/09/2026) : la CSS générée ne connaît que les fonds de
-   la maquette. Même teinte que « Bony », et même règle que les autres fonds sombres en thème clair +
-   Liquid Glass : texte blanc sur les widgets et le Dock (reprise de la règle de engine/wallpapers.ts). */
-:host(:is([data-wallpaper="bony-trame"], [data-wallpaper="bony-traces"])) { --tint: #1a1030; }
-:host([data-theme="light"][data-material="liquid"]:is([data-wallpaper="bony-trame"], [data-wallpaper="bony-traces"])) :is(#widgets .wdg.glass, .dock.glass) {
-  --text: #fff; --text-2: rgba(255,255,255,.84); --text-3: rgba(255,255,255,.64); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.45);
-}
-
 /* Défauts de CASCADE de la maquette (30/09/2026, recette Théo) :
    1. Interrupteurs `.switch` : la règle des cases à cocher chartées `input[type="checkbox"]` (engine/controls)
       est PLUS spécifique que `.switch` et les redessinait en petit carré à coche. On rétablit l'interrupteur. */

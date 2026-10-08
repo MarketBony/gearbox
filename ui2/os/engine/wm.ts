@@ -518,7 +518,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   WM.missionOn = () => mcOn;
   function renderSpacesBar() {
     const bar = GX.root.getElementById('mcSpaces'), a = { w: innerWidth, h: innerHeight };
-    bar.innerHTML = spaces.map((s, i) => `<div class="mc-sp ${i === cur ? 'cur' : ''}" data-i="${i}"><div class="th"><div class="wallpaper ${GX.shell?.wallpaperClass?.() || 'wp-sunset'}" style="position:absolute"></div>
+    bar.innerHTML = spaces.map((s, i) => `<div class="mc-sp ${i === cur ? 'cur' : ''}" data-i="${i}"><div class="th"><div class="wallpaper ${GX.shell?.wallpaperClass?.() || 'wp-ruban'}" style="position:absolute"></div>
       ${[...wins.values()].filter((w) => w.space === i && !w.min).map((w) => `<div class="mini" style="left:${(w.rect.x / a.w) * 100}%;top:${(w.rect.y / a.h) * 100}%;width:${(w.rect.w / a.w) * 100}%;height:${(w.rect.h / a.h) * 100}%"></div>`).join('')}</div>
       <span>${s.name}${spaces.length > 1 ? ` <button class="icon-btn sm" data-del="${i}" data-tip="Supprimer ce bureau" style="display:inline-grid;vertical-align:middle">${GX.icon('close', 'sm')}</button>` : ''}</span></div>`).join('') +
       (spaces.length < 4 ? `<div class="mc-sp add" data-add><div class="th">${GX.icon('plus', 'lg')}</div><span>Nouveau bureau</span></div>` : '');

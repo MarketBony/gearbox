@@ -383,16 +383,6 @@ svg.i.sm { width: 14px; height: 14px; } svg.i.lg { width: 20px; height: 20px; } 
 .wallpaper { position: fixed; inset: 0; z-index: 0; pointer-events: none; transition: opacity 600ms var(--ease-out); }
 .wallpaper::after { content: ""; position: absolute; inset: 0; opacity: .07; mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-.wp-sunset  { background: radial-gradient(60% 55% at 15% 110%, rgba(247,86,50,.62), transparent 70%), radial-gradient(55% 60% at 88% 102%, rgba(143,18,171,.6), transparent 70%), radial-gradient(70% 50% at 50% -12%, rgba(41,63,116,.6), transparent 70%), var(--bg); }
-.wp-night   { background: radial-gradient(80% 60% at 80% 0%, rgba(41,63,116,.75), transparent 65%), radial-gradient(60% 50% at 10% 100%, rgba(143,18,171,.38), transparent 70%), linear-gradient(180deg, #07060c, #0d0b16); }
-.wp-dawn    { background: radial-gradient(90% 70% at 50% 120%, rgba(247,86,50,.7), transparent 60%), radial-gradient(60% 50% at 0% 0%, rgba(255,170,90,.35), transparent 70%), radial-gradient(60% 60% at 100% 10%, rgba(143,18,171,.35), transparent 70%), #1a0f14; }
-.wp-graphite{ background: radial-gradient(70% 60% at 30% 20%, rgba(255,255,255,.06), transparent 70%), linear-gradient(160deg, #1b1a20, #0c0b0f); }
-.wp-volcans { background: radial-gradient(40% 30% at 50% 78%, rgba(247,86,50,.55), transparent 70%), linear-gradient(180deg, #151b33 0%, #2a1d3d 55%, #3b1a2a 75%, #120d14 76%, #0b0a10 100%); }
-:host([data-theme="light"]) .wp-sunset   { background: radial-gradient(60% 55% at 15% 110%, rgba(247,86,50,.36), transparent 70%), radial-gradient(55% 60% at 88% 102%, rgba(143,18,171,.3), transparent 70%), radial-gradient(70% 50% at 50% -12%, rgba(41,63,116,.26), transparent 70%), var(--bg); }
-:host([data-theme="light"]) .wp-night    { background: radial-gradient(80% 60% at 80% 0%, rgba(41,63,116,.35), transparent 65%), radial-gradient(60% 50% at 10% 100%, rgba(143,18,171,.2), transparent 70%), linear-gradient(180deg, #dfe3f0, #ece8f3); }
-:host([data-theme="light"]) .wp-dawn     { background: radial-gradient(90% 70% at 50% 120%, rgba(247,86,50,.4), transparent 60%), radial-gradient(60% 50% at 0% 0%, rgba(255,170,90,.3), transparent 70%), #f6ece8; }
-:host([data-theme="light"]) .wp-graphite { background: linear-gradient(160deg, #eceaf1, #dcd9e3); }
-:host([data-theme="light"]) .wp-volcans  { background: radial-gradient(40% 30% at 50% 78%, rgba(247,86,50,.4), transparent 70%), linear-gradient(180deg, #c9d3ee 0%, #e2d4ea 55%, #f0d2d6 75%, #ded8e6 76%, #e9e7ef 100%); }
 
 /* ---------------------------- Barre de menus ---------------------------- */
 .menubar { position: fixed; inset: 0 0 auto 0; height: var(--menubar-h); z-index: 9000; display: flex; align-items: center; gap: 2px; padding: 0 8px; font-size: var(--fs-13);
@@ -674,17 +664,11 @@ svg.i.sm { width: 14px; height: 14px; } svg.i.lg { width: 20px; height: 20px; } 
 .mb-tools .seg { padding: 1px; }
 :host(.mb-merged) .menubar { background: var(--glass-strong); }
 
+/* [GEARBOX] Lot B (08/10/2026) — Ruban : fond PAR DÉFAUT, fixe, en SVG (dessiné une fois par le navigateur).
+   Les autres fonds fixes sont calculés par engine/wallpapers.ts. Tous sombres, y compris en thème clair (choix de Théo). */
+.wp-ruban { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23f75632'/%3E%3Cstop offset='.5' stop-color='%23e0367a'/%3E%3Cstop offset='1' stop-color='%238f12ab'/%3E%3C/linearGradient%3E%3CradialGradient id='h' cx='.7' cy='.4' r='.6'%3E%3Cstop offset='0' stop-color='%23293f74' stop-opacity='.35'/%3E%3Cstop offset='1' stop-color='%23293f74' stop-opacity='0'/%3E%3C/radialGradient%3E%3ClinearGradient id='b' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230c0b12'/%3E%3Cstop offset='1' stop-color='%2307060a'/%3E%3C/linearGradient%3E%3Cfilter id='f' x='-20%25' y='-50%25' width='140%25' height='200%25'%3E%3CfeGaussianBlur stdDeviation='40'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='1600' height='1000' fill='url(%23b)'/%3E%3Crect width='1600' height='1000' fill='url(%23h)'/%3E%3Cpath d='M-100 820 C 300 760, 520 420, 860 470 S 1350 760, 1700 300' fill='none' stroke='url(%23g)' stroke-width='150' stroke-linecap='round' opacity='.22' filter='url(%23f)'/%3E%3Cpath d='M-100 820 C 300 760, 520 420, 860 470 S 1350 760, 1700 300' fill='none' stroke='url(%23g)' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M-100 860 C 320 800, 540 470, 870 515 S 1360 800, 1700 350' fill='none' stroke='url(%23g)' stroke-width='1.5' opacity='.45'/%3E%3C/svg%3E") center/cover no-repeat, #08070c; }
+
 /* Teinte de la matière reprise du fond d'écran (Material You) */
-:host([data-wallpaper="sunset"])   { --tint: #43203f; }
-:host([data-wallpaper="night"])    { --tint: #1c2a52; }
-:host([data-wallpaper="dawn"])     { --tint: #4a2320; }
-:host([data-wallpaper="volcans"])  { --tint: #3a1f36; }
-:host([data-wallpaper="graphite"]) { --tint: #25232b; }
-:host([data-theme="light"][data-wallpaper="sunset"])   { --tint: #f1d9e6; }
-:host([data-theme="light"][data-wallpaper="night"])    { --tint: #d9e1f5; }
-:host([data-theme="light"][data-wallpaper="dawn"])     { --tint: #f6dcd3; }
-:host([data-theme="light"][data-wallpaper="volcans"])  { --tint: #ecd9ea; }
-:host([data-theme="light"][data-wallpaper="graphite"]) { --tint: #e6e4ec; }
 /* Matière Pixel : grands rayons, pas de liseré spéculaire */
 :host(:not([data-material="liquid"])) .dock { border-radius: 28px; }
 :host(:not([data-material="liquid"])) .menu { border-radius: 16px; padding: 6px; }
@@ -984,19 +968,7 @@ svg.i.sm { width: 14px; height: 14px; } svg.i.lg { width: 20px; height: 20px; } 
 /* Agrandie, plein écran ou fusionnée avec la barre du haut : plus aucun coin arrondi */
 :host([data-da]) .win:is(.maxi, .full, .merged) { border-radius: 0; }
 
-/* ---------------- Fonds d'écran associés ---------------- */
-.wp-grille { background:
-  linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px) 0 0/40px 40px,
-  linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px) 0 0/40px 40px,
-  radial-gradient(50% 50% at 18% 100%, rgba(255,90,46,.2), transparent 70%),
-  radial-gradient(45% 50% at 96% 8%, rgba(180,59,255,.22), transparent 70%), #08080a; }
-:host([data-theme="light"]) .wp-grille { background:
-  linear-gradient(rgba(20,16,30,.05) 1px, transparent 1px) 0 0/40px 40px,
-  linear-gradient(90deg, rgba(20,16,30,.05) 1px, transparent 1px) 0 0/40px 40px, #eeedf2; }
-:host([data-wallpaper="grille"]) { --tint: #16121c; }
-.wp-carbone { background: radial-gradient(90% 70% at 85% 110%, rgba(247,86,50,.18), transparent 60%), radial-gradient(70% 60% at 0% 0%, rgba(255,255,255,.04), transparent 60%), #0c0c0e; }
-:host([data-theme="light"]) .wp-carbone { background: radial-gradient(90% 70% at 85% 110%, rgba(247,86,50,.14), transparent 60%), #ecebe9; }
-:host([data-wallpaper="carbone"]) { --tint: #1d1b1a; }
+
 
 /* =================== CONTRÔLES EN MATIÈRE (Liquid Glass / Pixel) ===================
    Comme sur iOS / macOS : les CONTRÔLES (boutons, sélecteurs, puces, segments, champs,
@@ -1209,26 +1181,18 @@ svg.i.sm { width: 14px; height: 14px; } svg.i.lg { width: 20px; height: 20px; } 
   :host([data-icons="tinted"]) .gx-ico .gl circle[fill^="#"]{fill:var(--gf)}
   :host([data-icons="tinted"]) .gx-cal{color:var(--gf)}:host([data-icons="tinted"]) .gx-cal .cd{color:var(--accent)}
   
-/* ===== GX.css — js/wallpapers.js ===== */
-:host([data-wallpaper="bony"]){--tint:#1a1030}
-/* ===== GX.css — js/wallpapers.js ===== */
-:host([data-wallpaper="gargantua"]){--tint:#2a1233}
-/* ===== GX.css — js/wallpapers.js ===== */
+/* ===== Fonds d'écran : teintes (lot B, 08/10/2026). Tous les fonds sont sombres, y compris en thème clair :
+   en Liquid Glass + thème clair, texte blanc sur les widgets et le Dock. ===== */
+:host([data-wallpaper="ruban"]){--tint:#1a1024}
 :host([data-wallpaper="soie"]){--tint:#2a1530}
-/* ===== GX.css — js/wallpapers.js ===== */
-:host([data-wallpaper="abysses"]){--tint:#0c2230}
-/* ===== GX.css — js/wallpapers.js ===== */
-:host([data-wallpaper="observatoire"]){--tint:#171230}
-/* ===== GX.css — js/wallpapers.js ===== */
-:host([data-wallpaper="aurore"]){--tint:#0f1f2a}
-/* ===== GX.css — js/wallpapers.js ===== */
+:host([data-wallpaper="faisceaux"]){--tint:#141a30}
+:host([data-wallpaper="aurore"]){--tint:#0f1424}
+:host([data-wallpaper="flux"]){--tint:#2a1230}
+:host([data-wallpaper="graphite"]){--tint:#1c1b20}
+:host([data-wallpaper="bony"]){--tint:#1a1030}
 :host([data-wallpaper="magma"]){--tint:#2a1420}
-/* ===== GX.css — js/wallpapers.js ===== */
 :host([data-wallpaper="retro"]){--tint:#2a1030}
-/* ===== GX.css — js/wallpapers.js ===== */
-:host([data-wallpaper="matrice"]){--tint:#0a1a10}
-/* ===== GX.css — js/wallpapers.js ===== */
-:host([data-theme="light"][data-material="liquid"]:is([data-wallpaper="bony"],[data-wallpaper="gargantua"],[data-wallpaper="soie"],[data-wallpaper="abysses"],[data-wallpaper="observatoire"],[data-wallpaper="aurore"],[data-wallpaper="magma"],[data-wallpaper="retro"],[data-wallpaper="matrice"])) :is(#widgets .wdg.glass, .dock.glass){--text:#fff;--text-2:rgba(255,255,255,.84);--text-3:rgba(255,255,255,.64);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45)}
+:host([data-theme="light"][data-material="liquid"]:is([data-wallpaper="ruban"],[data-wallpaper="soie"],[data-wallpaper="faisceaux"],[data-wallpaper="aurore"],[data-wallpaper="flux"],[data-wallpaper="graphite"],[data-wallpaper="bony"],[data-wallpaper="magma"],[data-wallpaper="retro"])) :is(#widgets .wdg.glass, .dock.glass){--text:#fff;--text-2:rgba(255,255,255,.84);--text-3:rgba(255,255,255,.64);color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45)}
 /* ===== GX.css — js/wallpapers.js ===== */
 .wp-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:auto}
   .wp-logo{position:absolute;left:50%;top:43%;width:min(30vw,500px);aspect-ratio:239.62/67.67;transform:translate(-50%,-50%);pointer-events:none;animation:wp-logo-in 1.4s var(--ease-out) both}
@@ -3427,7 +3391,7 @@ svg.i.sm { width: 14px; height: 14px; } svg.i.lg { width: 20px; height: 20px; } 
   .set-notecard{display:grid;grid-template-columns:auto 1fr;gap:12px;padding:16px}
   .set-notecard ul{margin:6px 0 0;padding-left:18px;display:grid;gap:4px;font-size:12.5px;color:var(--text-2);line-height:1.45}
   /* v2.1 — teinte du fond d'écran reprise par les aperçus (valeurs d'os.css) */
-  :host([data-wallpaper="sunset"]) .set-panel{--tint-d:#43203f;--tint-l:#f1d9e6}:host([data-wallpaper="night"]) .set-panel{--tint-d:#1c2a52;--tint-l:#d9e1f5}:host([data-wallpaper="dawn"]) .set-panel{--tint-d:#4a2320;--tint-l:#f6dcd3}:host([data-wallpaper="volcans"]) .set-panel{--tint-d:#3a1f36;--tint-l:#ecd9ea}:host([data-wallpaper="graphite"]) .set-panel{--tint-d:#25232b;--tint-l:#e6e4ec}
+  :host([data-wallpaper="ruban"]) .set-panel{--tint-d:#1a1024;--tint-l:#ebe7f1}:host([data-wallpaper="soie"]) .set-panel{--tint-d:#2a1530;--tint-l:#ebe7f1}:host([data-wallpaper="faisceaux"]) .set-panel{--tint-d:#141a30;--tint-l:#ebe7f1}:host([data-wallpaper="aurore"]) .set-panel{--tint-d:#0f1424;--tint-l:#ebe7f1}:host([data-wallpaper="flux"]) .set-panel{--tint-d:#2a1230;--tint-l:#ebe7f1}:host([data-wallpaper="graphite"]) .set-panel{--tint-d:#1c1b20;--tint-l:#ebe7f1}:host([data-wallpaper="bony"]) .set-panel{--tint-d:#1a1030;--tint-l:#ebe7f1}:host([data-wallpaper="magma"]) .set-panel{--tint-d:#2a1420;--tint-l:#ebe7f1}:host([data-wallpaper="retro"]) .set-panel{--tint-d:#2a1030;--tint-l:#ebe7f1}
   .set-mini.dark{--mb:color-mix(in srgb,#1b1822 74%,var(--tint-d,#3a1d4a));--ms:color-mix(in srgb,#110f16 86%,var(--tint-d,#3a1d4a))}
   .set-mini.light{--mb:color-mix(in srgb,#f7f6fa 76%,var(--tint-l,#e9d6f0));--ms:color-mix(in srgb,#f3f2f7 80%,var(--tint-l,#e9d6f0))}
   .set-mats,
