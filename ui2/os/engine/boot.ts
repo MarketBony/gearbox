@@ -63,11 +63,19 @@ export function boot(host: HTMLElement, root: ShadowRoot, body: HTMLElement): Sh
   // --- Rubriques PORTÉES (React, ui2/apps/*) : le moteur fournit la fenêtre, React la remplit par
   //     portail (OsHost). Un conteneur dédié en `display: contents` : React ne partage pas son nœud
   //     avec ce que le moteur ajoute au corps de la fenêtre (volets `win.sheet`, etc.).
+  // Pastilles « non lus » : la coque (Dock, pilule, grille) les lit par `GX.app(id).badge()`. Avant le 08/10/2026
+  // aucune rubrique ne la fournissait : le Dock du bureau n'affichait jamais rien. Source = le pont (useNavBadges,
+  // partagée avec l'ancienne interface).
+  const BADGE: Record<string, () => number> = {
+    chat: () => GX.bridge()?.chatUnread || 0,
+    games: () => GX.bridge()?.gamesChallenges || 0,
+  };
   let seq = 0;
   for (const id of PORTED_IDS) {
     const m = APP_META.find((x) => x.id === id) || PORTED_EXTRA_META[id]; if (!m) continue;
     GX.registerApp({
       ...m,
+      ...(BADGE[id] ? { badge: BADGE[id] } : {}),
       mount(bodyEl: HTMLElement, win: any) {
         const host = document.createElement('div'); host.className = 'gx-react'; host.style.display = 'contents';
         bodyEl.append(host);

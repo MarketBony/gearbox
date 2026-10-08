@@ -126,6 +126,8 @@ export function createData() {
     ready: false,
     ME: '',
     USERS: [] as MUser[],
+    /** Présence en temps réel : app de la coque → ids des AUTRES utilisateurs dessus (DataHub). */
+    PRESENCE: {} as Record<string, string[]>,
     PROJECTS: [] as MProject[],
     POSTS: [] as MPost[],
     EXPENSES: [] as { id: string; date: string; sites: string[]; service: string; brands: string[]; comment: string; amount: number; annual: boolean; proPlus: boolean; raw: FixedExpense }[],

@@ -88,7 +88,7 @@ function DataHubInner() {
   }, [core]);
 
   const first = useRef(true);
-  const prev = useRef<{ core: any; badges: string; users: any; avTick: number }>({ core: null, badges: '', users: null, avTick: 0 });
+  const prev = useRef<{ core: any; badges: string; users: any; avTick: number; pres: string }>({ core: null, badges: '', users: null, avTick: 0, pres: '' });
   useEffect(() => {
     const GX = gx(); const D: GXData = GX.data;
     D.ME = uid;
@@ -142,6 +142,17 @@ function DataHubInner() {
     if (core && core !== prev.current.core) { prev.current.core = core; GX.emit('data:projects'); }
     // Utilisateurs ou photos changés : les widgets du moteur (avatars en HTML) se redessinent.
     if (users !== prev.current.users || avTick !== prev.current.avTick) { prev.current.users = users; prev.current.avTick = avTick; GX.emit('data:users'); }
+    // Présence (pastilles d'avatars du Dock / de la pilule) : rubrique RÉELLE → app de la coque, sous-rubrique
+    // repliée sur son parent (c'est elle qui a une icône). Jamais pour un rôle sans fonctions sociales
+    // (chef de site, External) : même règle que les bulles de l'ancienne interface (Sidebar.tsx).
+    const pres: Record<string, string[]> = {};
+    if (b.showSocial) for (const [tab, list] of Object.entries(presence || {}) as [string, any[]][]) {
+      const a = appOf(tab), app = GX.app?.(a)?.parent || a;
+      for (const p of list || []) if (p?.userId && !(pres[app] ||= []).includes(p.userId)) pres[app].push(p.userId);
+    }
+    D.PRESENCE = pres;
+    const presKey = JSON.stringify(pres);
+    if (presKey !== prev.current.pres) { prev.current.pres = presKey; GX.emit('presence'); }
     const badges = `${chatTick}|${lobby ? JSON.stringify(D.GAMES.challenges.length) : ''}|${b.feed.unreadCount}|${b.chatUnread}|${b.gamesChallenges}`;
     if (badges !== prev.current.badges) { prev.current.badges = badges; GX.emit('badges'); }
     if (first.current && core) { first.current = false; GX.emit('ctx'); }

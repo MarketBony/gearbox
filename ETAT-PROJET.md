@@ -18,13 +18,17 @@
   passées en clair dans le chat de la session du 08/10 : à régénérer un jour (remplacer dans `backend/.env` ET le `.env`
   du VPS, puis `up -d api`). Poignée de débogage `el.__buddy` dans `mascot.ts` (inoffensive, sert aux tests). Branches
   locales `feat/assistant-p0` et `fix/chat-envoi-fiable` mergées : supprimables.
+- **Lot B demandé par Théo (08/10) : fonds d'écran v2** — trop gourmands (shaders WebGL plein écran à 30 i/s sous ~21
+  panneaux `backdrop-filter`, pause seulement si fenêtre agrandie / > 92 % couvert) et jugés moches. Arbitré : fonds FIXES
+  par défaut, quelques fonds animés au choix de Théo en option, et chercher une techno d'affichage moins coûteuse.
 - **Ensuite, dans l'ordre** : corrections issues des retours ci-dessus ; puis **mIAouss P2** (rédaction guidée : posts
   Digital, Forms, e-mails) et **P3** (actions avec confirmation) ; puis la suite de la liste d'octobre (tâches
   multi-assignées, prestataire, répartitions, fichiers maison — backlog § « Chantiers d'octobre 2026 »).
 - **À savoir pour la session suivante** : Bony ne paiera JAMAIS un service d'IA (aucune option payante à proposer). Le
   garde-fou de la session a bloqué une fois `git push` et le SSH malgré l'accord de Théo ; Théo a élargi les
   permissions (`.claude/settings.local.json`, non commité) et redonné son accord : ça passe désormais.
-- **En production : correctif 72 (08/10)** — **Chat : envoi fiable** (boîte d'envoi, renvoi automatique, photos réduites,
+- **En production : correctif 73 (08/10)** — **v2 : présence (mini-avatars sur le Dock / la pilule / la grille) et compteurs
+  de non-lus sur le Dock du bureau** (`web` seul, aucune migration). Avant lui le **correctif 72 (08/10)** — **Chat : envoi fiable** (boîte d'envoi, renvoi automatique, photos réduites,
   connexion morte détectée en < 20 s ; `api` ET `web`, aucune migration). Avant lui le **correctif 71 (08/10)** — **assistant IA mIAouss** (`api` ET `web`, migration `20261008120000_assistant_p0`,
   3 variables d'environnement nouvelles). Avant lui le **correctif 70 (07/10)** — **Interface v2 sur TÉLÉPHONE : nouvelle navigation** (proposition C de
   `maquettes/ux/mobile-nav.html`, choisie par Théo) : pilule flottante Accueil · 3 favoris · loupe, retour du téléphone,
@@ -571,6 +575,24 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 73 — 08/10 : v2, présence et pastilles de notification sur les icônes** (branche
+  `feat/v2-presence-pastilles`, **`web` seul**, aucune migration). Demandé par Théo : deux fonctions de l'ancienne interface
+  absentes de la v2.
+  - **Compteurs du Dock (bureau)** : le Dock lisait `GX.app(id).badge()`, qu'AUCUNE rubrique ne fournissait (compteur toujours
+    vide). `engine/boot.ts` enregistre `badge()` pour le Chat (non lus) et les Jeux (défis), source = le pont
+    (`useNavBadges`, partagée avec l'ancienne interface) ; le téléphone (`mobile.ts`, `badgeOf`) lit la même porte. « 99+ ».
+  - **Présence** : le serveur et l'annonce marchaient déjà (la fenêtre active remonte à `App.tsx` → `setMySection`) ; seul
+    l'AFFICHAGE manquait. `DataHub.tsx` range `D.PRESENCE` (app de la coque → ids des autres, sous-rubrique repliée sur son
+    parent ; vide pour chef de site et External, `bridge.showSocial`) et émet `presence` ; `GX.r.presStack` (r.ts) dessine les
+    mini-avatars. Bureau : 2 avatars + « +N » sous l'icône du Dock, rubriques hors Dock regroupées sur le Launchpad.
+    Téléphone : 2 avatars sur la grille, 1 + « +N » sur les favoris de la pilule. CSS `.gx-pres` dans `maquette.css`.
+  - **Couleurs d'avatar invalides** : l'ancienne interface (`pages/Settings.tsx`, création d'un compte) tirait
+    `toString(16)` sans `padStart(6, '0')` → 1 couleur sur 16 à 5 chiffres, fond transparent dans la v2. Code corrigé ;
+    Zakaria Bounaga réparé en base (`#5ff53` → `#05ff53`). Restent Morgane Barthe (`#8cc7d`) et Ali Abou El Jinane (`#715e7`).
+  - Testé sur localhost (compte de Théo, bureau 1440 / 800 px et téléphone 375 px) avec une présence et des compteurs
+    INJECTÉS dans le navigateur (ses propres onglets sont filtrés, les collègues sont sur la prod) : avatars, « +N »,
+    Launchpad, exclusion de soi, « 3 » / « 99+ » / « 5 ». ⚠️ Vrai test à deux personnes : en prod.
+
 - **Correctif 72 — 08/10 : Chat, envoi FIABLE (messages qui disparaissaient, images qui ne partaient pas)** (branche
   `fix/chat-envoi-fiable`, **`api` ET `web`**, aucune migration, les DEUX interfaces). Signalé par Théo, urgent.
   - **Cause établie** : le message de Théo du 08/10 dans le Général n'a JAMAIS atteint la base (aucun message ce jour-là) ;
@@ -724,7 +746,8 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 72** (8 octobre 2026) — Chat, envoi fiable. **`api` ET `web`**,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 73** (8 octobre 2026) — v2 : présence et compteurs sur les
+  icônes. **`web` seul**, aucune migration. Avant lui le **correctif 72** (8 octobre 2026) — Chat, envoi fiable. **`api` ET `web`**,
   aucune migration, aucune variable. Avant lui le **correctif 71** (8 octobre 2026) — assistant IA mIAouss. **`api` ET
   `web`**, migration `20261008120000_assistant_p0` (additive, 4 tables, appliquée et inscrite AVANT le push). Nouvelles
   variables `GROQ_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_TOKEN` (`.env` du VPS + `docker-compose.yml`). Avant lui le
