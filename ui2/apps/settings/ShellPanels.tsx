@@ -13,7 +13,8 @@ import { Head, Row, Switch, css, roleLabel, type SectionDef } from './common';
 
 const MATS: [string, string, string][] = [['pixel', 'Pixel', 'Flou dense teinté par le fond d’écran, sans reflet. Le réglage par défaut.'], ['liquid', 'Liquid Glass', 'Verre presque incolore : le fond d’écran reste visible au travers, liseré lumineux sur les bords.'], ['solid', 'Opaque', 'Aucune transparence ni flou : surfaces pleines, lecture maximale.']];
 const ICS: [string, string, string][] = [['light', 'Claire', 'Couleurs iOS par rubrique'], ['dark', 'Sombre', 'Tuile noire, pictogramme coloré'], ['tinted', 'Teintée', 'Toutes à l’accent de la direction']];
-const STATIC_WPS: [string, string][] = [['sunset', 'Coucher de soleil'], ['night', 'Nuit'], ['dawn', 'Aube'], ['volcans', 'Volcans'], ['graphite', 'Graphite'], ['carbone', 'Carbone'], ['grille', 'Grille']];
+// Ruban est dessiné en CSS (maquette.css) ; les autres viennent du catalogue du moteur (✦ = animé). Lot B, 08/10/2026.
+const STATIC_WPS: [string, string][] = [['ruban', 'Ruban']];
 const matNote = (eco: boolean) => eco
   ? <><b style={{ color: 'var(--warn)' }}>Effets économes actifs :</b> la matière est rendue Opaque partout tant qu’ils restent activés.</>
   : 'La matière habille tout ce qui sert à naviguer : barre de menus, Dock, menus, widgets, et le cadre des fenêtres (barre de titre, en-têtes, barre latérale). Le contenu des rubriques reste toujours plein, pour la lecture.';
@@ -25,7 +26,7 @@ const setPref = (k: string, v: unknown) => gx().shell.setPref(k, v);
 export function AppearancePanel({ s }: { s: SectionDef }) {
   const p = prefs();
   const theme = useBridge()?.theme || p.theme;
-  const wps: [string, string][] = [...(gx().wall ? gx().wall.catalog.map((d: any) => [d.id, d.name + ' ✦']) : []), ...STATIC_WPS];
+  const wps: [string, string][] = [...STATIC_WPS, ...(gx().wall ? gx().wall.catalog.map((d: any) => [d.id, d.name + (d.still ? '' : ' ✦')]) : [])];
   const mini = (t: string) => (
     <div className={`set-mini ${t}`}><div className={`wallpaper wp-${p.wallpaper}`} /><div className="mb" /><div className="w"><i style={{ top: '14%', width: '40%' }} /><i style={{ top: '30%', width: '52%' }} /><i style={{ top: '46%', width: '30%' }} /><i style={{ top: '62%', width: '46%' }} /></div><div className="mdk" /></div>
   );

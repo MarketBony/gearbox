@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fonds fixes — planche</title>
+<!-- Planche du lot B, v2 (08/10/2026). Retour de Théo sur la v1 : « on dirait du Paint ». Ici chaque fond est
+     CALCULÉ UNE FOIS (shader WebGL : lumière, matière, grain) puis figé en image — rendu riche, coût nul ensuite.
+     Le « B » est le VRAI tracé du logo (public/logo-color.svg), posé en verre, en relief ou en lueur. -->
+<style>
+  :root { --bg: #0b0a10; --text: #f3f1f7; --text-2: #a9a4b6; --line: rgba(255,255,255,.08); --orange: #f75632; }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 28px 16px 60px; }
+  header { max-width: 1240px; margin: 0 auto 22px; }
+  h1 { font-size: 22px; letter-spacing: -.01em; margin-bottom: 6px; }
+  header p { color: var(--text-2); max-width: 760px; }
+  .grid { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 22px; }
+  figure { cursor: zoom-in; }
+  figcaption { display: flex; gap: 10px; align-items: baseline; padding: 10px 2px 0; }
+  figcaption b { font-size: 15px; white-space: nowrap; } figcaption .n { color: var(--orange); font-weight: 800; }
+  figcaption span { color: var(--text-2); font-size: 13px; }
+  figcaption .ok { color: #3fd18b; font-weight: 700; }
+
+  .desk { position: relative; aspect-ratio: 16/10; border-radius: 14px; overflow: hidden; container-type: inline-size; background: #000; box-shadow: 0 10px 30px -12px rgba(0,0,0,.5), 0 0 0 1px var(--line); }
+  .desk .wp { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .desk .wp.svgwp svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .mb { position: absolute; inset: 0 0 auto; height: 3.4cqw; background: rgba(20,18,28,.35); backdrop-filter: blur(14px) saturate(1.6); display: flex; align-items: center; gap: 2cqw; padding: 0 1.6cqw; font-size: 1.5cqw; font-weight: 600; color: #fff; }
+  .glass { position: absolute; border-radius: 2.2cqw; background: rgba(22,20,30,.42); backdrop-filter: blur(20px) saturate(1.8); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); color: #fff; padding: 1.8cqw; font-size: 1.5cqw; }
+  .glass small { display: block; opacity: .7; font-weight: 600; margin-bottom: .8cqw; }
+  .glass .big { font-size: 4.6cqw; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+  .glass .bar { height: .7cqw; border-radius: 9px; background: rgba(255,255,255,.12); margin-top: 1.4cqw; overflow: hidden; }
+  .glass .bar i { display: block; height: 100%; width: 68%; background: linear-gradient(90deg, #f75632, #8f12ab); }
+  .w1 { left: 3cqw; top: 6.5cqw; width: 22cqw; height: 17cqw; }
+  .w2 { left: 27cqw; top: 6.5cqw; width: 22cqw; height: 17cqw; }
+  .w3 { right: 3cqw; top: 6.5cqw; width: 30cqw; height: 26cqw; }
+  .w3 .row { display: flex; gap: 1cqw; align-items: center; margin: 1.1cqw 0; } .w3 .av { width: 2.8cqw; height: 2.8cqw; border-radius: 50%; flex: none; }
+  .w3 .ln { height: .9cqw; border-radius: 9px; background: rgba(255,255,255,.18); flex: 1; }
+  .dock { position: absolute; left: 50%; bottom: 1.6cqw; transform: translateX(-50%); display: flex; gap: .9cqw; padding: .9cqw; border-radius: 2.4cqw; background: rgba(22,20,30,.4); backdrop-filter: blur(18px) saturate(1.8); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+  .dock i { width: 4.4cqw; height: 4.4cqw; border-radius: 1.1cqw; display: block; }
+  .bare .mb, .bare .glass, .bare .dock { display: none; }
+
+  .full { position: fixed; inset: 0; z-index: 10; background: #000; display: none; cursor: zoom-out; }
+  .full.on { display: block; } .full .desk { position: absolute; inset: 0; aspect-ratio: auto; border-radius: 0; }
+  .bar2 { position: fixed; top: 12px; right: 16px; z-index: 11; display: none; gap: 8px; }
+  .full.on + .bar2 { display: flex; }
+  .bar2 button { border: 0; font: inherit; font-size: 12px; font-weight: 600; color: #fff; background: rgba(0,0,0,.55); padding: 7px 13px; border-radius: 99px; cursor: pointer; }
+  .wait { color: var(--text-2); font-size: 13px; padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fonds fixes — série 2</h1>
+  <p>Chaque fond est calculé une seule fois (lumière, matière, grain) puis figé en image : aucun coût une fois affiché.
+    Le « B » est le vrai tracé du logo, posé en verre, en relief ou en lueur, souvent coupé par un bord de l’écran.
+    Cliquer pour le plein écran (bouton « Sans fenêtres » pour voir le fond seul).</p>
+</header>
+<div class="grid" id="grid"><div class="wait">Calcul des fonds…</div></div>
+<div class="full" id="full"></div><div class="bar2"><button id="bare">Sans fenêtres</button><button id="close">Fermer</button></div>
+
+<script>
+/* ---------------------------------------------------------------- le « B » du logo (public/logo-color.svg) */
+const MARK_D = 'M116.64,63.24V20.2c2.79-2.03,4.61-5.31,4.61-9.03,0-6.17-5-11.17-11.17-11.17s-11.17,5-11.17,11.17c0,3.71,1.82,7,4.61,9.03v29.92h-36.33v-29.92c2.79-2.03,4.61-5.31,4.61-9.03,0-6.17-5-11.17-11.17-11.17s-11.17,5-11.17,11.17c0,3.71,1.82,7,4.61,9.03v29.92H17.73v-29.92c2.79-2.03,4.61-5.31,4.61-9.03C22.34,5,17.34,0,11.17,0S0,5,0,11.17c0,3.71,1.82,7,4.61,9.03v72.96c-2.79,2.03-4.61,5.31-4.61,9.03,0,6.17,5,11.17,11.17,11.17s11.17-5,11.17-11.17c0-3.71-1.82-7-4.61-9.03v-29.92h36.33v29.92c-2.79,2.03-4.61,5.31-4.61,9.03,0,6.17,5,11.17,11.17,11.17s11.17-5,11.17-11.17c0-3.71-1.82-7-4.61-9.03v-29.92h49.45';
+const MW = 1100, MH = 1050;  // toile du masque (logo 121,25 × 113,36 centré, marge)
+function markCanvases() {
+  const s = 900 / 121.25, a = document.createElement('canvas'); a.width = MW; a.height = MH;
+  const x = a.getContext('2d'); x.fillStyle = '#fff';
+  x.translate((MW - 121.25 * s) / 2, (MH - 113.36 * s) / 2); x.scale(s, s); x.fill(new Path2D(MARK_D));
+  return [a];
+}
+
+/* ---------------------------------------------------------------- GLSL commun */
+const LIB = `
+precision highp float;
+uniform vec2 R; uniform sampler2D MK; uniform vec4 MP; uniform vec3 MM;
+const vec3 O=vec3(.969,.337,.196), V=vec3(.561,.071,.671), B=vec3(.161,.247,.455), P=vec3(.878,.212,.478);
+float perm(float x){return mod((x*34.+1.)*x,289.);}
+float h21(vec2 p){p=mod(floor(p*8.)/8.,289.);return fract(perm(perm(p.x)+p.y)/289.+perm(perm(p.y+11.)+p.x)/83521.);}
+vec2 h22(vec2 p){vec3 p3=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));p3+=dot(p3,p3.yzx+33.33);return fract((p3.xx+p3.yz)*p3.zy);}
+float n2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+1.),f.x),f.y);}
+float fbm(vec2 p){float v=0.,a=.5;mat2 m=mat2(1.6,1.2,-1.2,1.6);for(int i=0;i<6;i++){v+=a*n2(p);p=m*p;a*=.5;}return v;}
+float stars(vec2 p,float dens){vec2 g=p*90.;vec2 id=floor(g),f=fract(g)-.5;vec2 o=h22(id)-.5;float k=h21(id+7.3);
+  return smoothstep(.12,0.,length(f-o*.6))*step(1.-dens,k)*(.4+.6*h21(id+1.9));}
+`;
+/* Le « B » : verre (réfraction + aberration chromatique + arête éclairée), relief, ou lueur. */
+const MARKFX = `
+/* Logo À PLAT (décision de Théo, 08/10 : pas de verre ni de relief) : aplat translucide, bord net.
+   MM.x : 0 = blanc, 1 = dégradé du logo. MM.y : opacité. */
+vec3 markFx(vec2 p, vec3 col){
+  if(MM.y<=0.) return col;
+  vec2 m=(p-MP.xy)/MP.z; vec2 uv=vec2(m.x/MP.w+.5, .5-m.y);
+  if(uv.x<0.||uv.x>1.||uv.y<0.||uv.y>1.) return col;
+  float a=texture2D(MK,uv).r;
+  vec3 grad=mix(vec3(.914,.337,.22), vec3(.478,.212,.545), smoothstep(.1,.9,uv.x));
+  vec3 tint=MM.x<.5 ? vec3(1.) : grad;
+  return mix(col,tint,a*MM.y);
+}`;
+const MAIN = `
+void main(){
+  vec2 p=(gl_FragCoord.xy-.5*R)/R.y;
+  vec3 c=bg(p); c=markFx(p,c);
+  c*=1.-.32*pow(length(p*vec2(.62,.9)),2.2);                   // vignette
+  c+= (h21(gl_FragCoord.xy*1.37)-.5)*.022;                      // grain fin + anti-bandes
+  gl_FragColor=vec4(max(c,0.),1.);
+}`;
+
+/* ---------------------------------------------------------------- les fonds */
+const WALLS = [
+  { id: 'ruban', name: 'Ruban', note: 'Retenu — trait de lumière au dégradé du logo', ok: true, svg: true },
+  { id: 'soie', name: 'Soie', note: 'Plis de satin violet et orange, logo à plat, translucide, coupé par le bord',
+    mark: { mode: 0, op: .09, edge: 1, x: -.06, y: -.08, z: 1.05 },
+    glsl: `float H(vec2 p){vec2 q=p*1.6; q+=.55*vec2(sin(q.y*1.4+.4),sin(q.x*1.1-.8)); q+=.25*vec2(sin(q.y*2.7+1.9),sin(q.x*2.3+.3));
+      float w=sin(q.x*3.1+q.y*1.9); return w*.5+.5;}
+    vec3 bg(vec2 p){ float e=.0015; float h=H(p);
+      vec3 n=normalize(vec3(-(H(p+vec2(e,0))-H(p-vec2(e,0)))/(2.*e)*.22, -(H(p+vec2(0,e))-H(p-vec2(0,e)))/(2.*e)*.22, 1.));
+      vec3 l=normalize(vec3(-.55,.6,.6)); float d=max(dot(n,l),0.); float s=pow(max(dot(n,normalize(l+vec3(0,0,1))),0.),60.);
+      vec3 base=mix(vec3(.035,.012,.06), V*.6, smoothstep(.05,1.,h));
+      base=mix(base, O*.85, smoothstep(-.2,.9, -p.x*.55+h*.5-p.y*.35)*.65);
+      float sat=pow(max(dot(n,normalize(vec3(.3,.2,1.))),0.),8.);
+      vec3 c=base*(.12+1.25*d*d)+s*vec3(1.,.82,.78)*.7+base*sat*.35;
+      return c*smoothstep(1.6,.1,length(p-vec2(-.25,.05)));}` },
+  { id: 'faisceaux', name: 'Faisceaux', note: 'Rais de lumière dans la poussière, logo à plat au dégradé Bony, en bas à gauche',
+    mark: { mode: 1, op: .16, edge: -1, x: .1, y: -.42, z: 1.0 },
+    glsl: `vec3 bg(vec2 p){ vec2 d=p-vec2(-1.05,.75); float a=atan(d.y,d.x), r=length(d);
+      float beams=pow(fbm(vec2(a*11.,.7)),3.)*2.4+pow(n2(vec2(a*42.,3.)),7.)*.9;
+      float fall=exp(-r*1.05);
+      vec3 c=mix(vec3(.008,.01,.024), B*.32, smoothstep(1.1,-.7,p.y+p.x*.35));
+      c+=mix(O*1.1,P,smoothstep(.2,1.7,r))*beams*fall*.5;
+      vec2 g=p*55.; vec2 id=floor(g), f=fract(g)-.5; vec2 o=h22(id)-.5;
+      float dust=smoothstep(.12,0.,length(f-o*.7))*step(.9,h21(id+3.));
+      c+=dust*beams*fall*1.6*vec3(1.,.86,.72);
+      return c;}` },
+  { id: 'aurore', name: 'Aurore', note: 'Rideaux de lumière au-dessus des crêtes, ciel étoilé',
+    glsl: `vec3 bg(vec2 p){ vec3 c=mix(vec3(.006,.006,.018),vec3(.025,.03,.075),smoothstep(-.45,.55,p.y));
+      c+=stars(p,.06)*.7*smoothstep(-.2,.3,p.y);
+      for(int i=0;i<3;i++){ float fi=float(i); float x=p.x*(1.1+fi*.35)+fi*3.1;
+        float y0=.02+fi*.1+(fbm(vec2(x*.6,fi*1.7))-.5)*.42;
+        float band=exp(-pow((p.y-y0)*9.,2.));
+        float rays=pow(fbm(vec2(x*14.,fi*2.3)),3.2)*2.2;
+        float up=smoothstep(y0-.015,y0+.03,p.y)*exp(-max(p.y-y0,0.)*3.2);
+        vec3 cc=mix(mix(O,P,step(.5,fi)),V,step(1.5,fi));
+        c+=cc*(band*.35+up*rays*.6)*.38*(1.-fi*.18); }
+      float h=-.33+(fbm(vec2(p.x*1.4,.5))-.5)*.2+.06*exp(-pow((p.x-.35)*5.,2.));
+      float h2=-.42+(fbm(vec2(p.x*2.2,4.))-.5)*.14;
+      c=mix(c,vec3(.012,.01,.025),smoothstep(h+.003,h-.003,p.y));
+      c=mix(c,vec3(.004,.004,.01),smoothstep(h2+.003,h2-.003,p.y));
+      return c;}` },
+  { id: 'flux', name: 'Flux', note: 'Marbrure fluide orange, rose, violet ; logo à plat coupé à gauche',
+    mark: { mode: 0, op: .10, edge: -1, x: .02, y: .1, z: 1.15 },
+    glsl: `vec3 bg(vec2 p){ p*=.55;
+      vec2 q=vec2(fbm(p),fbm(p+vec2(5.2,1.3)));
+      vec2 r=vec2(fbm(p+3.*q+vec2(1.7,9.2)),fbm(p+3.*q+vec2(8.3,2.8)));
+      float f=fbm(p+3.2*r);
+      vec3 c=mix(V*.75,O,clamp(f*f*2.3,0.,1.));
+      c=mix(c,P,clamp(length(q)*.55,0.,1.)*.55);
+      c=mix(c,B*.7,clamp(r.x*r.x*1.5,0.,1.)*.75);
+      return c*(.28+.85*f*f);}` },
+  { id: 'graphite', name: 'Graphite', note: 'Sobre pour travailler : métal brossé, logo à plat en filigrane',
+    mark: { mode: 0, op: .05, edge: -1, x: .26, y: -.02, z: .95 },
+    glsl: `vec3 bg(vec2 p){ float b=fbm(vec2(p.x*1.4,p.y*95.))*.55+fbm(vec2(p.x*3.,p.y*210.))*.35;
+      vec3 c=vec3(.062,.062,.074)+b*.03;
+      c+=vec3(.09,.085,.1)*exp(-length(p-vec2(-.35,.7))*1.4);
+      c+=O*.05*exp(-length(p-vec2(.9,-.6))*2.);
+      return c;}` },
+];
+
+/* Ruban : la version validée par Théo, inchangée (SVG). */
+const RUBAN = `<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="rb" x1="0" x2="1"><stop offset="0" stop-color="#f75632"/><stop offset=".5" stop-color="#e0367a"/><stop offset="1" stop-color="#8f12ab"/></linearGradient><filter id="bl" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="40"/></filter><radialGradient id="rbg" cx=".7" cy=".4" r=".6"><stop offset="0" stop-color="#293f74" stop-opacity=".35"/><stop offset="1" stop-color="#293f74" stop-opacity="0"/></radialGradient><linearGradient id="rbb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0c0b12"/><stop offset="1" stop-color="#07060a"/></linearGradient></defs>
+  <rect width="1600" height="1000" fill="url(#rbb)"/><rect width="1600" height="1000" fill="url(#rbg)"/>
+  <path d="M-100 820 C 300 760, 520 420, 860 470 S 1350 760, 1700 300" fill="none" stroke="url(#rb)" stroke-width="150" stroke-linecap="round" opacity=".22" filter="url(#bl)"/>
+  <path d="M-100 820 C 300 760, 520 420, 860 470 S 1350 760, 1700 300" fill="none" stroke="url(#rb)" stroke-width="5" stroke-linecap="round"/>
+  <path d="M-100 860 C 320 800, 540 470, 870 515 S 1360 800, 1700 350" fill="none" stroke="url(#rb)" stroke-width="1.5" opacity=".45"/></svg>`;
+
+/* ---------------------------------------------------------------- rendu WebGL (une fois par fond) */
+const cv = document.createElement('canvas');
+const gl = cv.getContext('webgl', { preserveDrawingBuffer: true, antialias: false });
+const VS = 'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}';
+const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+function tex(c) { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c); return t; }
+const [mk] = markCanvases(); const TMK = tex(mk);
+const progs = {};
+function prog(w) {
+  if (progs[w.id]) return progs[w.id];
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(w.id + ' : ' + gl.getShaderInfoLog(s)); return s; };
+  const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, LIB + w.glsl + MARKFX + MAIN)); gl.linkProgram(pr);
+  return (progs[w.id] = pr);
+}
+function render(w, W, H) {
+  cv.width = W; cv.height = H; gl.viewport(0, 0, W, H);
+  const pr = prog(w); gl.useProgram(pr);
+  const loc = gl.getAttribLocation(pr, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const u = (n) => gl.getUniformLocation(pr, n);
+  gl.uniform2f(u('R'), W, H);
+  const m = w.mark || { mode: 0, op: 0, x: 0, y: 0, z: 1 };
+  // x compté depuis un bord : le « B » reste coupé quel que soit l'écran
+  gl.uniform4f(u('MP'), (m.edge || 0) * W / H / 2 + m.x, m.y, m.z, MW / MH); gl.uniform3f(u('MM'), m.mode, m.op, 0);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, TMK); gl.uniform1i(u('MK'), 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  return cv.toDataURL('image/jpeg', .93);
+}
+
+/* ---------------------------------------------------------------- planche */
+const chrome = `<div class="mb"><span>Gearbox</span><span style="opacity:.75">Fichier</span><span style="opacity:.75">Édition</span></div>
+  <div class="glass w1"><small>Budget 2026</small><div class="big">109 %</div><div class="bar"><i></i></div></div>
+  <div class="glass w2" style="background:linear-gradient(135deg,rgba(247,86,50,.85),rgba(143,18,171,.85))"><small>En retard</small><div class="big">16</div></div>
+  <div class="glass w3"><small>Chat · Général</small>${['#f75632', '#8f12ab', '#293f74', '#e0367a', '#3aa776'].map((c) => `<div class="row"><i class="av" style="background:${c}"></i><i class="ln"></i></div>`).join('')}</div>
+  <div class="dock">${['#ef5b3f', '#3b82f6', '#f2f2f2', '#ec4899', '#f59e0b', '#8b5cf6', '#22c55e', '#facc15', '#14b8a6', '#9ca3af'].map((c) => `<i style="background:${c}"></i>`).join('')}</div>`;
+const wpHTML = (w, src) => w.svg ? `<div class="wp svgwp">${RUBAN}</div>` : `<img class="wp" src="${src}" alt="">`;
+const thumbs = {};
+function build() {
+  const grid = document.getElementById('grid'); grid.innerHTML = '';
+  WALLS.forEach((w, i) => {
+    if (!w.svg) thumbs[w.id] = render(w, 1280, 800);
+    grid.insertAdjacentHTML('beforeend', `<figure data-i="${i}"><div class="desk">${wpHTML(w, thumbs[w.id])}${chrome}</div>
+      <figcaption><span class="n">${i + 1}</span><b>${w.name}</b><span>${w.ok ? '<span class="ok">✓ </span>' : ''}${w.note}</span></figcaption></figure>`);
+  });
+}
+const full = document.getElementById('full');
+document.getElementById('grid').onclick = (e) => {
+  const f = e.target.closest('figure'); if (!f) return; const w = WALLS[+f.dataset.i];
+  const dpr = Math.min(devicePixelRatio || 1, 2), src = w.svg ? '' : render(w, Math.round(innerWidth * dpr), Math.round(innerHeight * dpr));
+  full.innerHTML = `<div class="desk">${wpHTML(w, src)}${chrome}</div>`; full.classList.add('on');
+};
+const close = () => { full.classList.remove('on'); full.classList.remove('bare'); };
+full.onclick = close; document.getElementById('close').onclick = close;
+document.getElementById('bare').onclick = () => full.classList.toggle('bare');
+addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+setTimeout(build, 30);
+</script>
+</body>
+</html>

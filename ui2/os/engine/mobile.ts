@@ -35,7 +35,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   M.init = () => {
     const prefs = GX.shell.prefs;
     if (prefs.material === 'apple') prefs.material = 'liquid';
-    if (['prisme', 'terminal', 'glitch'].includes(prefs.wallpaper)) prefs.wallpaper = 'bony'; /* [GEARBOX] identifiants d'essai du 30/09/2026 → définitifs */ prefs.wallpaper = ({ 'bony-a': 'bony', 'bony-b': 'bony-trame', 'bony-c': 'bony-traces' } as any)[prefs.wallpaper] || prefs.wallpaper;
+    prefs.wallpaper = GX.wall ? GX.wall.normalize(prefs.wallpaper) : prefs.wallpaper; /* [GEARBOX] fond retiré ou ancien identifiant → Ruban (lot B, 08/10/2026) */
     const R0 = GX.host; R0.dataset.theme = prefs.theme; R0.dataset.effects = prefs.effects; R0.dataset.material = prefs.material || 'pixel'; R0.dataset.icons = prefs.iconStyle || 'light'; R0.dataset.wallpaper = prefs.wallpaper; R0.dataset.da = 'signal';
     setFitCover(true);
     GX.body.insertAdjacentHTML('beforeend', `<div class="m-root" id="mroot">
@@ -430,6 +430,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   function afterNav(win) {
     byScroll = false; markPill(); applyPill(); hSync();
     if (win) setTimeout(() => { padScan(win); applyPill(); }, 400);
+    if (!win) GX.emit('wall:check');   // [GEARBOX] retour à l'accueil : le fond animé peut reprendre (wallpapers.ts)
     if (win) GX.emit('wm:focus', win);   // même synchronisation que le bureau (onglet actif d'App.tsx, présence)
   }
   function appMenu(win, anchor) {

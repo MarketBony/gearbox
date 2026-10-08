@@ -18,17 +18,16 @@
   passées en clair dans le chat de la session du 08/10 : à régénérer un jour (remplacer dans `backend/.env` ET le `.env`
   du VPS, puis `up -d api`). Poignée de débogage `el.__buddy` dans `mascot.ts` (inoffensive, sert aux tests). Branches
   locales `feat/assistant-p0` et `fix/chat-envoi-fiable` mergées : supprimables.
-- **Lot B demandé par Théo (08/10) : fonds d'écran v2** — trop gourmands (shaders WebGL plein écran à 30 i/s sous ~21
-  panneaux `backdrop-filter`, pause seulement si fenêtre agrandie / > 92 % couvert) et jugés moches. Arbitré : fonds FIXES
-  par défaut (nouvelle série, planche à montrer d'abord), animés gardés en option : **Bony · Trait, Magma, Rétro** seulement,
-  arrêtés dès qu'une fenêtre est ouverte, et chercher une techno d'affichage moins coûteuse (vidéo en boucle ou 15 i/s).
+- **Lot B (fonds d'écran v2) : LIVRÉ, correctif 75.** À vérifier sur les PC qui chauffaient (gestionnaire de tâches de
+  Chrome) ; versions claires des fonds possibles plus tard si elles manquent (option b écartée pour l'instant).
 - **Ensuite, dans l'ordre** : corrections issues des retours ci-dessus ; puis **mIAouss P2** (rédaction guidée : posts
   Digital, Forms, e-mails) et **P3** (actions avec confirmation) ; puis la suite de la liste d'octobre (tâches
   multi-assignées, prestataire, répartitions, fichiers maison — backlog § « Chantiers d'octobre 2026 »).
 - **À savoir pour la session suivante** : Bony ne paiera JAMAIS un service d'IA (aucune option payante à proposer). Le
   garde-fou de la session a bloqué une fois `git push` et le SSH malgré l'accord de Théo ; Théo a élargi les
   permissions (`.claude/settings.local.json`, non commité) et redonné son accord : ça passe désormais.
-- **En production : correctif 74 (08/10)** — v2 : plus de « ? » à la place des avatars de présence (`web` seul). Avant lui le
+- **En production : correctif 75 (08/10)** — v2 : nouveaux fonds d'écran (fixes par défaut, Ruban ; 3 animés en option,
+  en pause dès qu'une fenêtre est ouverte), `web` seul. Avant lui le **correctif 74 (08/10)** — v2 : plus de « ? » à la place des avatars de présence (`web` seul). Avant lui le
   **correctif 73 (08/10)** — **v2 : présence (mini-avatars sur le Dock / la pilule / la grille) et compteurs
   de non-lus sur le Dock du bureau** (`web` seul, aucune migration). Avant lui le **correctif 72 (08/10)** — **Chat : envoi fiable** (boîte d'envoi, renvoi automatique, photos réduites,
   connexion morte détectée en < 20 s ; `api` ET `web`, aucune migration). Avant lui le **correctif 71 (08/10)** — **assistant IA mIAouss** (`api` ET `web`, migration `20261008120000_assistant_p0`,
@@ -577,6 +576,25 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 75 — 08/10 : v2, nouveaux fonds d'écran (lot B)** (branche `feat/v2-fonds-ecran`, **`web` seul**, aucune
+  migration). Demande de Théo : fonds « qui bouffent de la ressource comme jamais » et « globalement très moches ».
+  - **Cause du coût** : fonds animés WebGL plein écran à 30 i/s, en pause seulement si une fenêtre était agrandie ou si les
+    fenêtres couvraient > 92 % de l'écran ; sous ~21 panneaux `backdrop-filter`, le flou était recalculé à chaque image.
+  - **Fonds FIXES par défaut**, choisis par Théo sur la planche `maquettes/ux/fonds-fixes.html` (deux tours : la série en
+    dégradés CSS / SVG a été rejetée, « on dirait du Paint »). **Ruban** (défaut, SVG en CSS dans `maquette.css`) ;
+    **Soie, Faisceaux, Aurore, Flux, Graphite** : shaders CALCULÉS UNE FOIS par `engine/wallpapers.ts` (`stillDraw`) à
+    l'ouverture et au redimensionnement (fin de redimensionnement, 400 ms), posés en image (blob JPEG), contexte WebGL rendu
+    aussitôt. Le logo (tracé de `public/logo-color.svg`) est posé **à plat**, translucide, ancré sur un bord (Théo a refusé
+    l'effet verre / relief), réduit sur un écran en hauteur. Tous sombres, y compris en thème clair (option a de Théo).
+  - **Animés en option (✦)** : seuls **Bony · Trait, Magma, Rétro** restent ; **pause dès qu'une fenêtre est ouverte**
+    (au téléphone : dès qu'une rubrique est ouverte, événement `wall:check` émis par `mobile.ts`), boucle `requestAnimationFrame`
+    ARRÊTÉE en pause (elle tournait à vide avant), 24 i/s au lieu de 30, résolution réduite (0,75 / 0,5 / 0,6).
+  - Retirés : 7 fonds CSS (Sunset, Night, Dawn, Volcans, Graphite, Carbone, Grille) et 8 animés (Trame, Tracés, Gargantua,
+    Soie Bony, Abysses, Observatoire, ancienne Aurore, Matrice) avec leur code. `GX.wall.normalize` : un fond inconnu → Ruban.
+    **Migration unique `prefs.wpv`** : tout le monde passe une fois sur Ruban (l'ancien défaut animé faisait chauffer les PC).
+  - Testé sur localhost (compte de Théo, bureau) : rendu des fonds fixes, vignettes des 8 fonds du moteur, Magma en pause
+    « fenêtre ouverte » puis reprise à la fermeture, aucune erreur. Recette de Théo : « c'est propre ».
+
 - **Correctif 74 — 08/10 : v2, « ? » à la place de certains avatars de présence** (branche
   `fix/v2-presence-avatars-inconnus`, **`web` seul**, aucune migration). Vu par Théo en prod juste après le 73 : la présence
   arrive souvent AVANT la liste des utilisateurs → pile dessinée en « Ancien membre » (« ? »), jamais redessinée car
@@ -756,7 +774,8 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 74** (8 octobre 2026) — « ? » à la place des avatars de présence, **`web` seul**,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 75** (8 octobre 2026) — nouveaux fonds d'écran v2, **`web` seul**, aucune
+  migration. Avant lui le **correctif 74** (8 octobre 2026) — « ? » à la place des avatars de présence, **`web` seul**,
   aucune migration. Avant lui le **correctif 73** (8 octobre 2026) — v2 : présence et compteurs sur les
   icônes. **`web` seul**, aucune migration. Avant lui le **correctif 72** (8 octobre 2026) — Chat, envoi fiable. **`api` ET `web`**,
   aucune migration, aucune variable. Avant lui le **correctif 71** (8 octobre 2026) — assistant IA mIAouss. **`api` ET
@@ -4370,6 +4389,10 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Fonds d'écran v2 : un fond FIXE (`still: true`) ne passe JAMAIS par la boucle d'animation** — rendu une fois par
+  `stillDraw` (`engine/wallpapers.ts`), posé en `background` du `#wp`. Pour un nouveau fond : le dessiner d'abord sur la
+  planche `maquettes/ux/fonds-fixes.html` (même GLSL), puis recopier. Et `GX.css` étant vide, ses teintes vont dans
+  `maquette.css` (bloc « Fonds d'écran : teintes »), jamais dans `wallpapers.ts`.
 - **Chat : un message ne s'envoie QUE par `services/chatOutbox.ts`** (`sendChatMessage`, `sendChatFile`) — jamais par un
   `emitWithAck('chat:message:send')` direct : sans accusé ni renvoi, il se perd en silence sur un socket à moitié mort (08/10).
 - **Tester le socket en local** : `import('/services/socket.ts')` depuis la console rend une AUTRE copie du module après un

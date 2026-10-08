@@ -13,11 +13,14 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
 (() => {
   const S = (GX.shell = {});
   const D = GX.data, $ = (s, r = GX.root) => r.querySelector(s);
-  /* Réglages par défaut : fond Bony, thème sombre, direction Signal, Liquid Glass, icônes claires,
+  /* Réglages par défaut : fond Ruban (lot B, 08/10/2026 ; « Bony · Trait » animé avant), thème sombre, direction Signal, Liquid Glass, icônes claires,
      barre du haut escamotable. PREFS_V : quand les défauts changent, on les réapplique une fois. */
-  const DEFAULTS = { theme: 'dark', effects: 'full', wallpaper: 'bony', dockMag: true, dockAutohide: false, dockSmart: true, dockSize: 50, widgets: true, dnd: false, material: 'liquid', iconStyle: 'light', da: 'signal', menubarAuto: true };
+  const DEFAULTS = { theme: 'dark', effects: 'full', wallpaper: 'ruban', dockMag: true, dockAutohide: false, dockSmart: true, dockSize: 50, widgets: true, dnd: false, material: 'liquid', iconStyle: 'light', da: 'signal', menubarAuto: true };
   const PREFS_V = 3, stored = GX.store.get('prefs', {});
-  const prefs = Object.assign({}, DEFAULTS, (stored.v || 0) >= PREFS_V ? stored : { ...stored, theme: 'dark', wallpaper: 'bony', material: 'liquid', iconStyle: 'light', da: 'signal', menubarAuto: true, dockSize: 50 }, { v: PREFS_V });
+  const prefs = Object.assign({}, DEFAULTS, (stored.v || 0) >= PREFS_V ? stored : { ...stored, theme: 'dark', wallpaper: 'ruban', material: 'liquid', iconStyle: 'light', da: 'signal', menubarAuto: true, dockSize: 50 }, { v: PREFS_V });
+  /* [GEARBOX] Lot B (08/10/2026) : nouvelle série de fonds. Tout le monde passe UNE fois sur Ruban (fixe, défaut) :
+     le fond animé « Bony · Trait » était le défaut, et c'est lui qui faisait chauffer les PC. Choix libre ensuite. */
+  if ((prefs.wpv || 0) < 1) { prefs.wallpaper = 'ruban'; prefs.wpv = 1; }
   prefs.iconStyle = ({ signature: 'light', graphite: 'dark', bony: 'tinted' })[prefs.iconStyle] || prefs.iconStyle;
   const savePrefs = () => GX.store.set('prefs', prefs);
   S.prefs = prefs;
@@ -62,7 +65,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   /* ======================= Démarrage ======================= */
   S.init = () => {
     if (prefs.material === 'apple') prefs.material = 'liquid';
-    if (['prisme', 'terminal', 'glitch'].includes(prefs.wallpaper)) prefs.wallpaper = 'bony'; /* [GEARBOX] identifiants d'essai du 30/09/2026 → définitifs */ prefs.wallpaper = ({ 'bony-a': 'bony', 'bony-b': 'bony-trame', 'bony-c': 'bony-traces' } as any)[prefs.wallpaper] || prefs.wallpaper; // fonds retirés // « Verre Apple » est devenu « Liquid Glass »
+    prefs.wallpaper = GX.wall ? GX.wall.normalize(prefs.wallpaper) : prefs.wallpaper; /* [GEARBOX] fond retiré ou ancien identifiant → Ruban (lot B, 08/10/2026) */ // fonds retirés // « Verre Apple » est devenu « Liquid Glass »
     prefs.theme = GX.bridge().theme; /* [GEARBOX] thème de l'appli */
     const R0 = GX.host; R0.dataset.theme = prefs.theme; R0.dataset.effects = prefs.effects; R0.dataset.material = prefs.material; R0.dataset.icons = prefs.iconStyle; R0.dataset.wallpaper = prefs.wallpaper; prefs.da = 'signal'; R0.dataset.da = 'signal'; // direction artistique unique (les deux autres ont été retirées) R0.toggleAttribute('data-mbauto', !!prefs.menubarAuto);
     GX.body.insertAdjacentHTML('beforeend', `
@@ -366,11 +369,11 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   }
 
   /* ======================= Centre de contrôle ======================= */
-  const STATIC_WP = { sunset: 'Coucher de soleil', night: 'Nuit', dawn: 'Aube', volcans: 'Volcans', graphite: 'Graphite', carbone: 'Carbone', grille: 'Grille' };
-  const wpName = (w) => GX.wall?.get(w)?.name || STATIC_WP[w] || w;
+  /* Fonds : Ruban (CSS) puis le catalogue du moteur ; ✦ = animé. */
+  const wpName = (w) => (w === 'ruban' ? 'Ruban' : GX.wall?.get(w) ? GX.wall.get(w).name + (GX.wall.get(w).still ? '' : ' ✦') : w);
   function buildCC() {
     const cc = $('#cc');
-    const WPS = [...(GX.wall ? GX.wall.ids : []), 'sunset', 'night', 'dawn', 'volcans', 'graphite', 'carbone', 'grille'];
+    const WPS = ['ruban', ...(GX.wall ? GX.wall.ids : [])];
     const render = () => {
       cc.innerHTML = `<div class="cc">
         <div class="cc-tile ${prefs.theme === 'dark' ? 'on' : ''}" data-k="theme"><span class="ic">${GX.icon(prefs.theme === 'dark' ? 'moon' : 'sun')}</span><div><b>Thème</b><span>${prefs.theme === 'dark' ? 'Sombre' : 'Clair'}</span></div></div>
@@ -423,7 +426,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   function setWallpaper(w, save = true) {
     prefs.wallpaper = w; GX.host.dataset.wallpaper = w; const el = $('#wp');
     if (GX.wall && el) { if (GX.wall.is(w)) { el.className = 'wallpaper wp-anim'; GX.wall.mount(el, w); if (save) savePrefs(); return; } GX.wall.unmount(); }
-    if (save && el) { const old = el.cloneNode(); old.className = el.className.replace('wp-anim', 'wp-' + (GX.wall?.status()?.id || 'sunset')); el.after(old); el.className = `wallpaper wp-${w}`; old.style.zIndex = 0; GX.animate(old, [{ opacity: 1 }, { opacity: 0 }], { duration: 600, easing: 'ease' }).onfinish = () => old.remove(); }
+    if (save && el) { const old = el.cloneNode(); old.className = el.className.replace('wp-anim', 'wp-' + (GX.wall?.status()?.id || 'ruban')); el.after(old); el.className = `wallpaper wp-${w}`; old.style.zIndex = 0; GX.animate(old, [{ opacity: 1 }, { opacity: 0 }], { duration: 600, easing: 'ease' }).onfinish = () => old.remove(); }
     else if (el) el.className = `wallpaper wp-${w}`;
     if (save) savePrefs();
   }
@@ -438,7 +441,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     if (k === 'dockSize') { root.style.setProperty('--dock-icon', v + 'px'); GX.widgets?.render(); }
     if (k === 'material') root.dataset.material = v;
     if (k === 'da') { // chaque direction propose son fond d'écran
-      const apply = () => { root.dataset.da = v; const wp = { nocturne: 'gargantua', carbone: 'carbone', signal: 'bony' }[v]; if (wp) { prefs.wallpaper = wp; setWallpaper(wp); } };
+      const apply = () => { root.dataset.da = v; const wp = { nocturne: 'ruban', carbone: 'ruban', signal: 'ruban' }[v]; if (wp) { prefs.wallpaper = wp; setWallpaper(wp); } };
       if (document.startViewTransition && !GX.eco()) document.startViewTransition(apply).ready.catch(() => {}); else apply();
     }
     if (k === 'iconStyle') { root.dataset.icons = v; buildDock(); buildLaunchpad && GX.root.querySelector('#launchpad.on') && S.launchpad(true); }
@@ -537,7 +540,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       GX.menu.open([
         { label: 'Modifier le bureau et les widgets…', icon: 'grid', action: () => GX.widgets?.edit(true) },
         { label: 'Nouveau projet', icon: 'plus', action: () => S.action('new-project') }, '-',
-        { header: 'Fond d’écran' }, ...(GX.wall ? GX.wall.catalog : []).map((d) => ({ label: d.name + ' ✦', checked: prefs.wallpaper === d.id, action: () => setWallpaper(d.id) })), '-', ...['sunset', 'night', 'dawn', 'volcans', 'graphite', 'carbone', 'grille'].map((w) => ({ label: { sunset: 'Coucher de soleil', night: 'Nuit', dawn: 'Aube', volcans: 'Volcans', graphite: 'Graphite', carbone: 'Carbone', grille: 'Grille' }[w], checked: prefs.wallpaper === w, action: () => setWallpaper(w) })), '-',
+        { header: 'Fond d’écran' }, ...['ruban', ...(GX.wall ? GX.wall.ids : [])].map((w) => ({ label: wpName(w), checked: prefs.wallpaper === w, action: () => setWallpaper(w) })), '-',
         { label: 'Afficher les widgets', checked: prefs.widgets, action: () => { prefs.widgets = !prefs.widgets; savePrefs(); buildWidgets(); } },
         { label: 'Mission Control', icon: 'expose', kbd: 'F3', action: () => GX.wm.mission(true) },
         { label: GX.wm.desktopShown() ? 'Ramener les fenêtres' : 'Afficher le bureau', icon: 'desktop', kbd: 'Ctrl Alt D', action: () => GX.wm.showDesktop() }, '-',
