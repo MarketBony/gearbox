@@ -2,6 +2,13 @@
 
 Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec référence du commit).
 
+- [x] **Chat : messages qui disparaissaient à l'envoi, images qui ne partaient pas** (PC et téléphone, signalé par Théo le
+  08/10). Les messages n'atteignaient jamais le serveur (socket à moitié mort, `emitWithAck` sans délai, champ vidé avant
+  l'accusé). Correctif 72 : boîte d'envoi `services/chatOutbox.ts` (affichage immédiat, renvoi, anti-doublon serveur),
+  photos réduites et progression, détection des connexions mortes en < 20 s.
+- [ ] **À vérifier : l'aperçu « dernier message » d'une conversation après SUPPRESSION** du dernier message (vu le 08/10 en
+  nettoyant des tests) — il pourrait garder « 📷 Image » ou le texte supprimé. Non diagnostiqué.
+
 - [x] **mIAouss inventait des données quand il répondait sans outil** (« Céline B., Marc D. » absents, 08/10). Verrou serveur
   `DATA_INTENT` + prompt durci, correctif 71. Même lot : comptage faux (« 4 actifs » suivis de 5) → sous-totaux calculés par
   l'outil ; « plaque centre » incomprise → plaques résolues par l'outil et organisation envoyée au modèle.

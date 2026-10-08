@@ -30,18 +30,45 @@ const AVATAR_UPLOAD_PATH =
 
 // À la connexion (handshake authentifié déjà passé) : rejoint sa room
 // personnelle + les rooms de toutes ses conversations.
+//
+// ⚠️ Fiabilisé le 08/10/2026 (messages « qui disparaissent ») : le Général est rejoint AVANT la requête en base
+// (il ne dépend que du rôle), et la requête est RETENTÉE — un échec ponctuel du pooler laissait le socket hors de
+// toutes ses conversations, sans erreur visible : il ne recevait plus rien, pas même ses propres messages.
+// Filet supplémentaire : l'envoi d'un message rejoint la room (voir `chat:message:send`).
 export const joinUserRooms = async (socket: Socket) => {
   const userId: string = socket.data.user.id;
   const role: string | undefined = socket.data.user.role;
   socket.join(userRoom(userId));
-  const conversations = await prisma.chatConversation.findMany({
-    where: { participants: { has: userId } },
-    select: { id: true }
-  });
-  conversations.forEach(c => socket.join(convRoom(c.id)));
   // Chat Général : appartenance implicite — tout socket authentifié non-External
   // rejoint sa room à la connexion (aucun participants[] à synchroniser).
   if (role !== 'External') socket.join(convRoom('general'));
+  for (let essai = 0; essai < 3; essai++) {
+    try {
+      const conversations = await prisma.chatConversation.findMany({
+        where: { participants: { has: userId } },
+        select: { id: true }
+      });
+      conversations.forEach(c => socket.join(convRoom(c.id)));
+      return;
+    } catch (e) {
+      if (essai === 2 || !socket.connected) throw e;
+      await new Promise(r => setTimeout(r, 1000 * (essai + 1) * 2));
+    }
+  }
+};
+
+// --- Anti-doublon des envois (08/10/2026) -------------------------------------------
+// Le client (services/chatOutbox.ts) RENVOIE un message dont il n'a pas reçu l'accusé (connexion à moitié
+// morte, reconnexion). Chaque envoi porte un `clientId` : un renvoi déjà enregistré rend le message existant au
+// lieu d'en créer un second. En mémoire, par process (un seul conteneur `api`) : au pire, après un redémarrage
+// pile entre l'envoi et le renvoi, un doublon — préférable à un message perdu.
+const DEJA_ENVOYES = new Map<string, { message: any; at: number }>();
+const DEJA_TTL = 15 * 60_000;
+const dejaEnvoye = (cle: string) => {
+  const now = Date.now();
+  if (DEJA_ENVOYES.size > 3000) for (const [k, v] of DEJA_ENVOYES) if (now - v.at > DEJA_TTL) DEJA_ENVOYES.delete(k);
+  const e = DEJA_ENVOYES.get(cle);
+  return e && now - e.at < DEJA_TTL ? e.message : null;
 };
 
 // Seed idempotent du Chat Général : une seule conversation système, créée au
@@ -91,10 +118,16 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
   const userId: string = socket.data.user.id;
   const role: string | undefined = socket.data.user.role;
 
+  // Sonde de vie (services/chatOutbox.ts, au retour sur l'onglet) : un socket qui ne répond pas est reconnecté.
+  socket.on('chat:ping', (_p: unknown, ack: Ack) => reply(ack, { ok: true }));
+
   // Envoi d'un message : persiste PUIS diffuse à la room de la conversation.
   socket.on('chat:message:send', async (payload: any, ack: Ack) => {
     try {
-      const { conversationId, content, type, replyToId, fileName, fileSize } = payload ?? {};
+      const { conversationId, content, type, replyToId, fileName, fileSize, clientId } = payload ?? {};
+      const cleEnvoi = typeof clientId === 'string' && clientId.length > 0 && clientId.length <= 64 ? `${userId}:${clientId}` : null;
+      const existant = cleEnvoi ? dejaEnvoye(cleEnvoi) : null;
+      if (existant) { socket.join(convRoom(existant.conversationId)); return reply(ack, existant); }
       if (typeof conversationId !== 'string' || conversationId.length === 0) {
         return reply(ack, { error: 'Champ "conversationId" requis.' });
       }
@@ -131,6 +164,9 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       if (isGeneral ? role === 'External' : !conversation.participants.includes(userId)) {
         return reply(ack, { error: "Vous n'êtes pas participant de cette conversation." });
       }
+      // Filet : l'émetteur est forcément dans la room de la conversation où il écrit (une jonction ratée à la
+      // connexion le privait de la diffusion de ses propres messages).
+      socket.join(convRoom(conversationId));
 
       // Identité lue en base (on ne fait pas confiance au client pour nom/couleur).
       const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -197,6 +233,7 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
         }
       });
 
+      if (cleEnvoi) DEJA_ENVOYES.set(cleEnvoi, { message, at: Date.now() });
       io.to(convRoom(conversationId)).emit('chat:message:new', message);
       io.to(convRoom(conversationId)).emit('chat:conversation:updated', updatedConv);
       reply(ack, message);

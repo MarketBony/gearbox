@@ -9,7 +9,8 @@
   la pilule avec volet de discussion. Détail au correctif 71 et au backlog § « Assistant IA ». **Suite** : retours de Théo et
   de l'équipe en usage réel ; P2 rédaction guidée (posts Digital, Forms, e-mails) ; P3 actions avec confirmation. Retour de
   Théo sur la navigation téléphone (correctif 70) sur vrais téléphones : toujours attendu.
-- **En production : correctif 71 (08/10)** — **assistant IA mIAouss** (`api` ET `web`, migration `20261008120000_assistant_p0`,
+- **En production : correctif 72 (08/10)** — **Chat : envoi fiable** (boîte d'envoi, renvoi automatique, photos réduites,
+  connexion morte détectée en < 20 s ; `api` ET `web`, aucune migration). Avant lui le **correctif 71 (08/10)** — **assistant IA mIAouss** (`api` ET `web`, migration `20261008120000_assistant_p0`,
   3 variables d'environnement nouvelles). Avant lui le **correctif 70 (07/10)** — **Interface v2 sur TÉLÉPHONE : nouvelle navigation** (proposition C de
   `maquettes/ux/mobile-nav.html`, choisie par Théo) : pilule flottante Accueil · 3 favoris · loupe, retour du téléphone,
   accueil personnalisable (widgets). `web` seul, aucune migration ; ordinateur inchangé. ⚠️ Testée en navigateur
@@ -555,6 +556,28 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 72 — 08/10 : Chat, envoi FIABLE (messages qui disparaissaient, images qui ne partaient pas)** (branche
+  `fix/chat-envoi-fiable`, **`api` ET `web`**, aucune migration, les DEUX interfaces). Signalé par Théo, urgent.
+  - **Cause établie** : le message de Théo du 08/10 dans le Général n'a JAMAIS atteint la base (aucun message ce jour-là) ;
+    aucun doublon de texte sur 14 jours (les messages perdus ne sont jamais arrivés) ; les 15 fichiers de Chat déposés sur
+    14 jours = exactement les 15 messages image / vocal (les images bloquées n'ont même pas été déposées). Le champ se
+    vidait AVANT tout accusé, l'émission partait dans un socket à moitié mort (veille, changement de réseau : jusqu'à 45 s
+    où le navigateur le croit vivant) et `emitWithAck` n'avait AUCUN délai : ni réponse, ni erreur. Photos de 3 à 10 Mo en
+    4G sans aucune progression.
+  - **Boîte d'envoi** `services/chatOutbox.ts` (porte unique des envois, `pages/Chat.tsx` ET `ui2/apps/chat/ChatApp.tsx`) :
+    affichage immédiat « Envoi… », accusé en 8 s sinon reconnexion forcée et renvoi (même `clientId`), « Non envoyé ·
+    Réessayer · Annuler » après 4 essais ou 45 s sans connexion ; l'accusé est remis à l'écran (`gearbox-chat-delivered`)
+    même si la diffusion se perd. Pièces jointes : aperçu, progression (`db.uploadFileWithProgress`, XHR), photos > 1,5 Mo
+    réduites à 2048 px (JPEG 0,85 ; PNG → WebP). Sonde `chat:ping` au retour sur l'onglet / réseau retrouvé.
+  - **Serveur** (`realtime/chat.ts`) : anti-doublon par `clientId` (mémoire, 15 min) ; l'émetteur rejoint la room de la
+    conversation où il écrit ; `joinUserRooms` rejoint le Général AVANT la requête et la retente. `pingInterval` 10 s /
+    `pingTimeout` 8 s (index.ts) : connexion morte constatée en moins de 20 s. `emitWithAck` a un délai de 15 s.
+    Toute reconnexion (y compris forcée) recharge la conversation ouverte (`gearbox-chat-reconnected` au `connect`).
+  - Testé sur localhost (compte de Théo) dans la conversation privée Théo / Romane : envoi normal (v2 et ancienne
+    interface), **socket cassé** (paquets jetés : message resté affiché, renvoyé sur connexion neuve, arrivé à 11 s),
+    double envoi même `clientId` (un seul en base), photo 7,5 Mo → 2048 × 1536, 1,1 Mo. Messages de test supprimés.
+    ⚠️ Non vérifiés : progression sur vraie 4G, vrais téléphones.
+
 - **Correctif 71 — 08/10 : assistant IA « mIAouss » (P0 + P1 en un seul lot)** (branche `feat/assistant-p0`, **`api` ET
   `web`**, migration additive `20261008120000_assistant_p0` — 4 tables — appliquée et inscrite AVANT le push ; 3 variables
   nouvelles `GROQ_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_TOKEN` au `.env` du VPS et dans `docker-compose.yml`).
@@ -686,7 +709,8 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 71** (8 octobre 2026) — assistant IA mIAouss. **`api` ET
+- master = prod, synchronisés. Dernier lot déployé : **correctif 72** (8 octobre 2026) — Chat, envoi fiable. **`api` ET `web`**,
+  aucune migration, aucune variable. Avant lui le **correctif 71** (8 octobre 2026) — assistant IA mIAouss. **`api` ET
   `web`**, migration `20261008120000_assistant_p0` (additive, 4 tables, appliquée et inscrite AVANT le push). Nouvelles
   variables `GROQ_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_TOKEN` (`.env` du VPS + `docker-compose.yml`). Avant lui le
   **correctif 70** (7 octobre 2026) — nouvelle navigation de la v2 sur
@@ -4297,6 +4321,12 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Chat : un message ne s'envoie QUE par `services/chatOutbox.ts`** (`sendChatMessage`, `sendChatFile`) — jamais par un
+  `emitWithAck('chat:message:send')` direct : sans accusé ni renvoi, il se perd en silence sur un socket à moitié mort (08/10).
+- **Tester le socket en local** : `import('/services/socket.ts')` depuis la console rend une AUTRE copie du module après un
+  rechargement à chaud (paramètre `?t=`) — retrouver la bonne URL dans `performance.getEntriesByType('resource')`.
+- **Tester le Chat en local = fichiers sur CE poste, messages en base de PROD** : une image envoyée en local est cassée chez
+  les collègues ; supprimer aussitôt les messages de test.
 - **Interface v2 : `GX.css(...)` du moteur est une fonction VIDE** (`engine/core.ts`) : les styles du moteur ont été extraits
   une fois pour toutes dans `maquette.css`. Une règle écrite dans un `GX.css` n'existe pas — le widget mIAouss était sans style
   (08/10). Les rubriques nées dans la v2 ont leur feuille injectée par `OsHost.tsx` (`assistant.css`, `forms.css`…), et le

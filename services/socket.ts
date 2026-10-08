@@ -55,7 +55,12 @@ export const connectSocket = (): Socket | null => {
   });
 
   // 'connect' se déclenche au 1er établissement ET après chaque reconnexion.
+  let dejaConnecte = false;
   socket.on('connect', () => {
+    // Toute RE-connexion (automatique, ou forcée par la boîte d'envoi sur un socket à moitié mort) : les écrans du
+    // Chat rechargent la conversation ouverte — les messages des autres arrivés pendant la coupure (08/10/2026).
+    if (dejaConnecte) window.dispatchEvent(new CustomEvent('gearbox-chat-reconnected'));
+    dejaConnecte = true;
     // L'id change à chaque (re)connexion : on le republie pour que le serveur
     // puisse continuer à exclure cet onglet de ses propres événements.
     setCurrentSocketId(socket?.id ?? null);
@@ -67,9 +72,7 @@ export const connectSocket = (): Socket | null => {
 
   // Reconnexion après coupure réseau : recharge aussi l'historique de la conv
   // ouverte côté Chat.tsx (qui écoute cet event).
-  socket.io.on('reconnect', () => {
-    window.dispatchEvent(new CustomEvent('gearbox-chat-reconnected'));
-  });
+  // (désormais émis par le `connect` ci-dessus, qui couvre AUSSI les reconnexions forcées)
 
   // Listeners GLOBAUX de conversation : tiennent le store à jour pour toute
   // l'app (badge Sidebar temps réel même hors page Chat).
@@ -100,12 +103,16 @@ export const getSocket = (): Socket | null => socket;
 
 // Émet un événement avec ack et résout la réponse ; rejette si l'ack renvoie
 // { error } (le backend renvoie ses erreurs uniquement via l'ack).
+// ⚠️ Délai de 15 s (08/10/2026) : sans lui, une émission partie dans un socket à moitié mort attendait
+// INDÉFINIMENT — ni réponse, ni erreur. Les MESSAGES ne passent plus par ici : services/chatOutbox.ts.
 export const emitWithAck = <T = any>(event: string, payload: any): Promise<T> => {
   return new Promise<T>((resolve, reject) => {
     const s = socket;
     if (!s) return reject(new Error('Socket non connecté.'));
-    s.emit(event, payload, (response: any) => {
-      if (response && response.error) reject(new Error(response.error));
+    if (!s.connected) return reject(new Error('Connexion au serveur perdue, réessaie dans un instant.'));
+    s.timeout(15_000).emit(event, payload, (err: Error | null, response: any) => {
+      if (err) reject(new Error('Le serveur ne répond pas, réessaie dans un instant.'));
+      else if (response && response.error) reject(new Error(response.error));
       else resolve(response as T);
     });
   });

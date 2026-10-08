@@ -1260,6 +1260,13 @@ période indépendamment du planning.
 rôle `LECTURE_ROLES`, faute de quoi il créerait une ligne de planning que la personne
 n'aurait pas le droit de lire.
 
+### 💬 Chat — envoi fiable (08/10/2026, correctif 72)
+- `chat:message:send` accepte un `clientId` (≤ 64 caractères) : un renvoi déjà enregistré rend le message EXISTANT
+  (mémoire du process, 15 min) au lieu d'en créer un second. L'émetteur rejoint la room de la conversation à chaque envoi.
+- `chat:ping` → `{ ok: true }` : sonde de vie du client (services/chatOutbox.ts).
+- `joinUserRooms` : Général rejoint avant la requête, requête retentée 3 fois.
+- Socket.IO : `pingInterval` 10 s, `pingTimeout` 8 s (au lieu de 25 / 20) — `backend/src/index.ts`.
+
 ### 💬 Chat — thème PARTAGÉ, accusés de lecture, membres et renommage (24/09/2026)
 Correctif 57, migration additive `20260924100000_chat_theme_partage_et_lectures` : trois
 colonnes sur `ChatConversation` — `background`, `bubble` (nullables) et `readAt`

@@ -5,6 +5,7 @@ import { hasSocialFeatures } from '../../../constants';
 import { useAuth } from '../../../contexts/AuthContext';
 import { db, ApiError } from '../../../services/dataService';
 import { getSocket, connectSocket, emitWithAck } from '../../../services/socket';
+import { sendChatMessage, sendChatFile, retryChatMessage, cancelChatMessage, useOutbox, type OutboxItem } from '../../../services/chatOutbox';
 import { chatStore } from '../../../services/chatStore';
 import { usePresence } from '../../../services/presenceStore';
 import { estCheminLocalImage } from '../../../lib/richText';
@@ -30,8 +31,10 @@ import { AlertSheet, ConfirmSheet, NewDmSheet, NewGroupSheet, MembersSheet, Grou
 //  - fil de la conversation ouverte : `db.getMessages` (historique complet), puis `chat:message:new`
 //    (ajout sans doublon) et `chat:message:updated` (édition, suppression, réactions) ;
 //  - rechargement du fil sur `gearbox-chat-reconnected` ;
-//  - toutes les écritures par `emitWithAck` (erreur = ack `{ error }`), sans optimisme : l'émetteur est
-//    dans la room et reçoit sa propre diffusion ;
+//  - les MESSAGES par la boîte d'envoi (services/chatOutbox.ts, 08/10/2026) : affichés tout de suite en « Envoi… »,
+//    renvoyés à la reconnexion, « Non envoyé · Réessayer » sinon ; l'accusé du serveur est remis à l'écran
+//    (`gearbox-chat-delivered`) même si la diffusion s'est perdue ;
+//  - les autres écritures par `emitWithAck` (erreur = ack `{ error }`) ;
 //  - lu : `chat:conversation:read` à l'ouverture et à chaque message d'autrui reçu dans la conversation
 //    qu'on REGARDE (fenêtre étroite : seulement quand le fil est affiché, pas la liste).
 // Utilisateurs et projets cités : l'espace de travail (ui2/store/workspace.ts).
@@ -99,6 +102,25 @@ function GifPanel({ onPick }: { onPick: (url: string) => void }) {
 }
 
 // =====================================================================
+/** Message de la boîte d'envoi (pas encore accusé par le serveur) : « Envoi… », progression, « Non envoyé ». */
+const PendingMsg = React.memo(function PendingMsg({ o }: { o: OutboxItem }) {
+  const etat = o.status === 'failed' ? `Non envoyé${o.error ? ` · ${o.error}` : ''}`
+    : o.status === 'uploading' ? `Envoi du fichier… ${Math.round((o.progress || 0) * 100)} %` : 'Envoi…';
+  return (
+    <div className={`cht-msg me last cht-pending ${o.status}`}>
+      <div className="cht-col">
+        <div className="cht-bwrap">
+          {o.type === 'image' && (o.preview || o.content)
+            ? <span className="cht-media"><img src={o.preview || o.content} alt="" /></span>
+            : o.type === 'text' ? <div className="cht-b">{o.content}</div>
+              : <div className="cht-b cht-file"><Icon name={o.type === 'audio' ? 'mic' : 'file'} size="sm" /><b className="ellipsis">{o.type === 'audio' ? 'Message vocal' : o.fileName || 'Pièce jointe'}</b></div>}
+        </div>
+        <div className="cht-pstate">{etat}{o.status === 'failed' ? <> · <button onClick={() => retryChatMessage(o.clientId)}>Réessayer</button> · <button onClick={() => cancelChatMessage(o.clientId)}>Annuler</button></> : null}</div>
+      </div>
+    </div>
+  );
+});
+
 export default function ChatApp({ win, inst }: AppProps) {
   const { user } = useAuth();
   const meId = user?.id || '', role = user?.role || '';
@@ -178,10 +200,13 @@ export default function ChatApp({ win, inst }: AppProps) {
     };
     // Reconnexion réseau : recharge l'historique de la conversation ouverte.
     const onReconnect = () => { const id = R.current.selId; if (id) db.getMessages(id).then((ms) => { if (R.current.selId === id) setMessages(ms); }).catch(() => {}); };
+    // Accusé de la boîte d'envoi : même traitement qu'une diffusion (dédoublonné par id).
+    const onDelivered = (e: Event) => onNew((e as CustomEvent<ChatMessage>).detail);
     s.on('chat:message:new', onNew);
     s.on('chat:message:updated', onUpdated);
     window.addEventListener('gearbox-chat-reconnected', onReconnect);
-    return () => { s.off('chat:message:new', onNew); s.off('chat:message:updated', onUpdated); window.removeEventListener('gearbox-chat-reconnected', onReconnect); };
+    window.addEventListener('gearbox-chat-delivered', onDelivered);
+    return () => { s.off('chat:message:new', onNew); s.off('chat:message:updated', onUpdated); window.removeEventListener('gearbox-chat-reconnected', onReconnect); window.removeEventListener('gearbox-chat-delivered', onDelivered); };
   }, [social]);
 
   // Heures relatives de la liste (« il y a 5min ») : une mise à jour par minute.
@@ -324,8 +349,8 @@ export default function ChatApp({ win, inst }: AppProps) {
   const sendMessage = useCallback((content: string, type: 'text' | 'image' | 'file' | 'audio' | 'project' = 'text', piece?: { fileName: string; fileSize: number }) => {
     const id = R.current.selId; if (!id || !content.trim()) return;
     const replyToId = R.current.reply?.id; setReply(null);
-    // Pas d'optimisme : le message arrive par `chat:message:new` (identité, horodatage, non-lus : serveur).
-    emitWithAck('chat:message:send', { conversationId: id, content, type, replyToId, ...piece }).catch(fail('Échec de l’envoi du message.'));
+    // Boîte d'envoi : affiché tout de suite, renvoyé si la connexion lâche (services/chatOutbox.ts).
+    sendChatMessage(id, content, type, { replyToId, ...piece });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const grow = () => { const ta = taRef.current; if (!ta) return; ta.style.height = 'auto'; ta.style.height = `${Math.min(130, ta.scrollHeight)}px`; };
@@ -354,13 +379,10 @@ export default function ChatApp({ win, inst }: AppProps) {
     if (f.size > MAX_UPLOAD_SIZE) return alertSheet(`Fichier trop lourd (max ${MAX_UPLOAD_SIZE / 1024 / 1024} Mo).`);
     // Un fichier vide passerait le contrôle de taille mais produirait un message inutilisable.
     if (f.size === 0) return alertSheet('Fichier vide.');
-    setSending((n) => n + 1);
-    try {
-      // BESOIN: dépôt de fichier hors ui2/store (BESOINS.md § 4).
-      const url = await db.uploadFile('chat', f);
-      sendMessage(url, CHAT_IMAGE_TYPES.includes(f.type) ? 'image' : 'file', { fileName: f.name, fileSize: f.size });
-    } catch (e) { alertSheet(e instanceof ApiError ? e.message : 'Échec de l’envoi du fichier.'); }
-    finally { setSending((n) => n - 1); }
+    const id = R.current.selId; if (!id) return;
+    const replyToId = R.current.reply?.id; setReply(null);
+    // Boîte d'envoi : aperçu immédiat, progression, photo réduite si grosse, renvoi si la connexion lâche.
+    sendChatFile(id, f, CHAT_IMAGE_TYPES.includes(f.type) ? 'image' : 'file', { replyToId });
   };
   const onPaste = (e: React.ClipboardEvent) => {
     const f = Array.from(e.clipboardData.files as FileList)[0];
@@ -375,13 +397,9 @@ export default function ChatApp({ win, inst }: AppProps) {
   };
   const sendVoice = async () => {
     const r = await voice.take(); if (!r) { voice.cancel(); return; }
-    voice.cancel(); setSending((n) => n + 1);
-    try {
-      // Même chemin que les pièces jointes : fichier de conversation, purgé à 180 jours ; durée dans `fileName`.
-      const url = await db.uploadFile('chat', r.file);
-      sendMessage(url, 'audio', { fileName: r.duree, fileSize: r.file.size });
-    } catch (e) { alertSheet(e instanceof Error && e.message ? e.message : 'Échec de l’envoi.'); }
-    finally { setSending((n) => n - 1); }
+    voice.cancel();
+    // Même chemin que les pièces jointes (boîte d'envoi) ; durée dans `fileName`.
+    const id = R.current.selId; if (id) sendChatFile(id, r.file, 'audio', { fileName: r.duree });
   };
   const quoteProject = () => { if (ext) return; openSheet((close) => <QuoteProjectSheet close={close} onPick={(p) => sendMessage(p.id, 'project')} />, { width: 520 }); };
   const plusMenu = (el: HTMLElement) => gx().menu.open([
@@ -435,6 +453,7 @@ export default function ChatApp({ win, inst }: AppProps) {
   }), []);
   const msgCtx = useMemo<MsgCtx>(() => ({ meId, ext, byId }), [meId, ext, byId]);
 
+  const outbox = useOutbox(selId);
   const msgById = useMemo(() => Object.fromEntries(messages.map((m) => [m.id, m])) as Record<string, ChatMessage>, [messages]);
   const days = useMemo(() => messages.reduce<DayGroup[]>((acc, m) => {
     const label = dayLabel(m.timestamp), last = acc[acc.length - 1];
@@ -576,7 +595,8 @@ export default function ChatApp({ win, inst }: AppProps) {
                   ))}
                 </React.Fragment>
               ))}
-              {loadedFor === conv.id && !messages.length ? <div className="empty" style={{ marginTop: 40 }}><Icon name="chat" /><b style={{ color: 'var(--text)' }}>Aucun message</b>Dites bonjour 👋</div> : null}
+              {outbox.map((o) => <PendingMsg key={o.clientId} o={o} />)}
+              {loadedFor === conv.id && !messages.length && !outbox.length ? <div className="empty" style={{ marginTop: 40 }}><Icon name="chat" /><b style={{ color: 'var(--text)' }}>Aucun message</b>Dites bonjour 👋</div> : null}
               {vuPar ? <div className={`cht-seen ${vuPar.aMoi ? 'me' : ''}`} data-tip={vuPar.noms.join(', ')}><Icon name="check" size="sm" />{vuPar.libelle}</div> : null}
             </div>
           </div>
