@@ -948,3 +948,13 @@ model AssistantUser {
   dailyCap     Int?
   updatedAt    DateTime @updatedAt
 }
+
+/// Bureau de l'interface v2 : disposition des widgets PAR UTILISATEUR (09/10/2026, refonte des widgets W3).
+/// Une ligne par compte ; `desktop` et `phone` = listes de widgets ({ id, type, size, x, y, cfg }). Route : routes/widgets.ts
+/// (liste blanche WIDGET_FIELDS). Table à part, et non colonne de `User`, pour que rien ne passe dans `publicUser`.
+model UserWidgets {
+  userId    String   @id // référence libre vers User (pas de FK, style du schéma)
+  desktop   Json?
+  phone     Json?
+  updatedAt DateTime @updatedAt
+}

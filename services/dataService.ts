@@ -850,6 +850,13 @@ class DataService {
   }
 
   // --- Post-it : agenda personnel (la route filtre sur l'utilisateur connecté) ---
+  // Bureau v2 (refonte des widgets W3, 09/10/2026) : disposition des widgets PAR UTILISATEUR, sur le serveur.
+  async getMyWidgets(): Promise<{ desktop: unknown[] | null; phone: unknown[] | null; updatedAt: string | null }> {
+    return apiFetch('/widgets');
+  }
+  async saveMyWidgets(d: { desktop?: unknown[]; phone?: unknown[] }): Promise<{ updatedAt: string }> {
+    return apiFetch('/widgets', { method: 'PUT', body: JSON.stringify(d) });
+  }
   async getPostIts(): Promise<PostIt[]> {
     return apiFetch<PostIt[]>('/postits');
   }

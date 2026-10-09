@@ -1543,3 +1543,13 @@ est le bon comportement (`restart: always` côté Docker).
   pooler (6543, `?pgbouncer=true`, utilisé par le client Prisma à l'exécution).
 - `backend/.env` non versionné : si absent après une manœuvre git → `cp .env backend/.env`.
 - `backend/uploads/` gitignoré (données runtime, recréées au démarrage par la route uploads).
+
+## Bureau v2 enregistré sur le serveur (correctif 78, 09/10/2026)
+- Table **`UserWidgets`** (`userId` clé, `desktop` / `phone` en JSON, `updatedAt`), migration additive
+  `20261009120000_user_widgets`. Pas de FK (style du schéma), séparée de `User` pour rester hors de `publicUser`.
+- Route **`/api/widgets`** (`backend/src/routes/widgets.ts`) : `GET` (mes deux dispositions, `null` si jamais
+  enregistrées), `PUT` (remplace `desktop` et/ou `phone`). Filtre TOUJOURS sur `req.user.id`. `requireRole([...VALID_ROLES])`
+  volontairement large : chacun n'a accès qu'à son propre bureau. Liste blanche **`WIDGET_FIELDS`** (à compléter dans le
+  même lot si une colonne s'ajoute) ; validation : `type` `[a-z0-9-]`, `size` nom historique ou `LxH`, `x`/`y` entiers
+  0–500, 80 widgets max, `cfg` objet ≤ 8 000 caractères ; refus en 400.
+

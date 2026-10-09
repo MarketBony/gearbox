@@ -390,7 +390,11 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   const freshM = () => (layout = DEFAULT_M.map(([type, size], i) => ({ id: GX.uid('wg'), type, size, x: 0, y: i })));
   const load = () => { const saved = GX.store.get(KEY()); layout = (Array.isArray(saved) ? saved : isPhone() ? freshM() : fresh()).filter((w) => w && CAT[w.type]); };
   /* `widgets:saved` : l'accueil du téléphone se redessine (le bureau, lui, passe par W.render). */
-  const save = () => { GX.store.set(KEY(), layout); GX.emit('widgets:saved'); };
+  /* [GEARBOX] W3 (09/10/2026) : la disposition part AUSSI sur le serveur (GX.widgetsSync, ReactWidgets.tsx) — retrouvée
+     sur tous les postes. Le navigateur garde sa copie (affichage immédiat au démarrage). */
+  const save = () => { GX.store.set(KEY(), layout); GX.widgetsSync?.push(KEY(), layout); GX.emit('widgets:saved'); };
+  /** Relit la disposition (arrivée de celle du serveur) et redessine le bureau ou l'accueil du téléphone. */
+  W.reload = () => { if (gesture) return; layout = null; if (isPhone()) GX.emit('widgets:saved'); else W.render(); };
   const rectOf = (w) => { const [cw, ch] = dim(w.size); return { x: w.x, y: w.y, w: cw, h: ch }; };
   const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
   /* [GEARBOX] Marge du bureau PROPORTIONNELLE à l'écran (1,6 % de la largeur, bornée 10–28 px) au lieu
