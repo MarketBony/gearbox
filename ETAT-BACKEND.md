@@ -1553,3 +1553,13 @@ est le bon comportement (`restart: always` côté Docker).
   même lot si une colonne s'ajoute) ; validation : `type` `[a-z0-9-]`, `size` nom historique ou `LxH`, `x`/`y` entiers
   0–500, 80 widgets max, `cfg` objet ≤ 8 000 caractères ; refus en 400.
 
+## Correctif 79 (09/10/2026) — petites corrections côté serveur
+- **Matériel** : `MATERIAL_READ_ROLES` (GET `/api/equipment`, `/api/equipment-bookings`) et `BOOKING_ROLES` (POST/PUT/DELETE
+  des réservations) dans `auth/roles.ts`. `PUT /api/equipment/:id` refuse (409) un `totalQuantity` sous le pic des
+  réservations à venir (`checkAvailability`, du jour au 2100-01-01).
+- **Tags** : `POST /api/tags/rename { category, from, to }` — transaction : catalogue `DigitalTags` + publications
+  (`networks`, `co2s` et `co2` hérité, `lom`) ; 404 si l'ancien nom n'existe plus, 409 si le nouveau existe.
+- **Chat** (`realtime/chat.ts`) : `apercuDe()` = porte unique de l'aperçu (envoi ET suppression) ; `chat:message:edit` refuse
+  un message non texte ; `chat:conversation:delete` (groupe, administrateurs) : cascade des messages, `unlink` des fichiers
+  `/uploads/chat/<uuid>`, `chat:conversation:removed` aux membres.
+

@@ -55,7 +55,7 @@ export function Planning({ posts, plan, setPlan, ed, compact, smSite, appRef, ap
     setPlan({ ...plan, anchor: n === 0 ? gx().today() : plan.mode === 'week' ? gx().addDays(plan.anchor, 7 * n) : new Date(plan.anchor.getFullYear(), plan.anchor.getMonth() + n, 1) });
   };
   const pickSite = (el: HTMLElement) => {
-    const groups = [{ items: [{ v: '', l: 'Tous Sites' }] }, ...Object.entries(D().PLAQUES as Record<string, string[]>).map(([pl, ss]) => ({ label: pl, collapsible: true, items: [{ v: pl, l: '★ ' + pl, hint: 'toute la plaque' }, ...ss.map((s) => ({ v: s, l: s }))] }))];
+    const groups = [{ items: [{ v: '', l: 'Tous Sites' }] }, ...Object.entries(D().PLAQUES as Record<string, string[]>).map(([pl, ss]) => ({ label: pl, collapsible: true, items: [{ v: pl, l: '★ ' + pl, hint: 'toute la plaque' }, ...ss.map((s) => ({ v: s, l: s }))] })), { label: 'Autres', collapsible: true, items: [...(D().NISSAN_ONLY as string[]), 'Yssingeaux'].map((s) => ({ v: s, l: s })) }];
     gx().ui.pick(el, groups, { multi: false, selected: [plan.site], title: 'Sites', width: 280, onChange: ([v]: string[]) => setPlan({ ...plan, site: v || '' }) });
   };
 

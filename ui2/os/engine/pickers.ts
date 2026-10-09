@@ -108,7 +108,8 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     }
     if (variant === 'project') groups.push({ label: 'Périmètres groupés', items: [{ v: 'GROUPE BONY (GLOBAL)', l: 'GROUPE BONY (GLOBAL)', hint: 'répartition verrouillée' }, { v: 'GROUPE BONY (R/N)', l: 'GROUPE BONY (R/N)', hint: '16 sites' }] });
     Object.entries(D.PLAQUES).forEach(([pl, sites]) => groups.push({ label: pl, collapsible: true, toggleAll: true, items: sites.map((s) => ({ v: s, l: s, hint: [D.ALPINE_SITES.includes(s) && 'Alpine', D.NISSAN_SITES.includes(s) && 'Nissan'].filter(Boolean).join(' · ') })) }));
-    if (variant !== 'filter' || entities) groups.push({ label: variant === 'filter' ? 'Hors plaque' : 'Sites Nissan', items: D.NISSAN_ONLY.map((s) => ({ v: s, l: s, hint: 'Nissan' })) });
+    /* [GEARBOX] « Hors plaque » TOUJOURS proposé (09/10/2026) : couplé à `entities`, il manquait à la To-do (Montluçon, Saint-Etienne). */
+    groups.push({ label: variant === 'filter' ? 'Hors plaque' : 'Sites Nissan', items: D.NISSAN_ONLY.map((s) => ({ v: s, l: s, hint: 'Nissan' })) });
     if (variant === 'filter' && entities) groups.push({ label: 'Entités spécifiques', items: [{ v: 'Nissan', l: 'Nissan', hint: 'enveloppe globale' }] });
     return GX.ui.pick(anchor, groups, { multi, selected, onChange, allLabel: variant === 'filter' ? 'Tout le réseau' : 'Aucun', title: title || 'Périmètre', width: 310 });
   };

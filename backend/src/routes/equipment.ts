@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { authenticateToken, requireRole } from '../auth/middleware';
+import { MATERIAL_READ_ROLES } from '../auth/roles';
+import { checkAvailability } from '../utils/availability';
 import { emitEvent } from '../realtime';
 import { prisma } from '../db';
 
@@ -16,7 +18,7 @@ const MANAGE_ROLES = ['Master', 'Administrator', 'Director'];
 const isPositiveInt = (v: unknown): v is number =>
   typeof v === 'number' && Number.isInteger(v) && v > 0;
 
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, requireRole(MATERIAL_READ_ROLES), async (req, res) => {
   const equipment = await prisma.equipment.findMany({ orderBy: { name: 'asc' } });
   res.json(equipment);
 });
@@ -54,6 +56,16 @@ router.put('/:id', authenticateToken, requireRole(MANAGE_ROLES), async (req, res
   }
   if (category !== undefined && category !== null && typeof category !== 'string') {
     return res.status(400).json({ error: 'Champ "category" invalide : chaîne attendue.' });
+  }
+
+  // 09/10/2026 : baisser le stock SOUS le pic des réservations à venir laissait des réservations impossibles à
+  // honorer, sans rien dire. Refus en 409, avec le pic (même calcul que la réservation : utils/availability.ts).
+  if (totalQuantity !== undefined) {
+    const today = new Date().toISOString().slice(0, 10);
+    const check = await prisma.$transaction((tx) => checkAvailability(tx, { equipmentId: id, quantity: 0, startDate: today, endDate: '2100-01-01' }));
+    if (check.status !== 'equipment-not-found' && totalQuantity < check.peak) {
+      return res.status(409).json({ error: `Impossible : ${check.peak} unité(s) sont déjà réservées sur une même période à venir. Réduisez ou annulez ces réservations d'abord.` });
+    }
   }
 
   try {

@@ -13,7 +13,7 @@ import { AppIco, Head, RANKS, READ_ONLY, ROLE_SHORT, SecIco, css, roleLabel, typ
 // Écart voulu : le groupe « Voir comme » n'est pas porté — le moteur l'a retiré (rôle = compte connecté).
 // =====================================================================
 
-const MATRIX_APPS = ['hello', 'dashboard', 'projects', 'todo', 'digital', 'chat', 'campaigns', 'material', 'agenda', 'budget', 'fixed', 'conges', 'export', 'games', 'archives', 'settings'];
+const MATRIX_APPS = ['hello', 'dashboard', 'projects', 'todo', 'digital', 'chat', 'material', 'agenda', 'budget', 'fixed', 'conges', 'export', 'games', 'archives', 'settings'];
 
 export function RolesPanel({ s, cur }: { s: SectionDef; cur: string }) {
   const { gamesEnabled } = useAppSettings();

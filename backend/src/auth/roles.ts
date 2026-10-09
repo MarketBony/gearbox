@@ -99,6 +99,14 @@ export const forbiddenRoleMessage = (targetRole: string) =>
 // compte Google partagé (marketbony) : c'est cette liste, contrôlée sur CHAQUE route de
 // /api/forms (lecture comprise), qui fait office de porte. Alignée sur `FORMS_ROLES` de
 // constants.ts (navigation et matrice Rôles & accès).
+/**
+ * Matériel (09/10/2026, arbitrage BUGS-CONNUS du 30/09). LECTURE : tous ceux qui ont la rubrique (ni chef de site,
+ * ni External — liste fermée). RÉSERVATION : les rôles qui écrivent ailleurs ; le Guest reste en lecture seule.
+ * Aligné sur `canBook` de ui2/apps/material/logic.ts.
+ */
+export const MATERIAL_READ_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager', 'Guest'];
+export const BOOKING_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+
 export const FORMS_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
 // Connexion / déconnexion du compte Google : Master seul.
 export const GOOGLE_CONNECT_ROLES = ['Master'];

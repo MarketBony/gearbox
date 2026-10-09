@@ -12,7 +12,7 @@
 // Remplie et rafraîchie par <DataHub/> (DataHub.tsx), qui émet 'data' ensuite.
 // =====================================================================
 import {
-  PLAQUES_STRUCTURE, SITES as K_SITES, ALPINE_SITES as K_ALPINE, NISSAN_SITES as K_NISSAN, PROJECT_TYPES as K_TYPES,
+  PLAQUES_STRUCTURE, SITES as K_SITES, SITES_HORS_PLAQUE, ALPINE_SITES as K_ALPINE, NISSAN_SITES as K_NISSAN, PROJECT_TYPES as K_TYPES,
   TASK_CHANNELS, SOCIAL_NETWORKS, LOI_LOM_OPTIONS, DIGITAL_CONCESSIONS as K_CONCESSIONS, CONGES_TYPES,
   valeurJourConge, congeDecompteSolde, periodeCongesDe,
 } from '../../constants';
@@ -23,7 +23,7 @@ import type { Project, SocialPost, FixedExpense, BudgetLine, User, Equipment, Eq
 
 // ---------------- Référentiels ----------------
 export const PLAQUES: Record<string, string[]> = PLAQUES_STRUCTURE as any;
-export const NISSAN_ONLY = (K_SITES as string[]).filter(s => !Object.values(PLAQUES).flat().includes(s));
+export const NISSAN_ONLY = SITES_HORS_PLAQUE as string[];   // porte commune (constants.ts)
 export const SITES: string[] = K_SITES as string[];
 export const plaqueOf = (s: string) => Object.keys(PLAQUES).find(p => PLAQUES[p].includes(s)) || 'SITES NISSAN';
 export const ALPINE_SITES: string[] = K_ALPINE as string[];
@@ -114,7 +114,7 @@ export const mapPost = (s: SocialPost): MPost => ({
 
 // ---------------- L'objet GX.data ----------------
 // ids d'APP de la maquette (hello, fixed…) — le pont les traduit en rubriques réelles.
-const TAB_OF_ENTITY: Record<string, string> = { project: 'projects', post: 'digital', task: 'campaigns', 'fixed-expense': 'fixed', equipment: 'material', booking: 'material', user: 'settings' };
+const TAB_OF_ENTITY: Record<string, string> = { project: 'projects', post: 'digital', task: 'projects', 'fixed-expense': 'fixed', equipment: 'material', booking: 'material', user: 'settings' };
 
 export function createData() {
   const D = {

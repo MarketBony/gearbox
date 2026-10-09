@@ -1,7 +1,7 @@
 import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppProps } from '../types';
 import type { BrandType, BudgetLine, ServiceType } from '../../../types';
-import { PLAQUES_STRUCTURE, ALPINE_SITES, NISSAN_SITES, allowedSitesFor, BUDGET_PROVISION_EDIT_ROLES } from '../../../constants';
+import { PLAQUES_STRUCTURE, ALPINE_SITES, NISSAN_SITES, allowedSitesFor, BUDGET_PROVISION_EDIT_ROLES, SITES_HORS_PLAQUE } from '../../../constants';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useWorkspace } from '../../store/workspace';
 import { useBudgets, useFixedExpenses, upsertBudget } from '../../store/collections';
@@ -181,6 +181,7 @@ export default function BudgetApp({ win, inst }: AppProps) {
     const groups = scoped
       ? [{ items: scoped.map((s) => ({ v: s, l: s })) }]
       : [...Object.entries(PLAQUES_STRUCTURE).map(([pl, ss]) => ({ label: pl, collapsible: true, toggleAll: true, items: (ss as string[]).map((s) => ({ v: s, l: s, hint: [(ALPINE_SITES as string[]).includes(s) && 'Alpine', (NISSAN_SITES as string[]).includes(s) && 'Nissan'].filter(Boolean).join(' · ') })) })),
+        { label: 'Hors plaque', collapsible: true, items: (SITES_HORS_PLAQUE as string[]).map((s) => ({ v: s, l: s, hint: 'Nissan' })) },
         { label: 'Entités spécifiques', items: [{ v: 'Nissan', l: 'Nissan', hint: 'enveloppe globale' }] }];
     gx().ui.pick(el, groups, { multi: true, search: true, selected: effSites(f.sites), allLabel: scoped ? 'Tous mes sites' : 'Tout le réseau', title: 'Périmètre', width: 310, onChange: (v: string[]) => setF((x) => ({ ...x, sites: v })) });
   };

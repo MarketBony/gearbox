@@ -5,8 +5,8 @@ import { LOCKED_NETWORKS, NetIc } from './common';
 
 // « Gestion des TAGS » — `renderTags` de la maquette, sur le catalogue réel (`/api/tags`).
 // ⚠️ Écriture = PATCH d'UNE seule catégorie (perte du 10/09/2026), et rien tant que les tags n'ont pas
-// été LUS avec succès (`loaded`). Renommer un tag ne répercute PAS le nom sur les publications
-// (comme pages/Digital.tsx).
+// été LUS avec succès (`loaded`). Renommer un tag le REPORTE sur les publications (09/10/2026, route
+// /api/tags/rename, une transaction) — avant, elles gardaient l'ancien nom et sortaient de leur filtre.
 
 type Cat = 'networks' | 'co2' | 'lom';
 const COLS: { k: Cat; title: string; icon: string; ph: string; used: (p: SocialPost, n: string) => boolean }[] = [
@@ -15,7 +15,7 @@ const COLS: { k: Cat; title: string; icon: string; ph: string; used: (p: SocialP
   { k: 'lom', title: 'Mentions Loi LOM', icon: 'info', ph: 'Nouvelle mention…', used: (p, n) => p.lom === n },
 ];
 
-export function TagsView({ tags, posts, ed, save }: { tags: DigitalTags | null | undefined; posts: SocialPost[]; ed: boolean; save: (patch: Partial<DigitalTags>) => void }) {
+export function TagsView({ tags, posts, ed, save, rename }: { tags: DigitalTags | null | undefined; posts: SocialPost[]; ed: boolean; save: (patch: Partial<DigitalTags>) => void; rename: (k: Cat, from: string, to: string) => void }) {
   const [add, setAdd] = useState<Record<Cat, string>>({ networks: '', co2: '', lom: '' });
   const [edit, setEdit] = useState<{ k: Cat; n: string; v: string } | null>(null);
   const [del, setDel] = useState<{ k: Cat; n: string } | null>(null);
@@ -39,7 +39,7 @@ export function TagsView({ tags, posts, ed, save }: { tags: DigitalTags | null |
     const e = edit; setEdit(null); if (!e || !ok) return;
     const v = e.v.trim(); if (!v || v === e.n || !guard()) return;
     if (list(e.k).includes(v)) { hud('Ce tag existe déjà'); return; }
-    save({ [e.k]: list(e.k).map((x) => (x === e.n ? v : x)) });
+    rename(e.k, e.n, v);
   };
   const remove = (k: Cat, n: string, el: HTMLElement | null) => {
     setDel(null); if (!guard()) return;

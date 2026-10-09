@@ -1,15 +1,16 @@
 import { Router } from 'express';
 import { EquipmentBooking } from '@prisma/client';
-import { authenticateToken } from '../auth/middleware';
+import { authenticateToken, requireRole } from '../auth/middleware';
+import { MATERIAL_READ_ROLES, BOOKING_ROLES } from '../auth/roles';
 import { emitEvent } from '../realtime';
 import { checkAvailability, overCapacityMessage, AvailabilityCheck } from '../utils/availability';
 import { prisma } from '../db';
 
 const router = Router();
 
-// Réservations : accessibles à TOUT utilisateur authentifié (Material.tsx ne
-// restreint la réservation à aucun rôle côté UI — on reste cohérent avec ça,
-// pas avec la règle "gestion" plus stricte du catalogue Equipment).
+// Réservations : depuis le 09/10/2026, lecture réservée à MATERIAL_READ_ROLES et écriture à BOOKING_ROLES
+// (auth/roles.ts). Avant : tout utilisateur authentifié — un chef de site ou un External pouvait réserver par
+// appel direct, un Guest par l'interface (arbitrage BUGS-CONNUS du 30/09).
 //
 // Contrat aligné sur le frontend (types.ts EquipmentBooking + Material.tsx) :
 // requis { equipmentId, quantity, startDate, endDate } (la validation du
@@ -66,12 +67,12 @@ const optionalFieldsError = (body: any): string | null => {
   return null;
 };
 
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, requireRole(MATERIAL_READ_ROLES), async (req, res) => {
   const bookings = await prisma.equipmentBooking.findMany({ orderBy: { startDate: 'desc' } });
   res.json(bookings);
 });
 
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, requireRole(BOOKING_ROLES), async (req, res) => {
   const { equipmentId, quantity, startDate, endDate } = req.body;
 
   if (typeof equipmentId !== 'string' || equipmentId.length === 0) {
@@ -140,7 +141,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // PUT /:id — mise à jour partielle (pattern fixedExpenses.ts)
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, requireRole(BOOKING_ROLES), async (req, res) => {
   const { id } = req.params;
   const { equipmentId, quantity, startDate, endDate } = req.body;
 
@@ -222,7 +223,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
   res.json(issue.booking);
 });
 
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, requireRole(BOOKING_ROLES), async (req, res) => {
   const { id } = req.params;
   try {
     await prisma.equipmentBooking.delete({ where: { id } });

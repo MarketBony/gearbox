@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import { UPLOADS_ROOT } from '../routes/uploads';
 import { Server, Socket } from 'socket.io';
 import { sendPushToUsers, resolvePushRecipients } from '../utils/pushSender';
 import { getUserIdsOnSection } from './presence';
@@ -114,6 +117,23 @@ const bumpUnread = (unreadCounts: any, participants: string[], senderId: string)
   return counts;
 };
 
+/**
+ * Aperçu d'un message pour la liste des conversations ET le corps de la notification push : tronqué à 60, '📷 Image',
+ * '📎 <nom>'… (même logique que Chat.tsx). Un message `project` affiche le NOM du projet, jamais son id brut.
+ * Porte unique depuis le 09/10/2026 : l'envoi l'utilisait seul, la suppression ne recalculait rien (aperçu périmé).
+ */
+async function apercuDe(type: string, content: string, fileName?: string | null): Promise<string> {
+  if (type === 'image') return '📷 Image';
+  if (type === 'file') return `📎 ${fileName ?? 'Pièce jointe'}`.slice(0, 60);
+  // `fileName` d'un vocal porte sa durée formatée (« 0:12 »), posée par le client.
+  if (type === 'audio') return `🎤 Message vocal${fileName ? ` (${fileName})` : ''}`.slice(0, 60);
+  if (type === 'project') {
+    const projet = await prisma.project.findUnique({ where: { id: content }, select: { name: true } });
+    return `📋 ${projet?.name ?? 'Projet'}`.slice(0, 60);
+  }
+  return content.slice(0, 60);
+}
+
 export const registerChatHandlers = (io: Server, socket: Socket) => {
   const userId: string = socket.data.user.id;
   const role: string | undefined = socket.data.user.role;
@@ -208,22 +228,7 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       // ⚠️ Un type non traité ici retombe sur `content.slice(0, 60)` — soit, pour un
       // message de type `project`, l'ID BRUT du projet affiché dans la liste des
       // conversations ET dans la notification push. D'où la résolution du nom.
-      let apercu: string;
-      if (msgType === 'image') {
-        apercu = '📷 Image';
-      } else if (msgType === 'file') {
-        apercu = `📎 ${nomFichier ?? 'Pièce jointe'}`.slice(0, 60);
-      } else if (msgType === 'audio') {
-        // `fileName` porte la durée formatée (« 0:12 »), posée par le client : le
-        // modèle n'a pas de champ de durée et un vocal sans repère de longueur est
-        // désagréable à recevoir.
-        apercu = `🎤 Message vocal${nomFichier ? ` (${nomFichier})` : ''}`.slice(0, 60);
-      } else if (msgType === 'project') {
-        const projet = await prisma.project.findUnique({ where: { id: content }, select: { name: true } });
-        apercu = `📋 ${projet?.name ?? 'Projet'}`.slice(0, 60);
-      } else {
-        apercu = content.slice(0, 60);
-      }
+      const apercu = await apercuDe(msgType, content, nomFichier);
       const updatedConv = await prisma.chatConversation.update({
         where: { id: conversationId },
         data: {
@@ -282,6 +287,9 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       if (!existing) return reply(ack, { error: 'Message introuvable.' });
       if (existing.senderId !== userId) return reply(ack, { error: 'Seul l\'auteur peut modifier son message.' });
       if (existing.deleted) return reply(ack, { error: 'Message supprimé, modification impossible.' });
+      // 09/10/2026 : seul un message TEXTE se modifie (l'écran ne propose rien d'autre, le serveur l'acceptait) —
+      // éditer une image, un vocal ou un projet cité remplacerait son URL ou son id par du texte.
+      if (existing.type !== 'text') return reply(ack, { error: 'Seul un message texte peut être modifié.' });
 
       const message = await prisma.chatMessage.update({
         where: { id: messageId },
@@ -308,6 +316,17 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
         data: { deleted: true, content: '' }
       });
       io.to(convRoom(message.conversationId)).emit('chat:message:updated', message);
+      // 09/10/2026 : si c'était le DERNIER message, l'aperçu de la conversation (liste, widgets) gardait son texte ou
+      // « 📷 Image ». Il reprend le message précédent encore visible, sinon « Message supprimé ».
+      const dernier = await prisma.chatMessage.findFirst({ where: { conversationId: message.conversationId }, orderBy: { timestamp: 'desc' }, select: { id: true } });
+      if (dernier?.id === message.id) {
+        const prec = await prisma.chatMessage.findFirst({ where: { conversationId: message.conversationId, deleted: false }, orderBy: { timestamp: 'desc' } });
+        const updatedConv = await prisma.chatConversation.update({
+          where: { id: message.conversationId },
+          data: { lastMessage: prec ? await apercuDe(prec.type, prec.content, prec.fileName) : 'Message supprimé' },
+        });
+        io.to(convRoom(message.conversationId)).emit('chat:conversation:updated', updatedConv);
+      }
       reply(ack, message);
     } catch (e) {
       reply(ack, { error: 'Échec de la suppression.' });
@@ -535,6 +554,34 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       reply(ack, updatedConv);
     } catch (e) {
       reply(ack, { error: 'Échec du renommage.' });
+    }
+  });
+
+  // Suppression d'un GROUPE (09/10/2026, décision de Théo) : réservée à ses administrateurs, jamais le Chat Général ni
+  // une conversation privée. Les messages partent avec lui (cascade du schéma) ; les fichiers qu'ils citaient
+  // (/uploads/chat/<uuid>) sont effacés du disque — sans ça ils restaient orphelins (BUGS-CONNUS).
+  socket.on('chat:conversation:delete', async (payload: any, ack: Ack) => {
+    try {
+      const { conversationId } = payload ?? {};
+      if (typeof conversationId !== 'string') return reply(ack, { error: 'Champ "conversationId" requis.' });
+      const conversation = await prisma.chatConversation.findUnique({ where: { id: conversationId } });
+      if (!conversation) return reply(ack, { error: 'Conversation introuvable.' });
+      if (conversation.type !== 'group') return reply(ack, { error: 'Seul un groupe peut être supprimé.' });
+      if (!conversation.adminIds.includes(userId)) return reply(ack, { error: 'Seul un administrateur du groupe peut le supprimer.' });
+
+      const fichiers = await prisma.chatMessage.findMany({ where: { conversationId, type: { in: ['image', 'file', 'audio'] } }, select: { content: true } });
+      await prisma.chatConversation.delete({ where: { id: conversationId } });
+      const RE_CHAT = /^\/uploads\/chat\/([0-9a-f-]{36}\.[a-z0-9]{1,6})$/i;
+      for (const f of fichiers) {
+        const m = RE_CHAT.exec(f.content || '');
+        if (!m) continue;
+        try { fs.unlinkSync(path.join(UPLOADS_ROOT, 'chat', m[1])); } catch { /* déjà absent */ }
+      }
+      io.to(convRoom(conversationId)).emit('chat:conversation:removed', { id: conversationId });
+      io.in(convRoom(conversationId)).socketsLeave(convRoom(conversationId));
+      reply(ack, { id: conversationId });
+    } catch (e) {
+      reply(ack, { error: 'Échec de la suppression du groupe.' });
     }
   });
 

@@ -156,6 +156,8 @@ export const deleteSocialComment = (postId: string, id: string) => write({ res: 
 export const digitalTags = defineResource<DigitalTags | null>('digitalTags', () => db.getDigitalTags(), RT_EVENTS.tags, null);
 export const useDigitalTags = () => digitalTags.use();
 /** ⚠️ Charge PARTIELLE (seules les catégories modifiées) : voir `saveDigitalTags` dans dataService. */
+/** Renommage d'un tag, reporté sur les publications (une transaction serveur). */
+export const renameDigitalTag = (k: 'networks' | 'co2' | 'lom', from: string, to: string) => write({ res: digitalTags, call: () => db.renameDigitalTag(k, from, to), echo: (r) => ['tags:updated', r.tags], fail: 'Échec du renommage du tag.' }).then((r) => { socialPosts.reloadAll(); return r; });
 export const saveDigitalTags = (t: Partial<DigitalTags>) => write({ res: digitalTags, call: () => db.saveDigitalTags(t), echo: (r) => ['tags:updated', r], fail: 'Échec de l’enregistrement des tags.' });
 
 // ---------------------------------------------------------------- campagnes (liste lue par le Dashboard)

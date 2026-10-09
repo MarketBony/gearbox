@@ -60,7 +60,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   /** Ouvre une rubrique puis lui passe une commande — RIEN si l'ouverture est refusée (avant : la commande
       partait vers la fenêtre active, une autre rubrique). */
   S.openWith = (appId, cmd, params) => { const w = GX.wm.open(appId, params); if (!w) return null; setTimeout(() => w.inst?.command?.(cmd), 420); return w; };
-  const DOCK = ['launchpad', 'dashboard', 'projects', 'todo', 'digital', 'campaigns', 'forms', 'chat', 'hello', 'agenda', 'budget', 'fixed', 'material', 'conges', 'export', 'games', '|', 'archives', 'settings'];
+  const DOCK = ['launchpad', 'dashboard', 'projects', 'todo', 'digital', 'forms', 'chat', 'hello', 'agenda', 'budget', 'fixed', 'material', 'conges', 'export', 'games', '|', 'archives', 'settings'];
 
   /* ======================= Démarrage ======================= */
   S.init = () => {
