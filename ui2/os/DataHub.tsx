@@ -11,6 +11,7 @@ import { computeDashboardStats } from '../../services/dashboardStats';
 import { useWorkspace, startWorkspace } from '../store/workspace';
 import { budgets as rBudgets, socialPosts as rSocial, fixedExpenses as rFixed, equipment as rEquip, bookings as rBookings, conges as rConges } from '../store/collections';
 import { useWeatherData } from '../../pages/HelloMarketing';
+import { loadTrack, loadFeed, type DeezerTrack, type RssArticle } from '../apps/hello/sources';
 import { canSeeGames } from '../../constants';
 import type { Project, BudgetLine, SocialPost, FixedExpense, User, Equipment, EquipmentBooking } from '../../types';
 
@@ -66,6 +67,20 @@ function DataHubInner() {
   const conges = rConges.useWhen(allowed.has('conges'), cDebut, cFin) ?? null;
   const [lobby, setLobby] = useState<any>(null);
   const weather = useWeatherData(uid);
+  // Musique du jour et Actu auto pour les widgets (09/10/2026) : les MÊMES sources que Hello Marketing (cache du
+  // navigateur compris), chargées seulement si le rôle a Hello Marketing ; rafraîchies toutes les 30 min.
+  const [hello, setHello] = useState<{ track: DeezerTrack | null; auto: RssArticle[] | null }>({ track: null, auto: null });
+  const helloOk = b.nav.allowedIds.has('hello-marketing');
+  useEffect(() => {
+    if (!helloOk) return;
+    let vivant = true;
+    const go = () => {
+      loadTrack().then((t) => { if (vivant) setHello((h) => ({ ...h, track: t })); }).catch(() => {});
+      loadFeed('auto', false).then((r) => { if (vivant) setHello((h) => ({ ...h, auto: r.articles })); }).catch(() => { if (vivant) setHello((h) => ({ ...h, auto: h.auto || [] })); });
+    };
+    go(); const t = window.setInterval(go, 30 * 60e3);
+    return () => { vivant = false; window.clearInterval(t); };
+  }, [helloOk]);
   const loadLobby = () => { if (!canSeeGames(role, allowed.has('games'))) return; db.getGamesLobby().then(setLobby).catch(() => {}); };
   useEffect(() => { loadLobby(); }, [uid, role, allowed.has('games')]); // eslint-disable-line react-hooks/exhaustive-deps
   useRealtimeSync(RT_EVENTS.games, loadLobby);
@@ -89,7 +104,7 @@ function DataHubInner() {
   }, [core]);
 
   const first = useRef(true);
-  const prev = useRef<{ core: any; badges: string; users: any; avTick: number; pres: string }>({ core: null, badges: '', users: null, avTick: 0, pres: '' });
+  const prev = useRef<{ core: any; badges: string; users: any; avTick: number; pres: string; hello: any }>({ core: null, badges: '', users: null, avTick: 0, pres: '', hello: null });
   useEffect(() => {
     const GX = gx(); const D: GXData = GX.data;
     D.ME = uid;
@@ -128,12 +143,12 @@ function DataHubInner() {
     // qui y range les VRAIS fils des conversations affichées par le widget. Avant le 01/10/2026 il était
     // rempli à chaque rendu avec un faux message « dernier message » SANS auteur, que D.user rattachait à
     // l'utilisateur connecté : le widget montrait tout comme venant de soi.
-    D.GAMES = { challenges: (lobby?.challenges || []).filter((x: any) => x.toUserId === uid && x.status === 'pending').map((x: any) => ({ from: x.fromUserId, game: x.gameType || x.game || '', at: new Date(x.createdAt || Date.now()).getTime() })), running: [], board: [] };
+    D.GAMES = { challenges: (lobby?.challenges || []).filter((x: any) => x.toUserId === uid && x.status === 'pending').map((x: any) => ({ id: x.id, from: x.fromUserId, game: x.gameType || x.game || '', at: new Date(x.createdAt || Date.now()).getTime() })), running: [], board: [] };
     D.FEED = b.feed.entries.map(e => ({ id: e.id, u: e.userId, a: e.action, o: e.entityName, app: appOf(D.tabOfEntity(e.entity)), at: new Date(e.timestamp).getTime(), unread: b.feed.isUnread(e), raw: e }));
     D.HELLO = {
       weather: weather.current ? { city: weather.current.city, t: weather.current.temp, feels: weather.current.feelsLike, desc: weather.current.description, icon: weather.current.icon, owm: true } : null,
       forecast: weather.forecast.map(f => [f.day, f.icon, f.tempMax, f.tempMin]),
-      track: null, rss: {},
+      track: hello.track, rss: hello.auto ? { auto: hello.auto } : {},
     };
     D.stats = stats;
     D.ready = !!core;
@@ -156,8 +171,9 @@ function DataHubInner() {
     if (presKey !== prev.current.pres) { prev.current.pres = presKey; GX.emit('presence'); }
     const badges = `${chatTick}|${lobby ? JSON.stringify(D.GAMES.challenges.length) : ''}|${b.feed.unreadCount}|${b.chatUnread}|${b.gamesChallenges}`;
     if (badges !== prev.current.badges) { prev.current.badges = badges; GX.emit('badges'); }
+    if (hello !== prev.current.hello) { prev.current.hello = hello; GX.emit('data:hello'); }
     if (first.current && core) { first.current = false; GX.emit('ctx'); }
-  }, [core, users, equip, conges, lobby, stats, chatTick, avTick, weather.current, weather.forecast, b.feed.entries, b.feed.unreadCount, presence, uid, role]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [core, users, equip, conges, lobby, stats, chatTick, avTick, weather.current, weather.forecast, b.feed.entries, b.feed.unreadCount, presence, uid, role, hello]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
 }

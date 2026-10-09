@@ -22,7 +22,44 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
      dispositions déjà mémorisées ; W, T, M3, X3, XXW sont les crans intermédiaires du redimensionnement. */
   const SIZES = { S: [2, 2], W: [3, 2], T: [2, 4], M: [4, 2], M3: [4, 3], L: [4, 4], XL: [6, 2], X3: [6, 3], XXL: [6, 4], XXW: [8, 4] };
   const SIZE_L = { S: 'Petit', W: 'Petit large', T: 'Colonne', M: 'Moyen', M3: 'Moyen haut', L: 'Grand', XL: 'Bandeau', X3: 'Bandeau haut', XXL: 'Très grand', XXW: 'Panorama' };
-  const dim = (sz) => SIZES[sz] || SIZES.S;
+  /* [GEARBOX] Formats LIBRES (09/10/2026, refonte des widgets) : une taille est soit un nom historique (S…XXW), soit
+     « LxH » en cases (« 5x3 »). La poignée s'aimante CASE PAR CASE entre les bornes du widget (CAT.min / CAT.max ; à
+     défaut : la plus petite taille nommée et 12 × 8). Le nom historique est repris quand il correspond (téléphone). */
+  const parseSz = (sz) => { const m = /^(\d+)x(\d+)$/.exec(sz || ''); return m ? [+m[1], +m[2]] : null; };
+  const dim = (sz) => SIZES[sz] || parseSz(sz) || SIZES.S;
+  const sizeOf = (cw, ch) => Object.keys(SIZES).find((k) => SIZES[k][0] === cw && SIZES[k][1] === ch) || `${cw}x${ch}`;
+  const small = (sz) => { const [w, h] = dim(sz); return w <= 2 && h <= 2; };
+  const bounds = (c) => { const ds = c.sizes.map(dim); return { min: c.min || [Math.min(...ds.map((d) => d[0])), Math.min(...ds.map((d) => d[1]))], max: c.max || [12, 8] }; };
+  const resizable = (c) => { const b = bounds(c); return b.min[0] !== b.max[0] || b.min[1] !== b.max[1]; };
+  const sizeName = (sz) => SIZE_L[sz] || 'Sur mesure';
+  /* Un widget qui plante affiche « Indisponible » (et l'erreur part en console) au lieu d'un cadre vide. */
+  const indispo = (e, name = '') => { console.error('[widget]', name, e); return `<div class="wt"><span class="ellipsis grow">${GX.esc(name)}</span></div><div class="faint" style="margin:auto;font-size:12.5px">Indisponible</div>`; };
+  /* ---------------- Widgets en React (09/10/2026) ----------------
+     Un widget peut héberger un composant React (To-do, Ma journée, Forms) : son rendu pose un emplacement
+     `[data-wreact]`, remplacé après chaque rendu par un hôte PERSISTANT (une div par widget) dans lequel
+     ui2/apps/widgets/ReactWidgets.tsx rend le composant par portail. L'hôte survit aux re-rendus du bureau (pastilles,
+     messages…) : le composant garde son état (filtres, défilement). */
+  const rHosts = new Map(), rListeners = new Set();
+  let rSnap = [];
+  const rEmit = () => { rSnap = [...rHosts.entries()].map(([wid, v]) => ({ wid, ...v })); rListeners.forEach((f) => f()); };
+  const reactSlot = (w, kind, icon, title) => (w
+    ? `<div class="wreact-slot" data-wreact="${kind}" data-wid="${w.id}"></div>`
+    : `${head(icon, title)}<div class="wreact-prev"><i></i><i></i><i></i><i></i></div>`);   // aperçu de la galerie
+  W.react = { snapshot: () => rSnap, subscribe(f) { rListeners.add(f); return () => rListeners.delete(f); } };
+  W.adopt = (scope) => {
+    if (!scope) return; let changed = false;
+    scope.querySelectorAll('[data-wreact][data-wid]').forEach((ph) => {
+      const wid = ph.dataset.wid, kind = ph.dataset.wreact; if (!wid) return;
+      let r = rHosts.get(wid);
+      if (!r || r.kind !== kind) { const host = document.createElement('div'); host.className = 'wreact'; host.dataset.wreact = kind; r = { host, kind }; rHosts.set(wid, r); changed = true; }
+      ph.replaceWith(r.host);
+    });
+    if (layout) for (const wid of [...rHosts.keys()]) if (!layout.some((w) => w.id === wid)) { rHosts.delete(wid); changed = true; }
+    if (changed) rEmit();
+  };
+  /* Tâches assignées (mêmes règles que la To-do : ui2/apps/todo/board.ts), fournies par le côté React (GX.todo). */
+  const myTasks = () => (GX.todo?.items?.() || []).filter((it) => it.t.status !== 'Done').sort((a, b) => a.ref.localeCompare(b.ref));
+  const urg = (it) => GX.todo?.urgency?.(it) || { txt: '', cls: '' };
   const dimL = (sz) => dim(sz).join(' × ');
   /* Nombre de lignes qui tiennent dans la hauteur du widget (ligne de `row` px, en-tête + marges = `extra`) */
   const fit = (sz, row = 30, extra = 64) => Math.max(1, Math.floor((dim(sz)[1] * STEP - GAP - extra) / row));
@@ -141,7 +178,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   const CAT = {
     'budget-ring': { app: 'budget', name: 'Budget de l’année', sizes: ['S', 'M', 'M3'], render(sz) {
       const p = planned(), s = spent(), pct = p ? Math.round((s / p) * 100) : 0; /* [GEARBOX] pas de NaN pendant le chargement */
-      if (sz === 'S') return `${head('budget', 'Budget ' + new Date().getFullYear())}<div class="row" style="margin-top:auto;gap:10px"><div class="ring" style="--p:${Math.min(100, pct)};--sz:62px;--th:8px"></div><div><div class="wv num" style="font-size:24px">${pct} %</div><div class="faint" style="font-size:11px">${F.eurK(s)}</div></div></div>`;
+      if (small(sz)) return `${head('budget', 'Budget ' + new Date().getFullYear())}<div class="row" style="margin-top:auto;gap:10px"><div class="ring" style="--p:${Math.min(100, pct)};--sz:62px;--th:8px"></div><div><div class="wv num" style="font-size:24px">${pct} %</div><div class="faint" style="font-size:11px">${F.eurK(s)}</div></div></div>`;
       const mix = Object.fromEntries(D.SERVICES.map((x) => [x, (D.stats?.serviceChartData || []).find((d) => d.name === x)?.value || 0])); /* [GEARBOX] mix du Dashboard */
       return `${head('budget', 'Budget ' + new Date().getFullYear(), `<span class="faint">${pct} %</span>`)}<div class="row" style="gap:14px;margin-top:auto"><div class="ring" style="--p:${Math.min(100, pct)};--sz:84px;--th:10px"></div><div class="grow" style="display:grid;gap:5px">${D.SERVICES.map((x) => `<div class="row" style="gap:6px;font-size:12px"><i class="brand-dot" style="--c:${D.SERVICE_COLOR[x]}"></i><b style="width:30px">${x}</b><span class="grow"></span><span class="num muted">${F.eurK(mix[x])}</span></div>`).join('')}</div></div>
         ${dim(sz)[1] >= 3 ? `<div class="wtiles" style="margin-top:12px"><div><span class="faint">Prévu</span><b class="num">${F.eurK(p)}</b></div><div><span class="faint">Engagé</span><b class="num">${F.eurK(s)}</b></div><div><span class="faint">Reste</span><b class="num" style="color:${p - s < 0 ? 'var(--danger)' : 'inherit'}">${F.eurK(p - s)}</b></div></div>` : ''}`;
@@ -152,21 +189,31 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       if (wideSz(sz)) { const h = Math.ceil(items.length / 2); return `${head('budget', 'Top sites consommés')}<div class="wcols2" style="margin-top:10px">${GX.chart.hbars({ items: items.slice(0, h) })}${GX.chart.hbars({ items: items.slice(h), max: items[0]?.value })}</div>`; }
       return `${head('budget', 'Top sites consommés')}<div style="margin-top:10px">${GX.chart.hbars({ items })}</div>`;
     } },
-    kpi: { app: 'dashboard', name: 'Indicateur', sizes: ['S'], cfg: 'kpi', render(sz, c = {}) {
+    kpi: { app: 'dashboard', name: 'Indicateur', sizes: ['S'], max: [4, 3], cfg: 'kpi', render(sz, c = {}) {
       const k = c.kpi || 'actifs', p = planned(), s = spent();
-      const K = { actifs: ['Projets actifs', D.stats?.activeProjectsCount ?? 0, 'en cours de réalisation', 'layers'], reste: ['Reste à engager', F.eurK(p - s), p - s < 0 ? 'dépassement' : 'disponible', 'target'],
+      const t0 = today(), mon = GX.iso(GX.addDays(GX.today(), -((GX.today().getDay() + 6) % 7))), sun = GX.iso(GX.addDays(GX.today(), 6 - ((GX.today().getDay() + 6) % 7)));
+      const K = { actifs: ['Projets actifs', D.stats?.activeProjectsCount ?? 0, 'en cours de réalisation', 'layers'],
+        taches: ['Mes tâches en retard', myTasks().filter((it) => !it.noDate && it.ref < t0).length, 'échéance dépassée', 'todo'],
+        posts: ['Publications', D.POSTS.filter((p) => !p.archived && p.date >= mon && p.date <= sun).length, 'cette semaine', 'digital'],
+        absents: ['Absents', new Set(D.CONGES.filter((c) => c.date === t0).map((c) => c.u)).size, 'aujourd’hui', 'conges'], reste: ['Reste à engager', F.eurK(p - s), p - s < 0 ? 'dépassement' : 'disponible', 'target'],
         conso: ['Consommation', (p ? Math.round((s / p) * 100) : 0) + ' %', 'du budget annuel', 'percent'], campagnes: ['Campagnes programmées', D.stats?.activeCampaignsCount ?? 0, 'SMS / e-mail', 'campaigns'],
         retard: ['Projets en retard', lateList().length, 'échéance dépassée', 'alert'] }[k];
       return `<div class="wt">${GX.icon(K[3], 'sm')}<span class="ellipsis grow">${K[0]}</span></div><div class="wv num">${K[1]}</div><div class="faint" style="font-size:12px">${K[2]}</div>`;
     } },
     late: { app: 'projects', name: 'Projets en retard', sizes: ['S', 'M', 'M3', 'L'], accent: true, render(sz) {
       const L = lateList();
-      if (sz === 'S') return `${head('projects', 'En retard')}<div class="wv num">${L.length}</div><div class="faint" style="font-size:12px">projets à reprendre</div>`;
+      if (small(sz)) return `${head('projects', 'En retard')}<div class="wv num">${L.length}</div><div class="faint" style="font-size:12px">projets à reprendre</div>`;
       return `${head('projects', 'Projets en retard', `<b>${L.length}</b>`)}<div class="wl">${L.slice(0, fit(sz)).map((p) => `<div class="wr" data-proj="${p.id}"><span class="ellipsis grow">${GX.esc(p.name)}</span><span class="num" style="opacity:.85">${F.rel(p.endDate)}</span></div>`).join('') || '<div class="faint">Aucun retard 🎉</div>'}</div>`;
     } },
-    deadlines: { app: 'projects', name: 'Prochaines échéances', sizes: ['M', 'M3', 'L', 'X3'], render(sz) {
-      const L = deadlineList().slice(0, fit(sz));
-      return `${head('projects', 'Prochaines échéances')}<div class="wl">${L.map((p) => `<div class="wr" data-proj="${p.id}"><b class="num" style="width:52px">${F.date(p.endDate)}</b><span class="ellipsis grow">${GX.esc(p.name)}</span>${wideSz(sz) ? `<span class="faint ellipsis" style="max-width:34%">${GX.esc(p.sites.join(', '))}</span>` : ''}<span class="faint num">${D.projectProgress(p)} %</span></div>`).join('')}</div>`;
+    deadlines: { app: 'projects', name: 'Prochaines échéances', sizes: ['M', 'M3', 'L', 'X3'], max: [10, 8], cfg: 'deadlines', render(sz, c = {}) {
+      /* [GEARBOX] 09/10/2026 : projets ET tâches (les miennes) — option du widget. Fins de projet : liste du Dashboard. */
+      const mode = c.mode || 'both', t0 = today();
+      const P = mode === 'task' ? [] : deadlineList().map((p) => ({ d: p.endDate, n: p.name, sub: p.sites.join(', '), proj: p.id, k: 'Projet' }));
+      const T = mode === 'proj' ? [] : myTasks().filter((it) => !it.noDate && it.ref >= t0).map((it) => ({ d: it.ref, n: it.t.name, sub: it.p ? it.p.name : 'Tâche libre', proj: it.p?.id, k: 'Tâche' }));
+      const L = [...P, ...T].sort((a, b) => a.d.localeCompare(b.d)).slice(0, fit(sz) * (dim(sz)[0] >= 8 ? 2 : 1));
+      const rowH = (x) => `<div class="wr" ${x.proj ? `data-proj="${x.proj}"` : ''}><b class="num" style="width:52px">${F.date(x.d)}</b>${mode === 'both' && !narrow(sz) ? `<span class="wk ${x.k === 'Tâche' ? 't' : ''}">${x.k}</span>` : ''}<span class="ellipsis grow">${GX.esc(x.n)}</span>${wideSz(sz) ? `<span class="faint ellipsis" style="max-width:34%">${GX.esc(x.sub)}</span>` : ''}</div>`;
+      const body = dim(sz)[0] >= 8 ? `<div class="wcols2">${[L.slice(0, Math.ceil(L.length / 2)), L.slice(Math.ceil(L.length / 2))].map((h) => `<div class="wl">${h.map(rowH).join('')}</div>`).join('')}</div>` : `<div class="wl">${L.map(rowH).join('')}</div>`;
+      return `${head('projects', 'Prochaines échéances')}${L.length ? body : '<div class="faint" style="margin:auto">Aucune échéance à venir</div>'}`;
     } },
     'project-pin': { app: 'projects', name: 'Projet épinglé', sizes: ['M', 'M3', 'L'], cfg: 'project', render(sz, c = {}) {
       const p = D.project(c.project) || act().find((x) => x.status === 'Active'); if (!p) return head('projects', 'Projet épinglé');
@@ -175,13 +222,16 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
         <div class="row" style="margin-top:auto;gap:10px"><div class="grow"><div class="bar"><i style="width:${pr}%"></i></div><div class="row" style="font-size:11px;margin-top:4px"><span class="faint grow">${pr} % · ${p.tasks.length} tâches</span><b class="num">${F.eurK(D.projectActual(p))} / ${F.eurK(p.budgetPlanned)}</b></div></div></div>
         ${dim(sz)[1] >= 3 ? `<div class="wl" style="margin-top:10px">${p.tasks.slice(0, dim(sz)[1] >= 4 ? 5 : 2).map((t) => `<div class="wr"><span class="ellipsis grow">${GX.esc(t.name)}</span>${GX.r.tStatus(t.status)}</div>`).join('')}</div>` : ''}`;
     } },
-    'my-tasks': { app: 'todo', name: 'Mes tâches', sizes: ['M', 'M3', 'L', 'T'], render(sz) {
-      const T = D.PROJECTS.flatMap((p) => p.tasks.map((t) => ({ t, p }))).filter(({ t }) => t.assignee === GX.ctx.uid && t.status !== 'Done').sort((a, b) => a.t.deadline.localeCompare(b.t.deadline)).slice(0, fit(sz));
-      return `${head('todo', 'Mes tâches', `<span class="faint">${T.length}</span>`)}<div class="wl">${T.map(({ t, p }) => `<label class="wr" style="cursor:default"><input type="checkbox" class="check" data-task="${t.id}" /><span class="ellipsis grow">${GX.esc(t.name)}${narrow(sz) ? '' : ` <span class="faint">· ${GX.esc(p.name)}</span>`}</span><span class="num" style="font-size:11px;color:${t.deadline < today() ? 'var(--danger)' : 'var(--text-3)'}">${F.date(t.deadline)}</span></label>`).join('') || '<div class="faint">Rien à faire 🎉</div>'}</div>`;
+    'my-tasks': { app: 'todo', name: 'Mes tâches', sizes: ['M', 'M3', 'L', 'T'], max: [10, 8], render(sz) {
+      /* [GEARBOX] 09/10/2026 : tâches de projets ET tâches libres (règles de la To-do), case à cocher RÉELLE. */
+      const all = myTasks(), ro = !GX.todo?.canEdit?.(), L = all.slice(0, fit(sz) * (dim(sz)[0] >= 8 ? 2 : 1));
+      const rowH = (it) => { const u = urg(it); return `<div class="wr wtask"><input type="checkbox" class="check" data-task="${it.id}" aria-label="Terminer « ${GX.esc(it.t.name)} »"${ro ? ' disabled' : ''} /><span class="ellipsis grow" ${it.p ? `data-tproj="${it.p.id}"` : ''}>${GX.esc(it.t.name)}${narrow(sz) ? '' : ` <span class="faint">· ${GX.esc(it.p ? it.p.name : 'Libre')}</span>`}</span>${u.txt && !narrow(sz) ? `<span class="wdl-u ${u.cls}">${GX.esc(u.txt)}</span>` : ''}</div>`; };
+      const body = dim(sz)[0] >= 8 ? `<div class="wcols2">${[L.slice(0, Math.ceil(L.length / 2)), L.slice(Math.ceil(L.length / 2))].map((h) => `<div class="wl">${h.map(rowH).join('')}</div>`).join('')}</div>` : `<div class="wl">${L.map(rowH).join('')}</div>`;
+      return `${head('todo', 'Mes tâches', `<span class="faint">${all.length}</span>`)}${all.length ? body : `<div class="faint" style="margin:auto">${GX.todo ? 'Aucune tâche en cours 🎉' : 'Chargement…'}</div>`}`;
     } },
-    posts: { app: 'digital', name: 'Prochaines publications', sizes: ['M', 'M3', 'L', 'T'], render(sz) {
+    posts: { app: 'digital', name: 'Prochaines publications', sizes: ['M', 'M3', 'L', 'T'], max: [10, 8], render(sz) {
       const L = postList().slice(0, fit(sz));
-      return `${head('digital', narrow(sz) ? 'Publications' : 'Prochaines publications')}<div class="wl">${L.map((p) => `<div class="wr"><b class="num" style="width:${narrow(sz) ? 40 : 52}px">${F.date(p.date)}</b><span class="ellipsis grow">${GX.esc(p.title)}</span>${narrow(sz) ? `<i class="brand-dot" style="--c:${D.socialStatus(p.status).c}"></i>` : GX.r.sStatus(p.status)}</div>`).join('')}</div>`;
+      return `${head('digital', narrow(sz) ? 'Publications' : 'Prochaines publications')}<div class="wl">${L.map((p) => `<div class="wr" data-post="${p.id}"><b class="num" style="width:${narrow(sz) ? 40 : 52}px">${F.date(p.date)}</b><span class="ellipsis grow">${GX.esc(p.title)}</span>${narrow(sz) ? `<i class="brand-dot" style="--c:${D.socialStatus(p.status).c}"></i>` : GX.r.sStatus(p.status)}${wideSz(sz) && p.networks?.length ? `<span class="row" style="gap:4px">${p.networks.slice(0, 4).map((n) => GX.r.net(n)).join('')}</span>` : ''}</div>`).join('') || '<div class="faint">Aucune publication à venir</div>'}</div>`;
     } },
     'digital-week': { app: 'digital', name: 'Planning digital · semaine', sizes: ['XL', 'X3'], render(sz) {
       const t = GX.today(), mon = GX.addDays(t, -((t.getDay() + 6) % 7)), tall = dim(sz)[1] >= 3;
@@ -189,13 +239,15 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
         return `<div class="wday ${iso === today() ? 'on' : ''}"><span class="faint">${F.day(d)}</span><b class="num">${d.getDate()}</b>${tall ? `<div class="wdl">${ps.slice(0, 3).map((p) => `<span style="--c:${D.socialStatus(p.status).c}" data-tip="${GX.esc(p.title)}">${GX.esc(p.title)}</span>`).join('')}${ps.length > 3 ? `<span class="faint">+${ps.length - 3}</span>` : ''}</div>` : `<div class="wdots">${ps.slice(0, 4).map((p) => `<i style="background:${D.socialStatus(p.status).c}" data-tip="${GX.esc(p.title)}"></i>`).join('')}</div><span class="faint" style="font-size:10px">${ps.length || ''}</span>`}</div>`; }).join('')}</div>`;
     } },
     campaigns: { app: 'campaigns', name: 'Performance des campagnes', sizes: ['M', 'M3'], render(sz) {
-      const c = act().flatMap((p) => p.tasks).filter((t) => ['SMS', 'E-mail'].includes(t.channel)), avg = (k) => (c.length ? c.reduce((s, t) => s + (t[k] || 0), 0) / c.length : 0);
+      /* [GEARBOX] moyennes sur les SEULS taux renseignés (un taux vide comptait pour 0 %, BUGS-CONNUS.md) */
+      const c = act().flatMap((p) => p.tasks).filter((t) => ['SMS', 'E-mail'].includes(t.channel));
+      const avg = (k) => { const v = c.map((t) => t[k]).filter((x) => x != null && x !== '' && Number.isFinite(+x)).map(Number); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0; };
       const top = dim(sz)[1] >= 3 ? [...c].sort((a, b) => (b.openRate || 0) - (a.openRate || 0)).slice(0, 3) : [];
       return `${head('campaigns', 'Campagnes', `<span class="faint">${c.length}</span>`)}${top.length ? `<div class="wl">${top.map((t) => `<div class="wr"><span class="badge" style="--c:var(--info)">${GX.esc(t.channel)}</span><span class="ellipsis grow">${GX.esc(t.name)}</span><b class="num">${(t.openRate || 0).toFixed(0)} %</b></div>`).join('')}</div>` : ''}<div class="wtiles"><div><span class="faint">Contacts</span><b class="num">${F.n(c.reduce((s, t) => s + (t.volume || 0), 0))}</b></div><div><span class="faint">Ouverture</span><b class="num">${avg('openRate').toFixed(0)} %</b></div><div><span class="faint">Clics</span><b class="num">${avg('clickRate').toFixed(1)} %</b></div></div>`;
     } },
     chat: { app: 'chat', name: 'Chat', sizes: ['S', 'M', 'M3'], render(sz) {
       const n = D.CONVS.reduce((s, c) => s + c.unread, 0);
-      if (sz === 'S') return `${head('chat', 'Chat')}<div class="wv num">${n}</div><div class="faint" style="font-size:12px">messages non lus</div>`;
+      if (small(sz)) return `${head('chat', 'Chat')}<div class="wv num">${n}</div><div class="faint" style="font-size:12px">messages non lus</div>`;
       /* [GEARBOX] Dernier message de chaque conversation visible : fil réel si chargé, sinon aperçu serveur (sans
          auteur → avatar de la conversation). Avant le 01/10/2026 : faux message sans auteur, avatar de soi-même. */
       const last = chVisible().map((c) => ({ c, m: chLast(c) })).filter((x) => x.m).sort((a, b) => b.m.at - a.m.at).slice(0, fit(sz));
@@ -208,68 +260,114 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
         <input class="aw-in" data-aq placeholder="Pose ta question…" maxlength="2000" autocomplete="off" value="${GX.esc(awDraft)}" aria-label="Poser une question à mIAouss" /></div>`;
     } },
     'chat-live': { app: 'chat', name: 'Chat interactif', sizes: ['L', 'M3', 'XL', 'X3', 'XXL', 'XXW'], live: true, render: (sz, c = {}, w) => chatLive(sz, c, w) },
-    birthdays: { app: 'hello', name: 'Anniversaires', sizes: ['S', 'M', 'M3', 'T'], render(sz) {
-      const t = GX.today(), L = D.USERS.map((u) => { const b = new Date(u.birthdate); let n = new Date(t.getFullYear(), b.getMonth(), b.getDate()); if (n < t) n = new Date(t.getFullYear() + 1, b.getMonth(), b.getDate()); return { u, n, days: Math.round((n - t) / 864e5) }; }).sort((a, b) => a.days - b.days);
-      if (sz === 'S') { const x = L[0]; return `${head('hello', 'Anniversaire')}<div style="margin-top:auto">${GX.r.av(x.u.id, 'lg')}</div><b style="margin-top:6px">${GX.esc(x.u.name.split(' ')[0])}</b><div class="faint" style="font-size:12px">${x.days === 0 ? "aujourd'hui 🎂" : x.days === 1 ? 'demain' : 'dans ' + x.days + ' j'}</div>`; }
-      return `${head('hello', 'Anniversaires')}<div class="wl">${L.slice(0, fit(sz)).map((x) => `<div class="wr">${GX.r.av(x.u.id, 'sm')}<span class="ellipsis grow">${GX.esc(narrow(sz) ? x.u.name.split(' ')[0] : x.u.name)}</span><span class="faint">${x.days === 0 ? "Auj. !" : x.days === 1 ? 'demain' : 'dans ' + x.days + ' j'}</span></div>`).join('')}</div>`;
+    birthdays: { app: 'hello', name: 'Anniversaires', sizes: ['S', 'M', 'M3', 'T'], max: [8, 8], render(sz) {
+      /* [GEARBOX] collègue sans date de naissance : écarté (il faussait le tri, 09/10/2026) */
+      const t = GX.today(), L = D.USERS.filter((u) => u.birthdate && !isNaN(new Date(u.birthdate))).map((u) => { const b = new Date(u.birthdate); let n = new Date(t.getFullYear(), b.getMonth(), b.getDate()); if (n < t) n = new Date(t.getFullYear() + 1, b.getMonth(), b.getDate()); return { u, n, days: Math.round((n - t) / 864e5) }; }).sort((a, b) => a.days - b.days);
+      if (!L.length) return `${head('hello', 'Anniversaires')}<div class="faint" style="margin:auto">Aucune date renseignée</div>`;
+      const when = (x) => (x.days === 0 ? "aujourd'hui 🎂" : x.days === 1 ? 'demain' : 'dans ' + x.days + ' j');
+      if (small(sz)) { const x = L[0]; return `${head('hello', 'Anniversaire')}<div style="margin-top:auto">${GX.r.av(x.u.id, 'lg')}</div><b style="margin-top:6px">${GX.esc(x.u.name.split(' ')[0])}</b><div class="faint" style="font-size:12px">${when(x)}</div>`; }
+      return `${head('hello', 'Anniversaires')}<div class="wl">${L.slice(0, fit(sz)).map((x) => `<div class="wr">${GX.r.av(x.u.id, 'sm')}<span class="ellipsis grow">${GX.esc(narrow(sz) ? x.u.name.split(' ')[0] : x.u.name)}</span>${wideSz(sz) ? `<span class="faint">${x.n.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</span>` : ''}<span class="faint">${x.days === 0 ? 'Auj. !' : when(x)}</span></div>`).join('')}</div>`;
     } },
     weather: { app: 'hello', name: 'Météo', sizes: ['S', 'M', 'M3', 'T'], sky: true, render(sz) {
       const w = D.HELLO.weather, [cw, ch] = dim(sz);
+      if (!w) return `<div class="wt" style="color:rgba(255,255,255,.85)">${GX.icon('pin', 'sm')}Météo</div><div style="margin:auto;opacity:.85;font-size:12.5px">Chargement…</div>`;   /* [GEARBOX] avant : widget vide */
       const now = `<div class="wt" style="color:rgba(255,255,255,.85)">${GX.icon('pin', 'sm')}${GX.esc(w.city)}</div><div class="row" style="margin-top:${ch >= 4 && cw <= 2 ? '10px' : 'auto'};align-items:flex-end"><div class="wv num" style="font-size:${ch >= 3 ? 48 : 40}px">${w.t}°</div><span class="grow"></span>${GX.icon(w.icon, 'xl')}</div><div style="font-size:12px;opacity:.85">${GX.esc(w.desc)} · ressenti ${w.feels}°</div>`;
       if (cw <= 2 && ch >= 4) return `${now}<div class="wfv">${D.HELLO.forecast.map(([d, ic, mx, mn]) => `<div><span>${d}</span>${GX.icon(ic, 'sm')}<b>${mx}°</b><span>${mn}°</span></div>`).join('')}</div>`;
       return `${now}${cw >= 4 ? `<div class="wfc ${ch >= 3 ? 'lg' : ''}">${D.HELLO.forecast.map(([d, ic, mx, mn]) => `<div><span>${d}</span>${GX.icon(ic, ch >= 3 ? '' : 'sm')}<b>${mx}°</b><span>${mn}°</span></div>`).join('')}</div>` : ''}`;
     } },
-    music: { app: 'hello', name: 'Musique du jour', sizes: ['M'], render() {
+    music: { app: 'hello', name: 'Musique du jour', sizes: ['M', 'W', 'M3'], max: [6, 4], render(sz) {
+      /* [GEARBOX] 09/10/2026 : la VRAIE musique du jour de Hello Marketing (Deezer, ui2/apps/hello/sources.ts). */
       const t = D.HELLO.track;
-      return `${head('hello', 'Musique du jour')}<div class="row" style="margin-top:auto;gap:12px"><div style="width:62px;height:62px;border-radius:12px;background:linear-gradient(135deg,${t.cover[0]},${t.cover[1]});display:grid;place-items:center;color:#fff">${GX.icon('music', 'lg')}</div><div class="grow"><b>${GX.esc(t.title)}</b><div class="faint" style="font-size:12px">${GX.esc(t.artist)}</div><div class="bar" style="margin-top:8px;height:4px"><i style="width:35%"></i></div></div><button class="icon-btn" data-play>${GX.icon('play')}</button></div>`;
+      if (!t) return `${head('hello', 'Musique du jour')}<div class="faint" style="margin:auto">Chargement…</div>`;
+      const cover = t.album?.cover_medium ? `background:center/cover url(${GX.esc(t.album.cover_medium)})` : 'background:var(--bony-grad)';
+      return `${head('hello', 'Musique du jour')}<div class="row" style="margin-top:auto;gap:12px;min-width:0"><div style="width:62px;height:62px;flex:none;border-radius:12px;${cover}"></div><div class="grow" style="min-width:0"><b class="ellipsis" style="display:block">${GX.esc(t.title)}</b><div class="faint ellipsis" style="font-size:12px">${GX.esc(t.artist?.name || '')}</div>${dim(sz)[1] >= 3 ? `<div class="faint ellipsis" style="font-size:11.5px;margin-top:2px">${GX.esc(t.album?.title || '')}</div>` : ''}</div>${t.preview ? `<button class="icon-btn" data-play="${GX.esc(t.preview)}" aria-label="Écouter l’extrait">${GX.icon('play')}</button>` : ''}</div>`;
     } },
-    'conges-off': { app: 'conges', name: 'Absents cette semaine', sizes: ['S', 'M', 'M3', 'L'], render(sz) {
-      const e = GX.iso(GX.addDays(GX.today(), 6)), off = [...new Set(D.CONGES.filter((c) => c.date >= today() && c.date <= e).map((c) => c.u))];
-      if (sz === 'S') return `${head('conges', 'Absents')}<div class="av-stack" style="margin-top:auto">${off.slice(0, 4).map((u) => GX.r.av(u)).join('')}</div><div class="faint" style="font-size:12px;margin-top:6px">${off.length} cette semaine</div>`;
-      return `${head('conges', 'Absents cette semaine', `<span class="faint">${off.length}</span>`)}<div class="wl">${off.slice(0, fit(sz)).map((u) => { const c = D.CONGES.filter((x) => x.u === u && x.date >= today() && x.date <= e); const lt = D.leave(c[0].type); return `<div class="wr">${GX.r.av(u, 'sm')}<span class="ellipsis grow">${GX.esc(D.user(u).name)}</span><span class="badge" style="--c:${lt.c}">${lt.s}</span><span class="faint num">${c.length} j</span></div>`; }).join('') || '<div class="faint">Toute l’équipe est là</div>'}</div>`;
+    'conges-off': { app: 'conges', name: 'Absents cette semaine', sizes: ['S', 'M', 'M3', 'L'], max: [10, 8], render(sz) {
+      /* [GEARBOX] 09/10/2026 : la VRAIE semaine (lundi → dimanche). Avant : aujourd'hui → J+6, un CP de lundi
+         disparaissait dès mardi (« 0 cette semaine », BUGS-CONNUS.md). Ceux qui sont déjà revenus sont estompés. */
+      const t0 = today(), mon = GX.iso(GX.addDays(GX.today(), -((GX.today().getDay() + 6) % 7))), sun = GX.iso(GX.addDays(GX.today(), 6 - ((GX.today().getDay() + 6) % 7)));
+      const wk = D.CONGES.filter((c) => c.date >= mon && c.date <= sun), off = [...new Set(wk.map((c) => c.u))];
+      const back = (u) => !wk.some((c) => c.u === u && c.date >= t0);
+      off.sort((a, b) => (back(a) ? 1 : 0) - (back(b) ? 1 : 0));
+      if (small(sz)) return `${head('conges', 'Absents')}<div class="av-stack" style="margin-top:auto">${off.slice(0, 4).map((u) => GX.r.av(u)).join('')}</div><div class="faint" style="font-size:12px;margin-top:6px">${off.length} cette semaine</div>`;
+      const span = (u) => { const ds = wk.filter((c) => c.u === u).map((c) => c.date).sort(); const a = ds[0], b = ds[ds.length - 1]; return a === b ? F.date(a) : `${F.date(a)} → ${F.date(b)}`; };
+      return `${head('conges', 'Absents cette semaine', `<span class="faint">${off.length}</span>`)}<div class="wl">${off.slice(0, fit(sz)).map((u) => { const c = wk.find((x) => x.u === u), lt = D.leave(c.type); return `<div class="wr ${back(u) ? 'wback' : ''}">${GX.r.av(u, 'sm')}<span class="ellipsis grow">${GX.esc(D.user(u).name)}</span>${narrow(sz) ? '' : `<span class="faint num">${span(u)}</span>`}<span class="badge" style="--c:${lt?.c || 'var(--text-3)'}">${GX.esc(back(u) ? 'revenu' : lt?.l || c.type)}</span></div>`; }).join('') || '<div class="faint">Personne d’absent</div>'}</div>`;
     } },
-    'conges-solde': { app: 'conges', name: 'Mon solde de congés', sizes: ['S'], render() {
+    'conges-solde': { app: 'conges', name: 'Mon solde de congés', sizes: ['S'], max: [4, 3], render() {
       const pris = D.CONGES.filter((c) => c.u === GX.ctx.uid && D.leaveCountsCP(c)).reduce((s, c) => s + D.leaveValue(c), 0), droit = D.CONGES_DROITS[GX.ctx.uid] ?? 25 /* [GEARBOX] règles de constants.ts */, r = droit - pris;
       return `${head('conges', 'Solde CP')}<div class="wv num" style="color:${r < 0 ? 'var(--danger)' : r <= 3 ? 'var(--warn)' : 'inherit'}">${r}</div><div class="faint" style="font-size:12px">jours restants sur ${droit}</div><div class="bar" style="margin-top:6px"><i style="width:${Math.min(100, (pris / droit) * 100)}%;--c:var(--info)"></i></div>`;
     } },
-    material: { app: 'material', name: 'Matériel disponible', sizes: ['M', 'M3', 'L', 'T'], render(sz) {
-      const t = today(), L = D.EQUIPMENT.map((e) => ({ e, used: D.BOOKINGS.filter((b) => b.eq === e.id && b.start <= t && b.end >= t).reduce((s, b) => s + b.qty, 0) })).slice(0, fit(sz, 30, 58));
-      return `${head('material', narrow(sz) ? 'Matériel dispo' : 'Matériel disponible aujourd’hui')}<div class="wl">${L.map(({ e, used }) => `<div class="wr"><span class="ellipsis grow">${GX.esc(e.name)}</span><b class="num" style="color:${e.qty - used ? 'var(--ok)' : 'var(--danger)'}">${e.qty - used}/${e.qty}</b></div>`).join('')}</div>`;
+    material: { app: 'material', name: 'Matériel disponible', sizes: ['M', 'M3', 'L', 'T'], max: [10, 8], render(sz) {
+      /* [GEARBOX] trié par disponibilité : l'épuisé d'abord (09/10/2026) */
+      const t = today(), all = D.EQUIPMENT.map((e) => ({ e, used: D.BOOKINGS.filter((b) => b.eq === e.id && b.start <= t && b.end >= t).reduce((s, b) => s + b.qty, 0) })).sort((a, b) => (a.e.qty - a.used) - (b.e.qty - b.used) || a.e.name.localeCompare(b.e.name));
+      const L = all.slice(0, fit(sz, 30, 58) * (dim(sz)[0] >= 8 ? 2 : 1));
+      const rowH = ({ e, used }) => `<div class="wr"><span class="ellipsis grow">${GX.esc(e.name)}</span>${wideSz(sz) && e.cat ? `<span class="faint ellipsis" style="max-width:30%">${GX.esc(e.cat)}</span>` : ''}<b class="num" style="color:${e.qty - used ? 'var(--ok)' : 'var(--danger)'}">${e.qty - used}/${e.qty}</b></div>`;
+      const body = dim(sz)[0] >= 8 ? `<div class="wcols2">${[L.slice(0, Math.ceil(L.length / 2)), L.slice(Math.ceil(L.length / 2))].map((h) => `<div class="wl">${h.map(rowH).join('')}</div>`).join('')}</div>` : `<div class="wl">${L.map(rowH).join('')}</div>`;
+      return `${head('material', narrow(sz) ? 'Matériel dispo' : 'Matériel disponible aujourd’hui', `<span class="faint">${all.filter((x) => x.e.qty - x.used <= 0).length} épuisé${all.filter((x) => x.e.qty - x.used <= 0).length > 1 ? 's' : ''}</span>`)}${body}`;
     } },
-    'agenda-week': { app: 'agenda', name: 'Agenda de la semaine', sizes: ['XL', 'X3', 'XXL', 'M3', 'L'], render(sz) {
+    'agenda-week': { app: 'agenda', name: 'Agenda de la semaine', sizes: ['XL', 'X3', 'XXL', 'M3', 'L'], max: [14, 8], render(sz) {
+      /* [GEARBOX] 09/10/2026 : en grand, les 7 jours avec projets, publications et absents ; en étroit, la liste. */
       const t = GX.today(), mon = GX.addDays(t, -((t.getDay() + 6) % 7)), sun = GX.iso(GX.addDays(mon, 6));
-      const P = act().filter((p) => p.startDate <= sun && p.endDate >= GX.iso(mon)).slice(0, fit(sz));
-      return `${head('agenda', 'Agenda de la semaine', `<span class="faint">${P.length} projets</span>`)}<div class="wl">${P.map((p) => `<div class="wr" data-proj="${p.id}"><i class="brand-dot" style="--c:${D.SERVICE_COLOR[p.services[0]] || '#888'}"></i><span class="ellipsis grow">${GX.esc(p.name)}</span><span class="faint num">${F.date(p.startDate)} → ${F.date(p.endDate)}</span></div>`).join('')}</div>`;
+      const P = act().filter((p) => p.startDate <= sun && p.endDate >= GX.iso(mon));
+      const [cw, ch] = dim(sz);
+      if (cw >= 6 && ch >= 3) {
+        const per = Math.max(1, Math.floor((ch * STEP - 120) / 20));
+        return `${head('agenda', 'Agenda de la semaine', `<span class="faint">${P.length} projets</span>`)}<div class="wweek tall">${Array.from({ length: 7 }, (_, i) => {
+          const d = GX.addDays(mon, i), iso = GX.iso(d);
+          const items = [
+            ...P.filter((p) => p.startDate <= iso && p.endDate >= iso).map((p) => `<span style="--c:${D.SERVICE_COLOR[p.services[0]] || '#888'}" data-proj="${p.id}" data-tip="${GX.esc(p.name)}">${GX.esc(p.name)}</span>`),
+            ...D.POSTS.filter((p) => p.date === iso && !p.archived).map((p) => `<span style="--c:${D.socialStatus(p.status).c}" data-post="${p.id}" data-tip="${GX.esc(p.title)}">✦ ${GX.esc(p.title)}</span>`),
+          ];
+          const off = [...new Set(D.CONGES.filter((c) => c.date === iso).map((c) => c.u))];
+          return `<div class="wday ${iso === today() ? 'on' : ''}"><span class="faint">${F.day(d)}</span><b class="num">${d.getDate()}</b><div class="wdl">${items.slice(0, per).join('')}${items.length > per ? `<span class="faint" style="border:0;background:none">+${items.length - per}</span>` : ''}</div>${off.length ? `<div class="av-stack wday-off">${off.slice(0, 3).map((u) => GX.r.av(u, '', { s: 18 })).join('')}</div>` : ''}</div>`;
+        }).join('')}</div>`;
+      }
+      return `${head('agenda', 'Agenda de la semaine', `<span class="faint">${P.length} projets</span>`)}<div class="wl">${P.slice(0, fit(sz)).map((p) => `<div class="wr" data-proj="${p.id}"><i class="brand-dot" style="--c:${D.SERVICE_COLOR[p.services[0]] || '#888'}"></i><span class="ellipsis grow">${GX.esc(p.name)}</span><span class="faint num">${F.date(p.startDate)} → ${F.date(p.endDate)}</span></div>`).join('') || '<div class="faint">Aucun projet cette semaine</div>'}</div>`;
     } },
-    games: { app: 'games', name: 'Défis en attente', sizes: ['S'], render() {
-      const n = D.GAMES.challenges.length;
-      return `${head('games', 'Jeux')}<div class="wv num">${n}</div><div class="faint" style="font-size:12px">défi${n > 1 ? 's' : ''} en attente</div>`;
+    games: { app: 'games', name: 'Défis en attente', sizes: ['S', 'M', 'M3'], max: [6, 6], render(sz) {
+      /* [GEARBOX] 09/10/2026 : en moyen, chaque défi avec « Jouer » / « Refuser » (GX.games, ReactWidgets.tsx). */
+      const L = D.GAMES.challenges, n = L.length;
+      if (small(sz) || !GX.games) return `${head('games', 'Jeux')}<div class="wv num">${n}</div><div class="faint" style="font-size:12px">défi${n > 1 ? 's' : ''} en attente</div>`;
+      return `${head('games', 'Défis en attente', `<span class="faint">${n}</span>`)}<div class="wl">${L.slice(0, fit(sz, 34)).map((c) => `<div class="wr">${GX.r.av(c.from, 'sm')}<span class="ellipsis grow">${GX.esc(D.user(c.from).name.split(' ')[0])} <span class="faint">· ${GX.esc(GX.games.label?.(c.game) || c.game)}</span></span><button class="btn sm primary" data-game="accept:${c.id}">Jouer</button><button class="btn sm ghost" data-game="refuse:${c.id}">Refuser</button></div>`).join('') || '<div class="faint" style="margin:auto">Aucun défi en attente</div>'}</div>`;
     } },
-    'expenses-month': { app: 'fixed', name: 'Dépenses du mois', sizes: ['S'], render() {
+    'expenses-month': { app: 'fixed', name: 'Dépenses du mois', sizes: ['S'], max: [4, 3], render() {
       const m = today().slice(0, 7), L = D.EXPENSES.filter((e) => e.date.slice(0, 7) === m);
       return `${head('fixed', 'Dépenses du mois')}<div class="wv num" style="font-size:26px">${F.eurK(L.reduce((s, e) => s + e.amount, 0))}</div><div class="faint" style="font-size:12px">${L.length} ligne${L.length > 1 ? 's' : ''}</div>`;
     } },
-    clock: { app: null, name: 'Horloge', sizes: ['S'], render() {
+    clock: { app: null, name: 'Horloge', sizes: ['S'], max: [4, 4], render() {
       const d = new Date(), h = d.getHours() % 12, mi = d.getMinutes();
       return `<svg viewBox="0 0 100 100" class="wclock"><circle cx="50" cy="50" r="46" />${Array.from({ length: 12 }, (_, i) => `<line x1="50" y1="8" x2="50" y2="${i % 3 ? 13 : 17}" transform="rotate(${i * 30} 50 50)" />`).join('')}
         <line class="hh" x1="50" y1="50" x2="50" y2="28" transform="rotate(${h * 30 + mi / 2} 50 50)" /><line class="mm" x1="50" y1="50" x2="50" y2="16" transform="rotate(${mi * 6} 50 50)" /><circle cx="50" cy="50" r="3.5" class="c" /></svg>`;
     } },
-    note: { app: null, name: 'Note rapide', sizes: ['S', 'W', 'M', 'M3', 'L', 'T'], render(sz, c = {}, w) {
+    /* [GEARBOX] Retirée de la galerie le 09/10/2026 (remplacée par « Ma journée » et ses post-it) ; les notes déjà posées restent. */
+    note: { app: null, name: 'Note rapide', hidden: true, sizes: ['S', 'W', 'M', 'M3', 'L', 'T'], render(sz, c = {}, w) {
       return `<div class="wt">${GX.icon('edit', 'sm')}<span class="grow">Note</span></div><textarea class="wnote" data-note placeholder="Écrire une note…">${GX.esc(c.text || '')}</textarea>`;
     } },
-    shortcuts: { app: null, name: 'Raccourcis', sizes: ['M', 'S'], cfg: 'apps', render(sz, c = {}) {
-      const ids = (c.apps || ['projects', 'digital', 'budget', 'conges']).filter((id) => GX.shell.canOpen(id)).slice(0, sz === 'S' ? 4 : 4);
-      return `<div class="wsc ${sz}">${ids.map((id) => `<button data-open="${id}">${GX.appIcon(id, sz === 'S' ? 40 : 46)}<span>${GX.esc(GX.app(id).name)}</span></button>`).join('')}</div>`;
+    shortcuts: { app: null, name: 'Raccourcis', sizes: ['M', 'S'], min: [2, 2], max: [8, 4], cfg: 'apps', render(sz, c = {}) {
+      const [cw, ch] = dim(sz), n = small(sz) ? 4 : Math.min(8, cw * Math.max(1, Math.floor(ch / 2)));
+      const ids = (c.apps || ['projects', 'digital', 'budget', 'conges']).filter((id) => GX.shell.canOpen(id)).slice(0, n);
+      return `<div class="wsc ${small(sz) ? 'S' : ''}" style="${small(sz) ? '' : `grid-template-columns:repeat(${Math.min(cw, Math.max(1, ids.length))},1fr)`}">${ids.map((id) => `<button data-open="${id}">${GX.appIcon(id, small(sz) ? 40 : 46)}<span>${GX.esc(GX.app(id).name)}</span></button>`).join('')}</div>`;
     } },
-    news: { app: 'hello', name: 'Actu auto', sizes: ['M', 'M3', 'L'], render(sz) {
-      const L = D.HELLO.rss['Actu Auto'].slice(0, fit(sz, 58, 58));
-      return `${head('hello', 'Actu auto')}<div class="wl">${L.map((t, i) => `<div class="wr" style="align-items:flex-start;gap:10px"><span class="wthumb" style="--a:${['#f75632', '#293f74', '#8f12ab', '#22b573'][i % 4]}">${GX.icon('car', 'sm')}</span><span class="grow" style="font-size:12px;line-height:1.35">${GX.esc(t)}<br><span class="faint">il y a ${i * 3 + 2} h</span></span></div>`).join('')}</div>`;
+    news: { app: 'hello', name: 'Actu auto', sizes: ['M', 'M3', 'L'], max: [10, 8], render(sz) {
+      /* [GEARBOX] 09/10/2026 : les VRAIS articles des flux RSS de Hello Marketing (ui2/apps/hello/sources.ts). Avant :
+         des titres de démonstration et un « il y a N h » inventé. Clic = l'article dans un nouvel onglet. */
+      const A = D.HELLO.rss?.auto;
+      if (!A) return `${head('hello', 'Actu auto')}<div class="faint" style="margin:auto">Chargement…</div>`;
+      const ago = (d) => { const m = Math.round((Date.now() - new Date(d)) / 6e4); return !Number.isFinite(m) ? '' : m < 60 ? `il y a ${Math.max(1, m)} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`; };
+      const L = A.slice(0, fit(sz, 58, 58) * (dim(sz)[0] >= 8 ? 2 : 1));
+      const rowH = (a) => `<div class="wr" data-href="${GX.esc(a.link)}" style="align-items:flex-start;gap:10px;cursor:pointer">${a.thumbnail ? `<span class="wthumb" style="background:center/cover url(${GX.esc(a.thumbnail)})"></span>` : `<span class="wthumb" style="--a:#f75632">${GX.icon('car', 'sm')}</span>`}<span class="grow" style="font-size:12px;line-height:1.35;min-width:0"><span class="wnews-t">${GX.esc(a.title)}</span><span class="faint">${GX.esc(a.source)}${a.pubDate ? ' · ' + ago(a.pubDate) : ''}</span></span></div>`;
+      const body = dim(sz)[0] >= 8 ? `<div class="wcols2">${[L.slice(0, Math.ceil(L.length / 2)), L.slice(Math.ceil(L.length / 2))].map((h) => `<div class="wl">${h.map(rowH).join('')}</div>`).join('')}</div>` : `<div class="wl">${L.map(rowH).join('')}</div>`;
+      return `${head('hello', 'Actu auto')}${L.length ? body : '<div class="faint" style="margin:auto">Aucun article</div>'}`;
     } },
+    /* ---------------- Widgets React (09/10/2026, ui2/apps/widgets/) ---------------- */
+    todo: { app: 'todo', name: 'To-do', sizes: ['XXL', 'L', 'XXW'], min: [4, 3], max: [14, 8], live: true, react: 'todo', render: (sz, c, w) => reactSlot(w, 'todo', 'todo', 'To-do') },
+    myday: { app: 'todo', name: 'Ma journée', sizes: ['M3', 'L', 'X3', 'T'], min: [2, 3], max: [10, 8], live: true, react: 'myday', render: (sz, c, w) => reactSlot(w, 'myday', 'todo', 'Ma journée') },
+    'forms-resp': { app: 'forms', name: 'Forms · réponses', sizes: ['M3', 'L', 'M', 'X3'], min: [3, 2], max: [10, 8], live: true, react: 'forms', render: (sz, c, w) => reactSlot(w, 'forms', 'forms', 'Forms') },
   };
   W.catalog = CAT;
   /* Accès pour la coque téléphone : même disposition, rendue en grille 2 colonnes */
   W.items = () => { if (!layout) load(); return layout.filter((w) => allowed(w.type)).sort((a, b) => a.y - b.y || a.x - b.x); };
-  W.inner = (w) => { try { return CAT[w.type].render(w.size, w.cfg || {}, w); } catch (e) { return ''; } };
+  W.inner = (w) => { try { return CAT[w.type].render(w.size, w.cfg || {}, w); } catch (e) { return indispo(e, CAT[w.type].name); } };
   W.kind = (w) => (CAT[w.type].accent ? 'accent' : CAT[w.type].sky ? 'sky' : 'glass') + (CAT[w.type].live ? ' live' : '');
   W.app = (w) => CAT[w.type].app;
 
@@ -328,6 +426,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     if (type === 'assistant' && !GX.assistant?.available) return false;   /* [GEARBOX] mIAouss : équipe marketing (MascotLayer) */
     /* [GEARBOX] mêmes règles que les pages */
     if (['budget-sites', 'campaigns'].includes(type) && GX.ctx.role === 'Site Manager') return false;
+    if (CAT[type].react && !GX.reactWidgets) return false;   /* [GEARBOX] widgets React : leur calque doit être monté */
     if (['birthdays', 'music', 'chat-live'].includes(type) && !GX.bridge().showSocial) return false;
     return true;
   };
@@ -398,9 +497,10 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   /* Re-rend le contenu d'un widget en place (redimensionnement en cours), sans toucher aux commandes */
   function reInner(el, w) {
     [...el.children].forEach((n) => { if (!n.matches('.wx,.wsz,.wrz,.wtip')) n.remove(); });
-    let inner = ''; try { inner = CAT[w.type].render(w.size, w.cfg || {}, w); } catch (e) { inner = ''; }
+    let inner = ''; try { inner = CAT[w.type].render(w.size, w.cfg || {}, w); } catch (e) { inner = indispo(e, CAT[w.type].name); }
     el.insertAdjacentHTML('afterbegin', inner);
     el.className = el.className.replace(/\bsz-\S+/, 'sz-' + w.size);
+    W.adopt(el);
   }
 
   /* ---------------- Rendu ---------------- */
@@ -420,12 +520,13 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const keepAw = ae && box.contains(ae) && ae.matches('[data-aq]') ? ae.selectionStart : null;   /* champ « Pose ta question… » de mIAouss */
     box.innerHTML = vis.map((w, i) => {
       const c = CAT[w.type], [cw, ch] = dim(w.size);
-      let inner = ''; try { inner = c.render(w.size, w.cfg || {}, w); } catch (e) { inner = `<div class="faint">${GX.esc(e.message)}</div>`; }
+      let inner = ''; try { inner = c.render(w.size, w.cfg || {}, w); } catch (e) { inner = indispo(e, c.name); }
       return `<div class="wdg ${c.accent ? 'accent' : c.sky ? 'sky' : 'glass'}${c.live ? ' live' : ''} sz-${w.size}" data-id="${w.id}" data-app="${c.app || ''}" style="left:${XL(w.x, cw)}px;top:${w.y * sy}px;width:${cw * STEP - GAP}px;height:${ch * STEP - GAP}px;animation-delay:${i * 30}ms">
-        ${inner}${editing ? `<button class="wx" data-rm title="Retirer">${GX.icon('minus', 'sm')}</button><button class="wsz" data-size title="Taille suivante">${dimL(w.size).replace(' × ', '×')}</button>` : ''}${c.sizes.length > 1 ? '<button class="wrz" data-rz tabindex="-1" aria-label="Redimensionner" title="Tirer pour redimensionner"></button>' : ''}</div>`;
+        ${inner}${editing ? `<button class="wx" data-rm title="Retirer">${GX.icon('minus', 'sm')}</button><button class="wsz" data-size title="Taille suivante">${dimL(w.size).replace(' × ', '×')}</button>` : ''}${resizable(c) ? '<button class="wrz" data-rz tabindex="-1" aria-label="Redimensionner" title="Tirer pour redimensionner"></button>' : ''}</div>`;
     }).join('');
     if (keepAw != null) { const i = box.querySelector('.aw [data-aq]'); if (i) { i.focus({ preventScroll: true }); i.setSelectionRange(keepAw, keepAw); } }
     if (keep) { const i = box.querySelector(`.wch[data-wid="${keep.id}"] [data-wc-in]`); if (i) { i.focus({ preventScroll: true }); if (keep.pos != null) i.setSelectionRange(keep.pos, keep.pos); } }
+    W.adopt(box);   /* widgets en React : leurs hôtes persistants reprennent leur place */
     /* L'entrée « pop » ne se joue qu'à l'apparition du bureau, pas à chaque re-rendu (pastilles, messages…) */
     if (!box.classList.contains('settled')) { clearTimeout(W._st); W._st = setTimeout(() => box && box.classList.add('settled'), 900); }
     wire();
@@ -433,18 +534,32 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   /* ---------------- Actions d'un widget (hors mode édition) — PARTAGÉES par le bureau et l'accueil du téléphone ---------------- */
   /* Clic dans le widget `el` (.wdg[data-id]) : projet, conversation, raccourci, sinon la rubrique du widget. */
   function actOn(e, el) {
+    if (e.target.closest('.wreact')) return;   /* widget React : il gère ses clics lui-même */
     if (e.target.closest('input,textarea,button[data-play]')) return;
+    const gm = e.target.closest('[data-game]'); if (gm) { const [act, id] = gm.dataset.game.split(':'); return GX.games?.[act]?.(id); }
+    const ps = e.target.closest('[data-post]'); if (ps) return GX.shell.openWith('digital', 'post:' + ps.dataset.post);
+    const hr = e.target.closest('[data-href]'); if (hr) return window.open(hr.dataset.href, '_blank', 'noopener');
+    const tk = e.target.closest('[data-tproj]'); if (tk) return GX.openProject(tk.dataset.tproj);
     const pr = e.target.closest('[data-proj]'); if (pr) { const p = D.project(pr.dataset.proj); return p && GX.openProject(p.id); }
     const cv = e.target.closest('[data-conv]'); if (cv) { const win = GX.wm.open('chat', {}, { origin: cv }); if (!win) return; /* [GEARBOX] refusé : rien (pas la fenêtre active) */ return setTimeout(() => win.inst?.command?.('conv:' + cv.dataset.conv), 420); }
     const op = e.target.closest('[data-open]'); if (op) return GX.wm.open(op.dataset.open, {}, { origin: op.querySelector('.app-ico') });
     if (el.dataset.app) { if (GX.wm.desktopShown?.()) GX.wm.showDesktop(false); GX.wm.open(el.dataset.app, {}, { origin: el }); }
   }
   function onChange(e) {
-    /* [GEARBOX] cocher une tâche ÉCRIRAIT en base : on ouvre la To-do (la case reste décochée) */
-    const cb = e.target.closest('[data-task]'); if (cb) { cb.checked = false; GX.wm.open('todo'); }
+    /* [GEARBOX] 09/10/2026 : vraie case à cocher — la tâche passe à « Terminé » par les routes normales (GX.todo,
+       ui2/apps/widgets/ReactWidgets.tsx), avec annulation. Sans droit d'écriture : la To-do s'ouvre. */
+    const cb = e.target.closest('[data-task]'); if (!cb) return;
+    if (GX.todo?.canEdit?.()) GX.todo.complete(cb.dataset.task); else { cb.checked = false; GX.wm.open('todo'); }
   }
   function onInput(e) { const n = e.target.closest('[data-note]'); if (n) { const w = layout?.find((x) => x.id === n.closest('.wdg')?.dataset.id); if (!w) return; w.cfg = { ...(w.cfg || {}), text: n.value }; save(); } }
-  const wirePlay = (scope) => scope.querySelectorAll('[data-play]').forEach((b) => (b.onclick = () => { const on = b.classList.toggle('on'); b.innerHTML = GX.icon(on ? 'pause' : 'play'); }));
+  /* [GEARBOX] Musique du jour : VRAI extrait (30 s, Deezer), un seul lecteur pour tout le bureau (09/10/2026). */
+  let audio = null;
+  const wirePlay = (scope) => scope.querySelectorAll('[data-play]').forEach((b) => (b.onclick = (ev) => {
+    ev.stopPropagation(); const src = b.dataset.play; if (!src) return;
+    if (!audio || audio.src !== src) { audio?.pause(); audio = new Audio(src); audio.onended = () => GX.root.querySelectorAll('[data-play].on').forEach((x) => { x.classList.remove('on'); x.innerHTML = GX.icon('play'); }); }
+    const on = audio.paused; if (on) audio.play().catch(() => {}); else audio.pause();
+    b.classList.toggle('on', on); b.innerHTML = GX.icon(on ? 'pause' : 'play');
+  }));
   W.act = actOn; W.onChange = onChange; W.onInput = onInput; W.wirePlay = wirePlay;
 
   /* ---------------- Accueil du TÉLÉPHONE : édition de la liste (07/10/2026) ----------------
@@ -454,7 +569,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   const TIERS = { P: ['S'], L: ['M', 'XL', 'W'], G: ['M3', 'L', 'T', 'X3', 'XXL', 'XXW'] };
   const TIER_L = { P: 'Petit', L: 'Large', G: 'Grand' };
   const tiersOf = (type) => Object.keys(TIERS).map((t) => [t, TIERS[t].find((s) => CAT[type]?.sizes.includes(s))]).filter(([, s]) => s);
-  const tierOf = (size) => Object.keys(TIERS).find((t) => TIERS[t].includes(size)) || 'L';
+  const tierOf = (size) => Object.keys(TIERS).find((t) => TIERS[t].includes(size)) || (() => { const [w, h] = dim(size); return w <= 2 && h <= 2 ? 'P' : h <= 2 ? 'L' : 'G'; })();
   const mList = () => { if (!layout) load(); return layout; };
   const mRank = () => { layout.sort((a, b) => a.y - b.y).forEach((w, i) => { w.x = 0; w.y = i; }); };
   W.m = {
@@ -463,7 +578,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     /** Widgets visibles, dans l'ordre (rôle appliqué). */
     items: () => mList().filter((w) => allowed(w.type)).sort((a, b) => a.y - b.y),
     /** Catalogue autorisé au rôle : [type, nom, rubrique, tailles téléphone]. */
-    catalog: () => Object.entries(CAT).filter(([t]) => allowed(t)).map(([t, c]) => ({ type: t, name: c.name, app: c.app, tiers: tiersOf(t) })).filter((x) => x.tiers.length),
+    catalog: () => Object.entries(CAT).filter(([t, c]) => allowed(t) && !c.hidden).map(([t, c]) => ({ type: t, name: c.name, app: c.app, tiers: tiersOf(t) })).filter((x) => x.tiers.length),
     add(type) { if (!CAT[type] || !allowed(type)) return null; mList(); const s = tiersOf(type)[0]; if (!s) return null; const w = { id: GX.uid('wg'), type, size: s[1], x: 0, y: layout.length ? Math.max(...layout.map((x) => x.y)) + 1 : 0 }; layout.push(w); mRank(); save(); return w; },
     remove(id) { mList(); layout = layout.filter((w) => w.id !== id); mRank(); save(); },
     /** Déplace d'un cran parmi les widgets VISIBLES (un widget masqué au rôle ne bloque pas). */
@@ -493,7 +608,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       const w = layout.find((x) => x.id === el.dataset.id), c = CAT[w.type];
       GX.menu.open([
         ...(c.app ? [{ label: 'Ouvrir ' + GX.app(c.app).name, icon: 'arrowr', action: () => GX.wm.open(c.app, {}, { origin: el }) }, '-'] : []),
-        { header: 'Taille' }, ...c.sizes.map((s) => ({ label: `${SIZE_L[s]} · ${dimL(s)}`, checked: w.size === s, action: () => applySize(w, s) })),
+        { header: 'Taille' }, ...(c.sizes.includes(w.size) ? [] : [{ label: `Sur mesure · ${dimL(w.size)}`, checked: true, action: () => {} }]), ...c.sizes.map((s) => ({ label: `${sizeName(s)} · ${dimL(s)}`, checked: w.size === s, action: () => applySize(w, s) })),
         ...(c.cfg ? ['-', { label: 'Configurer…', icon: 'sliders', action: () => configure(w, el) }] : []),
         '-', { label: 'Modifier le bureau…', icon: 'edit', action: () => W.edit(true) }, { label: 'Retirer ce widget', icon: 'trash', action: () => removeW(w, el) },
       ], { x: e.clientX, y: e.clientY });
@@ -502,9 +617,10 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   }
   function configure(w, el) {
     const c = CAT[w.type];
-    if (c.cfg === 'kpi') GX.ui.pick(el, [{ items: [['actifs', 'Projets actifs'], ['reste', 'Reste à engager'], ['conso', 'Consommation'], ['campagnes', 'Campagnes programmées'], ['retard', 'Projets en retard']].map(([v, l]) => ({ v, l })) }], { multi: false, title: 'Indicateur', selected: [w.cfg?.kpi || 'actifs'], onChange: ([v]) => { w.cfg = { ...(w.cfg || {}), kpi: v }; save(); W.render(); } });
+    if (c.cfg === 'deadlines') GX.ui.pick(el, [{ items: [['both', 'Projets et tâches'], ['proj', 'Projets seulement'], ['task', 'Mes tâches seulement']].map(([v, l]) => ({ v, l })) }], { multi: false, title: 'Échéances', selected: [w.cfg?.mode || 'both'], onChange: ([v]) => { w.cfg = { ...(w.cfg || {}), mode: v }; save(); W.render(); } });
+    if (c.cfg === 'kpi') GX.ui.pick(el, [{ items: [['actifs', 'Projets actifs'], ['reste', 'Reste à engager'], ['conso', 'Consommation'], ['campagnes', 'Campagnes programmées'], ['retard', 'Projets en retard'], ['taches', 'Mes tâches en retard'], ['posts', 'Publications de la semaine'], ['absents', 'Absents aujourd’hui']].map(([v, l]) => ({ v, l })) }], { multi: false, title: 'Indicateur', selected: [w.cfg?.kpi || 'actifs'], onChange: ([v]) => { w.cfg = { ...(w.cfg || {}), kpi: v }; save(); W.render(); } });
     if (c.cfg === 'project') GX.ui.pick(el, [{ items: act().map((p) => ({ v: p.id, l: p.name, hint: p.sites[0] })) }], { multi: false, title: 'Projet à épingler', selected: [w.cfg?.project], width: 320, onChange: ([v]) => { w.cfg = { ...(w.cfg || {}), project: v }; save(); W.render(); } });
-    if (c.cfg === 'apps') GX.ui.pick(el, [{ items: [...GX.apps.values()].filter((a) => !a.hidden && !a.system && GX.shell.canOpen(a.id)).map((a) => ({ v: a.id, l: a.name })) }], { title: 'Raccourcis (4 max)', selected: w.cfg?.apps || ['projects', 'digital', 'budget', 'conges'], onChange: (v) => { w.cfg = { ...(w.cfg || {}), apps: v.slice(0, 4) }; save(); W.render(); } });
+    if (c.cfg === 'apps') GX.ui.pick(el, [{ items: [...GX.apps.values()].filter((a) => !a.hidden && !a.system && GX.shell.canOpen(a.id)).map((a) => ({ v: a.id, l: a.name })) }], { title: 'Raccourcis (8 max)', selected: w.cfg?.apps || ['projects', 'digital', 'budget', 'conges'], onChange: (v) => { w.cfg = { ...(w.cfg || {}), apps: v.slice(0, 8) }; save(); W.render(); } });
   }
 
   /* ---------------- Gestes : déplacer / redimensionner (souris, stylet, doigt) ----------------
@@ -564,7 +680,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     GX.win(window, 'pointermove', mv, { passive: false }); GX.win(window, 'pointerup', end); GX.win(window, 'pointercancel', end);
   }
   function resizeStart(e, el, w) {
-    const c = CAT[w.type]; if (c.sizes.length < 2) return;
+    const c = CAT[w.type]; if (!resizable(c)) return;
     e.preventDefault(); e.stopPropagation();
     const pid = e.pointerId, sx = e.clientX, sy = e.clientY, orig = w.size, W0 = el.offsetWidth, H0 = el.offsetHeight, base = snap();
     let cur = null, out = base, raf = 0, lx = sx, ly = sy;
@@ -574,17 +690,18 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     el.insertAdjacentHTML('beforeend', '<span class="wtip"></span>');
     const tip = el.querySelector('.wtip'), ghost = mkGhost(base[w.id], true);
     function track() {
-      const C = cols(), maxW = C * SX() - GAP;   // au-delà du bord droit, l'aimantation décale le widget vers la gauche
-      const fw = clamp(W0 + lx - sx, CELL * 1.2, Math.max(maxW, W0)), fh = clamp(H0 + ly - sy, CELL * 1.2, 8 * SY());
+      const C = cols(), maxW = C * SX() - GAP, bd = bounds(c);   // au-delà du bord droit, l'aimantation décale le widget vers la gauche
+      const fw = clamp(W0 + lx - sx, CELL * 1.2, Math.max(maxW, W0)), fh = clamp(H0 + ly - sy, CELL * 1.2, bd.max[1] * SY());
       el.style.width = fw + 'px'; el.style.height = fh + 'px';
-      const tw = (fw + GAP) / STEP, th = (fh + GAP) / SY(), cand = c.sizes.filter((s) => dim(s)[0] <= C);
-      const best = (cand.length ? cand : c.sizes).reduce((a, s) => { const [cw, ch] = dim(s), d = Math.hypot(cw - tw, ch - th); return d < a.d ? { s, d } : a; }, { s: w.size, d: Infinity }).s;
+      const tw = (fw + GAP) / STEP, th = (fh + GAP) / SY();
+      /* [GEARBOX] formats libres : la case la plus proche, dans les bornes du widget (09/10/2026) */
+      const best = sizeOf(clamp(Math.round(tw), bd.min[0], Math.max(bd.min[0], Math.min(bd.max[0], C))), clamp(Math.round(th), bd.min[1], bd.max[1]));
       if (best === cur) return; cur = best;
       const [cw, ch] = dim(best), nx = Math.min(base[w.id].x, Math.max(0, C - cw));
       out = arrange(base, w.id, { x: nx, y: base[w.id].y, w: cw, h: ch });
       placeGhost(ghost, out[w.id]); preview(out, null);
       if (w.size !== best) { w.size = best; reInner(el, w); }   // le contenu suit la taille aimantée
-      tip.textContent = `${dimL(best)} · ${SIZE_L[best]}`;
+      tip.textContent = `${dimL(best)}${SIZE_L[best] ? ' · ' + SIZE_L[best] : ''}`;
     }
     const mv = (ev) => { if (ev.pointerId !== pid) return; lx = ev.clientX; ly = ev.clientY; ev.preventDefault(); if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (gesture) track(); }); };
     const off = () => { GX.unwin(window, 'pointermove', mv); GX.unwin(window, 'pointerup', end); GX.unwin(window, 'pointercancel', end); };
@@ -617,9 +734,9 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     GX.body.append(gal);
     const list = gal.querySelector('.wgal-list');
     const show = (cat) => {
-      list.innerHTML = Object.entries(CAT).filter(([t, c]) => allowed(t) && (cat === 'all' || (cat === 'misc' ? !c.app : c.app === cat))).map(([t, c]) => `
+      list.innerHTML = Object.entries(CAT).filter(([t, c]) => allowed(t) && !c.hidden && (cat === 'all' || (cat === 'misc' ? !c.app : c.app === cat))).map(([t, c]) => `
         <button class="wgal-it" data-add="${t}"><div class="wgal-prev"><div class="wdg ${c.accent ? 'accent' : c.sky ? 'sky' : 'glass'} sz-${c.sizes[0]}" style="position:relative;width:${SIZES[c.sizes[0]][0] * STEP - GAP}px;height:${SIZES[c.sizes[0]][1] * STEP - GAP}px;animation:none">${(() => { try { return c.render(c.sizes[0], {}); } catch (e) { return ''; } })()}</div></div>
-        <b>${GX.esc(c.name)}</b><span class="faint">${c.app ? GX.esc(GX.app(c.app).name) + ' · ' : ''}${c.sizes.map(dimL).join(' · ')}</span></button>`).join('');
+        <b>${GX.esc(c.name)}</b><span class="faint">${c.app ? GX.esc(GX.app(c.app).name) + ' · ' : ''}${resizable(c) ? `${dimL(bounds(c).min)} à ${dimL(bounds(c).max)}` : dimL(c.sizes[0])}</span></button>`).join('');
       list.querySelectorAll('.wgal-prev .wdg').forEach((w) => { const s = Math.min(1, 150 / w.offsetWidth, 110 / w.offsetHeight); w.style.transform = `scale(${s})`; w.parentElement.style.height = w.offsetHeight * s + 'px'; w.parentElement.style.width = w.offsetWidth * s + 'px'; });
     };
     show('all');
@@ -634,6 +751,8 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   GX.on('badges', () => W.render());
   GX.on('data:projects', () => !editing && W.render());
   GX.on('data:users', () => !editing && W.render());   /* [GEARBOX] photos de profil changées */
+  GX.on('data:tasks', () => !editing && W.render());   /* [GEARBOX] tâches (To-do) changées : Mes tâches, échéances */
+  GX.on('data:hello', () => !editing && W.render());   /* [GEARBOX] musique du jour, actus chargées */
   setInterval(() => { if (box && !editing && box.querySelector('.wclock')) W.render(); }, 60000);
 
   /* ---------------- Widget Chat : interactions (bureau ET coque téléphone) ---------------- */

@@ -18,8 +18,7 @@
   passées en clair dans le chat de la session du 08/10 : à régénérer un jour (remplacer dans `backend/.env` ET le `.env`
   du VPS, puis `up -d api`). Poignée de débogage `el.__buddy` dans `mascot.ts` (inoffensive, sert aux tests). Branches
   locales `feat/assistant-p0` et `fix/chat-envoi-fiable` mergées : supprimables.
-- **Prochain chantier : refonte des widgets** (plan `maquettes/ux/PLAN-WIDGETS.md`, 5 décisions D1–D5 attendues de
-  Théo), puis le **lot sécurité serveur AVANT la bascule** (prévue vers le 16/10).
+- **Widgets : W0–W2 livrés (correctif 77) ; en cours : W3** (bureau enregistré sur le serveur), puis le **lot sécurité serveur AVANT la bascule** (prévue vers le 16/10).
 - **Lot B (fonds d'écran v2) : LIVRÉ, correctif 75.** À vérifier sur les PC qui chauffaient (gestionnaire de tâches de
   Chrome) ; versions claires des fonds possibles plus tard si elles manquent (option b écartée pour l'instant).
 - **Ensuite, dans l'ordre** : corrections issues des retours ci-dessus ; puis **mIAouss P2** (rédaction guidée : posts
@@ -28,7 +27,8 @@
 - **À savoir pour la session suivante** : Bony ne paiera JAMAIS un service d'IA (aucune option payante à proposer). Le
   garde-fou de la session a bloqué une fois `git push` et le SSH malgré l'accord de Théo ; Théo a élargi les
   permissions (`.claude/settings.local.json`, non commité) et redonné son accord : ça passe désormais.
-- **En production : correctif 76 (09/10)** — v2 : **bulles de discussion** façon Messenger sur ordinateur (`web` seul). Test
+- **En production : correctif 77 (09/10)** — v2 : **refonte des widgets** (formats libres, To-do / Ma journée / Forms,
+  contenus réparés), `web` seul. Avant lui le **correctif 76 (09/10)** — v2 : **bulles de discussion** façon Messenger sur ordinateur (`web` seul). Test
   grandeur nature à faire avec l'équipe. Avant lui le **correctif 75 (08/10)** — v2 : nouveaux fonds d'écran (fixes par défaut, Ruban ; 3 animés en option,
   en pause dès qu'une fenêtre est ouverte), `web` seul. Avant lui le **correctif 74 (08/10)** — v2 : plus de « ? » à la place des avatars de présence (`web` seul). Avant lui le
   **correctif 73 (08/10)** — **v2 : présence (mini-avatars sur le Dock / la pilule / la grille) et compteurs
@@ -579,6 +579,31 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 77 — 09/10 : v2, refonte des widgets (lots W0 à W2 de `maquettes/ux/PLAN-WIDGETS.md`)** (branche
+  `feat/v2-widgets`, **`web` seul**, aucune migration). Cadrage de Théo : « contenu et interaction », un widget To-do
+  « vraiment big et ajustable », plus de formats pour tous ; W0 à W2 livrés d'un seul tenant à sa demande.
+  - **W0 — formats libres** (`engine/widgets.ts`) : une taille est un nom historique (S…XXW) OU « LxH » en cases ; la poignée
+    s'aimante case par case entre `CAT.min` et `CAT.max` (défaut : plus petite taille nommée → 12 × 8). Le nom historique est
+    repris quand il correspond (tailles du téléphone inchangées). Un widget qui plante affiche « Indisponible » (erreur en
+    console). **Widgets en React** : emplacement `[data-wreact]` remplacé à chaque rendu par un HÔTE PERSISTANT par widget
+    (`GX.widgets.react`, `W.adopt`) ; `ui2/apps/widgets/ReactWidgets.tsx` (monté par OsHost) y rend le composant par portail.
+  - **W1 — contenu** : Absents = vraie semaine lundi → dimanche (cause du « 0 », BUGS-CONNUS), revenus estompés ; Mes tâches =
+    tâches de projets + libres (règles de la To-do, `ui2/apps/todo/board.ts`, sorti de TodoApp) ; Échéances = projets et/ou
+    tâches (option) ; Agenda en grand = 7 jours (projets, publications, absents) ; Musique du jour et Actu auto BRANCHÉES sur
+    `ui2/apps/hello/sources.ts` (chargées par DataHub si le rôle a Hello Marketing ; avant : vides / titres inventés) ;
+    Météo et Anniversaires robustes ; Campagnes = moyennes sur les seuls taux renseignés ; Matériel trié (épuisé d'abord) ;
+    Indicateur +3 ; Raccourcis jusqu'à 8 ; Note rapide retirée de la galerie (`hidden`, les notes posées restent).
+  - **W2 — agir** : widget **To-do** = la vue Tâches de la rubrique (`TasksView variant="widget"`, mêmes cartes,
+    glisser-déposer, filtres, formulaire ; volets sur un calque du bureau, `ui2/apps/widgets/sheetHost.ts`) ; **Ma journée**
+    (post-it du jour + ajout en une ligne, tâches dues / en retard à cocher, publications et absents du jour) ; **Forms ·
+    réponses** (Bony + Google, total et « aujourd'hui » — le serveur ne donne pas de compte par jour) ; vraie case à cocher
+    (`GX.todo.complete`, annulation par la notification) ; défis acceptés / refusés (`GX.games`) ; clics vers la publication,
+    le projet de la tâche, l'article. Téléphone : widgets React bornés en hauteur, défilement interne.
+  - Testé sur localhost (compte de Théo, bureau 1440 et téléphone 375) : aucune erreur, 9 × 5 libre → 4 colonnes, ajout de
+    post-it (post-it de test SUPPRIMÉ de la base ensuite), contenus réels (Deezer, AutoPlus, absents, échéances, agenda).
+    ⚠️ Non testés (écritures réelles) : cocher une tâche, déplacer une carte du widget, jouer / refuser un défi.
+  - **Reste : W3** (bureau enregistré sur le serveur, migration additive).
+
 - **Correctif 76 — 09/10 : v2, bulles de discussion façon Messenger (ordinateur)** (branche `feat/v2-bulles`, **`web`
   seul**, aucune migration). Demande de Théo ; plan `maquettes/ux/PLAN-BULLES.md`, sensation réglée sur la planche
   `maquettes/ux/bulles.html` (préréglage « Apple » retenu).
@@ -799,7 +824,8 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 76** (9 octobre 2026) — bulles de discussion v2, **`web` seul**, aucune migration.
+- master = prod, synchronisés. Dernier lot déployé : **correctif 77** (9 octobre 2026) — refonte des widgets v2 (W0–W2), **`web` seul**, aucune
+  migration. Avant lui le **correctif 76** (9 octobre 2026) — bulles de discussion v2, **`web` seul**, aucune migration.
   Avant lui le **correctif 75** (8 octobre 2026) — nouveaux fonds d'écran v2, **`web` seul**, aucune
   migration. Avant lui le **correctif 74** (8 octobre 2026) — « ? » à la place des avatars de présence, **`web` seul**,
   aucune migration. Avant lui le **correctif 73** (8 octobre 2026) — v2 : présence et compteurs sur les
@@ -4415,6 +4441,9 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Widgets v2 : un widget React n'est PAS rendu par le moteur** — le moteur pose `[data-wreact]`, `W.adopt` y remet l'hôte
+  persistant, ReactWidgets.tsx le remplit. Tout rendu qui pose ces emplacements (bureau, accueil du téléphone) doit appeler
+  `GX.widgets.adopt(scope)` ensuite. Et une feuille `?inline` d'OsHost ne se recharge PAS à chaud : recharger la page.
 - **Chat v2 : la conversation vit dans `ui2/apps/chat/Conversation.tsx`**, partagée par la rubrique Chat ET les bulles
   (`ui2/apps/chat/bubbles/`). Une retouche du fil ou de la saisie se fait là, une seule fois. Et toute page hors fenêtre
   qui veut des volets modaux passe un adaptateur `{ sheet: (html, o) => GX.ui.sheet(hôte, html, o) }` à `useSheets`.

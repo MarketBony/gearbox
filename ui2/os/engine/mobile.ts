@@ -54,6 +54,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     GX.on('badges', refreshBadges); GX.on('presence', refreshPresence); GX.on('data:users', refreshPresence);
     /* [GEARBOX] les VRAIES données arrivent après le démarrage : l'accueil suit leurs changements et le rôle. */
     GX.on('data:projects', () => buildHome()); GX.on('data:users', () => buildHome());
+    GX.on('data:tasks', () => buildHome()); GX.on('data:hello', () => buildHome());   /* [GEARBOX] Mes tâches, musique, actus */
     GX.on('ctx', () => { buildHome(); buildPill(); });
     GX.on('widgets:saved', () => buildHome());
     setInterval(() => { if (!current && home.querySelector('.wclock')) buildHome(); }, 60000);
@@ -132,7 +133,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
         <div class="m-sec">Rubriques</div><div class="m-grid">${apps.map(icoHTML).join('')}</div>`}
     </div>`;
     const sc2 = home.querySelector('.m-scroll'); if (sc2 && top) sc2.scrollTop = top;
-    if (GX.widgets) GX.widgets.wirePlay(home);
+    if (GX.widgets) { GX.widgets.wirePlay(home); GX.widgets.adopt?.(home); }   /* [GEARBOX] widgets React (09/10/2026) */
     refreshBadges();
   }
   const icoHTML = (a) => `<button class="m-ico" data-app="${a.id}">${GX.appIcon(a, 60)}<span class="nm">${esc(a.name)}</span></button>`;
