@@ -1,7 +1,7 @@
 import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppProps } from '../types';
 import type { BrandType, FixedExpense, ServiceType } from '../../../types';
-import { PLAQUES_STRUCTURE, SERVICES, BRANDS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, HOLDING_BRAND, RDM_BRANDS, FIXED_EXPENSE_EDIT_ROLES, isSiteManager } from '../../../constants';
+import { PLAQUES_STRUCTURE, SERVICES, BRANDS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, HOLDING_BRAND, RDM_BRANDS, FIXED_EXPENSE_EDIT_ROLES, isSiteManager, shareForSite, SITES_HORS_PLAQUE } from '../../../constants';
 import { useAuth } from '../../../contexts/AuthContext';
 import { fixedExpenses as fixedRes, createFixedExpense, updateFixedExpense, deleteFixedExpense } from '../../store/collections';
 import { logActivity as logFeed } from '../../store/workspace';
@@ -46,12 +46,15 @@ const inPer = (e: FixedExpense) => { const p = per(); if (p === 'Tout le réseau
 /** `getAvailableBrands` de la page. */
 const brandAvail = (sites: string[], b: string) => (b === 'Alpine' ? sites.some((s) => (ALPINE_SITES as string[]).includes(s)) : b === 'Nissan' ? sites.some((s) => (NISSAN_SITES as string[]).includes(s)) : true);
 
-/** Filtres et tri : règles EXACTES de FixedExpenses.tsx (l.219-250), dont le filtre Site à égalité stricte. */
+/** Part de la dépense comptée sous le filtre Site (1 sans filtre). 09/10/2026 : par la ventilation (constants.ts), plus
+ *  par égalité stricte du libellé — une dépense « Clermont, Vichy » sort sous Clermont pour sa part (décision de Théo). */
+export const partOf = (e: FixedExpense, site: string) => (site === 'All' ? 1 : shareForSite(e, site));
+/** Filtres et tri : règles de FixedExpenses.tsx (l.219-250), sauf le filtre Site (ventilation, ci-dessus). */
 function listOf(all: FixedExpense[], f: Filters, sort: Sort) {
   const q = f.q.toLowerCase();
   return all.filter((e) => inPer(e)
     && ((e.comment || '').toLowerCase().includes(q) || (e.site || '').toLowerCase().includes(q) || (e.service || '').toLowerCase().includes(q))
-    && (f.site === 'All' || e.site === f.site) && (f.service === 'All' || e.service === f.service)
+    && partOf(e, f.site) > 0 && (f.service === 'All' || e.service === f.service)
     && (!f.from || new Date(e.date) >= new Date(f.from)) && (!f.to || new Date(e.date) <= new Date(f.to)))
     .sort((a, b) => {
       let x: any = (a as any)[sort.k], y: any = (b as any)[sort.k];
@@ -116,7 +119,7 @@ export default function FixedApp({ win, inst }: AppProps) {
 
   const fd = useDeferredValue(f);
   const L = useMemo(() => listOf(expenses || [], fd, sort), [expenses, fd, sort]);
-  const total = useMemo(() => L.reduce((s, e) => s + (e.amount || 0), 0), [L]);
+  const total = useMemo(() => L.reduce((s, e) => s + (e.amount || 0) * partOf(e, fd.site), 0), [L, fd.site]);
   const nFilters = (f.q ? 1 : 0) + (f.site !== 'All' ? 1 : 0) + (f.service !== 'All' ? 1 : 0) + (f.from ? 1 : 0) + (f.to ? 1 : 0);
   const byId = useCallback((id: string) => (expenses || []).find((x) => x.id === id), [expenses]);
 
@@ -153,7 +156,8 @@ export default function FixedApp({ win, inst }: AppProps) {
 
   // --- filtres
   const pickSite = (el: HTMLElement) => gx().ui.pick(el, [{ items: [{ v: 'All', l: 'Tous sites' }, { v: 'GROUPE BONY', l: 'GROUPE BONY' }] },
-    ...Object.entries(PLAQUES_STRUCTURE).map(([pl, ss]) => ({ label: pl, collapsible: true, items: (ss as string[]).map((s) => ({ v: s, l: s })) }))],
+    ...Object.entries(PLAQUES_STRUCTURE).map(([pl, ss]) => ({ label: pl, collapsible: true, items: (ss as string[]).map((s) => ({ v: s, l: s })) })),
+    { label: 'Hors plaque', collapsible: true, items: (SITES_HORS_PLAQUE as string[]).map((s) => ({ v: s, l: s })) }],
   { multi: false, search: true, selected: [f.site], title: 'Site', width: 280, onChange: ([v]: string[]) => setF({ ...f, site: v || 'All' }) });
   const pickSvc = (el: HTMLElement) => gx().ui.pick(el, [{ items: [{ v: 'All', l: 'Tous services' }, ...SERVICES.map((s) => ({ v: s, l: s, color: SVC_HEX[s] }))] }],
     { multi: false, selected: [f.service], title: 'Service', onChange: ([v]: string[]) => setF({ ...f, service: v || 'All' }) });

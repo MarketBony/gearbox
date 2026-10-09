@@ -693,6 +693,11 @@ class DataService {
    * Loi LOM : l'état de l'écran faisait autorité sur des listes qu'il n'avait pas
    * chargées. Ne pas revenir à un objet complet « pour simplifier ».
    */
+  /** Renomme un tag ET le reporte sur les publications (routes/tags.ts, 09/10/2026). */
+  async renameDigitalTag(category: 'networks' | 'co2' | 'lom', from: string, to: string): Promise<{ tags: DigitalTags; posts: number }> {
+    const r = await apiFetch<{ tags: DigitalTags; posts: number }>('/tags/rename', { method: 'POST', body: JSON.stringify({ category, from, to }) });
+    return { tags: normalizeDigitalTags(r.tags), posts: r.posts };
+  }
   async saveDigitalTags(tags: Partial<DigitalTags>): Promise<DigitalTags> {
       if (this.isElectron && window.electron) {
           // ⚠️ Electron n'a pas d'équivalent du « patch » : le stockage local remplace la

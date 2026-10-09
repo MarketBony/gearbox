@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Equipment, EquipmentBooking, ServiceType } from '../../../types';
-import { SERVICES } from '../../../constants';
+import { SERVICES, SITES_HORS_PLAQUE } from '../../../constants';
 import { createBooking, updateBooking, deleteBooking, createEquipment, updateEquipment } from '../../store/collections';
 import { gx, hud, Icon } from '../ui/kit';
 import { P, isoAdd, range, available, usedOn, KNOWN_SITES, PLAQUES } from './logic';
@@ -111,6 +111,7 @@ export const BookingForm: React.FC<BookingProps> = ({ pre, edit, equipment, book
           {!siteKnown && v.site ? <option value={v.site}>{v.site}</option> : null}
           <option value="GROUPE BONY">GROUPE BONY</option>
           {Object.entries(PLAQUES).map(([pl, ss]) => <optgroup key={pl} label={pl}>{ss.map((s) => <option key={s} value={s}>{s}</option>)}</optgroup>)}
+          <optgroup label="Hors plaque">{(SITES_HORS_PLAQUE as string[]).map((s) => <option key={s} value={s}>{s}</option>)}</optgroup>
           <optgroup label="Entité"><option value="Nissan">Nissan</option></optgroup></select></label>
         <label className="field"><span className="label">Service</span><select className="select" value={v.service} onChange={(e) => set({ service: e.target.value })}>{SERVICES.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
         {eq ? <div className="field full"><span className="label">Disponibilité jour par jour · {eq.name}{days.length ? ` · ${days.length} jour${days.length > 1 ? 's' : ''}` : ''}</span><div className="mat-strip">

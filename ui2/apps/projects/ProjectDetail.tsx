@@ -42,7 +42,7 @@ export const ProjectDetail: React.FC<{ p: Project; api: DetailApi }> = ({ p, api
   const actual = p.budgetActual || 0, pr = p.progress || 0, gain = (p.budgetPlanned || 0) - actual, T = today();
   const sites = sitesDuProjet(p), gm = groupeDuProjet(p), dist: Record<string, number> = p.budgetDistribution || {};
   const total = Object.values(dist).reduce((a, b) => a + (+b || 0), 0), done = p.tasks.filter((t) => t.status === 'Done').length;
-  const hasRdm = (p.brands || []).some((b) => RDM_BRANDS.includes(b)), shareBrands = hasRdm ? (['Alpine', 'Nissan'] as const).filter((b) => (p.brands || []).includes(b)) : [];
+  const hasRdm = (p.brands || []).some((b) => RDM_BRANDS.includes(b)), shareBrands = hasRdm ? (['Alpine', 'Nissan'] as const).filter((b) => (p.brands || []).includes(b)).filter((b, _i, all) => !(b === 'Nissan' && all.includes('Alpine'))) : [];   // Alpine passe avant Nissan : le curseur Nissan, sans effet, n'est plus affiché (09/10/2026)
   const expert = !!p.expertMode, arch = p.status === 'Archived', dis = ro;
   const siteLbl = gm ? `${gm} · ${sites.length} sites` : sites.join(', ') || 'Sélectionner…';
   const gainC = gain >= 0 ? 'var(--ok)' : 'var(--danger)';

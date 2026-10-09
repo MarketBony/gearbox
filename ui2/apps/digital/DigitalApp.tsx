@@ -4,7 +4,7 @@ import type { SocialPost, DigitalTags } from '../../../types';
 import { SOCIAL_SERVICES, canEditDigital, isSiteManager } from '../../../constants';
 import { db } from '../../../services/dataService';
 import { useAuth } from '../../../contexts/AuthContext';
-import { useSocialPosts, socialPosts, createSocialPost, updateSocialPost, deleteSocialPost, useDigitalTags, saveDigitalTags } from '../../store/collections';
+import { useSocialPosts, socialPosts, createSocialPost, updateSocialPost, deleteSocialPost, useDigitalTags, saveDigitalTags, renameDigitalTag } from '../../store/collections';
 import { gx, hud, Icon, PickerBtn, useSheets, useEngineEvent, useCompact } from '../ui/kit';
 import { D, F0, TABS, TARGETS, type Filters, type TabId, listPosts, inPeri, tabOfLabel, labelOfTab, ssGet, ssSet, pd, todayIso, esc, stBadgeHTML, brandChipsHTML, netIcHTML, stLabel, brandLabel, estLienExterne } from './common';
 import { EditoRow, type RowApi, type PickKey } from './EditoRow';
@@ -295,7 +295,8 @@ export default function DigitalApp({ win, inst }: AppProps) {
         : <div className="empty"><Icon name={tab === 'arch' ? 'archives' : 'digital'} /><b style={{ color: 'var(--text)' }}>Aucune publication trouvée dans {tab === 'arch' ? 'Archives' : 'Calendrier Editorial'}.</b>{filtersOn ? 'Aucun résultat pour ces filtres.' : ''}</div>}
     </div></>;
   else if (tab === 'plan') body = <Planning posts={all} plan={plan} setPlan={setPlan} ed={ed} compact={compact} smSite={smSite} appRef={appRef} api={planApi} />;
-  else body = <TagsView tags={tags} posts={all} ed={ed} save={(patch) => { if (!ed) return; track(saveDigitalTags(patch)).catch(() => { /* message affiché, tags relus */ }); }} />;
+  else body = <TagsView tags={tags} posts={all} ed={ed} save={(patch) => { if (!ed) return; track(saveDigitalTags(patch)).catch(() => { /* message affiché, tags relus */ }); }}
+    rename={(k, from, to) => { if (!ed) return; track(renameDigitalTag(k, from, to)).then((r) => hud(r.posts ? `Tag renommé · ${r.posts} publication${r.posts > 1 ? 's' : ''} mise${r.posts > 1 ? 's' : ''} à jour` : 'Tag renommé')).catch(() => { /* message affiché, tags relus */ }); }} />;
 
   return (
     <div className="app dig" ref={appRef}>

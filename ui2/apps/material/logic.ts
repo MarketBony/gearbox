@@ -1,5 +1,5 @@
 import type { Equipment, EquipmentBooking } from '../../../types';
-import { PLAQUES_STRUCTURE } from '../../../constants';
+import { PLAQUES_STRUCTURE, SITES_HORS_PLAQUE } from '../../../constants';
 import { gx } from '../ui/kit';
 
 // =====================================================================
@@ -41,9 +41,8 @@ export function period(a: Date, view: View): Period {
 // ---------------------------------------------------------------- règles d'accès (routes/equipment.ts, routes/equipmentBookings.ts)
 /** Catalogue : `canManageCatalog` de pages/Material.tsx = `MANAGE_ROLES` de routes/equipment.ts. */
 export const canManageCatalog = (role?: string) => role === 'Master' || role === 'Administrator' || role === 'Director';
-/** Réservations : tout utilisateur authentifié (aucun requireRole, aucune notion d'auteur).
- *  Chef de site et Externe n'ont pas la rubrique (liste fermée) : seul garde-fou, comme la maquette. */
-export const canBook = (role?: string) => !!role && !['Site Manager', 'External'].includes(role);
+/** Réservations : BOOKING_ROLES du serveur (auth/roles.ts, 09/10/2026) — le Guest reste en lecture seule. */
+export const canBook = (role?: string) => ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'].includes(role || '');
 
 // ---------------------------------------------------------------- champ Site d'une réservation
 /**
@@ -54,7 +53,7 @@ export const canBook = (role?: string) => !!role && !['Site Manager', 'External'
  * porte encore l'affiche (option conservée en tête) : on ne réécrit jamais une valeur en silence.
  */
 export const PLAQUES: Record<string, string[]> = PLAQUES_STRUCTURE as any;
-export const KNOWN_SITES = ['GROUPE BONY', ...Object.values(PLAQUES).flat(), 'Nissan'];
+export const KNOWN_SITES = ['GROUPE BONY', ...Object.values(PLAQUES).flat(), ...(SITES_HORS_PLAQUE as string[]), 'Nissan'];
 
 // ---------------------------------------------------------------- DISPONIBILITÉ
 /**
@@ -125,5 +124,6 @@ export const colorOf = (b: EquipmentBooking): string => gx().data.SERVICE_COLOR[
 export function perOk(b: EquipmentBooking) {
   const per = gx().ctx.perimetre; if (!per || per === 'Tout le réseau') return true;
   if (per === 'Nissan') return b.site === 'Nissan' || (gx().data.NISSAN_ONLY as string[]).includes(b.site);
-  return b.site === per;
+  // [GEARBOX] 09/10/2026 : une réservation « GROUPE BONY » concerne tout le réseau — visible sous chaque périmètre.
+  return b.site === per || b.site === 'GROUPE BONY';
 }

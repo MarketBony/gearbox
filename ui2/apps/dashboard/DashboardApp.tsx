@@ -217,7 +217,7 @@ export default function DashboardApp({ win, inst }: AppProps) {
     ],
   });
 
-  const G = stats.perfGlobale;
+
   return (
     <div className="app">
       <div className="app-head">
@@ -245,7 +245,6 @@ export default function DashboardApp({ win, inst }: AppProps) {
             <div className={`bar ${burn > 100 ? 'over' : ''}`} style={{ height: 6 }}><i style={{ width: `${Math.min(100, burn)}%`, ...(burn > 100 ? { '--c': 'var(--danger)' } : {}) } as React.CSSProperties} /></div>)}
           {kpi('target', 'var(--info)', 'Reste à engager', F().n(Math.round(rest)), '€', rest < 0 ? 'Dépassement budgétaire sur la période.' : 'Disponible pour de nouveaux projets.', null, rest < 0 ? 'var(--danger)' : '')}
           {kpi('layers', 'var(--ok)', 'Projets actifs', stats.activeProjectsCount, '', <><span style={{ color: 'var(--ok)', fontWeight: 700 }}>● En cours de réalisation</span> sur le périmètre.</>)}
-          {kpi('campaigns', 'var(--bony-violet)', 'Campagnes programmées', stats.activeCampaignsCount, '', 'Envois SMS / e-mail au statut « programmé ».')}
           {kpi('alert', late.length ? 'var(--danger)' : 'var(--ok)', 'Projets en retard', late.length, '', 'Échéance dépassée, avancement inférieur à 100 %.', null, late.length ? 'var(--danger)' : 'var(--ok)')}
           {kpi('trending', gapC, 'Avance / retard de budget', `${gap > 0 ? '+' : gap < 0 ? '−' : ''}${Math.abs(gap)}`, 'points',
             `Engagé ${stats.pctEngageADate} % pour ${stats.pctTempsEcoule} % de la période écoulée : ${gap > 10 ? 'vous engagez plus vite que le temps ne passe, le budget risque de manquer.' : gap < -10 ? 'le budget risque de rester non engagé.' : 'engagements au rythme du calendrier.'}`,
@@ -305,16 +304,7 @@ export default function DashboardApp({ win, inst }: AppProps) {
         </div>
 
         {sm ? null : <>
-          <div className="card dsh-card"><Head title="Performance des campagnes" hint={<>Envois SMS et e-mail du périmètre. <b style={{ color: 'var(--text)' }}>Taux pondérés par la volumétrie</b> — une moyenne simple des taux serait faussée par les écarts de volume entre envois.</>} />
-            {G.volume ? <>
-              <div className="dsh-tiles">{([['Contacts touchés', F().n(G.volume), `${G.envois} envois`], ['Taux d’ouverture', `${pctTxt(G.ouverture)} %`, 'pondéré'], ['Taux de clic', `${pctTxt(G.clic)} %`, 'pondéré'],
-                ['Coût / contact', `${pctTxt(G.coutParContact, 3)} €`, F().eur(G.cout)], ['NPAI', `${pctTxt(G.npai)} %`, 'adresses invalides'], ['Désabonnements', `${pctTxt(G.stop)} %`, 'STOP / désinscrits']] as [string, string, string][])
-                .map(([l, v, s]) => <div key={l} className="dsh-tile"><div className="dsh-lbl ellipsis">{l}</div><b className="num">{v}</b><div className="faint ellipsis">{s}</div></div>)}</div>
-              <div className="scroll"><table className="tbl zebra" style={{ minWidth: 560 }}><thead><tr><th>Canal</th><th className="r">Envois</th><th className="r">Contacts</th><th className="r">Ouverture</th><th className="r">Clic</th><th className="r">Coût</th><th className="r">Coût / contact</th></tr></thead>
-                <tbody>{stats.perfCanal.map((x) => (
-                  <tr key={x.canal}><td><b><Icon name={x.canal === 'SMS' ? 'sms' : 'mail'} size="sm" /> {x.canal}</b></td><td className="r num muted">{x.envois}</td><td className="r num">{F().n(x.volume)}</td><td className="r num">{pctTxt(x.ouverture)} %</td><td className="r num">{pctTxt(x.clic)} %</td>
-                    <td className="r num muted">{F().eur(x.cout)}</td><td className="r num" style={{ color: 'var(--bony-orange)', fontWeight: 700 }}>{pctTxt(x.coutParContact, 3)} €</td></tr>))}</tbody></table></div>
-            </> : <Empty t="Aucune volumétrie saisie. Renseignez volumétrie et taux dans les tâches SMS / E-mail des projets pour activer ces indicateurs." />}</div>
+          {/* Performance des campagnes : retirée le 09/10/2026 avec la rubrique Campagnes (décision de Théo). */}
           <div className="dsh-g2">
             <div className="card dsh-card"><Head title="Top consommateurs" hint="Sites et prestataires, montants ventilés." />
               <div className="dsh-sub"><Icon name="building" size="sm" /> Sites</div>{charts.sites ? <Html html={charts.sites} /> : <Empty t="Aucune donnée." />}

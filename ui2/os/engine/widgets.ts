@@ -238,7 +238,8 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       return `${head('digital', 'Planning digital de la semaine')}<div class="wweek ${tall ? 'tall' : ''}">${Array.from({ length: 7 }, (_, i) => { const d = GX.addDays(mon, i), iso = GX.iso(d), ps = D.POSTS.filter((p) => p.date === iso && !p.archived);
         return `<div class="wday ${iso === today() ? 'on' : ''}"><span class="faint">${F.day(d)}</span><b class="num">${d.getDate()}</b>${tall ? `<div class="wdl">${ps.slice(0, 3).map((p) => `<span style="--c:${D.socialStatus(p.status).c}" data-tip="${GX.esc(p.title)}">${GX.esc(p.title)}</span>`).join('')}${ps.length > 3 ? `<span class="faint">+${ps.length - 3}</span>` : ''}</div>` : `<div class="wdots">${ps.slice(0, 4).map((p) => `<i style="background:${D.socialStatus(p.status).c}" data-tip="${GX.esc(p.title)}"></i>`).join('')}</div><span class="faint" style="font-size:10px">${ps.length || ''}</span>`}</div>`; }).join('')}</div>`;
     } },
-    campaigns: { app: 'campaigns', name: 'Performance des campagnes', sizes: ['M', 'M3'], render(sz) {
+    /* [GEARBOX] Rubrique Campagnes retirée de la v2 (09/10/2026) : widget masqué (son app n'est plus ouvrable). */
+    campaigns: { app: 'campaigns', hidden: true, name: 'Performance des campagnes', sizes: ['M', 'M3'], render(sz) {
       /* [GEARBOX] moyennes sur les SEULS taux renseignés (un taux vide comptait pour 0 %, BUGS-CONNUS.md) */
       const c = act().flatMap((p) => p.tasks).filter((t) => ['SMS', 'E-mail'].includes(t.channel));
       const avg = (k) => { const v = c.map((t) => t[k]).filter((x) => x != null && x !== '' && Number.isFinite(+x)).map(Number); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0; };
@@ -516,6 +517,16 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     if (!layout) load();
     if (GX.shell.prefs.widgets === false && !editing) { box.innerHTML = ''; return; }
     box.classList.toggle('editing', editing);
+    /* [GEARBOX] Bureau composé sur un écran plus LARGE (09/10/2026) : un widget qui dépasse la dernière colonne était
+       seulement recalé à droite, au risque de chevaucher ses voisins. On le replace dans une case libre proche, et la
+       disposition (adaptée à cet écran) est enregistrée. */
+    if (!isPhone() && !editing) {
+      const C = cols(), over = layout.filter((w) => w.x + dim(w.size)[0] > C);
+      if (over.length) {
+        over.forEach((w) => { const [cw] = dim(w.size); if (cw > C) { const b = bounds(CAT[w.type] || { sizes: [w.size] }); w.size = sizeOf(Math.max(b.min[0], C), dim(w.size)[1]); } const f = freeSpot(w.size, w, { x: Math.max(0, C - dim(w.size)[0]), y: w.y }); w.x = f.x; w.y = f.y; });
+        save();
+      }
+    }
     const vis = layout.filter((w) => allowed(w.type));
     const maxY = Math.max(0, ...vis.map((w) => w.y + dim(w.size)[1]));
     const sx = SX(), sy = SY(); box.style.width = cols() * sx - GAP + 'px'; box.style.left = M() + 'px'; box.style.top = Math.round(area().top + M()) + 'px'; box.style.height = maxY * sy + 'px'; /* [GEARBOX] marge proportionnelle */
@@ -622,7 +633,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   function configure(w, el) {
     const c = CAT[w.type];
     if (c.cfg === 'deadlines') GX.ui.pick(el, [{ items: [['both', 'Projets et tâches'], ['proj', 'Projets seulement'], ['task', 'Mes tâches seulement']].map(([v, l]) => ({ v, l })) }], { multi: false, title: 'Échéances', selected: [w.cfg?.mode || 'both'], onChange: ([v]) => { w.cfg = { ...(w.cfg || {}), mode: v }; save(); W.render(); } });
-    if (c.cfg === 'kpi') GX.ui.pick(el, [{ items: [['actifs', 'Projets actifs'], ['reste', 'Reste à engager'], ['conso', 'Consommation'], ['campagnes', 'Campagnes programmées'], ['retard', 'Projets en retard'], ['taches', 'Mes tâches en retard'], ['posts', 'Publications de la semaine'], ['absents', 'Absents aujourd’hui']].map(([v, l]) => ({ v, l })) }], { multi: false, title: 'Indicateur', selected: [w.cfg?.kpi || 'actifs'], onChange: ([v]) => { w.cfg = { ...(w.cfg || {}), kpi: v }; save(); W.render(); } });
+    if (c.cfg === 'kpi') GX.ui.pick(el, [{ items: [['actifs', 'Projets actifs'], ['reste', 'Reste à engager'], ['conso', 'Consommation'], ['retard', 'Projets en retard'], ['taches', 'Mes tâches en retard'], ['posts', 'Publications de la semaine'], ['absents', 'Absents aujourd’hui']].map(([v, l]) => ({ v, l })) }], { multi: false, title: 'Indicateur', selected: [w.cfg?.kpi || 'actifs'], onChange: ([v]) => { w.cfg = { ...(w.cfg || {}), kpi: v }; save(); W.render(); } });
     if (c.cfg === 'project') GX.ui.pick(el, [{ items: act().map((p) => ({ v: p.id, l: p.name, hint: p.sites[0] })) }], { multi: false, title: 'Projet à épingler', selected: [w.cfg?.project], width: 320, onChange: ([v]) => { w.cfg = { ...(w.cfg || {}), project: v }; save(); W.render(); } });
     if (c.cfg === 'apps') GX.ui.pick(el, [{ items: [...GX.apps.values()].filter((a) => !a.hidden && !a.system && GX.shell.canOpen(a.id)).map((a) => ({ v: a.id, l: a.name })) }], { title: 'Raccourcis (8 max)', selected: w.cfg?.apps || ['projects', 'digital', 'budget', 'conges'], onChange: (v) => { w.cfg = { ...(w.cfg || {}), apps: v.slice(0, 8) }; save(); W.render(); } });
   }

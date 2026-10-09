@@ -16,6 +16,10 @@ export const SITES: Site[] = [
     // Alpine et Nissan sont des buckets budgétaires, pas des sites géographiques sélectionnables
 ];
 
+/** Sites réels rattachés à AUCUNE plaque (Montluçon, Saint-Etienne : concessions Nissan). Un sélecteur construit sur
+ *  `PLAQUES_STRUCTURE` doit les ajouter (groupe « Hors plaque ») — ils manquaient à six filtres de la v2 (09/10/2026). */
+export const SITES_HORS_PLAQUE: Site[] = SITES.filter((s) => !Object.values(PLAQUES_STRUCTURE).flat().includes(s));
+
 // Sites où Alpine est présent (projets tagués Alpine → budget routé vers entité Alpine)
 export const ALPINE_SITES: Site[] = ['Clermont', 'Le Puy-en-Velay', 'Vichy', 'Rodez'];
 
@@ -103,6 +107,23 @@ const SITE_ALIASES: Record<string, string> = {
 
 /** Ramène un site saisi vers le site qui porte réellement son budget. */
 export const resolveSiteAlias = (site: string): string => SITE_ALIASES[site] ?? site;
+
+/**
+ * Parts (en %) d'un projet ou d'une dépense par site : sa ventilation s'il est multi-sites, sinon 100 % sur son
+ * site. MÊME source que Budget et Dashboard (`siteShares` de budgetStats / dashboardStats).
+ */
+export const siteSharesOf = (e: { site?: string | null; sites?: string[] | null; budgetDistribution?: Record<string, number> | null }): Record<string, number> =>
+  (e.sites && e.sites.length > 0 && e.budgetDistribution) ? e.budgetDistribution : { [e.site as string]: 100 };
+/**
+ * Fraction (0 → 1) d'un élément imputée à UN site (alias compris). Sert aux filtres « Site » des listes (Dépenses,
+ * 09/10/2026) : une dépense « Clermont, Vichy » sort sous Clermont, pour SA part (décision de Théo : le total
+ * de la liste suit le Budget). « GROUPE BONY » reste une entité à part (comme dans le Budget).
+ */
+export const shareForSite = (e: Parameters<typeof siteSharesOf>[0], site: string): number => {
+  let pct = 0;
+  for (const [raw, p] of Object.entries(siteSharesOf(e))) if (p > 0 && (raw === site || resolveSiteAlias(raw) === site)) pct += p;
+  return Math.min(1, pct / 100);
+};
 
 /**
  * Décompose une LIGNE DE BUDGET en (site réel, marque).

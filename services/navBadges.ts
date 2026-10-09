@@ -30,9 +30,15 @@ export function useNavBadges(user: { id: string; role: string } | null, gamesEna
       setGamesChallenges(0);
       return;
     }
+    // 09/10/2026 (Théo : « pas de pastille sur les Jeux, c'est relou ») : la pastille compte aussi les parties où
+    // c'est À MOI de jouer — avant, seulement les défis reçus, si bien qu'un coup de l'adversaire passait inaperçu.
+    // Bataille navale en placement : à moi tant que ma flotte n'est pas prête.
     db.getGamesLobby()
       .then(d => setGamesChallenges(
         d.challenges.filter(c => c.toUserId === user.id && c.status === 'pending').length
+        + (d.sessions || []).filter((s: any) =>
+            (s.status === 'playing' && s.currentTurn === user.id)
+            || (s.status === 'placing' && s.board?.me && !s.board.me.ready)).length
       ))
       .catch(() => { /* réseau : on garde la valeur précédente */ });
   };

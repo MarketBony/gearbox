@@ -228,6 +228,12 @@ export function archiveProject(id: string) {
   mutateProject(id, (x) => ({ ...x, status: 'Archived' }));
   logProject('a archivé le projet', p);
 }
+/** Restauration d'un projet archivé : l'écriture, plus l'entrée au journal (09/10/2026 : elle n'en laissait aucune). */
+export function restoreProject(id: string, status: Project['status'] = 'Active') {
+  const p = workspace.getState().byId[id]; if (!p) return;
+  mutateProject(id, (x) => ({ ...x, status }));
+  logProject('a restauré le projet', p);
+}
 
 // ---------------------------------------------------------------- écritures : tâches libres
 // Route `/api/tasks` : liste blanche `FIELDS` (backend/src/routes/tasks.ts), coût forcé à 0.

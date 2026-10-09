@@ -4,6 +4,7 @@ import type { TaskStatus } from '../../../types';
 import { canEditProjects } from '../../../constants';
 import { useAuth } from '../../../contexts/AuthContext';
 import { db } from '../../../services/dataService';
+import { getSocket, connectSocket } from '../../../services/socket';
 import { GAME_LABELS } from '../../../components/games/gameTypes';
 import { useWorkspace, workspace, mutateTask, updateStandalone } from '../../store/workspace';
 import { gx, hud } from '../ui/kit';
@@ -60,6 +61,29 @@ export default React.memo(function ReactWidgets() {
   }, [G, uid, role]);
   // Les widgets HTML suivent les tâches (projets ET tâches libres) : un événement par changement.
   useEffect(() => { G?.emit?.('data:tasks'); }, [items, G]);
+
+  // --- Jeux : bannière à l'arrivée d'un défi et quand c'est à moi de jouer (09/10/2026, Théo : « pas de notifs sur les
+  // jeux, c'est relou »). Rien si la fenêtre Jeux est déjà au premier plan, ni pour un rôle sans Jeux.
+  useEffect(() => {
+    if (!G || !uid) return;
+    const s = getSocket() ?? connectSocket(); if (!s) return;
+    const shown = () => { const w = G.wm?.active?.(); return !!w && (w.app?.parent || w.appId) === 'games' && !w.min && document.hasFocus(); };
+    const name = (id: string) => (G.data.user(id)?.name || '').split(' ')[0] || 'Quelqu’un';
+    const label = (g: string) => (GAME_LABELS as Record<string, string>)[g] || g;
+    const onChallenge = (c: any) => {
+      if (!G.shell?.canOpen?.('games') || c?.toUserId !== uid || c.status !== 'pending' || shown()) return;
+      G.shell.notify?.({ app: 'games', u: c.fromUserId, title: 'Nouveau défi', body: `${name(c.fromUserId)} te défie au ${label(c.gameType || c.game)}`, onClick: () => G.wm.open('games') });
+    };
+    const last: Record<string, string> = {};
+    const onSession = (p: any) => {
+      if (!G.shell?.canOpen?.('games') || !p?.id) return;
+      const key = `${p.status}:${p.currentTurn}`; if (last[p.id] === key) return; last[p.id] = key;
+      if (p.status !== 'playing' || p.currentTurn !== uid || shown()) return;
+      G.shell.notify?.({ app: 'games', u: p.opponentId, title: 'À toi de jouer', body: `${label(p.game)} contre ${name(p.opponentId)}`, onClick: () => G.shell.openWith('games', `play:${p.game}:${p.opponentId}`) });
+    };
+    s.on('game:challenge:updated', onChallenge); s.on('game:session:updated', onSession);
+    return () => { s.off('game:challenge:updated', onChallenge); s.off('game:session:updated', onSession); };
+  }, [G, uid]);
 
   // --- porte GX.games
   useEffect(() => {

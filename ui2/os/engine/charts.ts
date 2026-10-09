@@ -27,7 +27,8 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       let acc = 0;
       const tipLine = line ? ` · ${line.name} : ${fmt(line.values[i] || 0)}` : '';
       series.forEach((se, k) => {
-        const v = se.values[i] || 0; if (!v) return;
+        /* [GEARBOX] valeur négative (avoir…) : pas de barre — une hauteur négative est une erreur SVG (09/10/2026). */
+        const v = se.values[i] || 0; if (!(v > 0)) return;
         const x = i * bw + (bw - gw) / 2 + (stacked ? 0 : k * sw), h = (v / max) * ih, yy = stacked ? y(acc + v) : y(v); acc += v;
         bars += `<rect x="${x.toFixed(1)}" y="${yy.toFixed(2)}" width="${Math.max(2, sw - 3).toFixed(1)}" height="${h.toFixed(2)}" rx="4" fill="${se.color || `url(#${id}grad)`}" data-tip="${GX.esc(se.name)} · ${GX.esc(l)} : ${GX.esc(fmt(v))}${GX.esc(tipLine)}" style="transform-origin:0 ${ih}px;animation:ch-rise var(--t-slow) var(--spring-soft) both;animation-delay:${i * 25 + k * 40}ms" />`;
       });
@@ -57,7 +58,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   C.hbars = ({ items, fmt = GX.fmt.eurK, max }) => {
     const m = max || Math.max(1, ...items.map((i) => i.value));
     return `<div style="display:grid;gap:9px">${items.map((it, i) => `<div style="display:grid;gap:4px"><div class="row" style="font-size:12px"><span class="ellipsis grow">${it.icon || ''}${GX.esc(it.label)}</span><b class="num">${fmt(it.value)}</b></div>
-      <div class="bar" style="height:7px"><i style="width:${(it.value / m) * 100}%;${it.color ? `--c:${it.color};` : ''}animation-delay:${i * 50}ms"></i></div></div>`).join('')}</div>`;
+      <div class="bar" style="height:7px"><i style="width:${Math.max(0, (it.value / m) * 100)}%;${it.color ? `--c:${it.color};` : ''}animation-delay:${i * 50}ms"></i></div></div>`).join('')}</div>`;
   };
 
   /* Mini-courbe */

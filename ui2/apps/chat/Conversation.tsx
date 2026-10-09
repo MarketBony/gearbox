@@ -214,6 +214,12 @@ function ConversationView({ convId, win, viewing, compact, headExtra, onTogglePi
     try { chatStore.upsertConversation(await emitWithAck<ChatConversation>('chat:conversation:rename', { conversationId: c.id, name: v })); }
     catch (e) { alertSheet(e instanceof Error && e.message ? e.message : 'Renommage impossible.'); }
   };
+  // Suppression d'un groupe (09/10/2026) : administrateurs seulement ; le serveur décide et prévient tous les membres.
+  const deleteGroup = () => {
+    if (conv?.type !== 'group' || !isAdmin) return; const c = conv;
+    confirmSheet(`Supprimer le groupe « ${nameOf(c)} » ?`, 'Tous ses messages et ses fichiers sont effacés, pour tous les membres. Cette action est définitive.', 'Supprimer le groupe',
+      () => emitWithAck('chat:conversation:delete', { conversationId: c.id }).then(() => { chatStore.removeConversation(c.id); hud('Groupe supprimé'); }).catch(fail('Échec de la suppression du groupe.')));
+  };
   const convMenu = (el: HTMLElement) => {
     if (!conv) return; const muted = (conv.mutedBy ?? []).includes(meId), pinned = pins.isPinned(conv);
     gx().menu.open([
@@ -221,6 +227,7 @@ function ConversationView({ convId, win, viewing, compact, headExtra, onTogglePi
       ...(conv.type !== 'general' ? [{ label: 'Personnaliser la discussion…', icon: 'sliders', action: paletteSheet }] : []),
       { label: muted ? 'Réactiver les notifications' : 'Mettre en sourdine', icon: 'belloff', action: () => toggleMute(conv) },
       { label: pinned ? 'Désépingler' : 'Épingler', icon: 'star', action: () => togglePin(conv) },
+      ...(conv.type === 'group' && isAdmin ? ['-', { label: 'Supprimer le groupe…', icon: 'trash', action: deleteGroup }] : []),
     ], el, { align: 'right' });
   };
 
@@ -384,6 +391,7 @@ function ConversationView({ convId, win, viewing, compact, headExtra, onTogglePi
       ...(conv.type === 'group' ? [{ label: 'Membres…', icon: 'users', action: membersSheet }, { label: 'Renommer le groupe', icon: 'edit', disabled: !isAdmin, action: startRename }] : []),
       { label: 'Sourdine', checked: (conv.mutedBy ?? []).includes(meId), action: () => toggleMute(conv) },
       { label: 'Épinglée', checked: pins.isPinned(conv), action: () => togglePin(conv) },
+      ...(conv.type === 'group' && isAdmin ? ['-', { label: 'Supprimer le groupe…', icon: 'trash', action: deleteGroup }] : []),
     ] : []),
   };
 

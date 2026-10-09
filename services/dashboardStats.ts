@@ -4,7 +4,7 @@
 // widgets de l'interface v2 doivent l'appeler plutôt que recalculer quoi que ce
 // soit (cf. CLAUDE.md : une seule logique métier, jamais une seconde à côté).
 import { Project, BudgetLine, BrandType, ServiceType, SocialPost, FixedExpense } from '../types';
-import { isHoldingBrand, isDestinationInScope, resolveSiteAlias, splitShareToBuckets } from '../constants';
+import { isHoldingBrand, isDestinationInScope, resolveSiteAlias, splitShareToBuckets, siteSharesOf } from '../constants';
 import { parseLocalDate } from '../components/DateRangePicker';
 
 export interface DashboardStatsInput {
@@ -487,7 +487,11 @@ export function computeDashboardStats(input: DashboardStatsInput) {
   const todayMidnight = new Date();
   todayMidnight.setHours(0, 0, 0, 0);
   const deadlines = projects
-      .filter(p => p.status === 'Active' && isSiteInScope(p.site as string) && isProPlusInScope(p.proPlus)
+      // 09/10/2026 : par la VENTILATION (siteSharesOf), plus par le libellé brut `p.site` — un projet « Clermont, Vichy »
+      // ou GROUPE BONY disparaissait dès qu'un périmètre était filtré. Un projet GROUPE BONY concerne tout le réseau.
+      .filter(p => p.status === 'Active'
+          && (filterContexts.length === 0 || String(p.site || '').startsWith('GROUPE BONY') || Object.keys(siteSharesOf(p)).some(s => isSiteInScope(s)))
+          && isProPlusInScope(p.proPlus)
           && p.endDate && parseLocalDate(p.endDate) >= todayMidnight)
       .sort((a,b) => parseLocalDate(a.endDate).getTime() - parseLocalDate(b.endDate).getTime())
       .slice(0, 10);

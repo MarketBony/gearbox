@@ -3,7 +3,7 @@ import type { AppProps } from '../types';
 import type { Project } from '../../../types';
 import { PROJECT_TYPES, SERVICES, canEditProjects } from '../../../constants';
 import { useAuth } from '../../../contexts/AuthContext';
-import { useWorkspace, workspace, mutateProject, createProject, deleteProject, archiveProject } from '../../store/workspace';
+import { useWorkspace, workspace, mutateProject, createProject, deleteProject, archiveProject, restoreProject } from '../../store/workspace';
 import { nouveauProjet, sitesDuProjet } from '../../../utils/projet';
 import { gx, hud, Icon, Chips, Seg, PickerBtn, ProPlus, Stack, useSheets, useCompact } from '../ui/kit';
 import { D, F0, nFilters, listFor, siteTxt, marketing, brandHex, FILTER_BRANDS, type Filters, type Mode } from './common';
@@ -108,13 +108,17 @@ export default function ProjectsApp({ win, inst, mode }: AppProps & { mode: Mode
     gx().shell?.notify?.({ app: 'archives', title: msg, body: `« ${pr.name} »`, silent: true });
   };
   const archive = (pr: Project) => {
-    if (pr.status === 'Archived') { mutateProject(pr.id, (x) => ({ ...x, status: 'Active' })); return moved(pr, 'Projet restauré dans Projets'); }
+    if (pr.status === 'Archived') return restore(pr, 'Active');
     openSheet((close) => (
       <><div className="row" style={{ gap: 12, color: 'var(--bony-orange)' }}><Icon name="alert" size="lg" /><h3 style={{ margin: 0, color: 'var(--text)' }}>Confirmer l’archivage ?</h3></div>
         <div className="muted" style={{ marginTop: 10, lineHeight: 1.55 }}>Vous êtes sur le point d’archiver le projet <b style={{ color: 'var(--text)' }}>{pr.name}</b>.<br /><br />Il sera déplacé dans la rubrique <b style={{ color: 'var(--text)' }}>« Projets archivés »</b> et n’apparaîtra plus dans la liste des projets actifs. Il reste compté dans le budget : l’archivage est un classement, pas une annulation.</div>
         <div className="foot"><button className="btn" onClick={() => close()}>Annuler</button><button className="btn primary" onClick={() => { close(); archiveProject(pr.id); moved(pr, 'Projet archivé'); }}>Oui, archiver</button></div></>));
   };
-  const restore = (pr: Project, status: Project['status']) => { mutateProject(pr.id, (x) => ({ ...x, status })); moved(pr, 'Projet restauré dans Projets'); };
+  // Restauration : confirmation et entrée au journal (09/10/2026 — elle partait sans l'une ni l'autre).
+  const restore = (pr: Project, status: Project['status']) => openSheet((close) => (
+    <><div className="row" style={{ gap: 12, color: 'var(--ok)' }}><Icon name="refresh" size="lg" /><h3 style={{ margin: 0, color: 'var(--text)' }}>Restaurer le projet ?</h3></div>
+      <div className="muted" style={{ marginTop: 10, lineHeight: 1.55 }}>Le projet <b style={{ color: 'var(--text)' }}>{pr.name}</b> revient dans Projets avec le statut <b style={{ color: 'var(--text)' }}>{status === 'Draft' ? 'Brouillon' : status === 'Done' ? 'Terminé' : 'Actif'}</b>.</div>
+      <div className="foot"><button className="btn" onClick={() => close()}>Annuler</button><button className="btn primary" onClick={() => { close(); restoreProject(pr.id, status); moved(pr, 'Projet restauré dans Projets'); }}>Restaurer</button></div></>));
   const duplicate = async (pr: Project) => {
     const base = nouveauProjet(`${pr.name} (copie)`, user?.id);
     // Copie PROPRE : seuls les champs de tâche d'entrée (liste `TASK_FIELDS` de backend/src/routes/projects.ts)

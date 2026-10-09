@@ -46,7 +46,8 @@ export function computeNav({ role, gamesEnabled, voitConges, ui2 = false }: NavC
     ...(!isExternal ? [I('todo', CheckSquare, 'To-do')] : []),
     I('digital', Globe, 'Digital'),
     I('chat', MessageSquare, 'Chat'),
-    I('campaigns', Megaphone, 'Campagnes'),
+    // Campagnes : retirée de la v2 le 09/10/2026 (Théo : « elle sert à rien »). Reste dans l'ancienne interface jusqu'à la bascule.
+    ...(!ui2 ? [I('campaigns', Megaphone, 'Campagnes')] : []),
     ...(ui2 && canSeeForms(role) ? [I('forms', ClipboardList, 'Forms')] : []),
     I('material', Package, 'Matériel'),
     I('agenda', CalendarDays, 'Agenda'),

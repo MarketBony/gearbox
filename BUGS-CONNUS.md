@@ -18,7 +18,7 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   08/10). Les messages n'atteignaient jamais le serveur (socket à moitié mort, `emitWithAck` sans délai, champ vidé avant
   l'accusé). Correctif 72 : boîte d'envoi `services/chatOutbox.ts` (affichage immédiat, renvoi, anti-doublon serveur),
   photos réduites et progression, détection des connexions mortes en < 20 s.
-- [ ] **À vérifier : l'aperçu « dernier message » d'une conversation après SUPPRESSION** du dernier message (vu le 08/10 en
+- [x] **Corrigé (correctif 79) — l'aperçu « dernier message » d'une conversation après SUPPRESSION** du dernier message (vu le 08/10 en
   nettoyant des tests) — il pourrait garder « 📷 Image » ou le texte supprimé. Non diagnostiqué.
 
 - [x] **mIAouss inventait des données quand il répondait sans outil** (« Céline B., Marc D. » absents, 08/10). Verrou serveur
@@ -185,15 +185,15 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [ ] **Matériel : pseudo-site « Alpine » dans le champ Site d'une réservation** (`pages/Material.tsx`). Contraire à la règle Alpine PAR SITE (le pseudo-site a été retiré des sélecteurs ailleurs). Non reproduit.
 - [ ] **Budget : le sélecteur de périmètre propose toutes les plaques au chef de site.** `allowedSitesFor(user)` n'est pas transmis à `BudgetSitePicker` (le commentaire du code dit qu'il devrait être borné). Le serveur cloisonne bien les données : défaut d'interface, pas de fuite. Non reproduit.
 - [ ] **Dépenses : le filtre Site compare le libellé exact** (`e.site === filtre`) : une dépense « Clermont, Vichy » ne sort pas sous « Clermont », une dépense « GROUPE BONY (R/N) » ne sort pas sous « GROUPE BONY ». Montluçon, Saint-Etienne et R/N sont proposés à la saisie mais absents du filtre. Non reproduit.
-- [ ] **Campagnes : filtre « Service » mort** — `filterService` existe (état, filtrage, remise à zéro) dans `pages/Campaigns.tsx` mais aucun contrôle ne l'affiche. Et les moyennes de taux comptent un taux vide comme 0 (`openRate || 0`). Non reproduit.
-- [ ] **Digital : les filtres marque/service du Calendrier s'appliquent aussi au Planning**, où leur barre est masquée — filtrage invisible. Non reproduit.
+- [x] **Sans objet (rubrique Campagnes retirée de la v2, correctif 79) — Campagnes : filtre « Service » mort** — `filterService` existe (état, filtrage, remise à zéro) dans `pages/Campaigns.tsx` mais aucun contrôle ne l'affiche. Et les moyennes de taux comptent un taux vide comme 0 (`openRate || 0`). Non reproduit.
+- [x] **Fausse alerte dans la v2 (le Planning reçoit la liste non filtrée) — Digital : les filtres marque/service du Calendrier s'appliquent aussi au Planning**, où leur barre est masquée — filtrage invisible. Non reproduit.
 - [ ] **To-do : pour un rôle Guest, la page resterait bloquée sur « Chargement… »** — `getStandaloneTasks` reçoit un 403 non intercepté dans `loadTasks`, `setLoading(false)` n'est jamais appelé. Non reproduit (pas de compte Guest de test).
-- [ ] **To-do : Holding n'est pas exclusif dans le formulaire des tâches autonomes** (`StandaloneTaskForm`), contrairement à la règle métier appliquée partout ailleurs. Non reproduit.
+- [x] **Fausse alerte dans la v2 (`toggleBrand` l'applique) — To-do : Holding n'est pas exclusif dans le formulaire des tâches autonomes** (`StandaloneTaskForm`), contrairement à la règle métier appliquée partout ailleurs. Non reproduit.
 
 <!-- Relevés le 29/09/2026 (bis) pendant l'écriture des inventaires de parité (lot 0 de l'interface v2,
      maquettes/ux/inventaires/<rubrique>.md, section 11), par LECTURE DU CODE seulement : aucun n'a été
      reproduit. Revérifier avant de coder. Détail et autres écarts mineurs : section 11 de chaque inventaire. -->
-- [ ] **Matériel : les routes des réservations n'ont ni `requireRole` ni `siteScope`** (catalogue en GET compris).
+- [x] **Corrigé (correctif 79, `requireRole` ; le Matériel n'est pas cloisonné par site par conception) — Matériel : les routes des réservations n'ont ni `requireRole` ni `siteScope`** (catalogue en GET compris).
   Un chef de site, un External ou un Guest pourrait écrire par appel direct à l'API. Cf. `inventaires/materiel.md`.
 - [ ] **Chat : un chef de site peut lire le Général par l'API REST** — `routes/chat.ts` n'exclut que l'External,
   seul le socket lui est fermé. Compteur non-lu et push du Général visent aussi les chefs de site (non vérifié
@@ -202,21 +202,21 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   fait rien — toutes les campagnes sont lisibles dans l'onglet Réseau. Cf. `inventaires/dashboard.md`.
 - [ ] **Hello Marketing : clé OpenWeather en clair dans le code client** (`pages/HelloMarketing.tsx`, en tête).
 - [ ] **Réglages : l'ancien mot de passe n'est jamais envoyé ni vérifié** au changement de mot de passe.
-- [ ] **Chat : « Modifier » est proposé sur les messages image / fichier / vocal / projet** — éditer remplacerait
+- [x] **Corrigé (v2 : jamais proposé ; serveur : refusé au correctif 79) — Chat : « Modifier » est proposé sur les messages image / fichier / vocal / projet** — éditer remplacerait
   l'adresse du fichier ou l'id du projet par du texte.
-- [ ] **Filtres de périmètre qui comparent le site EXACT** (même famille que la fiche Dépenses ci-dessus) :
+- [x] **Corrigé dans la v2 (correctif 79 : Dépenses, Prochaines échéances, Matériel) — Filtres de périmètre qui comparent le site EXACT** (même famille que la fiche Dépenses ci-dessus) :
   Projets (`p.site === …` — un projet multi-sites ou GROUPE BONY ne sort sous aucun site ; entrées « Alpine » /
   « Nissan » qui ne correspondent à aucun projet) et échéances du Dashboard.
-- [ ] **Sélecteurs de périmètre incomplets** : Montluçon et Saint-Etienne absents du Dashboard ; Montluçon,
+- [x] **Corrigé dans la v2 (correctif 79, `SITES_HORS_PLAQUE`) — Sélecteurs de périmètre incomplets** : Montluçon et Saint-Etienne absents du Dashboard ; Montluçon,
   Saint-Etienne et Yssingeaux absents du filtre Site du Planning Digital, où Ricoux reste proposé.
-- [ ] **Digital : Holding n'est pas exclusif dans le sélecteur Marques** (sans effet budgétaire) ; statut brut
+- [x] **Fausse alerte dans la v2 (DigitalApp.tsx l'applique) — Digital : Holding n'est pas exclusif dans le sélecteur Marques** (sans effet budgétaire) ; statut brut
   « Programmed » en vue Semaine ; tri impossible sous `lg` ; date de création calculée en UTC (veille entre 0 h et 2 h).
-- [ ] **Projets : les deux curseurs s'affichent sur un projet Alpine + Nissan + RDM** alors que la règle ignore
+- [x] **Corrigé (correctif 79, curseur Nissan masqué) — Projets : les deux curseurs s'affichent sur un projet Alpine + Nissan + RDM** alors que la règle ignore
   `nissanShare` ; une marque Alpine/Nissan reste posée (et n'est plus retirable) quand on retire son dernier site
   éligible ; clé `Groupe` (et non `Holding`) dans `BRAND_DOT`.
 - [ ] **Mobile, menu « Plus »** : « Projets Archivés » proposé au chef de site (renvoyé au Dashboard) ; bouton
   « Actualités » non conditionné au rôle.
-- [ ] **Archives : restauration sans confirmation ni entrée au journal** ; options Brouillon/Actif/Terminé du
+- [x] **Corrigé dans la v2 (correctif 79) — Archives : restauration sans confirmation ni entrée au journal** ; options Brouillon/Actif/Terminé du
   filtre Statut qui ne peuvent rien remonter.
 
 <!-- Interface v2 (Gearbox OS), lot 1 — 29/09/2026 -->
@@ -243,7 +243,7 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [x] **Interface v2 : première ouverture d'une rubrique portée légèrement saccadée** (To-do : une tâche de 59 ms en
   build de prod, la maquette n'en a aucune). Relevé par Théo à la recette 2a : « un vrai sujet à gratter ».
   → Corrigé le 30/09 (lot 2b) : premier rendu en transition (To-do 0 ms, Projets ~53 ms de tâche longue).
-- [ ] **Interface v2 (moteur de la maquette) : un widget posé sur un écran plus large déborde à droite sur un écran
+- [x] **Corrigé (correctif 79, widget replacé) — Interface v2 (moteur de la maquette) : un widget posé sur un écran plus large déborde à droite sur un écran
   plus étroit** — la disposition n'est pas recalculée (comportement d'origine de la maquette).
 - [x] **Interface v2 : menu déroulant / sélecteur impossible à refermer en recliquant dessus** (le clic fermait puis
   rouvrait). Corrigé le 30/09 (bascule sur le déclencheur, `engine/core.ts`, `engine/pickers.ts`).
@@ -251,10 +251,10 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   navigation). Corrigé le 30/09 : `bindSwipeWheel`, un pas par geste ; ajouté au planning du Matériel.
 - [x] **Interface v2 : interrupteurs des Réglages en carrés, légende de Rôles & accès cassée** — cascade CSS du
   `input[type=checkbox]`. Corrigé le 30/09 (`ui2/os/overrides.css`).
-- [ ] **Interface v2 : erreur console « <rect> attribute height: A negative value is not valid (-1.11) »** — vue le
+- [x] **Corrigé (correctif 79) — Interface v2 : erreur console « <rect> attribute height: A negative value is not valid (-1.11) »** — vue le
   30/09 au chargement de la coque (un graphique SVG avec une valeur négative). Sans effet visible relevé ; non
   diagnostiqué.
-- [ ] **Interface v2 : `GX.shell.toggleTheme` appelé deux fois de suite** finit sur le mauvais thème (fermeture
+- [x] **Fausse alerte (vérifiée le 09/10 : `setTheme(prev => …)`, deux bascules reviennent au départ) — Interface v2 : `GX.shell.toggleTheme` appelé deux fois de suite** finit sur le mauvais thème (fermeture
   sur l'ancien thème). Sans effet pour un clic humain ; à corriger si un raccourci le déclenche un jour en rafale.
 - [x] **Interface v2 : budgets et dépenses de tout le réseau chargés pour un External** (DataHub, au démarrage de
   la coque). Corrigé le 30/09 (correctif 59) : chargés seulement pour les rôles qui ont une rubrique qui s'en sert.
@@ -266,14 +266,14 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   projet archivé), **réaction factice du widget Chat**, **chef de site multi-sites réduit à sa 1re concession**.
   Corrigés le 30/09 (correctif 59).
 <!-- Lot 3 de l'interface v2 (30/09/2026) : points remontés par les agents, À ARBITRER (non corrigés) -->
-- [ ] **Matériel : routes de réservation sans `requireRole`** — un chef de site ou un External peut réserver par appel
+- [x] **Corrigé (correctif 79) — Matériel : routes de réservation sans `requireRole`** — un chef de site ou un External peut réserver par appel
   direct, un Guest par l'interface ; une baisse de stock n'est pas contrôlée face aux réservations existantes.
-- [ ] **Campagnes : Digital Manager en lecture seule à l'écran alors que le serveur l'autorise à écrire.**
-- [ ] **Dépenses : filtre Site à égalité stricte** conservé en v2 (le corriger changerait le « Total période »).
-- [ ] **Budget : migration des enveloppes Alpine-* / Nissan manquantes** faite au montage par l'ancienne page (écriture),
+- [x] **Sans objet (correctif 79) : rubrique Campagnes retirée de la v2 — Campagnes : Digital Manager en lecture seule à l'écran alors que le serveur l'autorise à écrire.**
+- [x] **Corrigé (correctif 79, part du site, option a de Théo) — Dépenses : filtre Site à égalité stricte** conservé en v2 (le corriger changerait le « Total période »).
+- [x] **Vérifié en base le 09/10 : les 5 enveloppes existent — Budget : migration des enveloppes Alpine-* / Nissan manquantes** faite au montage par l'ancienne page (écriture),
   pas par la v2 — probablement sans objet en production, à vérifier en base.
-- [ ] **Digital : renommer un tag ne répercute pas le nom sur les publications** ; filtre Site du Planning sans
-  Montluçon, Saint-Etienne, Yssingeaux.
+- [x] **Corrigé (correctif 79) — Digital : renommer un tag ne répercute pas le nom sur les publications** ; filtre Site du Planning sans
+  Montluçon, Saint-Etienne, Yssingeaux (ajoutés).
 
 <!-- Interface v2 (Gearbox OS) — 01/10/2026, correctif 60 -->
 - [x] **Interface v2 : plus aucune photo de profil, des initiales partout.** Aucune donnée perdue : `mapUser`
@@ -288,7 +288,7 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   « Ancien membre ». **Correctif 60.**
 - [x] **Interface v2 : le Chat Général absent du widget Chat** (filtre sur `participants`, vide pour le Général dont
   l'appartenance est implicite). **Correctif 60.**
-- [ ] **Aucune suppression de conversation possible** (pas de route `DELETE /api/chat/conversations/:id`). Pas
+- [x] **Corrigé (correctif 79 : un administrateur supprime son groupe) — Aucune suppression de conversation possible** (pas de route `DELETE /api/chat/conversations/:id`). Pas
   bloquant, mais un groupe créé par erreur ou pour un test reste à vie. À arbitrer.
 - [ ] **Sauvegarde du volume `uploads_data` du VPS (photos, pièces jointes) : à vérifier** — le workflow hebdomadaire
   ne pousse qu'un dump Supabase. Prérequis du chantier « fichiers maison ».
@@ -369,3 +369,4 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   à faire par l'équipe depuis les kits de charte (Studio › Polices de marque). D'ici là, polices libres proches.
 - [ ] **Forms Bony : logos de marque en image** — seul le logo Bony est dessiné ; Renault, Dacia… s'affichent en
   texte tant qu'on n'importe pas le logo (Studio › En-tête › Logo importé).
+- [x] **Jeux : aucune pastille quand c'est à moi de jouer** (Théo, 09/10) : la pastille ne comptait que les défis reçus. Correctif 79 (parties à mon tour comptées, bannières).

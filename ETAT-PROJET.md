@@ -27,7 +27,8 @@
 - **À savoir pour la session suivante** : Bony ne paiera JAMAIS un service d'IA (aucune option payante à proposer). Le
   garde-fou de la session a bloqué une fois `git push` et le SSH malgré l'accord de Théo ; Théo a élargi les
   permissions (`.claude/settings.local.json`, non commité) et redonné son accord : ça passe désormais.
-- **En production : correctif 78 (09/10)** — v2 : **bureau enregistré sur le serveur** (widgets retrouvés sur tous les
+- **En production : correctif 79 (09/10)** — **petites corrections** (Campagnes retirée de la v2, filtre Site des Dépenses,
+  Matériel, tags, Chat, pastille Jeux…), `api` ET `web`. Avant lui le **correctif 78 (09/10)** — v2 : **bureau enregistré sur le serveur** (widgets retrouvés sur tous les
   postes ; `api` ET `web`, migration `20261009120000_user_widgets`). Avant lui le **correctif 77 (09/10)** — v2 : **refonte des widgets** (formats libres, To-do / Ma journée / Forms,
   contenus réparés), `web` seul. Avant lui le **correctif 76 (09/10)** — v2 : **bulles de discussion** façon Messenger sur ordinateur (`web` seul). Test
   grandeur nature à faire avec l'équipe. Avant lui le **correctif 75 (08/10)** — v2 : nouveaux fonds d'écran (fixes par défaut, Ruban ; 3 animés en option,
@@ -88,9 +89,8 @@
      — lot backend dédié, `ETAT-BACKEND.md` + `BUGS-CONNUS.md`.
   3. **Rôles restreints vus en vrai** (chef de site, External, Guest) dans la v2 — avec des collègues ou les comptes
      concernés (aucun compte de test). **Mobile** : testé par Théo lui-même.
-  4. **Arbitrages de `BUGS-CONNUS.md` (30/09)** : glisser du planning Digital, dupliquer une publication, écriture
-     des Campagnes pour le Digital Manager, filtre Site des Dépenses, réservations du Matériel sans `requireRole`,
-     migration des enveloppes du Budget, renommage d'un tag Digital.
+  4. ~~**Arbitrages de `BUGS-CONNUS.md` (30/09)**~~ → **faits, correctif 79** (Campagnes retirée de la v2 au lieu d'ouvrir
+     l'écriture au Digital Manager).
   5. **Bascule** : v2 par défaut, cohabitation ~2 semaines, puis **nettoyage** (retrait des `pages/*`, des copies
      temporaires `ui2/apps/hello/sources.ts`, `games/logic.ts`, `chat/voice.ts`, des `BESOINS.md` des agents).
   6. **Plus tard (noté, non planifié)** : gestion des accès par rôle depuis Réglages › Rôles & accès (backlog).
@@ -580,6 +580,37 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 79 — 09/10 : petites corrections (arbitrages du 30/09 + trouvailles de la semaine)** (branche
+  `fix/petites-corrections`, **`api` ET `web`**, aucune migration). Décisions de Théo : B1 (a), Campagnes retirée, B4, B5.
+  - **Campagnes retirée de la v2** (Théo : « elle sert à rien ») : `computeNav` ne la propose plus en v2 (`ui2`), Dock, matrice
+    des droits ; Dashboard v2 sans « Campagnes programmées » ni « Performance des campagnes » ; widget masqué, choix retiré de
+    l'Indicateur. Aucune donnée touchée ; l'ancienne interface la garde jusqu'à la bascule.
+  - **Dépenses, filtre Site** : par la ventilation (`shareForSite` / `siteSharesOf`, constants.ts) — une dépense
+    « Clermont, Vichy » sort sous Clermont et le Total période ne compte QUE sa part (option a). Mesuré : sous Clermont,
+    305 → 496 dépenses (191 multi-sites étaient invisibles).
+  - **Matériel** (serveur) : lecture `MATERIAL_READ_ROLES`, réservation `BOOKING_ROLES` (auth/roles.ts ; Guest en lecture
+    seule, `canBook` aligné) ; baisser le stock sous le pic des réservations à venir → 409 (même calcul que la réservation).
+  - **Digital, renommer un tag** : `POST /api/tags/rename` (transaction : catalogue + publications `networks` / `co2s` + `co2`
+    hérité / `lom`) ; message « N publications mises à jour ».
+  - **Chat** (serveur) : aperçu recalculé quand on supprime le DERNIER message (fonction unique `apercuDe`) ; modification
+    refusée hors message texte ; **suppression d'un groupe** par un administrateur (`chat:conversation:delete`, jamais le
+    Général ni un privé ; messages en cascade, fichiers `/uploads/chat` effacés du disque), entrée « Supprimer le groupe… ».
+  - **Jeux** (remontée de Théo) : la pastille compte aussi les parties où c'est À MOI de jouer (et une flotte à placer) —
+    avant, seulement les défis reçus ; bannière à l'arrivée d'un défi et quand c'est mon tour (sauf fenêtre Jeux au 1er plan).
+  - **Sites** : `SITES_HORS_PLAQUE` (Montluçon, Saint-Etienne) ajoutés aux filtres Dépenses, Budget, Planning (+ Yssingeaux),
+    Matériel, To-do (« Hors plaque » plus couplé à `entities` dans `GX.ui.sitePicker`). Dashboard « Prochaines échéances » par
+    la ventilation (multi-sites et GROUPE BONY ne disparaissent plus). Matériel : réservation GROUPE BONY visible partout.
+  - **Projets** : restauration avec confirmation + `restoreProject` (journal « a restauré le projet ») ; curseur Nissan masqué
+    quand Alpine l'emporte. **Graphiques** : plus de barre de hauteur négative. **Widgets** : un widget qui dépasse la grille
+    d'un écran plus étroit est replacé (disposition enregistrée).
+  - Vérifié en base : les 5 enveloppes Alpine-* / Nissan existent (fiche close). Glisser et dupliquer une publication : déjà
+    présents dans la v2 (fiches closes).
+  - Testé sur localhost (compte de Théo, hotspot), données de TEST créées puis SUPPRIMÉES : groupe de chat (modif image
+    refusée, aperçu « premier message test » après suppression, Général non supprimable, groupe effacé), tag Loi LOM + réseau
+    renommés sur une publication de test (1 mise à jour chacun, tags revenus à 4 / 8), matériel de test (baisse à 1 refusée,
+    à 2 acceptée), projet de test restauré (confirmation, Archivé → Actif). Pastille Jeux = 1 (Puissance 4 contre Alexis, mon
+    tour). ⚠️ Journal de la restauration NON vérifiable avec le compte Master (exclu du journal par conception).
+
 - **Correctif 78 — 09/10 : v2, bureau enregistré sur le serveur (lot W3 de la refonte des widgets)** (branche
   `feat/v2-widgets-serveur`, **`api` ET `web`**, migration additive `20261009120000_user_widgets` — table `UserWidgets` —
   appliquée et inscrite AVANT le push). La disposition des widgets suit l'utilisateur sur tous ses postes.
@@ -840,7 +871,8 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 78** (9 octobre 2026) — bureau v2 enregistré sur le serveur. **`api` ET `web`**,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 79** (9 octobre 2026) — petites corrections, **`api` ET `web`**, aucune migration.
+  Avant lui le **correctif 78** (9 octobre 2026) — bureau v2 enregistré sur le serveur. **`api` ET `web`**,
   migration additive `20261009120000_user_widgets` (table `UserWidgets`), appliquée et inscrite AVANT le push. Avant lui le
   **correctif 77** (9 octobre 2026) — refonte des widgets v2 (W0–W2), **`web` seul**, aucune
   migration. Avant lui le **correctif 76** (9 octobre 2026) — bulles de discussion v2, **`web` seul**, aucune migration.

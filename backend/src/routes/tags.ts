@@ -103,4 +103,42 @@ router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) =>
   res.json(tags);
 });
 
+// POST /api/tags/rename { category, from, to } — renomme un tag ET le reporte sur toutes les publications qui le portent
+// (09/10/2026, décision de Théo). Avant : seul le catalogue changeait, les publications gardaient l'ancien nom et
+// sortaient de leur filtre (tag fantôme). Une seule transaction : catalogue et publications bougent ensemble.
+router.post('/rename', authenticateToken, requireRole(EDIT_ROLES), async (req, res) => {
+  const { category, from, to } = req.body ?? {};
+  if (!(CATEGORIES as readonly string[]).includes(category)) return res.status(400).json({ error: 'Catégorie de tag inconnue.' });
+  const ancien = typeof from === 'string' ? from.trim() : '';
+  const nouveau = nettoyerListe([to])[0] || '';
+  if (!ancien || !nouveau) return res.status(400).json({ error: 'Ancien et nouveau nom requis.' });
+  if (ancien === nouveau) return res.status(400).json({ error: 'Le nom n’a pas changé.' });
+
+  const premier = await prisma.digitalTags.findFirst();
+  const liste: string[] = (premier as any)?.[category] || [];
+  if (!liste.includes(ancien)) return res.status(404).json({ error: 'Ce tag n’existe plus (renommé ou supprimé depuis un autre poste ?).' });
+  if (liste.includes(nouveau)) return res.status(409).json({ error: 'Ce tag existe déjà.' });
+
+  // Publications concernées : `networks` et `co2s` (listes), `lom` (texte), et l'ancien champ `co2` (une classe).
+  const ou = category === 'networks' ? { networks: { has: ancien } }
+    : category === 'co2' ? { OR: [{ co2s: { has: ancien } }, { co2: ancien }] }
+    : { lom: ancien };
+  const posts = await prisma.socialPost.findMany({ where: ou as any });
+  const remplace = (l: string[]) => [...new Set(l.map((x) => (x === ancien ? nouveau : x)))];
+
+  const [tags, ...maj] = await prisma.$transaction([
+    prisma.digitalTags.update({ where: { id: premier!.id }, data: { [category]: liste.map((x) => (x === ancien ? nouveau : x)) } }),
+    ...posts.map((p) => prisma.socialPost.update({
+      where: { id: p.id },
+      data: category === 'networks' ? { networks: remplace(p.networks) }
+        : category === 'co2' ? { co2s: remplace(p.co2s || []), ...(p.co2 === ancien ? { co2: nouveau } : {}) }
+        : { lom: nouveau },
+    })),
+  ]);
+  emitEvent('tags:updated', tags);
+  for (const p of maj) emitEvent('social:updated', p);
+  console.log(`[tags] « ${ancien} » → « ${nouveau} » (${category}) : ${maj.length} publication(s) mises à jour`);
+  res.json({ tags, posts: maj.length });
+});
+
 export default router;
