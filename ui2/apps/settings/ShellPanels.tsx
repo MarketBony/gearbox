@@ -132,7 +132,12 @@ export function NotifsPanel({ s, onPush }: { s: SectionDef; onPush: () => void }
           <Switch on={!!p.dnd} label="Ne pas déranger" onChange={(v) => { setPref('dnd', v); hud(v ? 'Ne pas déranger activé' : 'Ne pas déranger désactivé'); }} />
         </Row>
       </div>
-      <div className="set-group enter" style={css({ '--i': 1 })}><Row t="Notifications de cet appareil" d={`Messages du Chat reçus même Gearbox fermé · ${pushTxt}`} cls="stk"><button className="btn sm" onClick={onPush}><Icon name="chevright" size="sm" />Régler</button></Row></div>
+      <div className="set-group enter" style={css({ '--i': 1 })} data-anchor="bulles">
+        <Row t="Bulles de discussion" d="Un message reçu apparaît dans une bulle flottante, par-dessus les fenêtres (ordinateur)" ico={<span className="set-ico" style={css({ '--c': 'var(--ok)' })}><Icon name="chat" /></span>}>
+          <Switch on={p.bubbles !== false} label="Bulles de discussion" onChange={(v) => { setPref('bubbles', v); hud(v ? 'Bulles de discussion activées' : 'Bulles de discussion désactivées'); }} />
+        </Row>
+      </div>
+      <div className="set-group enter" style={css({ '--i': 2 })}><Row t="Notifications de cet appareil" d={`Messages du Chat reçus même Gearbox fermé · ${pushTxt}`} cls="stk"><button className="btn sm" onClick={onPush}><Icon name="chevright" size="sm" />Régler</button></Row></div>
       <div className="set-foot"><button className="btn" onClick={test}><Icon name="bell" size="sm" />Envoyer une notification de test</button></div>
     </div>
   );

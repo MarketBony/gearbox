@@ -1,0 +1,37 @@
+/* =====================================================================
+   Bulles de discussion (09/10/2026) — injectée par OsHost.tsx dans la racine fantôme.
+   Bord : un liseré très fin et une ombre douce (Théo : pas de gros bord blanc). Pas de flou d'arrière-plan
+   sur les bulles (coût GPU) ; le volet garde la matière des fenêtres.
+   ===================================================================== */
+.gxb-layer { position: fixed; inset: 0; z-index: 8800; pointer-events: none; }
+
+.gxb { position: absolute; left: 0; top: 0; width: var(--bs); height: var(--bs); border-radius: 50%; pointer-events: auto; cursor: grab; touch-action: none;
+  will-change: transform; outline: none; box-shadow: 0 10px 24px -8px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.28); transition: box-shadow 200ms, opacity 200ms; }
+.gxb::after { content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.22); }
+.gxb.drag { cursor: grabbing; box-shadow: 0 20px 36px -12px rgba(0,0,0,.6), 0 4px 10px rgba(0,0,0,.25); }
+.gxb.dim { opacity: .82; }
+.gxb:focus-visible::after { box-shadow: inset 0 0 0 2px var(--accent); }
+.gxb-av { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; display: grid; pointer-events: none; }
+.gxb-av > .av, .gxb-av > .cht-gav, .gxb-av > .cht-duo { --s: var(--bs); width: 100% !important; height: 100% !important; border-radius: 50%; font-size: calc(var(--bs) * .36); box-shadow: none; }
+.gxb-av .pres { display: none; }
+.gxb-cnt { position: absolute; top: -3px; right: -3px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 99px; background: var(--danger); color: #fff;
+  font-size: 10.5px; font-weight: 700; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,.35); pointer-events: none;
+  animation: gxb-pop 260ms cubic-bezier(.2,.9,.3,1) both; }
+@keyframes gxb-pop { from { transform: scale(0); } }
+
+/* Cible de fermeture : apparaît en bas pendant un glisser */
+.gxb-x { position: absolute; left: 50%; bottom: calc(var(--dock-icon, 50px) + 60px); width: 60px; height: 60px; margin-left: -30px; border-radius: 50%; display: grid; place-items: center;
+  color: #fff; font-size: 22px; background: rgba(20,18,28,.72); box-shadow: inset 0 0 0 1px rgba(255,255,255,.35), 0 8px 24px -8px rgba(0,0,0,.6);
+  opacity: 0; transform: translateY(24px); transition: opacity 180ms, transform 260ms cubic-bezier(.2,.8,.2,1), background 180ms, scale 180ms; pointer-events: none; }
+.gxb-x.on { opacity: 1; transform: none; }
+.gxb-x.hot { scale: 1.22; background: rgba(239,68,68,.88); }
+
+/* Volet : la conversation complète (Conversation.tsx), à la matière des fenêtres */
+.gxb-panel { position: absolute; pointer-events: auto; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column;
+  background: var(--surface-1); box-shadow: 0 28px 70px -24px rgba(0,0,0,.7), 0 0 0 .5px var(--glass-edge, rgba(255,255,255,.12));
+  transform-origin: 100% 0; animation: gxb-in 280ms cubic-bezier(.2,.8,.2,1) both; }
+.gxb-panel.l { transform-origin: 0 0; }
+.gxb-panel > .app { flex: 1; min-height: 0; }
+@keyframes gxb-in { from { opacity: 0; transform: translateY(-8px) scale(.94); } }
+:host([data-effects="eco"]) .gxb-panel, :host([data-effects="eco"]) .gxb-cnt { animation: none; }
+@media (prefers-reduced-motion: reduce) { .gxb-panel, .gxb-cnt { animation: none; } }

@@ -6,6 +6,8 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   compteur à des rubriques qui ne le fournissaient pas ; la présence arrivait mais n'était dessinée nulle part. Correctif 73.
 - [x] **Couleurs d'avatar à 5 chiffres en base** (fond transparent dans la v2) : cause corrigée au correctif 73
   (`pages/Settings.tsx` sans `padStart`) ; Zakaria, Morgane Barthe et Ali Abou El Jinane réparés en base le 08/10 (zéro de tête).
+- [x] **Widget « Chat interactif » : envoi hors boîte d'envoi** (`GX.chatFeed.send` en `emitWithAck` direct, message
+  perdable en silence comme avant le correctif 72). Trouvé en préparant les bulles, corrigé au correctif 76.
 - [x] **v2 : fonds d'écran gourmands** (PC qui chauffent, audit perf du 23/09 gelé jusqu'à la refonte) : fond animé WebGL
   sous du verre dépoli, actif tant que l'écran n'était pas couvert à 92 %. Correctif 75 : fonds fixes par défaut, animés en
   option et en pause dès qu'une fenêtre est ouverte. ⚠️ Non mesuré sur les PC concernés (accès à demander à Théo).

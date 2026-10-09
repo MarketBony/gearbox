@@ -18,6 +18,8 @@
   passées en clair dans le chat de la session du 08/10 : à régénérer un jour (remplacer dans `backend/.env` ET le `.env`
   du VPS, puis `up -d api`). Poignée de débogage `el.__buddy` dans `mascot.ts` (inoffensive, sert aux tests). Branches
   locales `feat/assistant-p0` et `fix/chat-envoi-fiable` mergées : supprimables.
+- **Prochain chantier : refonte des widgets** (plan `maquettes/ux/PLAN-WIDGETS.md`, 5 décisions D1–D5 attendues de
+  Théo), puis le **lot sécurité serveur AVANT la bascule** (prévue vers le 16/10).
 - **Lot B (fonds d'écran v2) : LIVRÉ, correctif 75.** À vérifier sur les PC qui chauffaient (gestionnaire de tâches de
   Chrome) ; versions claires des fonds possibles plus tard si elles manquent (option b écartée pour l'instant).
 - **Ensuite, dans l'ordre** : corrections issues des retours ci-dessus ; puis **mIAouss P2** (rédaction guidée : posts
@@ -26,7 +28,8 @@
 - **À savoir pour la session suivante** : Bony ne paiera JAMAIS un service d'IA (aucune option payante à proposer). Le
   garde-fou de la session a bloqué une fois `git push` et le SSH malgré l'accord de Théo ; Théo a élargi les
   permissions (`.claude/settings.local.json`, non commité) et redonné son accord : ça passe désormais.
-- **En production : correctif 75 (08/10)** — v2 : nouveaux fonds d'écran (fixes par défaut, Ruban ; 3 animés en option,
+- **En production : correctif 76 (09/10)** — v2 : **bulles de discussion** façon Messenger sur ordinateur (`web` seul). Test
+  grandeur nature à faire avec l'équipe. Avant lui le **correctif 75 (08/10)** — v2 : nouveaux fonds d'écran (fixes par défaut, Ruban ; 3 animés en option,
   en pause dès qu'une fenêtre est ouverte), `web` seul. Avant lui le **correctif 74 (08/10)** — v2 : plus de « ? » à la place des avatars de présence (`web` seul). Avant lui le
   **correctif 73 (08/10)** — **v2 : présence (mini-avatars sur le Dock / la pilule / la grille) et compteurs
   de non-lus sur le Dock du bureau** (`web` seul, aucune migration). Avant lui le **correctif 72 (08/10)** — **Chat : envoi fiable** (boîte d'envoi, renvoi automatique, photos réduites,
@@ -576,6 +579,28 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 76 — 09/10 : v2, bulles de discussion façon Messenger (ordinateur)** (branche `feat/v2-bulles`, **`web`
+  seul**, aucune migration). Demande de Théo ; plan `maquettes/ux/PLAN-BULLES.md`, sensation réglée sur la planche
+  `maquettes/ux/bulles.html` (préréglage « Apple » retenu).
+  - **Décisions de Théo** : apparition AUTOMATIQUE à chaque message reçu (réglage Réglages › Notifications › « Bulles de
+    discussion », activé par défaut) ; ORDINATEUR seulement ; volet IDENTIQUE au Chat (GIF, vocal, projets, photos,
+    réactions…) ; liseré fin au lieu du bord blanc de la planche.
+  - **Conversation extraite** de `ui2/apps/chat/ChatApp.tsx` vers `ui2/apps/chat/Conversation.tsx` (fil, saisie, volets,
+    « Vu par ») : la rubrique Chat et les bulles affichent le MÊME composant (`key={convId}`). ChatApp garde la liste, la
+    sélection, la création. Brouillons partagés entre les deux (mémoire de la page).
+  - **Bulles** : `ui2/apps/chat/bubbles/` — `physics.ts` (ressort réponse 0,5 s / amortissement 0,82, vitesse réelle du
+    geste au lâcher, projection décélération 0,99, cible ✕ aimantée, pile en chaîne, ligne quand le volet est ouvert ;
+    boucle qui S'ENDORT au repos), `BubbleLayer.tsx` (monté par `OsHost.tsx` comme la mascotte), `bubbles.css`. Pas de
+    bulle pour un message à soi, une conversation en sourdine, ni quand la fenêtre Chat est au premier plan. Position et
+    bulles ouvertes : préférence du navigateur (`GX.store` « bubbles »). Volets modaux posés dans le volet de la bulle
+    (adaptateur `win.sheet` → `GX.ui.sheet`).
+  - **Défaut corrigé au passage** : `GX.chatFeed.send` (widget « Chat interactif ») émettait en direct (`emitWithAck`),
+    hors boîte d'envoi — le chemin fermé par le correctif 72. Rebranché sur `services/chatOutbox.ts`.
+  - Testé sur localhost (compte de Théo, hotspot) avec des messages SIMULÉS côté navigateur (rien en base, personne
+    notifié) : apparition, pile, volet (Général, Romane), bascule entre bulles, Échap, cible ✕, réglage on/off, rubrique Chat
+    non régressée (liste, fils, saisie, changement de conversation). ⚠️ Non testés : un VRAI envoi depuis une bulle et la
+    pastille de non-lus (compteur serveur) — test grandeur nature prévu par Théo en prod.
+
 - **Correctif 75 — 08/10 : v2, nouveaux fonds d'écran (lot B)** (branche `feat/v2-fonds-ecran`, **`web` seul**, aucune
   migration). Demande de Théo : fonds « qui bouffent de la ressource comme jamais » et « globalement très moches ».
   - **Cause du coût** : fonds animés WebGL plein écran à 30 i/s, en pause seulement si une fenêtre était agrandie ou si les
@@ -774,7 +799,8 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 75** (8 octobre 2026) — nouveaux fonds d'écran v2, **`web` seul**, aucune
+- master = prod, synchronisés. Dernier lot déployé : **correctif 76** (9 octobre 2026) — bulles de discussion v2, **`web` seul**, aucune migration.
+  Avant lui le **correctif 75** (8 octobre 2026) — nouveaux fonds d'écran v2, **`web` seul**, aucune
   migration. Avant lui le **correctif 74** (8 octobre 2026) — « ? » à la place des avatars de présence, **`web` seul**,
   aucune migration. Avant lui le **correctif 73** (8 octobre 2026) — v2 : présence et compteurs sur les
   icônes. **`web` seul**, aucune migration. Avant lui le **correctif 72** (8 octobre 2026) — Chat, envoi fiable. **`api` ET `web`**,
@@ -4389,6 +4415,11 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Chat v2 : la conversation vit dans `ui2/apps/chat/Conversation.tsx`**, partagée par la rubrique Chat ET les bulles
+  (`ui2/apps/chat/bubbles/`). Une retouche du fil ou de la saisie se fait là, une seule fois. Et toute page hors fenêtre
+  qui veut des volets modaux passe un adaptateur `{ sheet: (html, o) => GX.ui.sheet(hôte, html, o) }` à `useSheets`.
+- **`React.FC` obligatoire pour un composant qui reçoit `key`** : avec la config TS du projet, `key` est refusé sur une
+  simple `function Composant(props)` (« Property 'key' does not exist »).
 - **Fonds d'écran v2 : un fond FIXE (`still: true`) ne passe JAMAIS par la boucle d'animation** — rendu une fois par
   `stillDraw` (`engine/wallpapers.ts`), posé en `background` du `#wp`. Pour un nouveau fond : le dessiner d'abord sur la
   planche `maquettes/ux/fonds-fixes.html` (même GLSL), puis recopier. Et `GX.css` étant vide, ses teintes vont dans

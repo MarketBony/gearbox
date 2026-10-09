@@ -44,7 +44,7 @@ const ITEMS: [string, string, string][] = [
   ['Barre du haut escamotable', 'bureau', 'dock'], ['Notifications de cet appareil (push)', 'application', 'push'], ['Espace détente (Jeux)', 'application', 'modules'], ['Nouvelle interface (bêta)', 'application', 'beta'], ['Ménage automatique des fichiers', 'stockage', 'menage'],
   ['Thème clair ou sombre', 'apparence', 'theme'], ['Matière (Pixel, Liquid Glass, Opaque)', 'apparence', 'matiere'], ['Style d’icônes', 'apparence', 'icones'], ['Effets économes (flou, transparence)', 'apparence', 'effets'], ['Fond d’écran', 'apparence', 'wallpaper'], ['Widgets du bureau', 'apparence', 'widgets'],
   ['Taille du Dock', 'bureau', 'dock'], ['Agrandissement du Dock', 'bureau', 'dock'], ['Masquer automatiquement le Dock', 'bureau', 'dock'], ['Dock intelligent', 'bureau', 'dock'], ['Personnaliser les widgets du bureau', 'bureau', 'wdg'], ['Réinitialiser les widgets', 'bureau', 'wdg'], ['Réinitialiser la session des fenêtres', 'bureau', 'session'], ['Balayage à deux doigts entre les fenêtres', 'bureau', 'session'],
-  ['Ne pas déranger', 'notifs', 'notifs'], ['Notification de test', 'notifs', 'notifs'],
+  ['Ne pas déranger', 'notifs', 'notifs'], ['Bulles de discussion', 'notifs', 'bulles'], ['Notification de test', 'notifs', 'notifs'],
   ['Installer l’application', 'application', 'install'],
   ['Compte Google (Forms)', 'comptes', 'google'], ['Connecter Google', 'comptes', 'google'],
   ['Ma consommation mIAouss', 'miaouss', 'conso'], ['Capacité de l’équipe (questions restantes)', 'miaouss', 'capacite'], ['Mémoire de mIAouss', 'miaouss', 'memoire-notes'], ['Mémoire en pause', 'miaouss', 'memoire-pause'], ['Consommation de l’équipe (plafonds)', 'miaouss', 'equipe'],
