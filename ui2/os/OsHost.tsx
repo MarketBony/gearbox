@@ -11,6 +11,8 @@ import DataHub from './DataHub';
 import MascotLayer from '../apps/assistant/MascotLayer';
 import BubbleLayer from '../apps/chat/bubbles/BubbleLayer';
 import bubblesCss from '../apps/chat/bubbles/bubbles.css?inline';
+import ReactWidgets from '../apps/widgets/ReactWidgets';
+import widgetsCss from '../apps/widgets/widgets.css?inline';
 import { bridgeStore, useLegacyIds, usePortedMounts, tabOf } from './bridge';
 import { PORTED_APPS } from '../apps/registry';
 import { useAuth } from '../../contexts/AuthContext';
@@ -126,7 +128,7 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
       Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '0' });
       const shadow = host.attachShadow({ mode: 'open' });
       const style = document.createElement('style');
-      style.textContent = `${css}\n${overridesCss}\n${postitCss}\n${formsCss}\n${assistantCss}\n${bubblesCss}`;
+      style.textContent = `${css}\n${overridesCss}\n${postitCss}\n${formsCss}\n${assistantCss}\n${bubblesCss}\n${widgetsCss}`;
       const body = document.createElement('div');
       body.className = 'gx-body';
       shadow.append(style, body);
@@ -149,6 +151,7 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
       {booted && <Hub />}
       {booted && <MascotLayer />}
       {booted && <BubbleLayer />}
+      {booted && <ReactWidgets />}
       {booted && ported.map(m => { const App = PORTED_APPS[m.appId]; return App ? createPortal(<DeferredApp App={App} win={m.win} inst={m.inst} />, m.host, m.key) : null; })}
       {booted && legacy.map(id => createPortal(
         <div key={id} slot={`app-${id}`} className="gx2-legacy text-bony-text font-sans" style={{ height: '100%', overflow: 'hidden' }}>

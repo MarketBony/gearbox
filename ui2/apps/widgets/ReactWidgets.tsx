@@ -1,0 +1,81 @@
+import React, { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
+import type { TaskStatus } from '../../../types';
+import { canEditProjects } from '../../../constants';
+import { useAuth } from '../../../contexts/AuthContext';
+import { db } from '../../../services/dataService';
+import { GAME_LABELS } from '../../../components/games/gameTypes';
+import { useWorkspace, workspace, mutateTask, updateStandalone } from '../../store/workspace';
+import { gx, hud } from '../ui/kit';
+import { buildItems, urgency } from '../todo/board';
+import TodoWidget from './TodoWidget';
+import MyDayWidget from './MyDayWidget';
+import FormsWidget from './FormsWidget';
+
+// =====================================================================
+// Widgets du bureau EN REACT (09/10/2026, refonte des widgets) — le moteur (engine/widgets.ts) pose un hôte
+// persistant par widget (`GX.widgets.react`) ; ce calque y rend le composant par portail. Monté par OsHost.tsx.
+//
+// Fournit aussi au moteur les PORTES dont ses widgets HTML ont besoin, sans recopier aucune règle :
+//  - `GX.todo` : mes tâches (règles de la To-do, ui2/apps/todo/board.ts), urgence, et « Terminer » (routes normales :
+//    file de sauvegarde du projet, ou /api/tasks pour une tâche libre), avec annulation ;
+//  - `GX.games` : accepter / refuser un défi (mêmes appels que la rubrique Jeux).
+// =====================================================================
+
+const EMPTY: { wid: string; host: HTMLElement; kind: string }[] = [];
+
+export default React.memo(function ReactWidgets() {
+  const { user } = useAuth();
+  const uid = user?.id || '', role = user?.role || '';
+  const G = gx();
+  const list = useSyncExternalStore(G?.widgets?.react?.subscribe || (() => () => {}), G?.widgets?.react?.snapshot || (() => EMPTY));
+
+  // --- porte GX.todo (lue par « Mes tâches », « Prochaines échéances », l'Indicateur)
+  const projects = useWorkspace((s) => s.projects), standalone = useWorkspace((s) => s.standalone);
+  const items = useMemo(() => buildItems(projects, standalone, uid), [projects, standalone, uid]);
+  useEffect(() => {
+    if (!G) return;
+    const canEdit = () => canEditProjects(role) && !G.ctx?.readOnly;
+    const setStatus = (id: string, st: TaskStatus) => {
+      const it = buildItems(workspace.getState().projects, workspace.getState().standalone, uid).find((x) => x.id === id);
+      if (!it || !canEdit()) return Promise.resolve(false);
+      if (it.p) { mutateTask(it.p.id, it.t.id, { status: st }); return Promise.resolve(true); }
+      return updateStandalone(it.t.id, { status: st }).then(() => true).catch(() => { hud('Échec de la sauvegarde (serveur injoignable ?).'); return false; });
+    };
+    G.todo = {
+      items: () => buildItems(workspace.getState().projects, workspace.getState().standalone, uid),
+      urgency,
+      canEdit,
+      complete(id: string) {
+        const it = buildItems(workspace.getState().projects, workspace.getState().standalone, uid).find((x) => x.id === id); if (!it) return;
+        const before = it.t.status;
+        setStatus(id, 'Done').then((ok) => {
+          if (!ok) return;
+          // Annulation : un clic sur la notification remet l'ancien statut.
+          G.shell?.notify?.({ app: 'todo', title: 'Tâche terminée', body: `« ${it.t.name} » — cliquer pour annuler`, onClick: () => setStatus(id, before).then((b) => b && hud('Tâche rétablie')) });
+        });
+      },
+    };
+    return () => { if (G.todo) G.todo = null; };
+  }, [G, uid, role]);
+  // Les widgets HTML suivent les tâches (projets ET tâches libres) : un événement par changement.
+  useEffect(() => { G?.emit?.('data:tasks'); }, [items, G]);
+
+  // --- porte GX.games
+  useEffect(() => {
+    if (!G) return;
+    G.games = {
+      label: (g: string) => (GAME_LABELS as Record<string, string>)[g] || g,
+      // La rubrique Jeux s'ouvre d'abord : c'est elle qui lance la partie à `game:session:started`.
+      accept(id: string) { G.wm?.open?.('games'); setTimeout(() => { db.acceptGameChallenge(id).catch(() => hud('Échec de l’acceptation du défi.')); }, 650); },
+      refuse(id: string) { db.refuseGameChallenge(id).then(() => hud('Défi refusé')).catch(() => hud('Échec du refus du défi.')); },
+    };
+    G.reactWidgets = true; G.widgets?.render?.();
+    return () => { G.games = null; G.reactWidgets = false; };
+  }, [G]);
+
+  if (!G) return null;
+  return <>{list.map(({ wid, host, kind }) => createPortal(
+    kind === 'todo' ? <TodoWidget /> : kind === 'myday' ? <MyDayWidget /> : kind === 'forms' ? <FormsWidget /> : null,
+    host, wid))}</>;
+});

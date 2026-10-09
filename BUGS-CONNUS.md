@@ -24,7 +24,7 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [x] **mIAouss inventait des données quand il répondait sans outil** (« Céline B., Marc D. » absents, 08/10). Verrou serveur
   `DATA_INTENT` + prompt durci, correctif 71. Même lot : comptage faux (« 4 actifs » suivis de 5) → sous-totaux calculés par
   l'outil ; « plaque centre » incomprise → plaques résolues par l'outil et organisation envoyée au modèle.
-- [ ] **À vérifier (08/10) : le widget « Absents » du bureau v2 affichait « 0 cette semaine »** alors qu'un CP de Bastien
+- [x] **Corrigé (09/10, correctif 77) — le widget « Absents » du bureau v2 affichait « 0 cette semaine »** : il comptait d'aujourd'hui à J+6, pas la semaine. Fiche d'origine : alors qu'un CP de Bastien
   Fuziol existe le lundi 05/10 (mIAouss et l'API le donnent). Peut-être voulu (le widget ne compte qu'à partir
   d'aujourd'hui ?) : non diagnostiqué, revérifier dans `engine/widgets.ts` avant d'y toucher.
 

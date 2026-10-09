@@ -43,47 +43,38 @@ données posées par `ui2/os/DataHub.tsx` (`GX.data`). Les montants passent par 
 
 ---
 
-## 2. Proposition, en trois lots
+## 2. Plan RÉVISÉ le 09/10/2026 après les décisions de Théo
+Décisions : **D1** brancher Musique et Actu auto sur les sources de Hello Marketing · **D3** bureau enregistré sur le
+serveur, dans ce chantier · **D4** « Ma journée » et « Forms » oui · **D5** Horloge gardée.
+**Nouvelles demandes** : un widget **réplique de la To-do, très grand et ajustable**, et **plus de formats pour TOUS les widgets**.
 
-### Lot W1 — Réparer et enrichir le contenu (`web` seul, aucune migration)
-1. **Absents** : vraie semaine du lundi au dimanche, avec le motif et les dates, et l'avatar barré pour ceux qui
-   sont déjà revenus.
-2. **Mes tâches** : tâches de projets **et** tâches autonomes de la To-do, triées par échéance, avec le retard en
-   rouge. Prévu pour accepter plusieurs assignés (lot suivant du §3) sans réécriture.
-3. **Prochaines échéances** : projets **et** tâches à échéance (option du widget : « projets », « tâches » ou « les deux »).
-4. **Agenda de la semaine** : bande de 7 jours avec projets, publications et absents (pastilles par type).
-5. **Météo, Anniversaires** : état « chargement » ou « aucune date » au lieu d'un widget vide.
-6. **Campagnes** : moyennes calculées sur les seuls taux renseignés.
-7. **Matériel** : tri par disponibilité, l'épuisé en premier en rouge, option « seulement ce qui est réservé aujourd'hui ».
-8. **Musique du jour et Actu auto** : branchées sur `ui2/apps/hello/sources.ts`, la même porte que Hello Marketing
-   (une seule source, pas de copie). Sinon retirées de la galerie (décision D1).
-9. **Indicateur** : nouveaux choix (publications de la semaine, tâches en retard, réponses Forms du jour, absents
-   aujourd'hui).
-10. **Garde générale** : un widget qui plante affiche « Indisponible » au lieu d'un cadre vide, et l'erreur part en
-    console. Aujourd'hui elle est avalée en silence.
+### Lot W0 — Fondations (`web`)
+1. **Formats libres.** Aujourd'hui chaque widget a une courte liste de tailles nommées (S, M, L…), et la poignée de
+   redimensionnement saute de l'une à l'autre. Demain : n'importe quelle taille **en cases** entre un minimum et un
+   maximum propres au widget (par exemple de 2×2 à 10×8), la poignée s'aimante case par case. Les anciennes tailles
+   nommées restent lues (les bureaux existants ne bougent pas). Chaque widget adapte son contenu à sa taille réelle
+   (plus de lignes, plus de colonnes, plus de détails), au lieu de cas écrits taille par taille.
+2. **Widgets en React** : un widget peut héberger un composant React par portail (comme les rubriques). C'est ce qui
+   permet un widget To-do qui est **la même chose** que la rubrique, pas une copie dessinée à part.
 
-### Lot W2 — Agir depuis le widget (`web`, routes d'écriture EXISTANTES, aucune migration)
-1. **Mes tâches : vraie case à cocher.** Elle passe la tâche à « Terminé » par la route normale (`TASK_FIELDS` pour
-   une tâche de projet, la route des tâches autonomes sinon), avec une annulation possible 5 s (« Annuler »).
-   Masquée pour un rôle en lecture seule.
-2. **Ouvrir au bon endroit** : une publication s'ouvre sur elle-même dans le Digital, un absent sur la bonne semaine
-   des Congés, un objet de matériel sur sa fiche (réservation pré-remplie si le rôle le permet), une tâche sur son
-   projet, onglet des tâches.
-3. **Défis en attente** : accepter ou refuser depuis le widget (mêmes appels que la rubrique Jeux).
-4. **Nouveau widget « Ma journée »** : post-it du jour, tâches dues aujourd'hui, publications du jour, réunions. On peut
-   cocher et ajouter un post-it en une ligne (route `/api/postits` existante, `POSTIT_FIELDS`).
-5. **Nouveau widget « Forms »** : réponses reçues (aujourd'hui / 7 jours) par formulaire, clic pour ouvrir les réponses.
-   Sous réserve du rôle (Forms est réservé à l'équipe marketing).
-6. **Note rapide** : décision D2.
+### Lot W1 — Réparer et enrichir (`web`)
+Comme prévu au § 1 : Absents (vraie semaine), Mes tâches (projets + tâches libres), échéances avec les tâches, agenda
+de la semaine enrichi, Météo et Anniversaires robustes, Campagnes (taux vides), Matériel trié, Indicateur enrichi,
+**Musique du jour et Actu auto branchées** sur `ui2/apps/hello/sources.ts`, « Indisponible » au lieu d'un cadre vide.
 
-### Lot W3 — Bureau retrouvé sur tous les postes (`api` + `web`, **migration additive**)
-- Disposition des widgets (bureau et téléphone) et réglages par widget enregistrés **sur le serveur, par
-  utilisateur** : colonne JSON sur `User` ou petite table. Une route avec liste blanche, à ajouter **dans le même
-  lot**, sinon le piège de la valeur jetée en silence.
-- Reprise : au premier chargement, la disposition locale existante est envoyée au serveur. Personne ne perd son bureau.
-- Hotspot 4G obligatoire (migration Supabase). Décision D3.
+### Lot W2 — Agir depuis le bureau + nouveaux widgets (`web`)
+1. **Widget To-do (très grand, ajustable)** : le tableau de la rubrique, extrait en composant commun (même principe que
+   la conversation du Chat pour les bulles). Colonnes À faire / En cours / Programmé / Terminé, cartes avec urgence,
+   déplacement entre colonnes, ouverture de la tâche ou du projet, filtres essentiels. De 6×4 à toute la largeur ;
+   petit, il passe en liste.
+2. **Ma journée** : post-it du jour, tâches dues aujourd'hui, publications du jour ; ajout d'un post-it en une ligne.
+3. **Forms** : réponses reçues (aujourd'hui / 7 jours) par formulaire, clic vers les réponses (équipe marketing).
+4. Vraie case à cocher dans « Mes tâches » (avec annulation 5 s), clics qui ouvrent au bon endroit, défis
+   acceptés / refusés depuis le widget.
 
----
+### Lot W3 — Bureau retrouvé sur tous les postes (`api` + `web`, migration additive, hotspot)
+Disposition et réglages des widgets enregistrés sur le serveur par utilisateur, route à liste blanche dans le même
+lot, reprise automatique de la disposition locale au premier chargement.
 
 ## 3. Règles à tenir (vérifiées widget par widget)
 - **Brouillons** : exclus partout, sauf la To-do et les événements de Hello Marketing (règle de `CLAUDE.md`).
@@ -106,8 +97,8 @@ données posées par `ui2/os/DataHub.tsx` (`GX.data`). Les montants passent par 
 ## 5. Décisions attendues de Théo
 - **D1 — Musique du jour et Actu auto** : les brancher sur les sources de Hello Marketing (recommandé, ce sont les
   mêmes services), ou les retirer ?
-- **D2 — Note rapide** : la garder locale au navigateur, ou en faire un **post-it** (enregistré sur le serveur,
-  retrouvé partout, visible dans la To-do) ? Recommandé : post-it.
+- **D2 — Note rapide** (widget de la galerie : un bloc de texte libre posé sur le bureau, enregistré dans le
+  navigateur) : en faire un post-it, ou la retirer au profit de « Ma journée » ? En attente.
 - **D3 — Lot W3** (bureau enregistré sur le serveur, avec migration) : on le fait maintenant, ou plus tard ?
 - **D4 — Nouveaux widgets** : « Ma journée » et « Forms », d'accord ? D'autres idées ?
 - **D5 — Horloge** : la garder ? Elle fait doublon avec l'heure de la barre du haut.

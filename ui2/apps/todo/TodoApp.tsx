@@ -6,6 +6,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useWorkspace, mutateTask, updateStandalone, createStandalone, deleteStandalone } from '../../store/workspace';
 import { gx, hud, Icon, Chips, Seg, PickerBtn, ServiceBadge, BrandChips, useSheets, useEngineStore, useEngineEvent } from '../ui/kit';
 import PostItBoard from './PostItBoard';
+import { type ColKey, COLS, FILTER_SERVICES, FORM_SERVICES, brandLabel, type Item, type Filters, F0, sitesOf, buildItems, inGlobal, urgency, matches, sortIt, siteLbl } from './board';
 
 // =====================================================================
 // Rubrique « To-do » — transposition de maquettes/v2/js/apps/todo.js (même balisage, mêmes
@@ -18,62 +19,6 @@ import PostItBoard from './PostItBoard';
 //  - déplacer une tâche de projet = une écriture du projet par la file de sauvegarde (plus de
 //    relecture de TOUS les projets comme l'ancienne page) ; tâche libre = `/api/tasks`.
 // =====================================================================
-
-type ColKey = 'Todo' | 'InProgress' | 'Programmed' | 'Done';
-const COLS: [ColKey, string, string][] = [['Todo', 'À faire', 'var(--info)'], ['InProgress', 'En cours', 'var(--bony-orange)'], ['Programmed', 'Programmé', 'var(--bony-violet)'], ['Done', 'Terminé', 'var(--ok)']];
-const FILTER_SERVICES = SERVICES.filter((s) => s !== 'Tous Services');          // comme TodoList.tsx
-const FORM_SERVICES = SERVICES as string[];                                       // formulaire : complet
-const brandLabel = (b: string) => (b === 'Holding' ? 'GROUPE BONY' : b);
-
-interface Item { id: string; t: Task; p: Project | null; sites: string[]; brands: string[]; services: string[]; ref: string; start: string; noDate: boolean }
-interface Filters { q: string; sites: string[]; brands: string[]; services: string[]; from: string; to: string }
-const F0: Filters = { q: '', sites: [], brands: [], services: [], from: '', to: '' };
-
-const todayIso = () => gx().iso(gx().today());
-const daysTo = (d: string) => Math.round((+new Date(d) - +gx().today()) / 864e5);
-const sitesOf = (p: Project) => (p.sites && p.sites.length ? p.sites : p.site ? [p.site] : []);
-
-function buildItems(projects: Project[], standalone: Task[], uid: string): Item[] {
-  const out: Item[] = [], T = todayIso();
-  for (const p of projects) {
-    if (!(p.status === 'Active' || p.status === 'Draft') || p.endDate < T) continue;
-    for (const t of p.tasks || []) if (t.assignedUserId === uid && t.status !== 'Empty')
-      out.push({ id: t.id, t, p, sites: sitesOf(p), brands: p.brands || [], services: p.service || [], ref: t.deadline || p.endDate, start: p.startDate, noDate: false });
-  }
-  for (const t of standalone) {
-    if (t.assignedUserId !== uid) continue;
-    if (t.status === 'Done' && t.deadline && t.deadline < T) continue;
-    out.push({ id: t.id, t, p: null, sites: t.sites || [], brands: t.brands || [], services: t.service || [], ref: t.deadline || '9999-12-31', start: t.deadline || T, noDate: !t.deadline });
-  }
-  return out;
-}
-function inGlobal(it: Item) {
-  const per = gx().ctx.perimetre; if (!per || per === 'Tout le réseau') return true;
-  if (per === 'Nissan') return it.brands.includes('Nissan');
-  return !it.sites.length || it.sites.includes(per);
-}
-function urgency(it: Item) {
-  if (it.noDate) return { txt: 'Sans échéance', cls: 'none', edge: '' };
-  const d = daysTo(it.ref), left = `${d} j restant${d > 1 ? 's' : ''}`;
-  if (d < 0) return { txt: `Expiré il y a ${-d} j`, cls: 'late', edge: 'r' };
-  if (d <= 3) return { txt: left, cls: 'crit', edge: 'r' };
-  if (d <= 7) return { txt: left, cls: 'warn', edge: 'o' };
-  return { txt: gx().fmt.dateY(it.ref), cls: '', edge: '' };
-}
-/** Filtres de la rubrique (mêmes règles que la maquette et TodoList.tsx). */
-function matches(it: Item, f: Filters) {
-  const q = f.q.trim().toLowerCase();
-  if (!inGlobal(it)) return false;
-  if (q && !`${it.t.name} ${it.p?.name || ''}`.toLowerCase().includes(q)) return false;
-  if (f.sites.length && !f.sites.some((s) => (s === 'Nissan' ? it.brands.includes('Nissan') : it.sites.includes(s)))) return false;
-  if (f.brands.length && !f.brands.some((b) => it.brands.includes(b))) return false;
-  if (f.services.length && !f.services.some((s) => it.services.includes(s))) return false;
-  if (f.from && it.ref < f.from) return false;
-  if (f.to && it.start > f.to) return false;
-  return true;
-}
-const sortIt = (a: Item, b: Item) => a.ref.localeCompare(b.ref) || a.t.name.localeCompare(b.t.name);
-const siteLbl = (v: string[]) => (v.length ? `${v.length} site${v.length > 1 ? 's' : ''}` : 'Périmètre');
 
 // ---------------------------------------------------------------- carte
 const Card = React.memo(function Card({ it, ro }: { it: Item; ro: boolean }) {
@@ -127,7 +72,10 @@ export default function TodoApp({ win, inst }: AppProps) {
   );
 }
 
-function TasksView({ win, inst, switcher }: AppProps & { switcher: React.ReactNode }) {
+/** Le tableau des tâches, dans la rubrique OU en widget du bureau (09/10/2026, refonte des widgets : « une réplique
+ *  de la To-do, vraiment big, ajustable »). Même composant : mêmes cartes, glisser-déposer, filtres, formulaire. */
+export function TasksView({ win, inst, switcher, variant = 'app' }: AppProps & { switcher?: React.ReactNode; variant?: 'app' | 'widget' }) {
+  const widget = variant === 'widget';
   const { user } = useAuth();
   const uid = user?.id || '';
   const projects = useWorkspace((s) => s.projects);
@@ -137,7 +85,7 @@ function TasksView({ win, inst, switcher }: AppProps & { switcher: React.ReactNo
   const [f, setF] = useState<Filters>(F0);
   const [hideDone, setHideDone] = useState(false);
   // Filtres dépliés par défaut, sauf fenêtre étroite / téléphone (même règle que la maquette).
-  const [open, setOpen] = useEngineStore<boolean>('todo.filters', (() => { const w = (win as any).body?.clientWidth ?? 0; return w === 0 || w >= 720; })());
+  const [open, setOpen] = useEngineStore<boolean>(widget ? 'todo.w.filters' : 'todo.filters', widget ? false : (() => { const w = (win as any).body?.clientWidth ?? 0; return w === 0 || w >= 720; })());
   const [savingFree, setSavingFree] = useState(0);
   const [, setTick] = useState(0);                       // périmètre global changé (GX.ctx)
   const { open: openSheet, portals } = useSheets(win);
@@ -293,13 +241,22 @@ function TasksView({ win, inst, switcher }: AppProps & { switcher: React.ReactNo
   const empty = ready && !filtered.length;
   const n = filtered.length;
   return (
-    <div className="app tdo" ref={appRef}>
-      <div className="app-head"><div className="ah-t"><span className="ah-eye">Gestion de projets</span><h1>To-do</h1><span className="sub"><b className="num" style={{ color: 'var(--text)' }}>{n}</b> tâche{n !== 1 ? 's' : ''} assignée{n !== 1 ? 's' : ''} · les plus urgentes en haut de chaque colonne</span></div>
+    <div className={`app tdo ${widget ? 'tdo-w' : ''}`} ref={appRef}>
+      {widget ? (
+        // Widget : en-tête compact (le fond reste une poignée pour déplacer le widget ; les boutons sont actifs).
+        <div className="tdo-whead">
+          <span className="tdo-wt"><Icon name="todo" size="sm" />To-do</span><span className="faint num">{n} tâche{n !== 1 ? 's' : ''}</span>
+          <span className="grow" /><span className={`tdo-saving ${saving ? '' : 'hide'}`}>Sauvegarde…</span>
+          <button className="btn sm tdo-fbtn" aria-expanded={open} onClick={toggleOpen}><Icon name="filter" size="sm" />{active ? <span className="count">{active}</span> : null}</button>
+          {canCreate ? <button className="btn sm primary" data-tip="Nouvelle tâche" aria-label="Nouvelle tâche" onClick={() => taskSheet(null)}><Icon name="plus" size="sm" /></button> : null}
+          <button className="icon-btn sm" data-tip="Ouvrir la To-do" aria-label="Ouvrir la To-do" onClick={() => gx().wm.open('todo')}><Icon name="maximize" size="sm" /></button>
+        </div>
+      ) : <div className="app-head"><div className="ah-t"><span className="ah-eye">Gestion de projets</span><h1>To-do</h1><span className="sub"><b className="num" style={{ color: 'var(--text)' }}>{n}</b> tâche{n !== 1 ? 's' : ''} assignée{n !== 1 ? 's' : ''} · les plus urgentes en haut de chaque colonne</span></div>
         <div className="ah-f">{switcher}<span className={`tdo-saving ${saving ? '' : 'hide'}`}>Sauvegarde…</span>
           <button className="btn tdo-fbtn" aria-expanded={open} onClick={toggleOpen}><Icon name="filter" size="sm" />Filtres{active ? <span className="count">{active}</span> : null}<Icon name={open ? 'chevup' : 'chevdown'} size="sm" /></button>
           {ro ? <span className="badge" style={{ '--c': 'var(--danger)' } as React.CSSProperties}><Icon name="lock" size="sm" />Lecture seule</span> : null}
-          {canCreate ? <button className="btn primary" data-tip="Nouvelle tâche" onClick={() => taskSheet(null)}><Icon name="plus" size="sm" /><span>Nouvelle tâche</span></button> : null}</div></div>
-      <div ref={h2Ref} className={`app-head2 tdo-h2 ${open ? '' : 'hide'}`}>
+          {canCreate ? <button className="btn primary" data-tip="Nouvelle tâche" onClick={() => taskSheet(null)}><Icon name="plus" size="sm" /><span>Nouvelle tâche</span></button> : null}</div></div>}
+      <div ref={h2Ref} className={`app-head2 tdo-h2 ${open ? '' : 'hide'}`} data-wc-zone>
         <div><span className="label">Recherche</span><label className="search"><Icon name="search" size="sm" /><input placeholder="Rechercher une tâche ou un projet…" value={f.q} onChange={(e) => refilter({ q: e.target.value })} /></label></div>
         <div><span className="label">Périmètre</span><PickerBtn icon="pin" label={siteLbl(f.sites)} active={!!f.sites.length} onClick={(el) => gx().ui.sitePicker(el, f.sites, (v: string[]) => refilter({ sites: v }), { variant: 'filter', multi: true, entities: false })} /></div>
         <span className="tdo-sep" /><div><span className="label">Marques</span><Chips values={BRANDS as string[]} selected={f.brands} onChange={(v) => refilter({ brands: v })} all="Toutes" colors={Object.fromEntries(gx().data.BRANDS.map((b: any) => [b.id, b.hex]))} /></div>
@@ -307,8 +264,8 @@ function TasksView({ win, inst, switcher }: AppProps & { switcher: React.ReactNo
         <span className="tdo-sep" /><div><span className="label">Dates</span><PickerBtn icon="agenda" label={gx().ui.periodLabel(f.from, f.to)} active={!!(f.from || f.to)} onClick={(el) => gx().ui.dateRange(el, { from: f.from, to: f.to }, ({ from, to }: { from?: string; to?: string }) => refilter({ from: from || '', to: to || '' }))} /></div>
         <button className={`btn ghost sm tdo-clear ${active ? '' : 'hide'}`} onClick={clearAll}><Icon name="close" size="sm" />Effacer tout</button>
       </div>
-      <div className={`tdo-colnav ${empty ? 'hide' : ''}`}><Seg value={navCol} onChange={(k) => { setNavCol(k); goCol(k); }} options={cols.map(([k, l]) => [k, `${l} ${byCol[k].length}`])} /></div>
-      <div ref={boardRef} className={`tdo-board scroll ${empty ? 'hide' : ''}`} style={{ '--n': cols.length } as React.CSSProperties}
+      <div className={`tdo-colnav ${empty ? 'hide' : ''}`} data-wc-zone><Seg value={navCol} onChange={(k) => { setNavCol(k); goCol(k); }} options={cols.map(([k, l]) => [k, `${l} ${byCol[k].length}`])} /></div>
+      <div ref={boardRef} className={`tdo-board scroll ${empty ? 'hide' : ''}`} style={{ '--n': cols.length } as React.CSSProperties} data-wc-zone
         onPointerDown={onPointerDown} onClick={onBoardClick} onKeyDown={onBoardKey} onContextMenu={onBoardMenu}>
         {cols.map(([k, l, c]) => (
           <section key={k} className="tdo-col" data-col={k} style={{ '--c': c } as React.CSSProperties}>
