@@ -18,7 +18,7 @@
   passées en clair dans le chat de la session du 08/10 : à régénérer un jour (remplacer dans `backend/.env` ET le `.env`
   du VPS, puis `up -d api`). Poignée de débogage `el.__buddy` dans `mascot.ts` (inoffensive, sert aux tests). Branches
   locales `feat/assistant-p0` et `fix/chat-envoi-fiable` mergées : supprimables.
-- **Widgets : W0–W2 livrés (correctif 77) ; en cours : W3** (bureau enregistré sur le serveur), puis le **lot sécurité serveur AVANT la bascule** (prévue vers le 16/10).
+- **Widgets : refonte TERMINÉE** (W0–W2 correctif 77, W3 correctif 78). **Ensuite** le **lot sécurité serveur AVANT la bascule** (prévue vers le 16/10).
 - **Lot B (fonds d'écran v2) : LIVRÉ, correctif 75.** À vérifier sur les PC qui chauffaient (gestionnaire de tâches de
   Chrome) ; versions claires des fonds possibles plus tard si elles manquent (option b écartée pour l'instant).
 - **Ensuite, dans l'ordre** : corrections issues des retours ci-dessus ; puis **mIAouss P2** (rédaction guidée : posts
@@ -27,7 +27,8 @@
 - **À savoir pour la session suivante** : Bony ne paiera JAMAIS un service d'IA (aucune option payante à proposer). Le
   garde-fou de la session a bloqué une fois `git push` et le SSH malgré l'accord de Théo ; Théo a élargi les
   permissions (`.claude/settings.local.json`, non commité) et redonné son accord : ça passe désormais.
-- **En production : correctif 77 (09/10)** — v2 : **refonte des widgets** (formats libres, To-do / Ma journée / Forms,
+- **En production : correctif 78 (09/10)** — v2 : **bureau enregistré sur le serveur** (widgets retrouvés sur tous les
+  postes ; `api` ET `web`, migration `20261009120000_user_widgets`). Avant lui le **correctif 77 (09/10)** — v2 : **refonte des widgets** (formats libres, To-do / Ma journée / Forms,
   contenus réparés), `web` seul. Avant lui le **correctif 76 (09/10)** — v2 : **bulles de discussion** façon Messenger sur ordinateur (`web` seul). Test
   grandeur nature à faire avec l'équipe. Avant lui le **correctif 75 (08/10)** — v2 : nouveaux fonds d'écran (fixes par défaut, Ruban ; 3 animés en option,
   en pause dès qu'une fenêtre est ouverte), `web` seul. Avant lui le **correctif 74 (08/10)** — v2 : plus de « ? » à la place des avatars de présence (`web` seul). Avant lui le
@@ -579,6 +580,21 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 78 — 09/10 : v2, bureau enregistré sur le serveur (lot W3 de la refonte des widgets)** (branche
+  `feat/v2-widgets-serveur`, **`api` ET `web`**, migration additive `20261009120000_user_widgets` — table `UserWidgets` —
+  appliquée et inscrite AVANT le push). La disposition des widgets suit l'utilisateur sur tous ses postes.
+  - **Serveur** : `backend/src/routes/widgets.ts` (`GET` / `PUT /api/widgets`), une ligne par compte (`desktop`, `phone`),
+    TOUT filtré sur `req.user.id` (même le Master ne lit pas le bureau des autres), `requireRole([...VALID_ROLES])` large
+    (tout le monde a un bureau, ses propres données seulement), liste blanche **`WIDGET_FIELDS`** et validation stricte
+    (type, taille « S…XXW » ou « LxH », positions entières, 80 widgets, réglages ≤ 8 000 caractères). Table à part, et non
+    colonne de `User`, pour que rien ne passe dans `publicUser`.
+  - **Interface** : `engine/widgets.ts` `save()` pousse aussi par `GX.widgetsSync` (1,5 s après le dernier geste, aussitôt si
+    l'onglet passe en arrière-plan) ; `W.reload()` relit la disposition. `ReactWidgets.tsx` : au démarrage la disposition du
+    SERVEUR fait foi ; s'il n'en a pas, celle du navigateur y monte (reprise, personne ne perd son bureau).
+  - Testé sur localhost (compte de Théo, hotspot) : reprise (12 widgets bureau + 6 téléphone montés), « autre poste » simulé
+    (copie locale effacée → bureau revenu du serveur, tailles comprises), ajout poussé (12 → 13, horloge de test retirée
+    ensuite), données invalides refusées (400). Ligne `UserWidgets` de Théo gardée en prod (c'est sa reprise).
+
 - **Correctif 77 — 09/10 : v2, refonte des widgets (lots W0 à W2 de `maquettes/ux/PLAN-WIDGETS.md`)** (branche
   `feat/v2-widgets`, **`web` seul**, aucune migration). Cadrage de Théo : « contenu et interaction », un widget To-do
   « vraiment big et ajustable », plus de formats pour tous ; W0 à W2 livrés d'un seul tenant à sa demande.
@@ -602,7 +618,7 @@
   - Testé sur localhost (compte de Théo, bureau 1440 et téléphone 375) : aucune erreur, 9 × 5 libre → 4 colonnes, ajout de
     post-it (post-it de test SUPPRIMÉ de la base ensuite), contenus réels (Deezer, AutoPlus, absents, échéances, agenda).
     ⚠️ Non testés (écritures réelles) : cocher une tâche, déplacer une carte du widget, jouer / refuser un défi.
-  - **Reste : W3** (bureau enregistré sur le serveur, migration additive).
+  - W3 livré au correctif 78.
 
 - **Correctif 76 — 09/10 : v2, bulles de discussion façon Messenger (ordinateur)** (branche `feat/v2-bulles`, **`web`
   seul**, aucune migration). Demande de Théo ; plan `maquettes/ux/PLAN-BULLES.md`, sensation réglée sur la planche
@@ -824,7 +840,9 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 77** (9 octobre 2026) — refonte des widgets v2 (W0–W2), **`web` seul**, aucune
+- master = prod, synchronisés. Dernier lot déployé : **correctif 78** (9 octobre 2026) — bureau v2 enregistré sur le serveur. **`api` ET `web`**,
+  migration additive `20261009120000_user_widgets` (table `UserWidgets`), appliquée et inscrite AVANT le push. Avant lui le
+  **correctif 77** (9 octobre 2026) — refonte des widgets v2 (W0–W2), **`web` seul**, aucune
   migration. Avant lui le **correctif 76** (9 octobre 2026) — bulles de discussion v2, **`web` seul**, aucune migration.
   Avant lui le **correctif 75** (8 octobre 2026) — nouveaux fonds d'écran v2, **`web` seul**, aucune
   migration. Avant lui le **correctif 74** (8 octobre 2026) — « ? » à la place des avatars de présence, **`web` seul**,
@@ -4441,6 +4459,9 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Widgets v2 : la disposition vit sur le SERVEUR** (`/api/widgets`, correctif 78) ; `GX.store` n'en est que la copie
+  locale. Pour remettre un bureau à zéro, passer par la galerie (« Disposition par défaut »), pas par le stockage du navigateur :
+  la copie serveur reviendrait au prochain chargement.
 - **Widgets v2 : un widget React n'est PAS rendu par le moteur** — le moteur pose `[data-wreact]`, `W.adopt` y remet l'hôte
   persistant, ReactWidgets.tsx le remplit. Tout rendu qui pose ces emplacements (bureau, accueil du téléphone) doit appeler
   `GX.widgets.adopt(scope)` ensuite. Et une feuille `?inline` d'OsHost ne se recharge PAS à chaud : recharger la page.

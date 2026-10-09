@@ -74,6 +74,43 @@ export default React.memo(function ReactWidgets() {
     return () => { G.games = null; G.reactWidgets = false; };
   }, [G]);
 
+  // --- W3 : bureau enregistré sur le SERVEUR (une ligne par compte, routes/widgets.ts). Au démarrage, la disposition du
+  // serveur fait foi ; s'il n'en a pas encore, celle du navigateur y monte (reprise : personne ne perd son bureau).
+  // Ensuite chaque changement part 1,5 s après le dernier geste (aussitôt si l'onglet passe en arrière-plan).
+  useEffect(() => {
+    if (!G?.widgets) return;
+    const FIELD: Record<string, 'desktop' | 'phone'> = { widgets: 'desktop', 'widgets.m': 'phone' };
+    let alive = true, ready = false;
+    const pending: Record<string, unknown[]> = {}, timers: Record<string, number> = {};
+    const flush = (k: string) => {
+      const v = pending[k]; if (!v) return; delete pending[k]; window.clearTimeout(timers[k]);
+      db.saveMyWidgets({ [FIELD[k]]: v }).catch(() => { if (alive) pending[k] = pending[k] || v; });   // nouvel essai au prochain geste
+    };
+    const flushAll = () => Object.keys(pending).forEach(flush);
+    G.widgetsSync = {
+      push(k: string, v: unknown[]) {
+        if (!FIELD[k]) return; pending[k] = JSON.parse(JSON.stringify(v));
+        if (!ready) return; window.clearTimeout(timers[k]); timers[k] = window.setTimeout(() => flush(k), 1500);
+      },
+    };
+    db.getMyWidgets().then((srv) => {
+      if (!alive) return;
+      const up: { desktop?: unknown[]; phone?: unknown[] } = {};
+      for (const [k, f] of Object.entries(FIELD)) {
+        if (pending[k]) continue;                                   // modifié pendant le chargement : le geste local gagne
+        const remote = srv[f], local = G.store.get(k);
+        if (Array.isArray(remote)) G.store.set(k, remote);
+        else if (Array.isArray(local) && local.length) up[f] = local;
+      }
+      if (up.desktop || up.phone) db.saveMyWidgets(up).catch(() => {});
+      ready = true; flushAll();
+      G.widgets.reload?.();
+    }).catch(() => { ready = true; flushAll(); });
+    const onHide = () => { if (document.hidden) flushAll(); };
+    document.addEventListener('visibilitychange', onHide); window.addEventListener('pagehide', flushAll);
+    return () => { alive = false; flushAll(); document.removeEventListener('visibilitychange', onHide); window.removeEventListener('pagehide', flushAll); G.widgetsSync = null; };
+  }, [G]);
+
   if (!G) return null;
   return <>{list.map(({ wid, host, kind }) => createPortal(
     kind === 'todo' ? <TodoWidget /> : kind === 'myday' ? <MyDayWidget /> : kind === 'forms' ? <FormsWidget /> : null,

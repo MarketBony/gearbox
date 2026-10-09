@@ -34,6 +34,7 @@ import gamesRoutes from './routes/games';
 import settingsRoutes from './routes/settings';
 import projectFilesRoutes from './routes/projectFiles';
 import postitRoutes from './routes/postits';
+import widgetRoutes from './routes/widgets';
 import formsRoutes from './routes/forms';
 import bonyFormsRoutes from './routes/bonyForms';
 import assistantRoutes from './routes/assistant';
@@ -118,6 +119,7 @@ app.use('/api/push', pushRoutes);
 
 // Post-it : agenda PERSONNEL de la To-do (chaque requête filtrée sur l'utilisateur connecté).
 app.use('/api/postits', postitRoutes);
+app.use('/api/widgets', widgetRoutes);
 
 // Forms : Google Forms par le compte partagé (rubrique v2). FORMS_ROLES sur chaque route.
 app.use('/api/forms', formsRoutes);
