@@ -3,6 +3,7 @@ import { mapProject, mapPost, mapUser, mapMessage, GXData } from './data';
 import { useBridge, appOf } from './bridge';
 import { db } from '../../services/dataService';
 import { chatStore } from '../../services/chatStore';
+import { sendChatMessage } from '../../services/chatOutbox';
 import { getSocket, connectSocket, emitWithAck } from '../../services/socket';
 import { usePresence } from '../../services/presenceStore';
 import { useRealtimeSync, RT_EVENTS } from '../../services/realtime';
@@ -236,7 +237,9 @@ function useChatFeed(uid: string, enabled: boolean) {
     GX.chatFeed = {
       load,
       isLoaded: (conv: string) => loaded.has(conv),
-      send: (conv: string, content: string) => emitWithAck('chat:message:send', { conversationId: conv, content, type: 'text' }),
+      // [GEARBOX] 09/10/2026 : par la boîte d'envoi (accusé, renvoi, anti-doublon), comme le Chat et les bulles. Avant, le
+      // widget « Chat interactif » émettait en direct : un message pouvait s'y perdre en silence (cause du correctif 72).
+      send: (conv: string, content: string) => { sendChatMessage(conv, content, 'text'); return Promise.resolve(); },
       react: (messageId: string, emoji: string) => emitWithAck('chat:message:react', { messageId, emoji }),
       read: (conv: string) => emitWithAck('chat:conversation:read', { conversationId: conv }).catch(() => {}),
     };

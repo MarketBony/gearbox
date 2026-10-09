@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bulles de discussion — planche</title>
+<!-- Planche interactive du chantier « bulles » (09/10/2026, PLAN-BULLES.md). Sert à régler la SENSATION avant de
+     coder dans Gearbox : glisser, collage au bord, lancer, cible ✕, pile, volet. Ordinateur seulement (décision B2).
+     Le contenu du volet est une maquette : dans Gearbox, ce sera la vraie conversation (décision B3 : identique au Chat). -->
+<style>
+  :root { --o: #f75632; --v: #8f12ab; --p: #e0367a; --b: #293f74; --text: #f3f1f7; --t2: #a9a4b6; --surf: #17151e; --surf2: #221f2b; --line: rgba(255,255,255,.08); }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body { font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text); user-select: none;
+    background: radial-gradient(60% 50% at 70% 40%, rgba(41,63,116,.35), transparent 70%), linear-gradient(160deg, #0c0b12, #07060a); }
+  .mb { position: fixed; inset: 0 0 auto; height: 28px; background: rgba(20,18,28,.6); display: flex; align-items: center; gap: 18px; padding: 0 14px; font-weight: 600; z-index: 5; }
+  .mb span { opacity: .75; font-weight: 500; }
+  .win { position: fixed; left: 8%; top: 70px; width: 46%; height: 56%; border-radius: 14px; background: #15131c; box-shadow: 0 20px 50px -20px #000, inset 0 0 0 1px var(--line); z-index: 2; }
+  .win .tb { height: 38px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; padding: 0 14px; }
+  .win .tb i { width: 12px; height: 12px; border-radius: 50%; background: #3a3644; }
+  .win p { padding: 16px; color: var(--t2); }
+  .dock { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 8px; padding: 8px; border-radius: 18px; background: rgba(22,20,30,.65); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); z-index: 5; }
+  .dock i { width: 44px; height: 44px; border-radius: 11px; display: block; }
+
+  /* ---------- réglages de la planche ---------- */
+  .tune { position: fixed; left: 50%; top: 40px; transform: translateX(-50%); width: 300px; background: rgba(15,13,20,.92); border: 1px solid var(--line); border-radius: 12px; padding: 12px; z-index: 30; font-size: 12px; }
+  .tune h3 { font-size: 13px; margin-bottom: 8px; }
+  .tune label { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin: 6px 0; color: var(--t2); }
+  .tune input[type=range] { grid-column: 1 / -1; width: 100%; }
+  .tune b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .tune .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .tune button { border: 0; font: inherit; font-weight: 600; color: #fff; background: linear-gradient(135deg, var(--o), var(--v)); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+  .tune button.sec { background: var(--surf2); }
+  .tune small { display: block; color: var(--t2); margin-top: 8px; line-height: 1.35; }
+
+  /* ---------- bulles ---------- */
+  .bub { position: fixed; left: 0; top: 0; width: var(--s); height: var(--s); border-radius: 50%; z-index: 40; cursor: grab; touch-action: none;
+    box-shadow: 0 6px 16px -4px rgba(0,0,0,.6), 0 0 0 2px rgba(255,255,255,.9); display: grid; place-items: center; font-weight: 800; color: #fff;
+    font-size: calc(var(--s) * .36); will-change: transform; }
+  .bub.drag { cursor: grabbing; }
+  .bub .cnt { position: absolute; top: -3px; right: -3px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 99px; background: #ef4444; color: #fff; font-size: 11px; display: grid; place-items: center; box-shadow: 0 0 0 2px #0c0b12; }
+  .bub.sel::after { content: ""; position: absolute; left: 50%; bottom: -14px; margin-left: -8px; border: 8px solid transparent; border-bottom-color: var(--surf); }
+  .bub .grp { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; }
+  .bub .grp i { display: grid; place-items: center; font-style: normal; font-size: calc(var(--s) * .26); }
+  .bub { transition: box-shadow .2s; }
+  .bub.drag { box-shadow: 0 16px 30px -8px rgba(0,0,0,.65), 0 0 0 2px rgba(255,255,255,.95); }
+
+  /* cible de fermeture */
+  .x { position: fixed; left: 50%; bottom: 96px; width: 64px; height: 64px; margin-left: -32px; border-radius: 50%; z-index: 39; display: grid; place-items: center;
+    background: rgba(20,18,28,.75); box-shadow: inset 0 0 0 2px rgba(255,255,255,.5); color: #fff; font-size: 26px; opacity: 0; translate: 0 30px; transition: opacity .18s, translate .22s, scale .18s, background .18s; pointer-events: none; }
+  .x.on { opacity: 1; translate: 0 0; }
+  .x.hot { scale: 1.25; background: rgba(239,68,68,.85); }
+  .xglow { position: fixed; inset: auto 0 0 0; height: 220px; z-index: 38; background: linear-gradient(transparent, rgba(0,0,0,.55)); opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .xglow.on { opacity: 1; }
+
+  /* ---------- volet ---------- */
+  .panel { position: fixed; z-index: 35; width: 380px; height: min(560px, calc(100vh - 190px)); border-radius: 16px; background: var(--surf); display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 24px 60px -18px #000, inset 0 0 0 1px var(--line); transform-origin: var(--ox, 100%) 0; animation: pin .28s cubic-bezier(.2,.8,.2,1) both; }
+  .panel.out { animation: pout .18s cubic-bezier(.4,0,1,1) both; }
+  @keyframes pin { from { opacity: 0; scale: .92; translate: 0 -8px; } }
+  @keyframes pout { to { opacity: 0; scale: .95; translate: 0 -6px; } }
+  .ph { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .ph .av { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; }
+  .ph b { display: block; font-size: 14px; } .ph small { color: #3fd18b; font-size: 11px; }
+  .ph .grow { flex: 1; min-width: 0; }
+  .ph button { border: 0; background: var(--surf2); color: var(--text); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font: inherit; }
+  .thread { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .m { max-width: 78%; padding: 8px 11px; border-radius: 16px; background: var(--surf2); align-self: flex-start; }
+  .m.me { align-self: flex-end; background: linear-gradient(135deg, var(--o), var(--v)); }
+  .m .t { display: block; font-size: 10px; opacity: .6; margin-top: 2px; text-align: right; }
+  .gif { width: 180px; height: 120px; border-radius: 12px; background: linear-gradient(135deg, #f59e0b, #ec4899); display: grid; place-items: center; font-weight: 800; align-self: flex-end; }
+  .voice { display: flex; align-items: center; gap: 8px; min-width: 190px; }
+  .voice i { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,.2); display: grid; place-items: center; font-style: normal; }
+  .voice span { flex: 1; height: 18px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.7) 0 2px, transparent 2px 5px); mask: linear-gradient(90deg, #000 60%, rgba(0,0,0,.35) 60%); }
+  .proj { border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: #1c1a24; width: 230px; }
+  .proj b { display: block; } .proj small { color: var(--t2); }
+  .proj .bar { height: 5px; border-radius: 9px; background: rgba(255,255,255,.1); margin-top: 8px; overflow: hidden; } .proj .bar i { display: block; height: 100%; width: 72%; background: linear-gradient(90deg, var(--o), var(--v)); }
+  .rx { font-size: 11px; background: var(--surf2); border-radius: 99px; padding: 1px 6px; margin-top: -10px; align-self: flex-end; box-shadow: 0 0 0 2px var(--surf); }
+  .comp { display: flex; align-items: center; gap: 6px; padding: 10px; border-top: 1px solid var(--line); }
+  .comp .ic { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--t2); font-size: 15px; }
+  .comp input { flex: 1; min-width: 0; border: 0; outline: 0; background: var(--surf2); color: var(--text); border-radius: 99px; padding: 8px 12px; font: inherit; }
+  .comp .send { background: linear-gradient(135deg, var(--o), var(--v)); color: #fff; }
+</style>
+</head>
+<body>
+<div class="mb">Gearbox <span>Fichier</span><span>Édition</span><span>Fenêtre</span></div>
+<div class="win"><div class="tb"><i></i><i></i><i></i><b style="margin-left:8px">Projets</b></div><p>Une fenêtre de Gearbox ouverte : les bulles passent par-dessus.</p></div>
+<div class="dock"></div>
+<div class="xglow" id="xglow"></div><div class="x" id="x">✕</div>
+
+<div class="tune">
+  <h3>Réglages de la sensation</h3>
+  <label>Taille des bulles <b id="vs"></b><input type="range" id="s" min="44" max="72" step="2"></label>
+  <label>Réponse du ressort (s) <b id="vresp"></b><input type="range" id="resp" min="0.2" max="0.9" step="0.01"></label>
+  <label>Amortissement (1 = sans rebond) <b id="vdamp"></b><input type="range" id="damp" min="0.3" max="1" step="0.01"></label>
+  <label>Inertie du lancer <b id="vdecel"></b><input type="range" id="decel" min="0.9" max="0.998" step="0.002"></label>
+  <label>Aimant de la cible ✕ (px) <b id="vm"></b><input type="range" id="m" min="30" max="160" step="5"></label>
+  <div class="btns"><button class="sec" id="pApple">Préréglage « Apple »</button><button class="sec" id="pTheo">Tes réglages d’hier</button></div>
+  <div class="btns"><button id="msg">Simuler un message</button><button class="sec" id="msg2">D’un autre collègue</button><button class="sec" id="grp">D’un groupe</button></div>
+  <small>Ressort à la façon d’Apple : une durée de réponse et un amortissement (1 = s’arrête net, en dessous = rebondit).
+    L’inertie fait continuer la bulle sur la vitesse réelle du geste avant qu’elle se pose au bord. Le côté choisi est
+    celui où la bulle AURAIT fini sa course.</small>
+</div>
+
+<script>
+/* ---------------------------------------------------------------- réglages
+   Ressort façon SwiftUI : `response` (période, s) et `dampingFraction` (ζ). raideur = (2π/response)², frottement = 2ζ·√raideur.
+   « Tes réglages d'hier » (09/10, k 180 / c 10) = réponse 0,47 s, ζ 0,37 : vivant mais rebondissant. */
+const APPLE = { resp: .5, damp: .82, decel: .99 }, THEO = { resp: .47, damp: .37, decel: .96 };
+const P = { s: 50, m: 40, ...APPLE };
+const fmt = (k, v) => (k === 'resp' || k === 'damp' ? (+v).toFixed(2) : k === 'decel' ? (+v).toFixed(3) : v);
+function syncUI() { for (const k of Object.keys(P)) { const el = document.getElementById(k); if (!el) continue; el.value = P[k]; document.getElementById('v' + k).textContent = fmt(k, P[k]); } }
+for (const k of Object.keys(P)) {
+  const el = document.getElementById(k); if (!el) continue;
+  el.oninput = () => { P[k] = +el.value; document.getElementById('v' + k).textContent = fmt(k, el.value); if (k === 's') { document.querySelectorAll('.bub').forEach((b) => b.style.setProperty('--s', P.s + 'px')); layout(); } };
+}
+document.getElementById('pApple').onclick = () => { Object.assign(P, APPLE); syncUI(); };
+document.getElementById('pTheo').onclick = () => { Object.assign(P, THEO); syncUI(); };
+syncUI();
+document.querySelector('.dock').innerHTML = ['#ef5b3f', '#3b82f6', '#f2f2f2', '#ec4899', '#f59e0b', '#8b5cf6', '#22c55e', '#facc15', '#14b8a6', '#9ca3af'].map((c) => `<i style="background:${c}"></i>`).join('');
+
+/* ---------------------------------------------------------------- ressort (pas fixe de 1/240 s : stable quel que soit l'écran) */
+function spring(o, k, target, resp, damp, dt) {   // o[k] position, o['v' + k] vitesse
+  const w = (2 * Math.PI) / resp, kk = w * w, c = 2 * damp * w;
+  const a = kk * (target - o[k]) - c * o['v' + k];
+  o['v' + k] += a * dt; o[k] += o['v' + k] * dt;
+}
+const settled = (b) => Math.abs(b.tx - b.x) < .3 && Math.abs(b.ty - b.y) < .3 && Math.abs(b.vx) < 2 && Math.abs(b.vy) < 2;
+
+/* ---------------------------------------------------------------- zone utile */
+const TOP = 40, MARGIN = 8;
+const bottomLimit = () => innerHeight - 90;   // au-dessus du Dock
+const clampY = (y) => Math.max(TOP, Math.min(bottomLimit() - P.s, y));
+const edgeX = (sd) => (sd > 0 ? innerWidth - P.s - MARGIN : MARGIN);
+
+/* ---------------------------------------------------------------- bulles */
+const PEOPLE = [
+  { id: 'romane', name: 'Romane Chambon', ini: 'RC', c: 'linear-gradient(135deg,#ec4899,#8f12ab)' },
+  { id: 'bastien', name: 'Bastien Fuziol', ini: 'BF', c: 'linear-gradient(135deg,#3b82f6,#293f74)' },
+  { id: 'morgane', name: 'Morgane Barthe', ini: 'MB', c: 'linear-gradient(135deg,#14b8a6,#0e7490)' },
+  { id: 'team', name: 'Team Market', grp: ['RC', 'BF', 'MB', 'LR'], c: '#2a2433' },
+];
+let bubbles = [];             // de la plus récente (tête de pile) à la plus ancienne
+let side = 1, anchorY = 140;  // bord (−1 gauche, 1 droite) et hauteur de la pile
+let open = null;              // id de la conversation ouverte (volet)
+const MAX = 4;
+
+function makeBubble(p) {
+  const el = document.createElement('div'); el.className = 'bub'; el.style.setProperty('--s', P.s + 'px'); el.style.background = p.c;
+  el.innerHTML = p.grp ? `<div class="grp">${p.grp.map((g, i) => `<i style="background:${['#ec4899', '#3b82f6', '#14b8a6', '#f59e0b'][i]}">${g}</i>`).join('')}</div>` : p.ini;
+  document.body.append(el);
+  const b = { p, el, x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0, sc: 1, vsc: 0, tsc: 1, n: 0 };
+  el.addEventListener('pointerdown', (e) => down(e, b));
+  return b;
+}
+function setCount(b) {
+  let c = b.el.querySelector('.cnt');
+  if (b.n && !c) { c = document.createElement('span'); c.className = 'cnt'; b.el.append(c); c.animate([{ scale: 0 }, { scale: 1 }], { duration: 260, easing: 'cubic-bezier(.2,.9,.3,1)' }); }
+  if (c) { if (b.n) c.textContent = b.n; else c.remove(); }
+}
+/* Arrivée d'un message : une NOUVELLE bulle glisse depuis le bord où vit la pile (gauche ou droite), sans rebond ;
+   une bulle DÉJÀ là fait un petit battement (impulsion sur son échelle, rendue par le ressort). */
+function receive(p) {
+  let b = bubbles.find((x) => x.p.id === p.id);
+  if (!b) {
+    b = makeBubble(p);
+    b.x = side > 0 ? innerWidth + 12 : -P.s - 12;   // hors de l'écran, du bon côté
+    b.y = anchorY; b.vx = -side * 300;              // déjà en mouvement vers l'intérieur : entrée fluide
+    bubbles.unshift(b);
+    if (bubbles.length > MAX) { const old = bubbles.pop(); old.el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160 }).onfinish = () => old.el.remove(); }
+  } else {
+    if (!open && bubbles[0] !== b) bubbles = [b, ...bubbles.filter((x) => x !== b)];
+    b.vsc += 2.6;                                   // battement
+  }
+  if (open !== p.id) b.n++;
+  setCount(b); layout();
+}
+
+/* ---------------------------------------------------------------- disposition (cibles des ressorts) */
+function layout() {
+  if (open) {   // en ligne en haut, côté de la pile
+    const gap = 10, w = P.s, n = bubbles.length;
+    const right = side > 0 ? innerWidth - MARGIN : MARGIN + n * (w + gap) - gap;
+    bubbles.forEach((b, i) => { b.tx = right - (n - i) * (w + gap) + gap; b.ty = TOP + 4; b.tsc = 1; });
+    placePanel();
+  } else {      // pile collée au bord : la tête devant, les autres juste derrière, un peu plus bas et plus petites
+    bubbles.forEach((b, i) => { b.tx = edgeX(side); b.ty = anchorY + i * 5; b.tsc = 1 - i * .04; });
+  }
+  bubbles.forEach((b, i) => { b.el.style.zIndex = 40 + (bubbles.length - i); b.el.classList.toggle('sel', !!open && b.p.id === open); });
+}
+
+/* ---------------------------------------------------------------- boucle */
+let last = performance.now(), drag = null;
+function tick(now) {
+  let left = Math.min(.05, (now - last) / 1000); last = now;
+  while (left > 1e-6) {
+    const dt = Math.min(1 / 240, left); left -= dt;
+    bubbles.forEach((b, i) => {
+      spring(b, 'sc', b.tsc * (drag && drag.b === b ? (drag.moved ? 1.06 : .92) : 1), .32, .62, dt);
+      if (drag && drag.b === b) {
+        // Sous le doigt : suit le pointeur à l'identique ; aimantée, glisse vers la cible (ressort ferme, sans rebond).
+        if (drag.hot) { spring(b, 'x', drag.hx, .18, 1, dt); spring(b, 'y', drag.hy, .18, 1, dt); }
+        else { b.x = drag.px; b.y = drag.py; }
+        return;
+      }
+      let tx = b.tx, ty = b.ty;
+      if (drag && !open && drag.stack && i > 0) { const prev = bubbles[i - 1]; tx = prev.x; ty = prev.y + 5; }   // la pile suit en chaîne
+      const r = drag && drag.stack && i > 0 ? P.resp * .55 : P.resp;
+      spring(b, 'x', tx, r, P.damp, dt); spring(b, 'y', ty, r, P.damp, dt);
+    });
+  }
+  bubbles.forEach((b) => { b.el.style.transform = `translate(${b.x}px, ${b.y}px) scale(${b.sc})`; });
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+/* ---------------------------------------------------------------- glisser */
+const X = document.getElementById('x'), XG = document.getElementById('xglow');
+const xCenter = () => { const r = X.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+function down(e, b) {
+  e.preventDefault(); b.el.setPointerCapture(e.pointerId);
+  if (!open && b !== bubbles[0]) bubbles = [b, ...bubbles.filter((x) => x !== b)];   // saisir une bulle de la pile = la tête
+  drag = { b, stack: !open, sx: e.clientX, sy: e.clientY, ox: e.clientX - b.x, oy: e.clientY - b.y, px: b.x, py: b.y, moved: false, hist: [[e.clientX, e.clientY, e.timeStamp]], hot: false };
+  b.el.classList.add('drag');
+  b.el.onpointermove = (ev) => move(ev);
+  b.el.onpointerup = b.el.onpointercancel = (ev) => up(ev);
+}
+function move(e) {
+  const d = drag; if (!d) return;
+  // Événements fusionnés : toutes les positions réelles du pointeur, pour une vitesse juste
+  for (const ev of (e.getCoalescedEvents?.() || [e])) d.hist.push([ev.clientX, ev.clientY, ev.timeStamp]);
+  while (d.hist.length > 2 && e.timeStamp - d.hist[0][2] > 90) d.hist.shift();
+  if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 4) { d.moved = true; X.classList.add('on'); XG.classList.add('on'); }
+  d.px = e.clientX - d.ox; d.py = e.clientY - d.oy;
+  if (!d.moved) return;
+  const [cx, cy] = xCenter(), dist = Math.hypot(e.clientX - cx, e.clientY - cy);
+  const hot = dist < P.m + P.s / 2;
+  if (hot !== d.hot) { d.hot = hot; X.classList.toggle('hot', hot); if (!hot) { d.b.vx = d.b.vy = 0; } }
+  d.hx = cx - P.s / 2; d.hy = cy - P.s / 2;
+}
+function up(e) {
+  const d = drag; if (!d) return; drag = null;
+  d.b.el.classList.remove('drag'); d.b.el.onpointermove = d.b.el.onpointerup = d.b.el.onpointercancel = null;
+  X.classList.remove('on', 'hot'); XG.classList.remove('on');
+  if (!d.moved) { return click(d.b); }
+  if (d.hot) { return dismiss(d.stack ? [...bubbles] : [d.b]); }
+  // Vitesse réelle du geste (px/s) sur les ~90 dernières ms, transmise telle quelle au ressort : c'est l'inertie.
+  const h = d.hist, a = h[0], z = h[h.length - 1], t = Math.max(.008, (z[2] - a[2]) / 1000);
+  const vx = (z[0] - a[0]) / t, vy = (z[1] - a[1]) / t;
+  d.b.vx = vx; d.b.vy = vy;
+  if (open) { layout(); return; }
+  // Projection façon UIKit : où la bulle s'arrêterait si on la laissait glisser (taux de décélération par ms).
+  const k = P.decel / (1 - P.decel) / 1000;
+  const endX = d.b.x + P.s / 2 + vx * k, endY = d.b.y + vy * k;
+  side = endX > innerWidth / 2 ? 1 : -1;
+  anchorY = clampY(endY);
+  layout();
+}
+function dismiss(list) {
+  list.forEach((b) => { b.el.animate([{ transform: b.el.style.transform, opacity: 1 }, { transform: b.el.style.transform + ' scale(.2)', opacity: 0 }], { duration: 200, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' }).onfinish = () => b.el.remove(); });
+  bubbles = bubbles.filter((b) => !list.includes(b));
+  if (open && !bubbles.some((b) => b.p.id === open)) { open = bubbles[0]?.p.id || null; if (!open) closePanel(); }
+  layout(); if (open) renderPanel();
+}
+
+/* ---------------------------------------------------------------- volet */
+let panelEl = null;
+function click(b) {
+  if (open === b.p.id) return closePanel();
+  open = b.p.id; b.n = 0; setCount(b);
+  layout(); renderPanel();
+}
+function closePanel() {
+  open = null; if (panelEl) { const p = panelEl; panelEl = null; p.classList.add('out'); setTimeout(() => p.remove(), 180); }
+  layout();
+}
+function placePanel() {
+  if (!panelEl) return;
+  const top = TOP + 4 + P.s + 14;
+  if (side > 0) { panelEl.style.left = ''; panelEl.style.right = MARGIN + 'px'; } else { panelEl.style.right = ''; panelEl.style.left = MARGIN + 'px'; }
+  panelEl.style.top = top + 'px'; panelEl.style.setProperty('--ox', side > 0 ? '100%' : '0%');
+}
+function renderPanel() {
+  const b = bubbles.find((x) => x.p.id === open); if (!b) return;
+  if (!panelEl) { panelEl = document.createElement('div'); panelEl.className = 'panel'; document.body.append(panelEl); panelEl.addEventListener('pointerdown', (e) => e.stopPropagation()); }
+  const p = b.p;
+  panelEl.innerHTML = `<div class="ph"><div class="av" style="background:${p.c}">${p.grp ? '👥' : p.ini}</div><div class="grow"><b>${p.name}</b><small>${p.grp ? '4 membres' : '● en ligne'}</small></div>
+      <button title="Ouvrir dans Chat">↗</button><button title="Réduire" id="pmin">—</button></div>
+    <div class="thread">
+      <div class="m">Salut ! Tu as vu la maquette du Forum ?<span class="t">14:02</span></div>
+      <div class="m me">Oui, je la regarde, deux minutes 👀<span class="t">14:03</span></div>
+      <div class="proj"><small>Projet</small><b>Forum Pièces 2026</b><small>Clermont, Mozac · 23 tâches</small><div class="bar"><i></i></div></div>
+      <div class="m"><div class="voice"><i>▶</i><span></span><small>0:12</small></div></div>
+      <div class="gif">GIF</div><div class="rx">😂 2</div>
+      <div class="m me">Top, je valide la version 2<span class="t">14:06</span></div>
+    </div>
+    <div class="comp"><span class="ic" title="Photo">🖼</span><span class="ic" title="GIF">GIF</span><span class="ic" title="Projet">📁</span><input placeholder="Message à ${p.grp ? p.name : p.name.split(' ')[0]}…"><span class="ic" title="Vocal">🎙</span><span class="ic send">↑</span></div>`;
+  panelEl.querySelector('#pmin').onclick = closePanel;
+  placePanel();
+}
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && open) closePanel(); });
+addEventListener('pointerdown', (e) => { if (open && !e.target.closest('.bub, .panel, .tune')) closePanel(); });
+addEventListener('resize', () => { anchorY = clampY(anchorY); layout(); });
+
+/* ---------------------------------------------------------------- démo */
+document.getElementById('msg').onclick = () => receive(PEOPLE[0]);
+document.getElementById('msg2').onclick = () => receive(PEOPLE[1 + Math.floor(Math.random() * 2)]);
+document.getElementById('grp').onclick = () => receive(PEOPLE[3]);
+setTimeout(() => receive(PEOPLE[0]), 500);
+setTimeout(() => receive(PEOPLE[1]), 1300);
+</script>
+</body>
+</html>

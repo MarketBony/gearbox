@@ -15,7 +15,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   const D = GX.data, $ = (s, r = GX.root) => r.querySelector(s);
   /* Réglages par défaut : fond Ruban (lot B, 08/10/2026 ; « Bony · Trait » animé avant), thème sombre, direction Signal, Liquid Glass, icônes claires,
      barre du haut escamotable. PREFS_V : quand les défauts changent, on les réapplique une fois. */
-  const DEFAULTS = { theme: 'dark', effects: 'full', wallpaper: 'ruban', dockMag: true, dockAutohide: false, dockSmart: true, dockSize: 50, widgets: true, dnd: false, material: 'liquid', iconStyle: 'light', da: 'signal', menubarAuto: true };
+  const DEFAULTS = { theme: 'dark', effects: 'full', wallpaper: 'ruban', dockMag: true, dockAutohide: false, dockSmart: true, dockSize: 50, widgets: true, dnd: false, material: 'liquid', iconStyle: 'light', da: 'signal', menubarAuto: true, bubbles: true };
   const PREFS_V = 3, stored = GX.store.get('prefs', {});
   const prefs = Object.assign({}, DEFAULTS, (stored.v || 0) >= PREFS_V ? stored : { ...stored, theme: 'dark', wallpaper: 'ruban', material: 'liquid', iconStyle: 'light', da: 'signal', menubarAuto: true, dockSize: 50 }, { v: PREFS_V });
   /* [GEARBOX] Lot B (08/10/2026) : nouvelle série de fonds. Tout le monde passe UNE fois sur Ruban (fixe, défaut) :
