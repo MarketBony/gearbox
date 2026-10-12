@@ -23,7 +23,7 @@
     },
     {
       "name": "maquettes",
-      "runtimeExecutable": "python",
+      "runtimeExecutable": "C:/Users/Operateur/AppData/Local/Python/bin/python.exe",
       "runtimeArgs": [
         "-m",
         "http.server",

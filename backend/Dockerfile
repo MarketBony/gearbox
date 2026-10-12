@@ -26,5 +26,7 @@ COPY prisma ./prisma
 # Le CLI prisma est en dependencies (migrate deploy au démarrage du conteneur).
 RUN npx prisma generate
 COPY --from=build /app/dist ./dist
+# Migrations SQL du RCU (base dédiée `rcu-db`), appliquées au démarrage du conteneur `rcu-worker`.
+COPY rcu-migrations ./rcu-migrations
 EXPOSE 3000
 CMD ["node", "dist/index.js"]

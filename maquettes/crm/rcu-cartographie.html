@@ -1,0 +1,453 @@
+<title>Cartographie RCU Bony</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout : une fiche technique d'atelier — colonne de lecture, tables pleine largeur, repères par plaque */
+:root{
+  --bg:#f5f6f4; --surface:#ffffff; --ink:#1b2128; --muted:#5d6670; --line:#dde1df;
+  --accent:#c77a12; --accent-soft:#fbefdc;
+  --ok:#2f7d4f; --ok-soft:#e3f2e8; --warn:#9a6b00; --warn-soft:#fbf1d4; --off:#9a3b31; --off-soft:#f7e3e0; --idle:#6b7280; --idle-soft:#eceeee;
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#13171b; --surface:#1b2026; --ink:#e7eaec; --muted:#9aa3ab; --line:#2c333a;
+  --accent:#f0a33a; --accent-soft:#3a2b14;
+  --ok:#6cc58f; --ok-soft:#183324; --warn:#e8c25a; --warn-soft:#352c12; --off:#ef8c80; --off-soft:#3a1d1a; --idle:#a3abb3; --idle-soft:#262c32; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13171b; --surface:#1b2026; --ink:#e7eaec; --muted:#9aa3ab; --line:#2c333a;
+  --accent:#f0a33a; --accent-soft:#3a2b14;
+  --ok:#6cc58f; --ok-soft:#183324; --warn:#e8c25a; --warn-soft:#352c12; --off:#ef8c80; --off-soft:#3a1d1a; --idle:#a3abb3; --idle-soft:#262c32; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-body);margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:32px 72px;display:flex;flex-direction:column;gap:48px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:clamp(28px,4.4vw,44px);font-weight:800;line-height:1.05}
+h2{font-size:24px;font-weight:700}
+h3{font-size:16px;font-weight:700}
+p{margin:0;max-width:68ch}
+code,.mono{font-family:var(--f-mono);font-size:.88em}
+.eyebrow{font:600 11.5px/1 var(--f-body);text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+.lead{color:var(--muted);font-size:16px}
+section{display:flex;flex-direction:column;gap:18px}
+.head{display:flex;flex-direction:column;gap:14px;border-bottom:2px solid var(--ink);padding-bottom:22px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;color:var(--muted);font-size:13.5px}
+.status{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent);font-weight:600;border-radius:999px;padding:3px 10px;font-size:12.5px}
+
+/* sources */
+.sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.src{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.src .n{font:800 30px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.src .k{font-size:13px;color:var(--muted)}
+.src .tag{align-self:flex-start;font:500 11.5px/1 var(--f-mono);padding:4px 7px;border-radius:5px;background:var(--idle-soft);color:var(--muted)}
+
+/* filtres */
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{font:500 13px/1 var(--f-body);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:8px 13px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip:focus-visible,#q:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#q{flex:1 1 220px;min-width:0;font:14px var(--f-body);padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+
+/* tables */
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font:600 11.5px/1.2 var(--f-body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface);position:sticky;top:0}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.code{font-family:var(--f-mono);font-size:12.5px;white-space:nowrap}
+.lbls{display:flex;flex-wrap:wrap;gap:4px}
+.lbl{font:500 11.5px/1 var(--f-mono);padding:4px 6px;border-radius:4px;background:var(--idle-soft);color:var(--ink);white-space:nowrap}
+.lbl.empty{color:var(--muted);font-style:italic}
+tr.grp td{background:var(--bg);font:700 12px/1 var(--f-display);text-transform:uppercase;letter-spacing:.08em;color:var(--ink);padding:12px}
+tr.grp .sum{float:right;font:500 12px var(--f-body);text-transform:none;letter-spacing:0;color:var(--muted)}
+.brand{white-space:nowrap}
+.note{color:var(--muted);font-size:12.5px;max-width:34ch}
+.pill{display:inline-block;font:600 11.5px/1 var(--f-body);padding:4px 8px;border-radius:999px;white-space:nowrap}
+.p-ok{background:var(--ok-soft);color:var(--ok)}
+.p-auto{background:var(--warn-soft);color:var(--warn)}
+.p-off{background:var(--off-soft);color:var(--off)}
+.p-idle{background:var(--idle-soft);color:var(--idle)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13px;color:var(--muted);align-items:center}
+.foot{font-size:13px;color:var(--muted)}
+
+/* règles */
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.rule{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.rule ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.rule li{max-width:60ch}
+.rule .why{font-size:13px;color:var(--muted);border-top:1px dashed var(--line);padding-top:10px}
+.layers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.layer{border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.layer.dcs{background:var(--idle-soft)} .layer.bony{background:var(--accent-soft)}
+.layer b{font-family:var(--f-display);font-size:15px}
+.layer p{font-size:13.5px}
+
+/* lots */
+.lots{display:flex;flex-direction:column;gap:0;border-left:2px solid var(--line);margin-left:10px}
+.lot{position:relative;padding:0 0 28px 28px;display:flex;flex-direction:column;gap:12px}
+.lot::before{content:"";position:absolute;left:-9px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--bg);border:2px solid var(--muted)}
+.lot.now::before{border-color:var(--accent);background:var(--accent)}
+.lot.done::before{border-color:var(--ok);background:var(--ok)}
+.lot-h{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:baseline}
+.lot-h .no{font:800 13px/1 var(--f-mono);color:var(--accent)}
+.lot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.box ul{margin:0;padding-left:17px;display:flex;flex-direction:column;gap:4px;font-size:13.5px}
+.box .eyebrow{font-size:10.5px}
+.dep{font-size:13px;color:var(--muted)}
+.dep b{color:var(--ink)}
+
+@media (max-width:640px){
+  .layers{grid-template-columns:1fr}
+  .wrap{padding-inline:16px;gap:40px}
+  .note{max-width:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="head">
+  <span class="eyebrow">Groupe Bony · CRM Gearbox · lot 0</span>
+  <h1>Cartographie du référentiel client unique</h1>
+  <p class="lead">Comment chaque ligne des extractions DCSNETneo trouve son site, sa société et son client, et ce que l'on construit ensuite, lot par lot.</p>
+  <div class="meta">
+    <span class="status">Proposition à valider par Théo</span>
+    <span>Mesuré sur les extractions du 12/10/2026</span>
+    <span>Aucune donnée personnelle sur cette page : uniquement des codes et des volumes</span>
+  </div>
+</header>
+
+<section aria-labelledby="s-src">
+  <h2 id="s-src">Les trois sources</h2>
+  <div class="sources">
+    <div class="src">
+      <span class="tag">Requête du soir · TXT tabulé</span>
+      <span class="n" id="n-vn">—</span>
+      <span class="k"><b>ventes VN retenues</b> sur 80 522 lignes. Sont écartés : 25 580 dossiers sans client, transferts au VO, loueurs, VS, LLD Bony, rétrocessions, immobilisations.</span>
+      <span class="k">Clé client : <code>société + n° client propriétaire</code></span>
+    </div>
+    <div class="src">
+      <span class="tag">Requête du soir · TXT tabulé</span>
+      <span class="n" id="n-vo">—</span>
+      <span class="k"><b>ventes VO retenues</b> sur 55 104 lignes (particuliers seulement, filtre maintenu). COBA et LLD Bony écartés.</span>
+      <span class="k">Clé client : <code>société + n° compte client</code> (autre numérotation que le VN)</span>
+    </div>
+    <div class="src">
+      <span class="tag">Import unique · gelée au 02/10/2025</span>
+      <span class="n">360 302</span>
+      <span class="k"><b>lignes de l'ancienne base Sud-Ouest</b> (LABOBSO), 1998 → 2025, 169 974 VIN distincts, dont 1 580 déjà connus de DCS.</span>
+      <span class="k">Clé client : <code>n° de fiche</code></span>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="s-map">
+  <h2 id="s-map">Table de correspondance des affaires</h2>
+  <p>Une affaire DCS (<code>VNVO…</code>) peut couvrir plusieurs concessions : c'est le couple <b>affaire + libellé de site</b> qui donne le site Gearbox. Les sites sont ceux de <code>constants.ts</code> ; Alpine et Nissan restent des <b>marques</b>, jamais des sites. Volumes = ventes retenues dans le RCU.</p>
+  <div class="tools" role="group" aria-label="Filtrer par plaque">
+    <button class="chip" data-p="all" aria-pressed="true">Toutes</button>
+    <button class="chip" data-p="PLAQUE CENTRE" aria-pressed="false">Centre</button>
+    <button class="chip" data-p="PLAQUE NORD" aria-pressed="false">Nord</button>
+    <button class="chip" data-p="PLAQUE SUD" aria-pressed="false">Sud</button>
+    <button class="chip" data-p="PLAQUE SUD-OUEST" aria-pressed="false">Sud-Ouest</button>
+    <button class="chip" data-p="HORS PLAQUE" aria-pressed="false">Hors plaque</button>
+    <button class="chip" data-p="ÉCARTÉ" aria-pressed="false">Écartés</button>
+    <input id="q" type="search" placeholder="Chercher une affaire, un libellé, un site…" aria-label="Chercher dans la table">
+  </div>
+  <div class="legend">
+    <span><span class="pill p-ok">Direct</span> libellé reconnu</span>
+    <span><span class="pill p-auto">Déduit</span> libellé vide ou atypique, site de l'affaire</span>
+    <span><span class="pill p-idle">Sans vente</span> code connu, absent des extractions</span>
+    <span><span class="pill p-off">Écarté</span> pas des clients</span>
+  </div>
+  <div class="tbl">
+    <table>
+      <thead><tr>
+        <th>Affaire</th><th>Libellés DCS</th><th>Site Gearbox</th><th>Marque</th><th>Société</th>
+        <th class="num">VN</th><th class="num">VO</th><th>État</th><th>Note</th>
+      </tr></thead>
+      <tbody id="map"></tbody>
+    </table>
+  </div>
+  <p class="foot">Libellé de site inconnu dans un futur fichier : la vente est importée avec un site « à classer » et signalée dans le rapport d'import. Jamais de rejet silencieux, jamais de site inventé.</p>
+
+  <h3>Ancienne base Sud-Ouest : compte évènement → site</h3>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Compte évènement</th><th>Site Gearbox</th><th class="num">Lignes</th><th>Note</th></tr></thead>
+      <tbody id="bso"></tbody>
+    </table>
+  </div>
+</section>
+
+<section aria-labelledby="s-fin">
+  <h2 id="s-fin">Financement</h2>
+  <p>On lit d'abord les <b>libellés</b> (organisme, type de produit). Vides ou à « NE PLUS UTILISER », on se replie sur les codes. La <b>durée</b> vient du fichier si elle dépasse 0, sinon elle est calculée entre début et fin. Une date avant 2000 (le 01/01/1997 de l'ancienne base) est ignorée.</p>
+  <div class="layers">
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Code financier</th><th>Organisme</th></tr></thead>
+        <tbody>
+          <tr><td class="code">01 · 1 · DIA</td><td>DIAC</td></tr>
+          <tr><td class="code">02 · AB · BQ · BQE · CET · AUT</td><td>Autre banque</td></tr>
+          <tr><td class="code">00</td><td>Aucun (comptant)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Code financement</th><th>Famille de produit</th></tr></thead>
+        <tbody>
+          <tr><td class="code">01 · 07 · ND1 · ND2 · ND3 · NEW</td><td>LOA <span class="note">(New Deal 1 et 2, anciens codes)</span></td></tr>
+          <tr><td class="code">03 DLA · 25 NLA</td><td>LOA <span class="pill p-auto">à confirmer</span></td></tr>
+          <tr><td class="code">08 · 24 NLO · DLO</td><td>LLD <span class="note">(New Deal 3)</span></td></tr>
+          <tr><td class="code">02 · CLA · CR · CRE · C · CER</td><td>Crédit classique</td></tr>
+          <tr><td class="code">21</td><td>Crédit ballon (VO)</td></tr>
+          <tr><td class="code">05 · CBA · BAI</td><td>Crédit-bail</td></tr>
+          <tr><td class="code">06 · 22 · CPT</td><td>New Deal Pro · Intégral · comptant <span class="pill p-auto">à confirmer</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="foot">Dictionnaire déduit en croisant codes et libellés dans les fichiers. On avance avec lui tel quel ; c'est une table de référence, corrigeable sans toucher au code.</p>
+</section>
+
+<section aria-labelledby="s-rules">
+  <h2 id="s-rules">Les règles</h2>
+  <div class="rules">
+    <article class="rule">
+      <h3>Lecture des fichiers</h3>
+      <ul>
+        <li>Encodage Windows (cp1252), ligne 1 = titre, ligne 2 = en-têtes.</li>
+        <li>Colonnes lues <b>par leur nom, sans la casse</b>, jamais par leur position. Colonne obligatoire absente : import refusé, colonne nommée.</li>
+        <li>La <b>ligne de total</b> marque la fin du fichier et contrôle le nombre de lignes. Un fichier encore en cours de dépôt ne l'a pas : il attend.</li>
+        <li>Les guillemets sont du texte. Dates <code>jj/mm/aaaa</code>, montants à virgule, CP complété sur 5 chiffres.</li>
+      </ul>
+    </article>
+    <article class="rule">
+      <h3>Qui entre dans le RCU</h3>
+      <ul>
+        <li><b>Particuliers et sociétés.</b></li>
+        <li>Écartés : lignes sans client, transferts au VO, ventes aux loueurs, VS, LLD Bony, rétrocessions, immobilisations, buy-back, ex-rent.</li>
+        <li>Écartés aussi : affaires COBA et LLD Bony, civilité « Groupe Bony ».</li>
+        <li><b>Identité générique</b> (plus de 20 véhicules : garages, loueurs, la concession elle-même, comptes <code>77777</code>) : gardée pour l'historique du véhicule, jamais comme client à relancer.</li>
+      </ul>
+    </article>
+    <article class="rule">
+      <h3>Nettoyage</h3>
+      <ul>
+        <li>Noms et prénoms en majuscules, sans accents, espaces réduits.</li>
+        <li>39 civilités DCS ramenées à 4 : homme, femme, couple, société.</li>
+        <li>Téléphones au format <code>0XXXXXXXXX</code>. Un 06 / 07 est un portable, quelle que soit la colonne qui le porte.</li>
+      </ul>
+    </article>
+    <article class="rule">
+      <h3>Coordonnée suspecte</h3>
+      <ul>
+        <li>Utilisée par <b>plus de 3 personnes</b> de noms différents.</li>
+        <li>Ou nom de domaine Bony (<code>@bonyautomobiles.com</code>, <code>@bonyauto-mobile.com</code>).</li>
+        <li>Ou numéro bidon (<code>0600000000</code>, chiffres répétés).</li>
+        <li>Une coordonnée suspecte ne sert <b>ni à rapprocher ni à relancer</b>. Recalculé à chaque import ; le seuil est un réglage.</li>
+      </ul>
+      <p class="why">Mesuré : un portable sur 278 ventes, 315 portables et 350 e-mails sur plus de 5 ventes.</p>
+    </article>
+  </div>
+
+  <h3>Rapprochement : quand deux fiches sont un seul client</h3>
+  <div class="tbl">
+    <table>
+      <thead><tr><th>Situation</th><th>Décision</th></tr></thead>
+      <tbody>
+        <tr><td>Même identité source (société + n° client)</td><td><span class="pill p-ok">Même client</span></td></tr>
+        <tr><td>Même nom + même prénom + même portable <b>ou</b> même e-mail (non suspects)</td><td><span class="pill p-ok">Fusion automatique</span></td></tr>
+        <tr><td>Même nom + même prénom + même CP + même voie</td><td><span class="pill p-ok">Fusion automatique</span></td></tr>
+        <tr><td>Société : même raison sociale normalisée + même CP</td><td><span class="pill p-ok">Fusion automatique</span></td></tr>
+        <tr><td>Ancienne base Sud-Ouest ↔ DCS : même VIN + même nom</td><td><span class="pill p-ok">Fusion automatique</span></td></tr>
+        <tr><td>Même portable, même nom, prénom différent</td><td><span class="pill p-idle">Pas de fusion</span> <span class="note">même foyer, lien noté</span></td></tr>
+        <tr><td>Même nom + prénom + CP, rien d'autre en commun</td><td><span class="pill p-auto">File à arbitrer</span> <span class="note">proposé, pas appliqué</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="foot">Une fusion ou une séparation décidée à la main est <b>rejouée à chaque import</b> : la nuit ne défait jamais un arbitrage. Un client garde son identifiant à vie ; en cas de fusion, le plus ancien survit. Repère : DCS a lui-même 1 065 personnes sous plusieurs numéros, dont 818 dans la même société.</p>
+
+  <h3>Deux couches qui ne se mélangent jamais</h3>
+  <div class="layers">
+    <div class="layer dcs">
+      <b>Ce que DCS envoie</b>
+      <p>Identités, ventes, véhicules, financements, garanties. <b>Réécrit chaque nuit</b> par l'import, et par lui seul.</p>
+    </div>
+    <div class="layer bony">
+      <b>Ce que Bony saisit</b>
+      <p>Vendeur référent, arbitrages de rapprochement, « ne plus contacter », contacts refusés, qualifications, relances, échanges. <b>L'import n'y écrit jamais.</b></p>
+    </div>
+  </div>
+
+  <h3>Garde-fous de l'import</h3>
+  <div class="rules">
+    <article class="rule">
+      <ul>
+        <li>Total absent ou faux, ou volume en baisse de <b>plus de 10 %</b> sur la veille : <b>import non appliqué</b>, données de la veille conservées, rapport en erreur.</li>
+        <li>Fichiers bruts archivés 14 jours sur le VPS ; sauvegarde de la base chaque nuit, sur le VPS seulement.</li>
+        <li>La base n'a aucun port ouvert vers l'extérieur et ne quitte jamais le VPS.</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<section aria-labelledby="s-lots">
+  <h2 id="s-lots">Les lots</h2>
+  <p>Chaque lot suit la méthode habituelle : test réel sur le poste, recette par Théo, documentation à jour, puis mise en ligne. Une autorisation de mise en ligne vaut pour un seul lot.</p>
+  <div class="lots" id="lots"></div>
+</section>
+
+</div>
+
+<script>
+const PLAQUE={Clermont:"PLAQUE CENTRE",Mozac:"PLAQUE CENTRE",Massagettes:"PLAQUE CENTRE",Ussel:"PLAQUE CENTRE",
+  Vichy:"PLAQUE NORD",Moulins:"PLAQUE NORD",Thiers:"PLAQUE NORD",Ambert:"PLAQUE NORD",
+  Issoire:"PLAQUE SUD",Brioude:"PLAQUE SUD",Mende:"PLAQUE SUD","Le Puy-en-Velay":"PLAQUE SUD",
+  Albi:"PLAQUE SUD-OUEST",Rodez:"PLAQUE SUD-OUEST",Millau:"PLAQUE SUD-OUEST",Aurillac:"PLAQUE SUD-OUEST",Figeac:"PLAQUE SUD-OUEST",Gaillac:"PLAQUE SUD-OUEST",Villefranche:"PLAQUE SUD-OUEST",Carmaux:"PLAQUE SUD-OUEST",Lavaur:"PLAQUE SUD-OUEST",
+  "Montluçon":"HORS PLAQUE","Saint-Etienne":"HORS PLAQUE"};
+const RD="Renault · Dacia";
+// [affaire, libellés, site, marque, société, VN, VO, état, note]
+const ROWS=[
+ ["VNVOCL",["CLERM"],"Clermont",RD,"EAA",12248,14784,"ok",""],
+ ["VNVOCL",["(vide)"],"Clermont",RD,"EAA",0,1,"auto",""],
+ ["VNVOCL",["RIOM"],"Mozac",RD,"EAA",3,0,"auto","Ventes de Riom saisies sous l'affaire de Clermont"],
+ ["VNVOCLAPL",["ALPINE CLE"],"Clermont","Alpine","EAA",724,0,"ok",""],
+ ["VNVOCLERNIS",["CLERMONT","SILENCE"],"Clermont","Nissan","REP_AUTO",1578,2767,"ok","SILENCE : 2 ventes VO, rattachées à Clermont"],
+ ["VNVOVOL",["RIOM","MBZ RIOM","MOZAC"],"Mozac",RD,"EAA",3424,3049,"ok",""],
+ ["VNVOMA",["VNVOMA","Massagette"],"Massagettes",RD,"EAA",1229,1792,"ok",""],
+ ["VNVOUS",["USSEL","Ussel"],"Ussel",RD,"EAA",1565,1949,"ok",""],
+ ["VNVOVI",["VICHY","Vichy","MBZ VICHY"],"Vichy",RD,"SODAVI",2681,4544,"ok",""],
+ ["VNVOVI",["(vide)"],"Vichy",RD,"SODAVI",2067,0,"auto","Affaire mono-site"],
+ ["VNVOVIALP",["ALPVICHY"],"Vichy","Alpine","SODAVI",15,0,"ok",""],
+ ["VNVOCLERNIS",["BELLERIVE"],"Vichy","Nissan","REP_AUTO",350,832,"ok","Nissan Vichy (Théo, 12/10)"],
+ ["VNVOCUSNIS",["CUSSE"],"Vichy","Nissan","REP_AUTO",10,0,"ok","Nissan Vichy · code absent du mapping, ajouté"],
+ ["VNVOMOUNIS",["CUSSE"],"Vichy","Nissan","REP_AUTO",13,0,"ok","Nissan Vichy · code absent du mapping, ajouté"],
+ ["VNVOMO",["AVERMES","Moulins"],"Moulins",RD,"GGPL",2850,3438,"ok",""],
+ ["VNVOCLERNIS",["MOULINS"],"Moulins","Nissan","REP_AUTO",628,1819,"ok",""],
+ ["VNVOMOUNIS",["MOULI"],"Moulins","Nissan","REP_AUTO",21,0,"ok",""],
+ ["VNVOTH",["THIER"],"Thiers",RD,"RICOUX",2434,2565,"ok",""],
+ ["VNVOTH",["AMBER"],"Ambert",RD,"RICOUX",0,47,"ok",""],
+ ["VNVOISS",["ISSOI","RENAULT"],"Issoire",RD,"AVA",2674,3210,"ok",""],
+ ["VNVOISS",["(vide)"],"Issoire",RD,"AVA",837,0,"auto","Affaire mono-site"],
+ ["VNVOAVABRI",["BRIOUDE"],"Brioude",RD,"AVA",0,365,"ok",""],
+ ["VNVOBRI",[],"Brioude",RD,"GGV",0,0,"idle","Aucune vente dans les extractions"],
+ ["VNVOMEN",["MENDE","Mende"],"Mende",RD,"GGV",1494,1805,"ok",""],
+ ["VNVOPUY",["LE PUY","GGV LE PUY","(vide)"],"Le Puy-en-Velay",RD,"GGV",4802,4435,"ok",""],
+ ["VNVOPUYALP",["ALPLEPUY"],"Le Puy-en-Velay","Alpine","GGV",19,0,"ok",""],
+ ["VNVOCLERNIS",["LEPUY"],"Le Puy-en-Velay","Nissan","REP_AUTO",132,624,"ok",""],
+ ["VNVORALBI",["ALBI","(vide)"],"Albi",RD,"BSO",619,535,"ok","Dans DCS depuis le 07/10/2025"],
+ ["VNVORAURIL",["AURILLAC","MBZ AURILL"],"Aurillac",RD,"BSO",783,0,"ok","Dans DCS depuis le 07/10/2025"],
+ ["VNVORGAILLAC",["GAILLAC","(vide)"],"Gaillac",RD,"BSO",587,359,"ok","Dans DCS depuis le 07/10/2025"],
+ ["VNVORLAVR",["LAVAUR"],"Lavaur",RD,"BSO",0,127,"ok",""],
+ ["VNVORRODEZ",["RODEZ","(vide)"],"Rodez",RD,"BSO",660,537,"ok",""],
+ ["VNVORRODEZ",["RLTVIL"],"Villefranche",RD,"BSO",154,0,"ok","Villefranche vend sous l'affaire de Rodez"],
+ ["VNVORVIL",["VILLEFRANC","VILLEFRAN","(vide)"],"Villefranche",RD,"BSO",0,156,"ok",""],
+ ["VNVORFIG",[],"Figeac",RD,"BSO",0,0,"idle","Aucune vente dans les extractions"],
+ ["VNVORMILLAU",[],"Millau",RD,"BSO",0,0,"idle","Aucune vente dans les extractions"],
+ ["VNVORCARM",[],"Carmaux",RD,"BSO",0,0,"idle","Le mapping dit « Blaye », la doc DCS dit Carmaux : Carmaux retenu"],
+ ["VNVONISRDZ",[],"Rodez · Albi · Aurillac","Nissan","Nissan BSO",0,0,"idle","Aucune vente dans les extractions"],
+ ["VNVOCLERNIS",["MONTLUCON"],"Montluçon","Nissan","REP_AUTO",318,1348,"ok",""],
+ ["VNVOMONNIS",["MONTLUCON"],"Montluçon","Nissan","REP_AUTO",1,0,"ok","Code absent du mapping, ajouté"],
+ ["VNVOCLERNIS",["STETIENNE"],"Saint-Etienne","Nissan","REP_AUTO",994,2289,"ok",""],
+ ["VNVOCOBA",["COBA","Coba"],"—","—","Coba",0,1417,"off","Pas des clients (Théo, 12/10)"],
+ ["VNVOLLDBONY",["LLDBONY"],"—","—","LLD_BONY",0,30,"off","Pas des clients (Théo, 12/10)"],
+];
+const ORDER=["PLAQUE CENTRE","PLAQUE NORD","PLAQUE SUD","PLAQUE SUD-OUEST","HORS PLAQUE","ÉCARTÉ"];
+const NICE={"PLAQUE CENTRE":"Plaque Centre","PLAQUE NORD":"Plaque Nord","PLAQUE SUD":"Plaque Sud","PLAQUE SUD-OUEST":"Plaque Sud-Ouest","HORS PLAQUE":"Hors plaque (Nissan)","ÉCARTÉ":"Écartés"};
+const STATE={ok:["Direct","p-ok"],auto:["Déduit","p-auto"],idle:["Sans vente","p-idle"],off:["Écarté","p-off"]};
+const fmt=n=>n?n.toLocaleString("fr-FR"):"·";
+const plaqueOf=r=>r[7]==="off"?"ÉCARTÉ":(PLAQUE[r[2]]||(r[2].includes("Rodez")?"PLAQUE SUD-OUEST":"HORS PLAQUE"));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const kept=ROWS.filter(r=>r[7]!=="off");
+document.getElementById("n-vn").textContent=kept.reduce((a,r)=>a+r[5],0).toLocaleString("fr-FR");
+document.getElementById("n-vo").textContent=kept.reduce((a,r)=>a+r[6],0).toLocaleString("fr-FR");
+
+let filt="all";
+function render(){
+  const q=document.getElementById("q").value.trim().toLowerCase();
+  const tb=document.getElementById("map"); let html="";
+  for(const p of ORDER){
+    if(filt!=="all"&&filt!==p) continue;
+    const rows=ROWS.filter(r=>plaqueOf(r)===p).filter(r=>!q||r.flat().join(" ").toLowerCase().includes(q));
+    if(!rows.length) continue;
+    const vn=rows.reduce((a,r)=>a+r[5],0), vo=rows.reduce((a,r)=>a+r[6],0);
+    html+=`<tr class="grp"><td colspan="9">${NICE[p]}<span class="sum">${fmt(vn)} VN · ${fmt(vo)} VO</span></td></tr>`;
+    for(const r of rows){
+      const l=r[1].length?r[1].map(x=>`<span class="lbl${x==="(vide)"?" empty":""}">${esc(x)}</span>`).join(""):'<span class="lbl empty">—</span>';
+      const [st,cl]=STATE[r[7]];
+      html+=`<tr><td class="code">${r[0]}</td><td><div class="lbls">${l}</div></td><td>${esc(r[2])}</td><td class="brand">${esc(r[3])}</td><td class="code">${esc(r[4])}</td><td class="num">${fmt(r[5])}</td><td class="num">${fmt(r[6])}</td><td><span class="pill ${cl}">${st}</span></td><td class="note">${esc(r[8])}</td></tr>`;
+    }
+  }
+  tb.innerHTML=html||'<tr><td colspan="9" class="note">Aucune ligne ne correspond à cette recherche.</td></tr>';
+}
+document.querySelectorAll(".chip").forEach(b=>b.addEventListener("click",()=>{
+  filt=b.dataset.p; document.querySelectorAll(".chip").forEach(x=>x.setAttribute("aria-pressed",x===b?"true":"false")); render();
+}));
+document.getElementById("q").addEventListener("input",render);
+render();
+
+const BSO=[
+ ["VNVO_FDC_021025","Millau",82349,""],
+ ["VNVORO_FDC_021025","Rodez",71443,""],
+ ["VNVOAU_FDC_021025","Aurillac",51538,""],
+ ["VNVOALBI_FDC_021025","Albi",50028,""],
+ ["VNVOGA_FDC_021025","Gaillac",46187,"Lavaur vendait sous Gaillac : site indiscernable, Gaillac retenu"],
+ ["FIVNVO_FDC_021025","Figeac",39879,""],
+ ["VNVOVI_FDC_021025","Villefranche",18878,""],
+ ["VNVOCX_FDC","Carmaux",0,"Absent de l'extraction"],
+ ["VNVONISLP_FDC","Sud-Ouest, à classer",0,"Un seul compte pour Nissan Rodez, Albi et Aurillac"],
+];
+document.getElementById("bso").innerHTML=BSO.map(r=>`<tr><td class="code">${r[0]}</td><td>${esc(r[1])}</td><td class="num">${fmt(r[2])}</td><td class="note">${esc(r[3])}</td></tr>`).join("");
+
+const LOTS=[
+ {no:"Lot 0",t:"Cadrage",cls:"now",deploy:"Rien en ligne",
+  goal:"Fixer les sources, les correspondances et les règles avant la première ligne de code.",
+  what:["Extractions VN, VO et ancienne base Sud-Ouest mesurées","Table de correspondance et règles de cette page","Document de référence RCU-CADRAGE.md"],
+  test:["Relecture et validation par Théo"],
+  dep:"Rien. <b>En cours.</b>"},
+ {no:"Lot 1",t:"Socle et import du soir",deploy:"Nouveaux conteneurs <code>rcu-db</code> et <code>rcu-worker</code> + api + web",
+  goal:"Recevoir chaque nuit les fichiers de DCS et les ranger proprement, sans encore fusionner les clients.",
+  what:["Base Postgres dédiée sur le VPS, sans port ouvert, sauvegardée chaque nuit","Compte SFTP de dépôt pour DCS, sans accès au serveur","Lecture des TXT, contrôles (total, colonnes, chute de volume), archivage 14 jours","Tables de référence : affaires, sites, sociétés, comptes Sud-Ouest, financement","Import VN et VO chaque nuit, ancienne base Sud-Ouest une seule fois","Rapport d'import consultable dans Gearbox (Master)"],
+  test:["Base locale chargée avec les vrais fichiers","Même fichier importé deux fois : aucun changement","Fichier tronqué ou sans total : refusé","Dépôt réel par SFTP sur le VPS"],
+  dep:"Théo configure l'envoi automatique du Requêteur avec le compte SFTP fourni."},
+ {no:"Lot 2",t:"Client unique et rubrique CRM en lecture",deploy:"api + web",
+  goal:"Passer de lignes de vente à des personnes, et les consulter dans Gearbox.",
+  what:["Rapprochement selon les règles ci-dessus, coordonnées suspectes, identités génériques","File d'arbitrage : fusionner ou séparer à la main, décisions rejouées chaque nuit","Rubrique CRM (interface v2), rôles de Jeux : Master, Administrator, Coordinator, Digital Manager","Recherche par nom, téléphone, e-mail, immatriculation, VIN","Fiche client : identité, coordonnées et leur état, véhicules, ventes VN / VO / ancienne base, financements, garanties, vendeurs"],
+  test:["Chiffres de rapprochement contrôlés (≈ 29 300 personnes sur 34 900 ventes VN à particuliers)","Cas limites : foyers, sociétés, comptes génériques","Parcours dans le navigateur avec un rôle autorisé, et un rôle refusé"],
+  dep:"Lot 1 en ligne depuis quelques nuits."},
+ {no:"Lot 3",t:"Travail des équipes Bony sur les fiches",deploy:"api + web",
+  goal:"Que la base vive au-delà de DCS.",
+  what:["Vendeur référent : le dernier vendeur DCS au départ, réattribution en masse quand un vendeur part","Référentiel des vendeurs : noms DCS reliés aux personnes","« Ne plus contacter », par canal, et coordonnées refusées","Qualification du client (projet, véhicule recherché, échéance) et historique des échanges","Corrections de coordonnées par Bony, jamais écrasées par la nuit"],
+  test:["Une saisie survit à l'import de la nuit suivante","Réattribution d'un portefeuille de test, puis retour à l'état initial"],
+  dep:"Lot 2."},
+ {no:"Lot 4",t:"Moteur de relances",deploy:"api + web",
+  goal:"Sortir chaque jour les bons clients à appeler.",
+  what:["Règles réglables : fin de financement par famille (LOA, LLD, crédit), prochain contrôle technique, anniversaire de livraison, âge du véhicule, sans achat depuis X ans","Un client = une seule relance active, la plus prioritaire","Exclusions automatiques : « ne plus contacter », coordonnées suspectes, identités génériques","Listes par site et par vendeur, export Excel, suivi du résultat"],
+  test:["Listes recalculées à la main sur un échantillon","Volumes par règle présentés à Théo avant activation"],
+  dep:"Lot 3 (vendeur référent, oppositions)."},
+ {no:"Lot 5",t:"Branchement de GRID",deploy:"api + GRID (dépôt séparé)",
+  goal:"Que les vendeurs travaillent leurs fiches depuis GRID.",
+  what:["Accès sécurisé au RCU depuis GRID, qui vérifie la session GRID et ne renvoie que le portefeuille du vendeur","Les fiches clients ne transitent jamais par Supabase","Comptes vendeurs dans GRID","Saisie des qualifications et des échanges depuis GRID, dans la même couche Bony"],
+  test:["Un vendeur ne voit que ses clients, vérifié dans le navigateur et dans l'onglet Réseau"],
+  dep:"Lot 4. Le site « ALPINE » du référentiel GRID est à aligner (Alpine est par site)."},
+];
+document.getElementById("lots").innerHTML=LOTS.map(l=>`
+ <article class="lot ${l.cls||""}">
+  <div class="lot-h"><span class="no">${l.no}</span><h3>${l.t}</h3><span class="pill p-idle">${l.deploy}</span></div>
+  <p>${l.goal}</p>
+  <div class="lot-grid">
+   <div class="box"><span class="eyebrow">Contenu</span><ul>${l.what.map(x=>`<li>${x}</li>`).join("")}</ul></div>
+   <div class="box"><span class="eyebrow">Vérification</span><ul>${l.test.map(x=>`<li>${x}</li>`).join("")}</ul></div>
+  </div>
+  <p class="dep">Prérequis : ${l.dep}</p>
+ </article>`).join("");
+</script>

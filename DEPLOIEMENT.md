@@ -181,7 +181,31 @@ première connexion.
 - **Logs** : `sudo docker compose logs -f` (ou `logs -f api`)
 - **État des conteneurs** : `sudo docker compose ps`
 - **Base de données** : gérée par Supabase (backups/PITR côté dashboard Supabase —
-  pas de `pg_dump` local, il n'y a pas de conteneur db).
+  pas de `pg_dump` local). Exception : la base du CRM, `rcu-db`, est sur le VPS (§ CRM / RCU).
+
+## CRM / RCU — base `rcu-db`, worker, dépôt SFTP de DCS (12/10/2026, correctif 82)
+
+Base du référentiel client unique : Postgres **sur le VPS**, jamais exposée, jamais copiée hors du VPS.
+Mise en place (une fois) :
+
+1. **Mot de passe de la base** dans `~/gearbox/.env` : `RCU_DB_PASSWORD=<openssl rand -hex 24>` (hors git ; inutile sur le poste,
+   qui a sa propre base `rcu` locale via `RCU_DATABASE_URL` dans `backend/.env`).
+2. **Dossiers** : `sudo mkdir -p /srv/dcs/depot /srv/rcu/archive && sudo chown root:root /srv/dcs && sudo chmod 755 /srv/dcs
+   && sudo chmod 700 /srv/rcu/archive`.
+3. **Compte SFTP `dcs`** (dépôt seul, sans shell, enfermé dans `/srv/dcs`) :
+   `sudo useradd -M -d /srv/dcs -s /usr/sbin/nologin dcs && sudo chown dcs:dcs /srv/dcs/depot` puis, dans
+   `/etc/ssh/sshd_config.d/70-dcs-sftp.conf` : `Match User dcs` → `ChrootDirectory /srv/dcs`, `ForceCommand internal-sftp`,
+   `AllowTcpForwarding no`, `X11Forwarding no` (+ `PasswordAuthentication yes` SEULEMENT si DCS n'accepte pas de clé).
+   **Toujours `sudo sshd -t` avant `sudo systemctl reload ssh`**, et garder la session ouverte pendant le test.
+4. **Démarrage** : `sudo docker compose up -d --build rcu-db rcu-worker api web`. Contrôle : `sudo docker compose logs rcu-worker`
+   → `migrations appliquées : 001_socle.sql, 002_demandes.sql` puis `surveillance de /depot`.
+5. **Sauvegarde** : crontab root `45 3 * * * /home/ubuntu/gearbox/scripts/backup-rcu.sh >> /var/log/gearbox-backup-rcu.log 2>&1`
+   (`pg_dump` gzippé dans `/var/backups/rcu`, root seul, 14 jours).
+6. **Ancienne base Sud-Ouest (une fois)** : déposer le TXT dans `/srv/rcu/archive/manuel/`, puis
+   `sudo docker compose exec rcu-worker node dist/rcu/worker.js --fichier "/archive/manuel/<fichier>"`, puis supprimer le fichier.
+
+Au quotidien : DCS dépose ses TXT dans `depot/` ; le worker les importe et les range dans l'archive. Le journal est dans
+Gearbox (CRM › Imports, Master). Un import refusé pour baisse de volume s'applique depuis Gearbox (« Appliquer quand même… »).
 
 ## Worker Cloudflare des Forms Bony (`forms-worker/`, 01/10/2026)
 

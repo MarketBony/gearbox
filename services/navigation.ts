@@ -1,10 +1,10 @@
 import {
   LayoutDashboard, FolderKanban, Megaphone, Package, CalendarDays, PiggyBank, Archive,
-  Globe, Euro, Sparkles, Gamepad2, CheckSquare, MessageSquare, FileSpreadsheet, Palmtree, ClipboardList,
+  Globe, Euro, Sparkles, Gamepad2, CheckSquare, MessageSquare, FileSpreadsheet, Palmtree, ClipboardList, Handshake,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { canSeeGames, SITE_MANAGER_SECTIONS, isSiteManager } from '../constants';
-import { EXPORT_ALLOWED_ROLES, canSeeForms } from '../constants';
+import { EXPORT_ALLOWED_ROLES, canSeeForms, canSeeCrm } from '../constants';
 
 // ============================================================================
 // Navigation : SOURCE UNIQUE des rubriques visibles, partagée par la Sidebar
@@ -49,6 +49,8 @@ export function computeNav({ role, gamesEnabled, voitConges, ui2 = false }: NavC
     // Campagnes : retirée de la v2 le 09/10/2026 (Théo : « elle sert à rien »). Reste dans l'ancienne interface jusqu'à la bascule.
     ...(!ui2 ? [I('campaigns', Megaphone, 'Campagnes')] : []),
     ...(ui2 && canSeeForms(role) ? [I('forms', ClipboardList, 'Forms')] : []),
+    // CRM : interface v2 seulement (12/10/2026), comme Forms.
+    ...(ui2 && canSeeCrm(role) ? [I('crm', Handshake, 'CRM')] : []),
     I('material', Package, 'Matériel'),
     I('agenda', CalendarDays, 'Agenda'),
     I('budget', PiggyBank, 'Budget'),
@@ -79,6 +81,7 @@ export function computeNav({ role, gamesEnabled, voitConges, ui2 = false }: NavC
         { label: '', items: pick('dashboard') },
         { label: 'GESTION DE PROJETS', items: pick('projects', 'todo') },
         { label: 'COM DIGITALE', items: pick('digital', 'campaigns', 'forms') },
+        { label: 'RELATION CLIENT', items: pick('crm') },
         { label: 'COMMUNAUTÉ', items: pick('hello-marketing', 'conges', 'games', 'chat') },
         { label: 'OUTILS', items: pick('budget', 'fixed-expenses', 'material', 'agenda', 'export') },
         { label: 'HISTORIQUE', items: [I('archives', Archive, 'Archives')] },
