@@ -4,42 +4,62 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 12/10/2026, fin de session (lire en premier)
-- **ÉTAT : tout est en production (correctifs 80 et 81 livrés le 12/10), RIEN en cours de code, `master` = `origin` = prod.**
-  Correctif 81 : artefact du verre Liquid Glass sur les widgets (ligne nette sous le haut des widgets) + barres de défilement
-  parasites des widgets Forms / Ma journée. Forms : suppression d'une réponse = onglet « Réponse par réponse » (existe, Théo garde
-  tel quel) ; Google Forms : suppression dans Google puis « Actualiser ».
-  Session du 12/10 : **LOT SÉCURITÉ SERVEUR** (correctif 80) bouclé AVANT la bascule, testé avec de vrais comptes Master,
-  chef de site (Mozac), External et Guest, dans les deux interfaces. Détail : fiche du correctif 80.
-- **RESTE DU LOT, côté Théo (consoles externes)** : **régénérer la clé OpenWeather** (openweathermap.org — l'ancienne a été
-  publique dans le bundle client des mois durant ; elle sert ENCORE, désormais côté serveur seulement) et **le secret client
-  Google** (console Google, projet `gearbox-forms`). Valeurs à reporter dans `backend/.env` + `.env` du VPS
-  (`OPENWEATHER_API_KEY`, `GOOGLE_CLIENT_SECRET`) puis `sudo docker compose up -d api` (variables seules, pas de rebuild).
-- **BASCULE : PAS ENCORE** (Théo, 12/10) — ne pas la lancer sans son feu vert ; date à reconfirmer avec lui.
+- **ÉTAT : tout est en production (correctifs 80 et 81 livrés le 12/10), RIEN en cours de code, `master` = `origin` = prod**
+  (`61b930a`). Dernier déploiement : correctif 81, `web` seul. Aucune branche en cours.
+- **Fait le 12/10** (détail : fiches 80 et 81) :
+  - **80 — lot sécurité serveur** : lectures gardées par rôle (`INTERNAL_ROLES` / `UNSCOPED_READ_ROLES` / `CHAT_ROLES`,
+    `auth/roles.ts`) ; l'External ne lit plus AUCUN projet (ni budget, dépenses, fichiers projet), ni par l'API ni par le temps
+    réel ; Chat fermé au chef de site (REST + push du Général) ; `/uploads` sous session (cookie `gx_media`,
+    `auth/mediaAccess.ts`) ; photo de profil validée ; ancien mot de passe exigé ; météo par relais serveur ET par coordonnées
+    (températures trop basses de ~3 °C, mesuré) ; **déconnexion = rechargement complet** (la coque v2 héritait du compte
+    précédent). Testé avec de vrais comptes Master, chef de site (Mozac), External, Guest, dans les deux interfaces.
+  - **81 — verre Liquid Glass des widgets** : ligne nette dans le verre (puce Intel D3D11) → `clip-path` sur les widgets ;
+    barres de défilement parasites des widgets Forms / Ma journée.
+  - **Forms, suppression d'une réponse** : rien codé — elle existe (Forms Bony › onglet « Réponse par réponse » › « Effacer
+    cette réponse ») et Théo la garde telle quelle. Google Forms : supprimer dans Google, puis « Actualiser » dans Gearbox (l'API
+    de Google ne supprime pas de réponse).
+- **À FAIRE PAR THÉO (consoles externes), puis par moi** : **régénérer la clé OpenWeather** (openweathermap.org — l'ancienne a été
+  publique dans le bundle client des mois durant ; elle sert ENCORE, côté serveur seulement) et **le secret client Google**
+  (console Google, projet `gearbox-forms`). Ensuite : `backend/.env` + `~/gearbox/.env` du VPS (`OPENWEATHER_API_KEY`,
+  `GOOGLE_CLIENT_SECRET`), puis `sudo docker compose up -d api` (variables seules, pas de rebuild).
+- **BASCULE : PAS ENCORE** (Théo, 12/10) — ne pas la lancer ni la reproposer comme « prochaine étape » sans son feu vert ; la
+  date (annoncée ~16/10) est à reconfirmer avec lui.
 - **EN ATTENTE DE RETOURS (Théo + équipe)** :
-  - **bulles de discussion (76)** : test grandeur nature — pastille de non-lus et VRAI envoi depuis une bulle jamais testés ;
+  - **Liquid Glass ailleurs que sur les widgets** (Dock, menus, panneaux, fenêtres) : non rognés ; si une ligne du même genre y
+    est signalée, même correctif (`clip-path`). Méthode : capture d'ÉCRAN de Théo, agrandie et mesurée (cf. Pièges) ;
+  - **bulles de discussion (76)** : pastille de non-lus et VRAI envoi depuis une bulle jamais testés ;
   - **widgets (77–78)** : cocher une tâche, déplacer une carte du widget To-do, jouer / refuser un défi (écritures non testées) ;
-    ⚠️ la disposition de Théo a été réarrangée par le panneau de test étroit (9 colonnes) — un glisser la remet ;
   - **fonds d'écran (75)** : mesurer sur un PC qui chauffait (gestionnaire de tâches de Chrome) ;
-  - **Chat (72), mIAouss (71 : réponses + sensation de la mascotte, réglages dans `ui2/apps/assistant/mascot.ts`),
-    navigation téléphone (70, iPhone / Pixel)** : retours toujours attendus ;
-  - **Jeux (79)** : pastille = défis reçus + parties à mon tour ; bannières à confirmer en usage réel.
-- **ENSUITE, dans l'ordre** : bascule (v2 par défaut, cohabitation ~2 semaines, puis retrait de `pages/*`) ; corrections
-  issues des retours ; **mIAouss P2** (rédaction guidée) et **P3** (actions avec confirmation) ; suite de la liste
-  d'octobre : **tâches multi-assignées**, **prestataire sur les dépenses**, **répartitions personnalisées** (question ouverte :
-  une répartition déjà utilisée reste-t-elle modifiable ?), **fichiers maison** (régler d'abord la sauvegarde du volume
-  `uploads_data`, non sauvegardé). Backlog § « Chantiers d'octobre 2026 ».
-- **Points ouverts non urgents** : la trace « a restauré le projet » (79) n'est pas vérifiable avec le compte Master (exclu du
-  journal par conception) — à voir avec un autre compte ; clés Gemini / Groq / Cloudflare passées en clair le 08/10 (Théo :
-  « pas un problème ») ; poignée de débogage `el.__buddy` dans `mascot.ts` (inoffensive).
-- **Décisions de Théo à NE PAS rediscuter (08–09/10)** : rubrique **Campagnes retirée de la v2** (ses données restent sur les
-  tâches) ; Dépenses filtrées par la PART du site ; bulles **ordinateur seulement**, apparition automatique (réglage pour la
-  couper) ; fonds : Ruban par défaut, animés Bony · Trait / Magma / Rétro seulement, sombres même en thème clair ; logo
-  toujours À PLAT (jamais verre ni relief) ; Note rapide retirée de la galerie ; Horloge gardée.
-- **À savoir pour la session suivante** : Bony ne paiera JAMAIS un service d'IA (aucune option payante à proposer). Push et
-  déploiement autorisés par Théo une fois un lot validé à la recette (autorisation par lot). Le panneau navigateur de
-  Claude Code perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par leur nom,
-  demander à Théo de se reconnecter). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`), plus seulement dans
-  le navigateur.
+  - **Chat (72), mIAouss (71 : réponses + mascotte, `ui2/apps/assistant/mascot.ts`), navigation téléphone (70, iPhone /
+    Pixel)**, **Jeux (79** : pastille et bannières) : retours toujours attendus.
+- **Non vérifié du correctif 80** (à faire au passage) : le temps réel SANS charge pour l'External (vérifié dans le code
+  seulement — test : un onglet Master modifie un projet de test, regarder ce que reçoit l'External) ; le Chat de l'ANCIENNE
+  interface avec un External.
+- **ENSUITE, dans l'ordre** : bascule (quand Théo le dira) ; corrections issues des retours ; **mIAouss P2** (rédaction guidée)
+  et **P3** (actions avec confirmation) ; liste d'octobre : **tâches multi-assignées**, **prestataire sur les dépenses**,
+  **répartitions personnalisées** (question ouverte : une répartition déjà utilisée reste-t-elle modifiable ?), **fichiers
+  maison** (régler d'abord la sauvegarde du volume `uploads_data`, non sauvegardé). Backlog § « Chantiers d'octobre 2026 ».
+- **Points ouverts non urgents** : `/uploads` cloisonné par DOSSIER, pas par fichier (pièce jointe de chat lisible par tout rôle
+  qui a le Chat s'il connaît l'URL) ; déconnexion = cookie effacé mais jeton valide 24 h (JWT sans état) — backlog § Sécurité ;
+  trace « a restauré le projet » (79) à vérifier avec un compte autre que Master ; clés Gemini / Groq / Cloudflare passées en
+  clair le 08/10 (Théo : « pas un problème ») ; poignée de débogage `el.__buddy` dans `mascot.ts` (inoffensive).
+- **Décisions de Théo à NE PAS rediscuter** :
+  - 12/10 : l'**External n'a accès aux projets « tout court »** (bloc événements de Hello Marketing retiré pour lui) ; **photos
+    de profil protégées** comme les autres fichiers ; **suppression des réponses Forms laissée telle quelle** ; une rubrique sans
+    accès n'a **pas d'icône** dans le Dock (règle déjà en place, le défaut venait du changement de compte).
+  - 08–09/10 : **Campagnes retirée de la v2** ; Dépenses filtrées par la PART du site ; bulles **ordinateur seulement** ; fonds :
+    Ruban par défaut, animés Bony · Trait / Magma / Rétro, sombres même en thème clair ; logo toujours À PLAT ; Note rapide
+    retirée de la galerie ; Horloge gardée.
+- **À savoir pour la session suivante** :
+  - Bony ne paiera JAMAIS un service d'IA (aucune option payante à proposer). Push et déploiement autorisés par Théo une fois un
+    lot validé à la recette — **autorisation par lot**.
+  - **Tester un autre rôle** : Théo se déconnecte et reconnecte l'autre compte dans le même onglet (la page se recharge seule
+    depuis le 80). `/uploads` sans session = 401 ; derrière une session, un 404 = fichier de prod absent du poste local.
+  - **Défaut d'affichage signalé par Théo** : mes captures du panneau NE montrent PAS les artefacts GPU (rendu hors écran) —
+    demander tout de suite une capture d'écran, l'agrandir et la mesurer (Pillow est installé pour le Python du poste :
+    `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
+  - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
+    leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
 - **En production : correctif 81 (12/10)** — **v2, verre Liquid Glass des widgets** (rognage `clip-path`) et listes des widgets
   sans barre horizontale, `web` seul. Avant lui le **correctif 80 (12/10)** — **lot sécurité serveur** (lectures gardées par rôle, Chat fermé au chef de
   site, `/uploads` sous connexion, photo et mot de passe vérifiés, météo par le serveur et par coordonnées, rechargement au
