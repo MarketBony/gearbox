@@ -7,6 +7,10 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   `rcu.ref_affaire` : rien à coder, ils seront importés dès qu'ils remonteront.
 - [ ] **VPS : pare-feu `ufw` inactif** (constaté le 12/10 en préparant le CRM). Rien n'est exposé à tort aujourd'hui (Caddy 80/443
   et SSH seulement ; `rcu-db` n'a AUCUN port publié), mais aucun filet si un conteneur publiait un port par erreur.
+- [x] **CRM, trouvés en recette locale avant la prod (correctif 83)** : portable rangé en « téléphone domicile » par l'ancienne
+  base → non rapproché (règle étendue à tout 06/07) ; « LOA · Aucun » sur 104 ventes DCS incohérentes (organisme affiché inconnu) ;
+  rapprochement en 155 s (écriture quadratique, résumés réécrits chaque nuit) → 29 s.
+- [ ] **CRM : pas de fenêtre séparée « fiche client »** (maquette : ctrl-clic, double-clic, « Ouvrir dans une fenêtre ») — non porté au lot 2.
 - [x] **CRM, trouvé en recette locale avant la prod (correctif 82)** : après un import FORCÉ partiel, renvoyer le fichier complet
   de la veille était ignoré (« déjà appliqué », empreinte connue) → base amputée. « Déjà appliqué » ne compare plus qu'au DERNIER
   import appliqué de la source.

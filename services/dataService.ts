@@ -556,6 +556,29 @@ class DataService {
   async classerCrmSite(body: { affaire?: string; libelle?: string; compte?: string; site: string }): Promise<{ ok: boolean }> {
     return apiFetch('/crm/sites', { method: 'POST', body: JSON.stringify(body) });
   }
+  // Lot 2 (contrat : ui2/apps/crm/CONTRAT-API.md) — liste paginée PAR LE SERVEUR (50 lignes), jamais chargée en masse.
+  async getCrmClients(params: Record<string, string | number | boolean | string[] | null | undefined>): Promise<{ total: number; page: number; taille: number; rows: any[] }> {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v === null || v === undefined || v === '' || v === false) return;
+      if (Array.isArray(v)) { if (v.length) qs.set(k, v.join(',')); return; }
+      qs.set(k, v === true ? '1' : String(v));
+    });
+    const s = qs.toString();
+    return apiFetch(`/crm/clients${s ? `?${s}` : ''}`);
+  }
+  async getCrmClient(id: number): Promise<any> {
+    return apiFetch(`/crm/clients/${id}`);
+  }
+  async getCrmArbitrage(offset = 0): Promise<{ total: number; paires: { a: any; b: any; raison: string }[] }> {
+    return apiFetch(`/crm/arbitrage?offset=${offset}`);
+  }
+  async decideCrmArbitrage(a: number, b: number, decision: 'fusion' | 'separation'): Promise<{ ok: boolean; client: number }> {
+    return apiFetch('/crm/arbitrage', { method: 'POST', body: JSON.stringify({ a, b, decision }) });
+  }
+  async separerCrmIdentite(clientId: number, identiteId: number): Promise<{ ok: boolean; client: number }> {
+    return apiFetch(`/crm/clients/${clientId}/separer`, { method: 'POST', body: JSON.stringify({ identite: identiteId }) });
+  }
 
   // --- JEUX (branchés backend le 05/08/2026) ---
   // Avant, défis et parties vivaient dans le localStorage : défier un collègue

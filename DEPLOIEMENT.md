@@ -204,6 +204,9 @@ Mise en place (une fois) :
 6. **Ancienne base Sud-Ouest (une fois)** : déposer le TXT dans `/srv/rcu/archive/manuel/`, puis
    `sudo docker compose exec rcu-worker node dist/rcu/worker.js --fichier "/archive/manuel/<fichier>"`, puis supprimer le fichier.
 
+7. **Client unique (correctif 83)** : recalculé par le worker après chaque import appliqué. À la main (après un déploiement
+   qui change les règles) : `sudo docker compose exec rcu-worker node dist/rcu/worker.js --rapprocher` (~30 s).
+
 Au quotidien : DCS dépose ses TXT dans `depot/` ; le worker les importe et les range dans l'archive. Le journal est dans
 Gearbox (CRM › Imports, Master). Un import refusé pour baisse de volume s'applique depuis Gearbox (« Appliquer quand même… »).
 
