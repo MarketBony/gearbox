@@ -4,14 +4,17 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 12/10/2026, fin de session (lire en premier)
-- **ÉTAT : tout est en production (correctif 80 livré le 12/10), RIEN en cours de code, `master` = `origin` = prod.**
+- **ÉTAT : tout est en production (correctifs 80 et 81 livrés le 12/10), RIEN en cours de code, `master` = `origin` = prod.**
+  Correctif 81 : artefact du verre Liquid Glass sur les widgets (ligne nette sous le haut des widgets) + barres de défilement
+  parasites des widgets Forms / Ma journée. Forms : suppression d'une réponse = onglet « Réponse par réponse » (existe, Théo garde
+  tel quel) ; Google Forms : suppression dans Google puis « Actualiser ».
   Session du 12/10 : **LOT SÉCURITÉ SERVEUR** (correctif 80) bouclé AVANT la bascule, testé avec de vrais comptes Master,
   chef de site (Mozac), External et Guest, dans les deux interfaces. Détail : fiche du correctif 80.
 - **RESTE DU LOT, côté Théo (consoles externes)** : **régénérer la clé OpenWeather** (openweathermap.org — l'ancienne a été
   publique dans le bundle client des mois durant ; elle sert ENCORE, désormais côté serveur seulement) et **le secret client
   Google** (console Google, projet `gearbox-forms`). Valeurs à reporter dans `backend/.env` + `.env` du VPS
   (`OPENWEATHER_API_KEY`, `GOOGLE_CLIENT_SECRET`) puis `sudo docker compose up -d api` (variables seules, pas de rebuild).
-- **PROCHAINE ÉTAPE : la BASCULE** (v2 par défaut, annoncée vers le **16/10**). Le lot sécurité qui la conditionnait est fait.
+- **BASCULE : PAS ENCORE** (Théo, 12/10) — ne pas la lancer sans son feu vert ; date à reconfirmer avec lui.
 - **EN ATTENTE DE RETOURS (Théo + équipe)** :
   - **bulles de discussion (76)** : test grandeur nature — pastille de non-lus et VRAI envoi depuis une bulle jamais testés ;
   - **widgets (77–78)** : cocher une tâche, déplacer une carte du widget To-do, jouer / refuser un défi (écritures non testées) ;
@@ -37,7 +40,8 @@
   Claude Code perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par leur nom,
   demander à Théo de se reconnecter). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`), plus seulement dans
   le navigateur.
-- **En production : correctif 80 (12/10)** — **lot sécurité serveur** (lectures gardées par rôle, Chat fermé au chef de
+- **En production : correctif 81 (12/10)** — **v2, verre Liquid Glass des widgets** (rognage `clip-path`) et listes des widgets
+  sans barre horizontale, `web` seul. Avant lui le **correctif 80 (12/10)** — **lot sécurité serveur** (lectures gardées par rôle, Chat fermé au chef de
   site, `/uploads` sous connexion, photo et mot de passe vérifiés, météo par le serveur et par coordonnées, rechargement au
   changement de compte), `api` ET `web`, aucune migration, variable `OPENWEATHER_API_KEY`. Avant lui le **correctif 79 (09/10)** — **petites corrections** (Campagnes retirée de la v2, filtre Site des Dépenses,
   Matériel, tags, Chat, pastille Jeux…), `api` ET `web`. Avant lui le **correctif 78 (09/10)** — v2 : **bureau enregistré sur le serveur** (widgets retrouvés sur tous les
@@ -592,6 +596,18 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 81 — 12/10 : artefact du verre Liquid Glass sur les widgets** (branche `fix/liquid-glass-widgets`, **`web` seul**,
+  aucune migration). Signalé par Théo : « traits / carrés dans le verre, surtout les widgets, quand j'interagis », en Liquid Glass
+  SEULEMENT (Pixel et Opaque sains). Puce Intel, Direct3D 11. **Cause** : une ligne NETTE ~30 px sous le haut des widgets posés
+  sous un autre (Budget, Solde CP sous Forms) — la zone de travail du flou d'un widget peint APRÈS (3 × le rayon, 10 px en
+  Liquid) débordait sur ses voisins, recomposés de travers par le GPU. **Invisible dans les captures du panneau** (rendu hors
+  écran, profil de luminance parfaitement continu) : seule la capture d'ÉCRAN de Théo, agrandie, le montrait. Écartés un à un en
+  A/B direct (style injecté dans la coque) : liseré masqué, `brightness`, voile de grain `mix-blend-mode`, `will-change`,
+  saturation, `filter` d'atténuation, flou débordant (couche à -24 px). **Correctif** : `clip-path: inset(0 round 24px)` sur les
+  widgets en verre Liquid (levé pendant un déplacement / redimensionnement) — prix : plus d'ombre portée au repos.
+  **Au passage** : les listes des widgets Forms et Ma journée débordaient de 6 px (lignes à marge -6 px dans une liste `.scroll`)
+  → barre horizontale + carré de coin ; corrigé dans `widgets.css`, barre verticale visible au survol seulement.
+
 - **Correctif 80 — 12/10 : LOT SÉCURITÉ SERVEUR (avant la bascule)** (branche `fix/securite-serveur`, **`api` ET `web`**,
   aucune migration, nouvelle variable `OPENWEATHER_API_KEY`). Audit d'abord : chaque fiche revérifiée dans le code — celle de
   `GET /api/projects` était **à moitié fausse** (le Guest a TOUTES les rubriques en lecture, il lit les projets à bon droit).
@@ -915,7 +931,8 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 80** (12 octobre 2026) — lot sécurité serveur, **`api` ET `web`**,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 81** (12 octobre 2026) — verre Liquid Glass des widgets,
+  **`web` seul**, aucune migration. Avant lui le **correctif 80** (12 octobre 2026) — lot sécurité serveur, **`api` ET `web`**,
   aucune migration, **nouvelle variable `OPENWEATHER_API_KEY`** (`.env` du VPS + `docker-compose.yml`). Avant lui le **correctif 79** (9 octobre 2026) — petites corrections, **`api` ET `web`**, aucune migration.
   Avant lui le **correctif 78** (9 octobre 2026) — bureau v2 enregistré sur le serveur. **`api` ET `web`**,
   migration additive `20261009120000_user_widgets` (table `UserWidgets`), appliquée et inscrite AVANT le push. Avant lui le
@@ -4542,6 +4559,11 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Artefact GPU = invisible dans les captures du panneau navigateur** (rendu hors écran) : demander une capture d'ÉCRAN à Théo,
+  l'agrandir et mesurer (profil de luminance, PIL) avant toute hypothèse. Tester une piste CSS = un `<style>` injecté dans le
+  shadow root de la coque (perdu au rechargement). Correctif 81 : 8 variantes à l'aveugle avant de regarder la vraie image.
+- **Verre Liquid Glass : tout élément `backdrop-filter` voisin d'un autre doit être rogné** (`clip-path`) — sa zone de flou
+  (3 × le rayon) déborde sinon chez ses voisins sur certaines puces Intel (correctif 81, widgets seulement à ce jour).
 - **Interface v2 : la coque ne s'installe qu'UNE FOIS PAR PAGE** (`ui2/os/engine/boot.ts`) — Dock, Launchpad, menus et widgets
   sont construits au démarrage avec les droits du compte d'alors. D'où le rechargement complet à la déconnexion (12/10). Pour
   tester un autre rôle : se déconnecter (la page se recharge seule), jamais changer de jeton à la main.

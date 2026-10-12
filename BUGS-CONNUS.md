@@ -371,6 +371,12 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   texte tant qu'on n'importe pas le logo (Studio › En-tête › Logo importé).
 - [x] **Jeux : aucune pastille quand c'est à moi de jouer** (Théo, 09/10) : la pastille ne comptait que les défis reçus. Correctif 79 (parties à mon tour comptées, bannières).
 
+<!-- Interface v2 — 12/10/2026, correctif 81 -->
+- [x] **Liquid Glass : ligne / traits dans le verre des widgets** (puce Intel D3D11), zone de flou d'un widget débordant sur ses
+  voisins. **Corrigé** : `clip-path` sur les widgets en verre (`maquette.css`). ⚠️ Le reste du verre Liquid (Dock, menus, panneaux,
+  fenêtres) n'est PAS rogné : à surveiller si le même défaut y est signalé.
+- [x] **Widgets Forms et Ma journée : barre de défilement horizontale + carré de coin** (débordement de 6 px). **Corrigé** (`widgets.css`).
+
 <!-- Lot sécurité serveur — 12/10/2026, correctif 80 : trous découverts pendant l'audit et la recette -->
 - [x] **Temps réel : l'External recevait en clair les projets, budgets et dépenses modifiés** — `emitEvent` n'envoyait la
   version « sans charge » qu'aux rôles sans Chat. **Corrigé** : charge complète réservée à `UNSCOPED_READ_ROLES`.

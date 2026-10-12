@@ -66,6 +66,14 @@
 .fmw-list { flex: 1; min-height: 0; overflow-y: auto; display: grid; gap: 2px; align-content: start; }
 .fmw-row { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 6px; margin: 0 -6px; border-radius: 8px; font-size: 12.5px; text-align: left; color: var(--text); min-width: 0; }
 .fmw-row:hover { background: var(--line); }
+
+/* Listes des widgets (Ma journée, Forms) — 12/10/2026. Les lignes ont une marge de -6 px (surbrillance qui déborde) ; dans
+   une liste `.scroll` (défilement dans les DEUX sens), ces 6 px faisaient apparaître une barre horizontale et un carré de
+   coin, visibles sur le verre transparent de Liquid Glass. La liste rend les 6 px et ne défile plus qu'en hauteur. */
+:is(.myd-body, .fmw-list).scroll { overflow-x: hidden; padding-inline: 6px; margin-inline: -6px; }
+/* Barre verticale discrète : visible seulement au survol du widget (façon macOS). */
+.wdg .scroll { scrollbar-color: transparent transparent; }
+.wdg:hover .scroll { scrollbar-color: var(--surface-4) transparent; }
 .fmw-k { flex: none; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: 1px 5px; border-radius: 5px; }
 .fmw-k.b { color: var(--bony-orange); background: color-mix(in srgb, var(--bony-orange) 15%, transparent); }
 .fmw-k.g { color: #6aa7ff; background: color-mix(in srgb, #4285f4 18%, transparent); }
