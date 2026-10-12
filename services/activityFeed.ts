@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { db } from './dataService';
+import { db, getStoredRole } from './dataService';
+import { hasSocialFeatures } from '../constants';
 import { useRealtimeSync, RT_EVENTS } from './realtime';
 import { ActivityLog } from '../types';
 
@@ -62,7 +63,8 @@ export function useActivityFeed() {
   const [lastReadTs, setLastReadTs] = useState<string | null>(null);
 
   const load = () => {
-    // Best-effort : le fil reste vide si l'API est injoignable.
+    // Best-effort : le fil reste vide si l'API est injoignable. Chef de site : refusé par le serveur, rien à demander.
+    if (!hasSocialFeatures(getStoredRole())) { setEntries([]); return; }
     db.getActivityLog().then(setEntries).catch(() => { /* ignore */ });
     setLastReadTs(localStorage.getItem(LAST_READ_KEY));
   };

@@ -64,9 +64,10 @@ export function computeNav({ role, gamesEnabled, voitConges, ui2 = false }: NavC
       ? allMainItems.filter(i => ['digital', 'chat', 'hello-marketing'].includes(i.id))
       : allMainItems;
 
-  // Archives n'est pas dans `mainItems` : autorisée à part, sauf chef de site
-  // (et External, qui n'a jamais eu de nav groupée — son groupe unique = mainItems).
-  const allowedIds = new Set([...mainItems.map(i => i.id), ...(isSm ? [] : ['archives'])]);
+  // Archives n'est pas dans `mainItems` : autorisée à part, sauf chef de site et External.
+  // ⚠️ L'External y figurait jusqu'au 12/10/2026 (absente de son menu, mais ouvrable par l'URL) : des projets archivés,
+  // qu'il ne lit plus depuis que le serveur lui refuse `GET /api/projects`.
+  const allowedIds = new Set([...mainItems.map(i => i.id), ...(isSm || isExternal ? [] : ['archives'])]);
 
   // Nav groupée (desktop lg+). Toujours filtrée par `allowedIds` : une rubrique
   // ajoutée ici sans passer par `allMainItems` n'apparaît pour personne.

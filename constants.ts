@@ -730,6 +730,9 @@ export const isMarketingRole = (role?: string): boolean =>
 // locale jusqu'à leur retrait.
 export const PROJECT_EDIT_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
 export const canEditProjects = (role?: string): boolean => !!role && PROJECT_EDIT_ROLES.includes(role);
+/** Lecture des projets : tout le monde SAUF l'External (prestataire), refusé par le serveur depuis le 12/10/2026
+ *  (`INTERNAL_ROLES`, backend/src/auth/roles.ts). Un écran ne lance pas un appel qu'il sait voué au 403. */
+export const canReadProjects = (role?: string): boolean => !!role && role !== 'External';
 // Dépenses fixes : miroir d'`EDIT_ROLES` de backend/src/routes/fixedExpenses.ts. Provisions du Budget
 // (lignes prévisionnelles) : miroir de backend/src/routes/budget.ts. Ajoutés le 30/09/2026 (interface v2) ;
 // pages/FixedExpenses.tsx et pages/Budget.tsx gardent leur copie locale jusqu'à leur retrait.

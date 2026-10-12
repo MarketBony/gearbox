@@ -121,3 +121,16 @@ export const ASSISTANT_ROLES = ['Master', 'Administrator', 'Director', 'Coordina
 export const ASSISTANT_TEAM_ROLES = ['Master', 'Administrator'];
 // Fixer le plafond quotidien de chacun : Master seul (décision de Théo, 08/10/2026).
 export const ASSISTANT_CAP_ROLES = ['Master'];
+
+/**
+ * Lot sécurité serveur (12/10/2026). Listes écrites EN SOUSTRACTION (comme `UPLOAD_ROLES`) : un futur rôle hérite
+ * des droits courants, seuls les rôles explicitement restreints sont retirés.
+ *
+ * INTERNAL_ROLES — tout le monde SAUF l'External (prestataire : Digital, Chat, Hello Marketing seulement). Lecture
+ * des projets, budgets, dépenses. Le chef de site y est, son périmètre étant appliqué ensuite par `siteScope.ts`.
+ */
+export const INTERNAL_ROLES = (VALID_ROLES as readonly string[]).filter(r => r !== 'External');
+/** Données SANS cloisonnement par site (campagnes, contacts, dépenses ponctuelles) : ni External, ni chef de site. */
+export const UNSCOPED_READ_ROLES = INTERNAL_ROLES.filter(r => r !== SITE_MANAGER_ROLE);
+/** Rôles qui ont le Chat (et donc ses fichiers) : ceux de `hasSocialFeatures`. */
+export const CHAT_ROLES = (VALID_ROLES as readonly string[]).filter(r => !NO_SOCIAL_ROLES.includes(r));

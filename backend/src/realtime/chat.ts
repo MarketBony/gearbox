@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { UPLOADS_ROOT } from '../routes/uploads';
+import { AVATAR_UPLOAD_PATH } from '../utils/avatarUrl';
 import { Server, Socket } from 'socket.io';
 import { sendPushToUsers, resolvePushRecipients } from '../utils/pushSender';
 import { getUserIdsOnSection } from './presence';
@@ -18,18 +19,8 @@ const userRoom = (id: string) => `user:${id}`;
 type Ack = ((response: any) => void) | undefined;
 const reply = (ack: Ack, data: any) => { if (typeof ack === 'function') ack(data); };
 
-// Une photo de groupe ne peut être QUE un fichier déposé par POST /api/uploads/avatar :
-// nom en uuid v4 + extension assainie (voir routes/uploads.ts).
-// ⚠️ Ce contrôle n'est pas cosmétique. Sans lui, un participant pourrait faire pointer
-// la photo du groupe vers une URL EXTERNE que le navigateur de tous les autres irait
-// charger à l'affichage — fuite d'adresse IP, pixel de traçage, accusé de lecture
-// involontaire — ou vers /uploads/chat/<...>, où AUCUN format n'est filtré à l'entrée.
-// La valeur est écrite par un utilisateur et rendue chez tous les autres : elle ne peut
-// pas être crue sur parole.
-// Les 4 extensions sont exactement celles que `EXT_BY_MIME` produit pour la liste
-// blanche du type `avatar` (jpeg -> .jpg, png, gif, webp) : pas de `.jpeg` possible.
-const AVATAR_UPLOAD_PATH =
-  /^\/uploads\/avatar\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|gif|webp)$/;
+// Photo de groupe : règle commune `AVATAR_UPLOAD_PATH` (utils/avatarUrl.ts), partagée avec la photo de profil.
+// ⚠️ Pas cosmétique : une valeur écrite par un participant est rendue chez tous les autres.
 
 // À la connexion (handshake authentifié déjà passé) : rejoint sa room
 // personnelle + les rooms de toutes ses conversations.
@@ -218,7 +209,9 @@ export const registerChatHandlers = (io: Server, socket: Socket) => {
       let unreadTargets = conversation.participants;
       if (isGeneral) {
         const allUsers = await prisma.user.findMany({ select: { id: true, role: true } });
-        unreadTargets = allUsers.filter(u => u.role !== 'External').map(u => u.id);
+        // ⚠️ 12/10/2026 : ni External, ni rôle sans Chat (chef de site) — il recevait le compteur ET le push du Général,
+        // aperçu du message compris.
+        unreadTargets = allUsers.filter(u => u.role !== 'External' && hasSocialFeatures(u.role)).map(u => u.id);
       }
 
       // lastMessage tronqué à 60 / '📷 Image' / '📎 <nom>' : même logique que Chat.tsx.

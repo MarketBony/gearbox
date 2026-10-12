@@ -1,5 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
-import { db, getToken } from './dataService';
+import { db, getToken, getStoredRole } from './dataService';
+import { hasSocialFeatures } from '../constants';
 import { chatStore } from './chatStore';
 import { presenceStore, type PresenceState } from './presenceStore';
 import { setCurrentSocketId } from './socketId';
@@ -35,6 +36,8 @@ export const setMySection = (section: string) => {
 // Recharge la liste des conversations dans le store. Appelé au connect ET à
 // chaque reconnexion (rattrape les événements manqués pendant une coupure).
 const refreshConversations = async () => {
+  // Rôle sans Chat (chef de site) : le serveur refuse tout le Chat depuis le 12/10/2026 — on ne demande rien.
+  if (!hasSocialFeatures(getStoredRole())) return;
   try {
     const convs = await db.getConversations();
     chatStore.setConversations(convs);

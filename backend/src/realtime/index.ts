@@ -12,7 +12,7 @@ import {
 } from './chat';
 import { registerPresenceHandlers, handleUserChanged, getUserIdsOnSection } from './presence';
 import { registerGameHandlers, emitSessionToPlayers } from './games';
-import { hasSocialFeatures } from '../auth/roles';
+import { hasSocialFeatures, UNSCOPED_READ_ROLES } from '../auth/roles';
 import { invalidateUserScope } from '../auth/siteScope';
 import { sendPushToUsers } from '../utils/pushSender';
 import { prisma } from '../db';
@@ -132,8 +132,11 @@ export const withEmitterContext: RequestHandler = (req, _res, next) => {
 const scopedRoom = 'scoped-clients';
 
 /** Range un socket dans la room des clients à charge réduite, selon son rôle. */
+// ⚠️ 12/10/2026 (lot sécurité serveur) : l'External y est aussi. Il n'est pas cloisonné par site, mais il ne lit
+// ni projets, ni budgets, ni dépenses (`INTERNAL_ROLES`) — il les recevait pourtant en clair dans le socket.
+// Règle : charge complète seulement pour `UNSCOPED_READ_ROLES` (ceux qui lisent tout sans filtre).
 export const assignEmitRoom = (socket: Socket) => {
-  if (!hasSocialFeatures(socket.data.user?.role)) socket.join(scopedRoom);
+  if (!UNSCOPED_READ_ROLES.includes(socket.data.user?.role)) socket.join(scopedRoom);
 };
 
 export const emitEvent = (event: string, data: any) => {

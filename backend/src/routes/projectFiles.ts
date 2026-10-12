@@ -2,6 +2,7 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
+import { INTERNAL_ROLES } from '../auth/roles';
 import { emitEvent } from '../realtime';
 import { scopeOf, arrayScopeWhere } from '../auth/siteScope';
 import { UPLOADS_ROOT } from './uploads';
@@ -39,7 +40,7 @@ const projetAutorise = async (req: AuthRequest, projectId: string) => {
 
 // GET /api/project-files/:projectId — tous les fichiers du projet, ceux des tâches
 // comprises (`taskId` distingue les deux côté client, en une seule requête).
-router.get('/:projectId', authenticateToken, async (req: AuthRequest, res) => {
+router.get('/:projectId', authenticateToken, requireRole(INTERNAL_ROLES), async (req: AuthRequest, res) => {
   const { projectId } = req.params;
   if (!(await projetAutorise(req, projectId))) {
     return res.status(404).json({ error: 'Projet introuvable.' });

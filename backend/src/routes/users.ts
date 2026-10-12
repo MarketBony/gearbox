@@ -8,6 +8,7 @@ import { emitEvent, notifyUserChanged } from '../realtime';
 // la règle (ne jamais faire sortir l'objet Prisma brut, il porte `passwordHash`).
 import { publicUser } from '../utils/publicUser';
 import { prisma } from '../db';
+import { checkAvatarUrl, AVATAR_REFUSED } from '../utils/avatarUrl';
 
 const router = Router();
 
@@ -62,10 +63,14 @@ router.post('/', authenticateToken, requireRole(ADMIN_ROLES), async (req: AuthRe
     return res.status(403).json({ error: forbiddenRoleMessage(role) });
   }
 
+  // Photo : même règle que le profil (utils/avatarUrl.ts) — jamais d'URL externe.
+  const photo = checkAvatarUrl(avatarUrl);
+  if (photo === false) return res.status(400).json({ error: AVATAR_REFUSED });
+
   const passwordHash = await bcrypt.hash(password, 10);
   try {
     const user = await prisma.user.create({
-      data: { name, loginId, passwordHash, role, avatarColor, avatarUrl, birthdate, sites: cleanSites(sites) }
+      data: { name, loginId, passwordHash, role, avatarColor, avatarUrl: photo ?? null, birthdate, sites: cleanSites(sites) }
     });
     emitEvent('users:updated', publicUser(user));
     res.json(publicUser(user));
@@ -91,7 +96,15 @@ router.put('/:id', authenticateToken, requireRole(ADMIN_ROLES), async (req: Auth
   }
 
   const updateData: any = { name, loginId, role, avatarColor };
-  if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl; // null = suppression
+  // null = suppression. Validée (utils/avatarUrl.ts) ; la valeur déjà en base est tolérée (le client renvoie tout).
+  if (avatarUrl !== undefined) {
+    const actuel = await prisma.user.findUnique({ where: { id }, select: { avatarUrl: true } });
+    if (avatarUrl !== actuel?.avatarUrl) {
+      const photo = checkAvatarUrl(avatarUrl);
+      if (photo === false) return res.status(400).json({ error: AVATAR_REFUSED });
+      updateData.avatarUrl = photo;
+    }
+  }
   // Même convention qu'avatarUrl : undefined = champ absent (non modifié) ;
   // chaîne vide ou null = l'anniversaire est effacé.
   if (birthdate !== undefined) updateData.birthdate = birthdate || null;

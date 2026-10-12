@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppProps } from '../types';
 import type { Project, User } from '../../../types';
-import { hasSocialFeatures, canEditProjects } from '../../../constants';
+import { hasSocialFeatures, canEditProjects, canReadProjects } from '../../../constants';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useWeatherData, computeBirthdays, type WeatherData, type ForecastDay } from '../../../pages/HelloMarketing';
 import { parseLocalDate } from '../../../components/DateRangePicker';
@@ -288,7 +288,8 @@ export default function HelloApp({ inst }: AppProps) {
         <div className="hel-sec">{team ? 'L’équipe aujourd’hui' : 'Aujourd’hui'}</div>
         <section className={`hel-top ${team ? '' : 'sm'}`}>
           <Weather current={weather.current} forecast={weather.forecast} loading={weather.loading} error={weather.error} onRefresh={weather.refresh} i={0} />
-          <Events list={events} canCreate={canEditProjects(role)} i={1} />
+          {/* External : pas de lecture des projets (serveur, 12/10/2026) → pas de bloc événements. */}
+          {canReadProjects(role) ? <Events list={events} canCreate={canEditProjects(role)} i={1} /> : null}
           {team ? <><Music ref={player} i={2} onState={() => setPlayTick((n) => n + 1)} /><Viennoiseries users={users} i={3} /></> : null}
         </section>
         {team ? <Birthdays users={users} i={4} /> : null}

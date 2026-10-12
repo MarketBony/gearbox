@@ -489,8 +489,11 @@ const Settings: React.FC = () => {
     if (!user) return;
 
     if (newPassword || oldPassword) {
-      // Le mot de passe n'est plus disponible côté client (auth backend, hash
-      // bcrypt en base) : plus de vérification locale de l'ancien mot de passe.
+      // L'ancien mot de passe est vérifié par le SERVEUR (bcrypt), jamais localement (12/10/2026).
+      if (newPassword && !oldPassword) {
+        setProfileMsg({ type: 'error', text: "Saisissez votre ancien mot de passe." });
+        return;
+      }
       if (newPassword !== confirmPassword) {
         setProfileMsg({ type: 'error', text: 'Les nouveaux mots de passe ne correspondent pas.' });
         return;
@@ -504,12 +507,13 @@ const Settings: React.FC = () => {
     try {
       // `birthdate` part au serveur avec le profil ; seule la ville reste locale.
       const updatedUser: User = { ...user, name, birthdate: userBirthdate, password: newPassword || undefined };
-      await updateProfile(updatedUser); // PUT /api/auth/me
+      await updateProfile(updatedUser, oldPassword); // PUT /api/auth/me
       saveUserPrefs(user.id, { city: userCity });
       setProfileMsg({ type: 'success', text: 'Profil mis à jour avec succès.' });
       setOldPassword(''); setNewPassword(''); setConfirmPassword('');
-    } catch {
-      setProfileMsg({ type: 'error', text: 'Échec de la mise à jour (serveur injoignable ?).' });
+    } catch (e: any) {
+      // 403 = ancien mot de passe refusé : le message du serveur est le bon à afficher.
+      setProfileMsg({ type: 'error', text: e?.status === 403 ? (e.message || 'Ancien mot de passe incorrect.') : 'Échec de la mise à jour (serveur injoignable ?).' });
     }
   };
 

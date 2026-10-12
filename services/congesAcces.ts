@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db, ApiError } from './dataService';
-import { peutGererConges } from '../constants';
+import { peutGererConges, peutLireConges } from '../constants';
 
 // =====================================================================
 // ACCÈS À LA RUBRIQUE CONGÉS — qui la voit dans la navigation.
@@ -49,7 +49,8 @@ export const congesAccesStore = {
    * dans la console — sinon chaque chef de site verrait une erreur à chaque chargement.
    */
   async refresh(role?: string, userId?: string): Promise<void> {
-    if (!userId) { state = { visible: false, membres: [], charge: true }; notify(); return; }
+    // Rôle sans la rubrique (chef de site, External) : réponse connue d'avance, on n'appelle pas le serveur (12/10/2026).
+    if (!userId || !peutLireConges(role)) { state = { visible: false, membres: [], charge: true }; notify(); return; }
     try {
       // Période volontairement vide de sens : on ne veut que le périmètre. Une fenêtre
       // d'un jour évite de tirer l'année entière juste pour savoir si l'onglet s'affiche.

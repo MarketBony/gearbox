@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
+import { INTERNAL_ROLES } from '../auth/roles';
 import { emitEvent } from '../realtime';
 import { scopeOf, arrayScopeWhere, redactSiteFields } from '../auth/siteScope';
 import { prisma } from '../db';
@@ -67,7 +68,7 @@ const optionalFieldsError = (body: any): string | null => {
   return null;
 };
 
-router.get('/', authenticateToken, async (req: AuthRequest, res) => {
+router.get('/', authenticateToken, requireRole(INTERNAL_ROLES), async (req: AuthRequest, res) => {
   // Cloisonnement par concession — voir auth/siteScope.ts. `null` = aucune
   // restriction (rôles historiques), liste = sites d'un chef de site.
   const scope = await scopeOf(req);

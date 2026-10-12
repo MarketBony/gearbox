@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
+import { INTERNAL_ROLES } from '../auth/roles';
 import { emitEvent } from '../realtime';
 import { withDates } from '../utils/dates';
 import { scopeOf, arrayScopeWhere, redactSiteFields } from '../auth/siteScope';
@@ -17,7 +18,7 @@ const router = Router();
 // des boutons que l'API refuse en 403.
 const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
 
-router.get('/', authenticateToken, async (req: AuthRequest, res) => {
+router.get('/', authenticateToken, requireRole(INTERNAL_ROLES), async (req: AuthRequest, res) => {
   // Cloisonnement par concession : `scopeOf` rend `null` pour tous les rôles
   // historiques (aucune restriction), et la liste des sites autorisés pour un chef
   // de site. ⚠️ Le filtre est appliqué ICI, côté serveur : le faire côté client

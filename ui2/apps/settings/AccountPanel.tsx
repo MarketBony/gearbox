@@ -47,21 +47,22 @@ export function AccountPanel({ s, user, onPhoto }: { s: SectionDef; user: User; 
     // Écart voulu (maquette) : un nom vide n'est plus envoyé en silence.
     if (!name.trim()) return fail('Le nom affiché est obligatoire.');
     if (pw.old || pw.nw || pw.conf) {
-      // Règles réelles de Settings.tsx : pas de vérification locale de l'ancien mot de passe.
+      // L'ancien mot de passe est vérifié par le SERVEUR (12/10/2026) ; ici on exige seulement qu'il soit saisi.
+      if (pw.nw && !pw.old) return fail('Saisissez votre ancien mot de passe.');
       if (pw.nw !== pw.conf) return fail('Les nouveaux mots de passe ne correspondent pas.');
       if (pw.nw.length < 4) return fail('Le mot de passe est trop court.');
     }
     setBusy(true);
     try {
       // `birthdate` part au serveur avec le profil ('' = effacer) ; seule la ville reste locale.
-      await updateProfile({ ...user, name, birthdate, password: pw.nw || undefined });
+      await updateProfile({ ...user, name, birthdate, password: pw.nw || undefined }, pw.old);
       saveCity(user.id, city);
       setMsg({ ok: true, t: 'Profil mis à jour avec succès.' });
       setPw({ old: '', nw: '', conf: '' });
       if (btn.current) gx().animate(btn.current, [{ transform: 'scale(.94)' }, { transform: 'none' }], { spring: 'bouncy' });
       hud('Profil enregistré');
-    } catch {
-      fail('Échec de la mise à jour (serveur injoignable ?).');
+    } catch (e: any) {
+      fail(e?.status === 403 ? (e.message || 'Ancien mot de passe incorrect.') : 'Échec de la mise à jour (serveur injoignable ?).');
     } finally { setBusy(false); }
   };
   const pwType = show ? 'text' : 'password';
