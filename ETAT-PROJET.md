@@ -3,30 +3,47 @@
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
-## ▶ POINT DE REPRISE — 08/10/2026 (lire en premier)
-- **ÉTAT AU SOIR DU 08/10 — EN ATTENTE DES RETOURS DE THÉO ET DE L'ÉQUIPE (tout est en prod, rien en cours de code)** :
-  1. **Chat, correctif 72** (envoi fiable) : vérifier en usage réel que plus aucun message ne disparaît, que les photos
-     partent (progression visible en 4G), PC et téléphones. En cas de nouveau message perdu : regarder s'il est en base
-     et lire `sudo docker compose logs api` AVANT tout redéploiement (un redémarrage efface les journaux du conteneur).
-  2. **mIAouss, correctif 71** : justesse des réponses (comparer aux écrans), plafonds et consommation réels
-     (Paramètres › mIAouss), et **sensation de la mascotte** (hauteur des sauts, force du lancer, seuil des secousses,
-     fréquence des bulles) — réglages dans `ui2/apps/assistant/mascot.ts` (`G_ACC`, `HARD_FALL`, `SOFT_FALL`, envol
-     des icônes, `PHRASES`). Théo : « pour l'instant c'est vraiment du lourd ».
-  3. **Navigation téléphone, correctif 70** : retour sur iPhone et Pixel toujours attendu.
-- **Points ouverts connus (non urgents)** : `BUGS-CONNUS.md` — widget « Absents » à 0 alors qu'un CP existe lundi 05/10 ;
-  aperçu « dernier message » d'une conversation après suppression du dernier message. Clés Gemini, Groq et Cloudflare
-  passées en clair dans le chat de la session du 08/10 : à régénérer un jour (remplacer dans `backend/.env` ET le `.env`
-  du VPS, puis `up -d api`). Poignée de débogage `el.__buddy` dans `mascot.ts` (inoffensive, sert aux tests). Branches
-  locales `feat/assistant-p0` et `fix/chat-envoi-fiable` mergées : supprimables.
-- **Widgets : refonte TERMINÉE** (W0–W2 correctif 77, W3 correctif 78). **Ensuite** le **lot sécurité serveur AVANT la bascule** (prévue vers le 16/10).
-- **Lot B (fonds d'écran v2) : LIVRÉ, correctif 75.** À vérifier sur les PC qui chauffaient (gestionnaire de tâches de
-  Chrome) ; versions claires des fonds possibles plus tard si elles manquent (option b écartée pour l'instant).
-- **Ensuite, dans l'ordre** : corrections issues des retours ci-dessus ; puis **mIAouss P2** (rédaction guidée : posts
-  Digital, Forms, e-mails) et **P3** (actions avec confirmation) ; puis la suite de la liste d'octobre (tâches
-  multi-assignées, prestataire, répartitions, fichiers maison — backlog § « Chantiers d'octobre 2026 »).
-- **À savoir pour la session suivante** : Bony ne paiera JAMAIS un service d'IA (aucune option payante à proposer). Le
-  garde-fou de la session a bloqué une fois `git push` et le SSH malgré l'accord de Théo ; Théo a élargi les
-  permissions (`.claude/settings.local.json`, non commité) et redonné son accord : ça passe désormais.
+## ▶ POINT DE REPRISE — 12/10/2026 (lire en premier)
+- **ÉTAT : tout est en production (correctifs 73 → 79 livrés les 08 et 09/10), RIEN en cours de code, `master` = `origin`
+  = prod.** Session du 08–09/10 : présence et pastilles (73, 74), fonds d'écran (75), bulles de discussion (76), refonte des
+  widgets (77, 78), petites corrections dont la liste d'arbitrages du 30/09 (79). Détail : fiches des correctifs 73 à 79.
+- **PROCHAIN LOT DÉCIDÉ : le LOT SÉCURITÉ SERVEUR, AVANT LA BASCULE** (bascule annoncée vers le **16/10** : v2 par défaut).
+  Périmètre (BUGS-CONNUS.md + ETAT-BACKEND.md) :
+  - `GET /api/budget` et `GET /api/fixed-expenses` sans garde de rôle (un External les lit) → `requireRole` + `siteScope` ;
+  - `GET /api/projects` sans contrôle de rôle (External et Guest lisent tous les projets) ;
+  - Chat : un chef de site lit le Général par l'API REST (`routes/chat.ts` n'exclut que l'External) ;
+  - Dashboard : `GET /api/campaigns` sans filtre de site pour un chef de site ;
+  - `/uploads` servi par `express.static` SANS connexion (fichiers lisibles par qui connaît l'URL) ;
+  - `PUT /api/auth/me` accepte une `avatarUrl` EXTERNE (pixel de traçage chez les collègues) ;
+  - changement de mot de passe sans vérification de l'ancien ; clé OpenWeather en clair dans le code client ;
+  - secret client Google à renouveler (console Google + `.env` local et VPS).
+  Méthode : audit (vérifier chaque fiche dans le code, plusieurs diagnostics passés étaient faux), plan, validation de Théo,
+  puis test avec de VRAIS comptes restreints (chef de site, External, Guest) — aucun compte de test, Théo s'organise.
+- **EN ATTENTE DE RETOURS (Théo + équipe)** :
+  - **bulles de discussion (76)** : test grandeur nature — pastille de non-lus et VRAI envoi depuis une bulle jamais testés ;
+  - **widgets (77–78)** : cocher une tâche, déplacer une carte du widget To-do, jouer / refuser un défi (écritures non testées) ;
+    ⚠️ la disposition de Théo a été réarrangée par le panneau de test étroit (9 colonnes) — un glisser la remet ;
+  - **fonds d'écran (75)** : mesurer sur un PC qui chauffait (gestionnaire de tâches de Chrome) ;
+  - **Chat (72), mIAouss (71 : réponses + sensation de la mascotte, réglages dans `ui2/apps/assistant/mascot.ts`),
+    navigation téléphone (70, iPhone / Pixel)** : retours toujours attendus ;
+  - **Jeux (79)** : pastille = défis reçus + parties à mon tour ; bannières à confirmer en usage réel.
+- **ENSUITE, dans l'ordre** : bascule (v2 par défaut, cohabitation ~2 semaines, puis retrait de `pages/*`) ; corrections
+  issues des retours ; **mIAouss P2** (rédaction guidée) et **P3** (actions avec confirmation) ; suite de la liste
+  d'octobre : **tâches multi-assignées**, **prestataire sur les dépenses**, **répartitions personnalisées** (question ouverte :
+  une répartition déjà utilisée reste-t-elle modifiable ?), **fichiers maison** (régler d'abord la sauvegarde du volume
+  `uploads_data`, non sauvegardé). Backlog § « Chantiers d'octobre 2026 ».
+- **Points ouverts non urgents** : la trace « a restauré le projet » (79) n'est pas vérifiable avec le compte Master (exclu du
+  journal par conception) — à voir avec un autre compte ; clés Gemini / Groq / Cloudflare passées en clair le 08/10 (Théo :
+  « pas un problème ») ; poignée de débogage `el.__buddy` dans `mascot.ts` (inoffensive).
+- **Décisions de Théo à NE PAS rediscuter (08–09/10)** : rubrique **Campagnes retirée de la v2** (ses données restent sur les
+  tâches) ; Dépenses filtrées par la PART du site ; bulles **ordinateur seulement**, apparition automatique (réglage pour la
+  couper) ; fonds : Ruban par défaut, animés Bony · Trait / Magma / Rétro seulement, sombres même en thème clair ; logo
+  toujours À PLAT (jamais verre ni relief) ; Note rapide retirée de la galerie ; Horloge gardée.
+- **À savoir pour la session suivante** : Bony ne paiera JAMAIS un service d'IA (aucune option payante à proposer). Push et
+  déploiement autorisés par Théo une fois un lot validé à la recette (autorisation par lot). Le panneau navigateur de
+  Claude Code perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par leur nom,
+  demander à Théo de se reconnecter). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`), plus seulement dans
+  le navigateur.
 - **En production : correctif 79 (09/10)** — **petites corrections** (Campagnes retirée de la v2, filtre Site des Dépenses,
   Matériel, tags, Chat, pastille Jeux…), `api` ET `web`. Avant lui le **correctif 78 (09/10)** — v2 : **bureau enregistré sur le serveur** (widgets retrouvés sur tous les
   postes ; `api` ET `web`, migration `20261009120000_user_widgets`). Avant lui le **correctif 77 (09/10)** — v2 : **refonte des widgets** (formats libres, To-do / Ma journée / Forms,
