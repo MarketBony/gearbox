@@ -11,43 +11,11 @@ import Avatar from '../components/Avatar';
 import { User, Project, FeedInfo } from '../types';
 // `parseLocalDate` est exporté par DateRangePicker (et non par constants.ts).
 import { parseLocalDate } from '../components/DateRangePicker';
-import { hasSocialFeatures } from '../constants';
+import { hasSocialFeatures, canReadProjects } from '../constants';
 
-// =============================================================================
-// OPENWEATHER API KEY
-// Pour obtenir une clé gratuite : https://openweathermap.org/ → My API Keys
-// =============================================================================
-const OPENWEATHER_API_KEY = '6d5fe29fdd1253aae4c3b5fe1b7f1dcc';
-
-// Mapping noms sites Bony → noms compatibles OpenWeatherMap
-const CITY_MAPPING: Record<string, string> = {
-  'Clermont':        'Clermont-Ferrand',
-  'Mozac':           'Clermont-Ferrand',
-  'Massagettes':     'Clermont-Ferrand',
-  'Vichy':           'Vichy',
-  'Moulins':         'Moulins',
-  'Ussel':           'Ussel',
-  'Issoire':         'Issoire',
-  'Brioude':         'Brioude',
-  'Le Puy-en-Velay': 'Le Puy-en-Velay',
-  'Mende':           'Mende',
-  'Albi':            'Albi',
-  'Rodez':           'Rodez',
-  'Millau':          'Millau',
-  'Aurillac':        'Aurillac',
-  'Figeac':          'Figeac',
-  'Gaillac':         'Gaillac',
-  'Villefranche':    'Villefranche-de-Rouergue',
-  'Carmaux':         'Carmaux',
-  'Lavaur':          'Lavaur',
-  'Ricoux':          'Thiers',
-  'Thiers':          'Thiers',
-  'Ambert':          'Ambert',
-  'Alpine':          'Clermont-Ferrand',
-  'Nissan':          'Clermont-Ferrand',
-  'Saint-Etienne':   'Saint-Etienne',
-  'Montluçon':       'Montlucon',
-};
+// Météo : plus de clé ni de correspondance de villes ici (12/10/2026). Le relais serveur `/api/weather`
+// (backend/src/routes/weather.ts) garde la clé OpenWeather et interroge par COORDONNÉES de chaque site — la requête
+// par nom tombait sur un point en altitude (Clermont : ~900 m), d'où des températures toujours trop basses.
 
 // Les flux RSS (noms, couleurs et surtout URL) vivent côté SERVEUR
 // (backend/src/routes/feeds.ts), et le contenu est proxifié par /api/feeds.
@@ -70,8 +38,8 @@ const DEFAULT_WEATHER_CITY = 'Clermont-Ferrand';
 const RSS_CACHE_KEY      = 'gearbox_rss_cache';
 const DEEZER_CACHE_KEY   = 'gearbox_deezer_cache';
 const USER_PREFS_KEY     = (id: string) => `gearbox_user_prefs_${id}`;
-const WEATHER_CACHE_KEY  = (city: string) => `gearbox_weather_cache_${city.toLowerCase().replace(/\s+/g, '_')}`;
-const FORECAST_CACHE_KEY = (city: string) => `gearbox_forecast_cache_${city.toLowerCase().replace(/\s+/g, '_')}`;
+const WEATHER_CACHE_KEY  = (city: string) => `gearbox_weather2_cache_${city.toLowerCase().replace(/\s+/g, '_')}`;
+const FORECAST_CACHE_KEY = (city: string) => `gearbox_forecast2_cache_${city.toLowerCase().replace(/\s+/g, '_')}`;
 
 const CACHE_24H = 24 * 60 * 60 * 1000;
 const CACHE_30M = 30 * 60 * 1000;
@@ -537,26 +505,26 @@ export const useWeatherData = (userId: string) => {
   const load = async (rawCity: string, force = false) => {
     setLoading(true);
     setError('');
-    const mapped = CITY_MAPPING[rawCity] || rawCity;
+    const mapped = rawCity; // clé de site, résolue en coordonnées par le serveur
 
     try {
-      // ── Météo actuelle ──
       let wd: WeatherData | null = null;
+      let days: ForecastDay[] = [];
       if (!force) {
-        const cached = localStorage.getItem(WEATHER_CACHE_KEY(mapped));
-        if (cached) {
-          const { data, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < CACHE_30M) wd = data;
-        }
+        try {
+          const c1 = localStorage.getItem(WEATHER_CACHE_KEY(mapped));
+          const c2 = localStorage.getItem(FORECAST_CACHE_KEY(mapped));
+          if (c1 && c2) {
+            const a1 = JSON.parse(c1), a2 = JSON.parse(c2);
+            if (Date.now() - a1.timestamp < CACHE_30M && Date.now() - a2.timestamp < CACHE_30M) { wd = a1.data; days = a2.data; }
+          }
+        } catch { /* cache illisible : on recharge */ }
       }
       if (!wd) {
-        const res = await fetch(
-          `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(mapped)}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=fr`
-        );
-        if (!res.ok) throw new Error(`Météo indisponible (${res.status}) — ${mapped}`);
-        const d = await res.json();
+        // Une seule requête, au relais serveur : météo actuelle + prévisions 5 jours (réponses brutes d'OpenWeather).
+        const { city: label, current: d, forecast: f } = await db.getWeather(mapped);
         wd = {
-          city:        d.name,
+          city:        label || d.name,
           temp:        Math.round(d.main.temp),
           feelsLike:   Math.round(d.main.feels_like),
           description: d.weather[0]?.description || '',
@@ -565,48 +533,32 @@ export const useWeatherData = (userId: string) => {
           wind:        Math.round((d.wind.speed ?? 0) * 3.6),
           pressure:    d.main.pressure ?? 0,
         };
-        localStorage.setItem(WEATHER_CACHE_KEY(mapped), JSON.stringify({ data: wd, timestamp: Date.now() }));
+        const list: any[] = f?.list || [];
+        const byDay: Record<string, any[]> = {};
+        list.forEach(item => {
+          const key = item.dt_txt.slice(0, 10);
+          if (!byDay[key]) byDay[key] = [];
+          byDay[key].push(item);
+        });
+        const todayKey = new Date().toISOString().slice(0, 10);
+        days = Object.entries(byDay)
+          .filter(([k]) => k > todayKey)
+          .slice(0, 5)
+          .map(([date, items]) => {
+            const noon = items.find(i => i.dt_txt.includes('12:00:00')) || items[Math.floor(items.length / 2)];
+            return {
+              day:     capitalizeFirst(new Date(date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short' })).replace('.', ''),
+              icon:    noon.weather[0]?.icon || '01d',
+              tempMax: Math.round(Math.max(...items.map((i: any) => i.main.temp_max))),
+              tempMin: Math.round(Math.min(...items.map((i: any) => i.main.temp_min))),
+            };
+          });
+        try {
+          localStorage.setItem(WEATHER_CACHE_KEY(mapped), JSON.stringify({ data: wd, timestamp: Date.now() }));
+          if (days.length) localStorage.setItem(FORECAST_CACHE_KEY(mapped), JSON.stringify({ data: days, timestamp: Date.now() }));
+        } catch { /* stockage plein : sans cache */ }
       }
       setCurrent(wd);
-
-      // ── Prévisions 5 jours ──
-      let days: ForecastDay[] = [];
-      if (!force) {
-        const cached = localStorage.getItem(FORECAST_CACHE_KEY(mapped));
-        if (cached) {
-          const { data, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < CACHE_30M) days = data;
-        }
-      }
-      if (days.length === 0) {
-        const res = await fetch(
-          `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(mapped)}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=fr&cnt=40`
-        );
-        if (res.ok) {
-          const d = await res.json();
-          const list: any[] = d.list || [];
-          const byDay: Record<string, any[]> = {};
-          list.forEach(item => {
-            const key = item.dt_txt.slice(0, 10);
-            if (!byDay[key]) byDay[key] = [];
-            byDay[key].push(item);
-          });
-          const todayKey = new Date().toISOString().slice(0, 10);
-          days = Object.entries(byDay)
-            .filter(([k]) => k > todayKey)
-            .slice(0, 5)
-            .map(([date, items]) => {
-              const noon = items.find(i => i.dt_txt.includes('12:00:00')) || items[Math.floor(items.length / 2)];
-              return {
-                day:     capitalizeFirst(new Date(date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short' })).replace('.', ''),
-                icon:    noon.weather[0]?.icon || '01d',
-                tempMax: Math.round(Math.max(...items.map((i: any) => i.main.temp_max))),
-                tempMin: Math.round(Math.min(...items.map((i: any) => i.main.temp_min))),
-              };
-            });
-          localStorage.setItem(FORECAST_CACHE_KEY(mapped), JSON.stringify({ data: days, timestamp: Date.now() }));
-        }
-      }
       setForecast(days);
     } catch (e: any) {
       setError(e.message || 'Erreur météo.');
@@ -1278,7 +1230,8 @@ const HelloMarketing: React.FC = () => {
               événements restent, ils concernent ses projets. */}
           <div className="flex flex-col gap-3 h-full">
             {blocsEquipe && <BirthdaysSection />}
-            <NextEventSection />
+            {/* External : pas de lecture des projets (serveur, 12/10/2026) → pas de bloc événements. */}
+            {canReadProjects(user?.role) && <NextEventSection />}
           </div>
 
         </div>

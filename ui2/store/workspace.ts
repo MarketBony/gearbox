@@ -5,7 +5,7 @@ import { db, ApiError, normalizeProject } from '../../services/dataService';
 import { getSocket, connectSocket } from '../../services/socket';
 import { fileSauvegardeProjet } from '../../services/fileSauvegardeProjet';
 import { recalculerProjet } from '../../utils/projet';
-import { canEditProjects } from '../../constants';
+import { canEditProjects, canReadProjects } from '../../constants';
 
 // =====================================================================
 // Espace de travail de l'interface v2 : SOURCE UNIQUE des projets (tâches comprises), des
@@ -73,6 +73,8 @@ const dropProject = (id: string) => {
 
 // ---------------------------------------------------------------- chargements
 export async function reloadProjects() {
+  // External : aucun projet (refusé par le serveur) — Hello Marketing et le Chat font sans.
+  if (!canReadProjects(me?.role)) { setProjects([]); return; }
   const list = await db.getProjects();
   // Une écriture locale en attente PRIME sur la lecture : sinon le rechargement effacerait
   // à l'écran une saisie que la file va envoyer.

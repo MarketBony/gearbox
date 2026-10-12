@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { ChatConversation, ChatMessage, User, Project } from '../types';
 import FloatingPanel from '../components/FloatingPanel';
 import ProjectSummary from '../components/ProjectSummary';
-import { hasSocialFeatures } from '../constants';
+import { hasSocialFeatures, canReadProjects } from '../constants';
 import { renduTexteRiche, messageEstImageDistante, estCheminLocalImage, premierLien } from '../lib/richText';
 import LinkPreview from '../components/LinkPreview';
 import VoiceRecorder from '../components/VoiceRecorder';
@@ -614,8 +614,10 @@ const Chat: React.FC = () => {
   const [showProjetPicker, setShowProjetPicker] = useState(false);
   const [rechercheProjet, setRechercheProjet] = useState('');
   const chargerProjets = useCallback(() => {
+    // External : pas de lecture des projets (serveur, 12/10/2026) — la citation lui est déjà masquée.
+    if (!canReadProjects(me?.role)) { setProjets([]); return; }
     db.getProjects().then(setProjets).catch(() => setProjets([]));
-  }, []);
+  }, [me?.role]);
   useEffect(() => { chargerProjets(); }, [chargerProjets]);
   useRealtimeSync(RT_EVENTS.projects, chargerProjets);
 

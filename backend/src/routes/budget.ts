@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
+import { INTERNAL_ROLES } from '../auth/roles';
 import { emitEvent } from '../realtime';
 import { budgetScopeOf, stringScopeWhere } from '../auth/siteScope';
 import { prisma } from '../db';
@@ -14,7 +15,7 @@ const EDIT_ROLES = ['Master', 'Administrator', 'Director'];
 // Cette route ne fait que stocker/renvoyer les valeurs brutes — toute l'agrégation
 // (buckets Alpine/Nissan, filtres...) reste côté frontend.
 
-router.get('/', authenticateToken, async (req: AuthRequest, res) => {
+router.get('/', authenticateToken, requireRole(INTERNAL_ROLES), async (req: AuthRequest, res) => {
   // ⚠️ `budgetScopeOf` et non `scopeOf` : une ligne de budget peut être un BUCKET
   // (`Alpine-Clermont`) et pas un site géographique. Le chef de site de Clermont doit
   // voir `Alpine-Clermont` — c'est sa concession — mais **pas** l'enveloppe `Nissan`,

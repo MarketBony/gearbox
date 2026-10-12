@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useSessionState, useScrollRestore } from '../hooks/useSessionState';
-import { Project, Campaign, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense, User } from '../types';
+import { Project, BudgetLine, BrandType, PlaqueName, Site, ServiceType, SocialPost, FixedExpense, User } from '../types';
 import { db } from '../services/dataService';
 import { computeDashboardStats } from '../services/dashboardStats';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
@@ -298,7 +298,6 @@ const Dashboard: React.FC = () => {
   const { theme } = useTheme();
   // --- DATA STATES ---
   const [projects, setProjects] = useState<Project[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [budgets, setBudgets] = useState<BudgetLine[]>([]);
   const [socialPosts, setSocialPosts] = useState<SocialPost[]>([]); // New State
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
@@ -325,16 +324,16 @@ const Dashboard: React.FC = () => {
   // page reste affichée pendant le refetch).
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    const [pData, cData, bData, sData, feData, uData] = await Promise.all([
+    // ⚠️ Les campagnes ne sont plus chargées (12/10/2026) : la page n'en faisait RIEN, et pour un chef de site la
+    // route renvoyait toutes les campagnes du réseau, sans filtre de site (refusée désormais par le serveur).
+    const [pData, bData, sData, feData, uData] = await Promise.all([
       db.getProjects(),
-      db.getCampaigns(),
       db.getBudgets(),
       db.getSocialPosts(),
       db.getFixedExpenses(),
       db.getUsers()
     ]);
     setProjects(pData);
-    setCampaigns(cData);
     setBudgets(bData);
     setSocialPosts(sData);
     setFixedExpenses(feData);
@@ -346,12 +345,11 @@ const Dashboard: React.FC = () => {
     load();
   }, [load]);
 
-  // Temps réel : le Dashboard agrège 5 ressources, il se rafraîchit dès que
+  // Temps réel : le Dashboard agrège 4 ressources, il se rafraîchit dès que
   // l'une d'elles bouge chez un autre utilisateur.
   useRealtimeSync(
     [
       ...RT_EVENTS.projects,
-      ...RT_EVENTS.campaigns,
       ...RT_EVENTS.budget,
       ...RT_EVENTS.social,
       ...RT_EVENTS.fixedExpenses

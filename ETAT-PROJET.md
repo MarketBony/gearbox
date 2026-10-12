@@ -3,22 +3,15 @@
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
-## ▶ POINT DE REPRISE — 12/10/2026 (lire en premier)
-- **ÉTAT : tout est en production (correctifs 73 → 79 livrés les 08 et 09/10), RIEN en cours de code, `master` = `origin`
-  = prod.** Session du 08–09/10 : présence et pastilles (73, 74), fonds d'écran (75), bulles de discussion (76), refonte des
-  widgets (77, 78), petites corrections dont la liste d'arbitrages du 30/09 (79). Détail : fiches des correctifs 73 à 79.
-- **PROCHAIN LOT DÉCIDÉ : le LOT SÉCURITÉ SERVEUR, AVANT LA BASCULE** (bascule annoncée vers le **16/10** : v2 par défaut).
-  Périmètre (BUGS-CONNUS.md + ETAT-BACKEND.md) :
-  - `GET /api/budget` et `GET /api/fixed-expenses` sans garde de rôle (un External les lit) → `requireRole` + `siteScope` ;
-  - `GET /api/projects` sans contrôle de rôle (External et Guest lisent tous les projets) ;
-  - Chat : un chef de site lit le Général par l'API REST (`routes/chat.ts` n'exclut que l'External) ;
-  - Dashboard : `GET /api/campaigns` sans filtre de site pour un chef de site ;
-  - `/uploads` servi par `express.static` SANS connexion (fichiers lisibles par qui connaît l'URL) ;
-  - `PUT /api/auth/me` accepte une `avatarUrl` EXTERNE (pixel de traçage chez les collègues) ;
-  - changement de mot de passe sans vérification de l'ancien ; clé OpenWeather en clair dans le code client ;
-  - secret client Google à renouveler (console Google + `.env` local et VPS).
-  Méthode : audit (vérifier chaque fiche dans le code, plusieurs diagnostics passés étaient faux), plan, validation de Théo,
-  puis test avec de VRAIS comptes restreints (chef de site, External, Guest) — aucun compte de test, Théo s'organise.
+## ▶ POINT DE REPRISE — 12/10/2026, fin de session (lire en premier)
+- **ÉTAT : tout est en production (correctif 80 livré le 12/10), RIEN en cours de code, `master` = `origin` = prod.**
+  Session du 12/10 : **LOT SÉCURITÉ SERVEUR** (correctif 80) bouclé AVANT la bascule, testé avec de vrais comptes Master,
+  chef de site (Mozac), External et Guest, dans les deux interfaces. Détail : fiche du correctif 80.
+- **RESTE DU LOT, côté Théo (consoles externes)** : **régénérer la clé OpenWeather** (openweathermap.org — l'ancienne a été
+  publique dans le bundle client des mois durant ; elle sert ENCORE, désormais côté serveur seulement) et **le secret client
+  Google** (console Google, projet `gearbox-forms`). Valeurs à reporter dans `backend/.env` + `.env` du VPS
+  (`OPENWEATHER_API_KEY`, `GOOGLE_CLIENT_SECRET`) puis `sudo docker compose up -d api` (variables seules, pas de rebuild).
+- **PROCHAINE ÉTAPE : la BASCULE** (v2 par défaut, annoncée vers le **16/10**). Le lot sécurité qui la conditionnait est fait.
 - **EN ATTENTE DE RETOURS (Théo + équipe)** :
   - **bulles de discussion (76)** : test grandeur nature — pastille de non-lus et VRAI envoi depuis une bulle jamais testés ;
   - **widgets (77–78)** : cocher une tâche, déplacer une carte du widget To-do, jouer / refuser un défi (écritures non testées) ;
@@ -44,7 +37,9 @@
   Claude Code perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par leur nom,
   demander à Théo de se reconnecter). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`), plus seulement dans
   le navigateur.
-- **En production : correctif 79 (09/10)** — **petites corrections** (Campagnes retirée de la v2, filtre Site des Dépenses,
+- **En production : correctif 80 (12/10)** — **lot sécurité serveur** (lectures gardées par rôle, Chat fermé au chef de
+  site, `/uploads` sous connexion, photo et mot de passe vérifiés, météo par le serveur et par coordonnées, rechargement au
+  changement de compte), `api` ET `web`, aucune migration, variable `OPENWEATHER_API_KEY`. Avant lui le **correctif 79 (09/10)** — **petites corrections** (Campagnes retirée de la v2, filtre Site des Dépenses,
   Matériel, tags, Chat, pastille Jeux…), `api` ET `web`. Avant lui le **correctif 78 (09/10)** — v2 : **bureau enregistré sur le serveur** (widgets retrouvés sur tous les
   postes ; `api` ET `web`, migration `20261009120000_user_widgets`). Avant lui le **correctif 77 (09/10)** — v2 : **refonte des widgets** (formats libres, To-do / Ma journée / Forms,
   contenus réparés), `web` seul. Avant lui le **correctif 76 (09/10)** — v2 : **bulles de discussion** façon Messenger sur ordinateur (`web` seul). Test
@@ -597,6 +592,38 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 80 — 12/10 : LOT SÉCURITÉ SERVEUR (avant la bascule)** (branche `fix/securite-serveur`, **`api` ET `web`**,
+  aucune migration, nouvelle variable `OPENWEATHER_API_KEY`). Audit d'abord : chaque fiche revérifiée dans le code — celle de
+  `GET /api/projects` était **à moitié fausse** (le Guest a TOUTES les rubriques en lecture, il lit les projets à bon droit).
+  - **Lectures gardées par rôle** (listes `INTERNAL_ROLES` / `UNSCOPED_READ_ROLES` / `CHAT_ROLES` de `auth/roles.ts`, écrites en
+    SOUSTRACTION) : projets, budget, dépenses, fichiers projet → tout sauf l'External (décision de Théo : « l'External n'a pas
+    accès aux projets tout court ») ; campagnes, contacts, dépenses ponctuelles (`/api/expenses`, aucune page ne s'en sert)
+    → ni External ni chef de site. Le cloisonnement par site (`siteScope.ts`) s'applique ensuite, inchangé.
+  - **Temps réel** : l'External recevait en CLAIR, par le socket, chaque projet / budget / dépense modifié (trou trouvé en
+    route). Il rejoint la salle « sans charge » (`assignEmitRoom`) : nom de l'événement seul, puis rappel de la route filtrée.
+  - **Chat** : tout `routes/chat.ts` fermé aux rôles sans Chat (porte au niveau du routeur) ; le Général ne compte plus les
+    chefs de site dans ses non-lus et ses **push** (ils recevaient l'aperçu des messages).
+  - **`/uploads`** : plus rien sans connexion. Porte `auth/mediaAccess.ts` : cookie `gx_media` (httpOnly, SameSite=Strict,
+    chemin `/uploads`, 24 h = le jeton) posé à la connexion, au `GET /auth/me` du démarrage ET par tout appel authentifié où il
+    manque (onglet resté ouvert pendant le déploiement) ; effacé par `POST /api/auth/logout`. Droits par dossier : chat/chatbg
+    → `CHAT_ROLES`, project → `INTERNAL_ROLES`, avatar/calendar → tout connecté, dossier inconnu → 403. `Cache-Control: private`.
+  - **Photo** : `utils/avatarUrl.ts` (règle extraite de la photo de groupe) appliquée à `PUT /api/auth/me` et `POST`/`PUT
+    /api/users` ; la valeur déjà en base reste tolérée. **Mot de passe** : `oldPassword` exigé et vérifié (bcrypt), envoyé par
+    les deux interfaces, message « Ancien mot de passe incorrect. » (testé par Théo).
+  - **Météo** : relais `GET /api/weather?city=<site>` (`routes/weather.ts`, cache 10 min), clé côté serveur. **Températures
+    toujours trop basses (Théo) : MESURÉ** — la requête par nom tombait sur un point à ~900 m (Clermont : 6,6 °C contre 9,5 °C
+    aux vraies coordonnées), d'autres sur le centroïde d'un « Arrondissement », Le Puy ne répondait pas. Interrogation par
+    COORDONNÉES de chaque site.
+  - **Changement de compte (v2)** : la coque ne s'installe qu'UNE fois par page — un chef de site connecté après Master
+    (même onglet) voyait les 16 icônes, menus, widgets et données de Master. **Déconnexion = rechargement complet**, et
+    connexion = rechargement si la coque appartenait à un autre compte (`AuthContext`). Constaté par Théo en recette.
+  - **Appels voués au 403 supprimés** : Dashboard de l'ancienne interface (campagnes, inutilisées), Hello Marketing et Chat de
+    l'External (projets), coque du chef de site (conversations, congés, fil d'actualité) ; Archives retirées des rubriques
+    autorisées de l'External.
+  - Testé (localhost, base de prod en lecture seule, aucune donnée écrite) : Master, chef de site Mozac, External, Guest —
+    Dock, chaque rubrique ouverte, statuts de chaque route, zéro erreur au chargement. **Non vérifié en direct** : le temps réel
+    sans charge de l'External (code seulement) ; le Chat de l'ancienne interface pour l'External.
+
 - **Correctif 79 — 09/10 : petites corrections (arbitrages du 30/09 + trouvailles de la semaine)** (branche
   `fix/petites-corrections`, **`api` ET `web`**, aucune migration). Décisions de Théo : B1 (a), Campagnes retirée, B4, B5.
   - **Campagnes retirée de la v2** (Théo : « elle sert à rien ») : `computeNav` ne la propose plus en v2 (`ui2`), Dock, matrice
@@ -888,7 +915,8 @@
   Encrypt, base Supabase (pas de Postgres local)
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 79** (9 octobre 2026) — petites corrections, **`api` ET `web`**, aucune migration.
+- master = prod, synchronisés. Dernier lot déployé : **correctif 80** (12 octobre 2026) — lot sécurité serveur, **`api` ET `web`**,
+  aucune migration, **nouvelle variable `OPENWEATHER_API_KEY`** (`.env` du VPS + `docker-compose.yml`). Avant lui le **correctif 79** (9 octobre 2026) — petites corrections, **`api` ET `web`**, aucune migration.
   Avant lui le **correctif 78** (9 octobre 2026) — bureau v2 enregistré sur le serveur. **`api` ET `web`**,
   migration additive `20261009120000_user_widgets` (table `UserWidgets`), appliquée et inscrite AVANT le push. Avant lui le
   **correctif 77** (9 octobre 2026) — refonte des widgets v2 (W0–W2), **`web` seul**, aucune
@@ -4209,6 +4237,12 @@
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
 > l'historique des correctifs ci-dessus et dans `BUGS-CONNUS.md`.
 
+### Sécurité (suite du correctif 80)
+- **Cloisonnement des fichiers FICHIER PAR FICHIER** : `/uploads` exige une session et un rôle par dossier, mais une pièce
+  jointe de chat reste lisible par tout rôle qui a le Chat s'il connaît l'URL (uuid), et un fichier projet par tout rôle
+  interne, concession comprise. Le fermer demande une recherche en base par fichier (participant / périmètre).
+- **Déconnexion = jeton toujours valide 24 h** (JWT sans état) : le cookie est effacé, pas le jeton. Révocation à étudier.
+
 ### Fonctionnel / produit
 - **Chantiers d'octobre 2026 (liste de Théo du 01/10) — arbitrages, ne pas les rediscuter :**
   - Nouveautés **dans la v2 seulement**.
@@ -4508,6 +4542,13 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **Interface v2 : la coque ne s'installe qu'UNE FOIS PAR PAGE** (`ui2/os/engine/boot.ts`) — Dock, Launchpad, menus et widgets
+  sont construits au démarrage avec les droits du compte d'alors. D'où le rechargement complet à la déconnexion (12/10). Pour
+  tester un autre rôle : se déconnecter (la page se recharge seule), jamais changer de jeton à la main.
+- **`/uploads` exige une session depuis le 12/10** (cookie `gx_media`, `auth/mediaAccess.ts`). Un `curl` sans cookie rend 401 ;
+  un 404 derrière une session veut dire « porte passée, fichier absent » (fichiers de prod absents du poste local).
+- **Les listes de lecture par rôle (`INTERNAL_ROLES`…) vivent dans `backend/src/auth/roles.ts`** : une route qui sert des projets,
+  budgets ou dépenses ajoute `requireRole(INTERNAL_ROLES)` ; ne pas réécrire « tout sauf External » à la main.
 - **Widgets v2 : la disposition vit sur le SERVEUR** (`/api/widgets`, correctif 78) ; `GX.store` n'en est que la copie
   locale. Pour remettre un bureau à zéro, passer par la galerie (« Disposition par défaut »), pas par le stockage du navigateur :
   la copie serveur reviendrait au prochain chargement.

@@ -17,6 +17,11 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 const API_BASE = '/api'; // proxifié par vite vers le backend (vite.config.ts)
 const TOKEN_KEY = 'gearbox_token';
 const AUTH_USER_KEY = 'gearbox_auth_user';
+/** Rôle du compte connecté, pour les services hors React (socket, fil d'actualité) qui ne doivent pas lancer
+ *  un appel voué au 403 (12/10/2026). Copie locale écrite par AuthContext AVANT l'ouverture du socket. */
+export const getStoredRole = (): string | undefined => {
+  try { return JSON.parse(localStorage.getItem(AUTH_USER_KEY) || 'null')?.role; } catch { return undefined; }
+};
 
 export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY);
 export const setToken = (token: string) => localStorage.setItem(TOKEN_KEY, token);
@@ -765,6 +770,11 @@ class DataService {
   // blocs qui ne fonctionnaient jamais en production avant le 30/07/2026.
   // Le client ne transmet qu'une CLÉ, jamais une URL (voir la note de sécurité
   // dans routes/feeds.ts).
+  /** Météo du site (relais serveur, 12/10/2026) : `current` / `forecast` = réponses brutes d'OpenWeather. */
+  async getWeather(city: string): Promise<{ city: string; current: any; forecast: any }> {
+    return apiFetch(`/weather?city=${encodeURIComponent(city)}`);
+  }
+
   async getFeeds(): Promise<FeedInfo[]> {
     return apiFetch('/feeds');
   }
@@ -951,7 +961,12 @@ class DataService {
   async duplicateForm(id: string): Promise<{ form: GForm; skipped: number }> { return apiFetch(`/forms/${id}/duplicate`, { method: 'POST' }); }
   async getFormLog(id: string): Promise<GFormLog[]> { return apiFetch<GFormLog[]>(`/forms/${id}/log`); }
 
-  async updateMe(data: { name?: string; password?: string; avatarColor?: string; avatarUrl?: string | null; birthdate?: string; chatBackground?: string; chatBubble?: string }): Promise<Omit<User, 'loginId'>> {
+  /** Efface le cookie des fichiers `/uploads` (lot sécurité, 12/10/2026). Sans jeton : marche même expiré. */
+  async logoutMedia(): Promise<void> {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+  }
+
+  async updateMe(data: { name?: string; password?: string; oldPassword?: string; avatarColor?: string; avatarUrl?: string | null; birthdate?: string; chatBackground?: string; chatBubble?: string }): Promise<Omit<User, 'loginId'>> {
     return apiFetch('/auth/me', { method: 'PUT', body: JSON.stringify(data) });
   }
 }

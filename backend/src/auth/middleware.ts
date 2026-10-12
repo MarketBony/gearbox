@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET as SECRET } from './secret';
+import { MEDIA_COOKIE, setMediaCookie } from './mediaAccess';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -34,6 +35,9 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
       return res.status(401).json({ error: expire ? 'Session expirée.' : 'Jeton invalide.' });
     }
     req.user = user;
+    // Cookie des /uploads (auth/mediaAccess.ts) absent → posé au passage. Couvre l'onglet resté OUVERT pendant un
+    // déploiement : il ne repasse pas par `GET /api/auth/me`, ses images seraient restées en 401 jusqu'au rechargement.
+    if (!req.headers.cookie?.includes(`${MEDIA_COOKIE}=`)) setMediaCookie(res, token);
     next();
   });
 };

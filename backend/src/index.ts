@@ -29,6 +29,8 @@ import musicRoutes from './routes/music';
 import pushRoutes from './routes/push';
 import seedRoutes from './routes/seed';
 import uploadsRoutes, { UPLOADS_ROOT } from './routes/uploads';
+import { requireMediaAccess } from './auth/mediaAccess';
+import weatherRoutes from './routes/weather';
 import storageRoutes from './routes/storage';
 import gamesRoutes from './routes/games';
 import settingsRoutes from './routes/settings';
@@ -108,6 +110,8 @@ app.use('/api/project-files', projectFilesRoutes);
 // Hello Marketing : proxy des flux RSS et de la playlist Deezer (le navigateur ne
 // peut pas les appeler en direct — CORS ; voir les commentaires de ces routes).
 app.use('/api/feeds', feedRoutes);
+// Météo : relais OpenWeather, clé côté serveur et requête par coordonnées (12/10/2026).
+app.use('/api/weather', weatherRoutes);
 // Aperçu de liens — liste blanche STRICTE de fournisseurs oEmbed (voir la route).
 app.use('/api/link-preview', linkPreviewRoutes);
 // Recherche de GIF (Tenor) — la clé d'API reste côté serveur, voir la route.
@@ -156,9 +160,12 @@ const EXT_AFFICHABLES = new Set([
   '.webm', '.ogg', '.oga', '.mp3', '.m4a', '.aac', '.wav',
 ]);
 
-app.use('/uploads', express.static(UPLOADS_ROOT, {
+// ⚠️ 12/10/2026 (lot sécurité serveur) : plus AUCUN fichier servi sans connexion — porte `requireMediaAccess`
+// (auth/mediaAccess.ts : cookie `gx_media` + droits par dossier). Et `private` : jamais en cache partagé.
+app.use('/uploads', requireMediaAccess, express.static(UPLOADS_ROOT, {
   setHeaders: (res, filePath) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, max-age=0');
     const ext = path.extname(filePath).toLowerCase();
     if (!EXT_AFFICHABLES.has(ext)) {
       res.setHeader('Content-Disposition', 'attachment');

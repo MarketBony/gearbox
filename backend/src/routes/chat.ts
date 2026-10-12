@@ -1,11 +1,16 @@
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
-import { authenticateToken, AuthRequest } from '../auth/middleware';
-import { hasSocialFeatures } from '../auth/roles';
+import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
+import { hasSocialFeatures, CHAT_ROLES } from '../auth/roles';
 import { joinConversationRooms, notifyConversationCreated } from '../realtime';
 import { prisma } from '../db';
 
 const router = Router();
+
+// ⚠️ 12/10/2026 (lot sécurité serveur) : TOUT le Chat est fermé aux rôles sans Chat (chef de site). Le socket l'était
+// déjà (realtime/index.ts), le REST non : un chef de site lisait le Général par appel direct. Porte au niveau du
+// routeur, pas route par route — une route ajoutée plus tard en hérite.
+router.use(authenticateToken, requireRole(CHAT_ROLES));
 
 // REST = chargement initial et historique uniquement.
 // La création/édition/suppression/réaction de MESSAGE passe par Socket.IO

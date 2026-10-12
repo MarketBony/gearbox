@@ -37,6 +37,20 @@ ne pas les réécrire.
 > rendre :
 > `grep -rn "new PrismaClient" backend/src --include=*.ts | grep -v "src/db.ts"`
 
+### 🔐 Lot sécurité serveur — lectures par rôle, `/uploads` sous session, météo (12/10/2026, correctif 80)
+- **Listes de lecture** (`auth/roles.ts`, en soustraction) : `INTERNAL_ROLES` (tout sauf External) sur `GET /api/projects`,
+  `/api/budget`, `/api/fixed-expenses`, `/api/project-files/:id` ; `UNSCOPED_READ_ROLES` (ni External ni chef de site) sur
+  `GET /api/campaigns`, `/api/contacts`, `/api/expenses` ; `CHAT_ROLES` sur TOUT `routes/chat.ts` (`router.use`).
+- **Temps réel** : `assignEmitRoom` range dans la salle sans charge tout rôle hors `UNSCOPED_READ_ROLES` (External compris).
+  Non-lus / push du Général : rôles avec Chat seulement.
+- **`/uploads`** : `app.use('/uploads', requireMediaAccess, express.static(…))` — porte unique `auth/mediaAccess.ts` (cookie
+  `gx_media` ou Bearer, droits par dossier, dossier inconnu → 403). Cookie posé par `/auth/login`, `GET /auth/me` et
+  `authenticateToken` s'il manque ; `POST /api/auth/logout` l'efface.
+- **`PUT /api/auth/me`** : `avatarUrl` validée par `utils/avatarUrl.ts` (aussi `POST`/`PUT /api/users`, et la photo de groupe
+  du Chat) ; nouveau mot de passe → `oldPassword` exigé, 403 s'il est faux.
+- **`GET /api/weather?city=<site>`** (`routes/weather.ts`) : relais OpenWeather, `OPENWEATHER_API_KEY`, coordonnées par site
+  (table locale), cache mémoire 10 min ; site inconnu → Clermont ; 503 sans clé, 502 si OpenWeather ne répond pas.
+
 ## ✅ Modules de données branchés (frontend → REST/Socket.IO, vérifiés en base)
 
 1. **Auth** — `/api/auth` login (JWT 24h, bcrypt), GET/PUT `/me` (+ `avatarUrl`).

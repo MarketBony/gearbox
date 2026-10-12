@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { authenticateToken, requireRole } from '../auth/middleware';
+import { UNSCOPED_READ_ROLES } from '../auth/roles';
 import { emitEvent } from '../realtime';
 import { prisma } from '../db';
 
 const router = Router();
 
 // Allow all authenticated users to view expenses
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, requireRole(UNSCOPED_READ_ROLES), async (req, res) => {
   try {
     const expenses = await prisma.oneOffExpense.findMany({
       orderBy: { date: 'desc' }

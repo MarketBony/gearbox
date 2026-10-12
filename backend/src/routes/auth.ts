@@ -6,6 +6,8 @@ import { publicUser } from '../utils/publicUser';
 import { emitEvent, notifyUserChanged } from '../realtime';
 import { FOND_PROCEDURAL, CHATBG_UPLOAD_PATH, BULLE_ID } from '../utils/personnalisationChat';
 import { prisma } from '../db';
+import { checkAvatarUrl, AVATAR_REFUSED } from '../utils/avatarUrl';
+import { setMediaCookie, clearMediaCookie } from '../auth/mediaAccess';
 
 const router = Router();
 
@@ -32,6 +34,7 @@ router.post('/login', async (req, res) => {
   }
 
   const token = jwt.sign({ id: user.id, role: user.role }, SECRET, { expiresIn: '24h' });
+  setMediaCookie(res, token); // lecture des /uploads (auth/mediaAccess.ts)
   res.json({ token, user: publicUser(user) });
 });
 
@@ -65,7 +68,17 @@ router.get('/me', async (req, res) => {
 
   const user = await prisma.user.findUnique({ where: { id: decoded.id } });
   if (!user) return res.sendStatus(404);
+  // Appelé au démarrage de l'appli : (re)pose le cookie des /uploads — une session ouverte avant le 12/10/2026
+  // l'obtient ainsi sans se reconnecter. Même jeton que l'en-tête, donc même échéance.
+  setMediaCookie(res, token);
   res.json(publicUser(user));
+});
+
+// Déconnexion : efface le cookie des /uploads (le jeton de l'API, lui, vit dans le navigateur). Sans authentification
+// à dessein : effacer un cookie ne donne rien, et un jeton déjà expiré doit pouvoir l'effacer aussi.
+router.post('/logout', (_req, res) => {
+  clearMediaCookie(res);
+  res.json({ ok: true });
 });
 
 router.put('/me', async (req, res) => {
@@ -76,11 +89,21 @@ router.put('/me', async (req, res) => {
   const decoded = decodeToken(req);
   if (!decoded) return res.sendStatus(403);
 
-  const { name, password, avatarColor, avatarUrl, birthdate, chatBackground, chatBubble } = req.body;
+  const { name, password, oldPassword, avatarColor, avatarUrl, birthdate, chatBackground, chatBubble } = req.body;
+
+  const current = await prisma.user.findUnique({ where: { id: decoded.id } });
+  if (!current) return res.sendStatus(404);
 
   // avatarUrl : undefined = champ absent (non modifié) ; null = suppression de la photo.
+  // ⚠️ 12/10/2026 : VALIDÉE (utils/avatarUrl.ts) — une URL externe était acceptée et rendue chez tous les collègues.
+  // La valeur DÉJÀ en base est tolérée telle quelle : le client renvoie l'utilisateur entier à chaque sauvegarde, et une
+  // valeur héritée d'une autre forme rendrait sinon le profil insauvegardable (même tolérance que `mediaFiles`, social.ts).
   const updateData: any = { name, avatarColor };
-  if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
+  if (avatarUrl !== undefined && avatarUrl !== current.avatarUrl) {
+    const ok = checkAvatarUrl(avatarUrl);
+    if (ok === false) return res.status(400).json({ error: AVATAR_REFUSED });
+    updateData.avatarUrl = ok;
+  }
   // Même convention : undefined = non modifié ; vide = anniversaire effacé.
   if (birthdate !== undefined) updateData.birthdate = birthdate || null;
   // Fond du Chat : undefined = non modifié ; vide = retour au fond par défaut.
@@ -111,7 +134,13 @@ router.put('/me', async (req, res) => {
       return res.status(400).json({ error: 'Couleur de bulle refusée.' });
     }
   }
+  // ⚠️ 12/10/2026 : l'ANCIEN mot de passe est exigé et vérifié. Les deux interfaces le demandaient sans jamais
+  // l'envoyer : une session laissée ouverte suffisait à changer le mot de passe d'un collègue et à lui prendre son
+  // compte. La réinitialisation par un administrateur passe par `PUT /api/users/:id`, pas par ici.
   if (password) {
+    if (typeof oldPassword !== 'string' || !oldPassword || !(await bcrypt.compare(oldPassword, current.passwordHash))) {
+      return res.status(403).json({ error: 'Ancien mot de passe incorrect.' });
+    }
     updateData.passwordHash = await bcrypt.hash(password, 10);
   }
 

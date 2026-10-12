@@ -9,7 +9,8 @@ interface AuthContextType {
   user: User | null;
   login: (loginId: string, password?: string) => Promise<boolean>;
   logout: () => void;
-  updateProfile: (updatedUser: User) => Promise<void>;
+  /** `oldPassword` : exigé par le serveur dès qu'un nouveau mot de passe part (lot sécurité, 12/10/2026). */
+  updateProfile: (updatedUser: User, oldPassword?: string) => Promise<void>;
   setAvatarPhoto: (url: string | null) => Promise<void>;
   /** Fond du Chat : `proc:<id>`, chemin d'une image importée, ou `null` pour le défaut. */
   setChatBackground: (valeur: string | null) => Promise<void>;
@@ -65,6 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Déconnexion propre déclenchée par la couche API sur un 401 (token expiré).
     const onExpired = () => {
+      db.logoutMedia();
       disconnectSocket();
       sessionStorage.clear();
       setUser(null);
@@ -80,6 +82,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const fullUser: User = { ...apiUser, loginId } as User;
       setToken(token);
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(fullUser));
+      // ⚠️ Interface v2 : le moteur ne s'installe qu'UNE fois par page (ui2/os/engine/boot.ts). Une coque déjà
+      // montée pour un AUTRE compte (session expirée puis connexion d'un collègue) garderait son Dock, ses menus,
+      // ses fenêtres et ses données. Le jeton est enregistré : le rechargement rouvre la session du nouveau compte.
+      const gxUid = (window as any).GX?.ctx?.uid;
+      if (gxUid && gxUid !== fullUser.id) { window.location.reload(); return true; }
       setUser(fullUser);
       setAvatarUrl(fullUser.id, fullUser.avatarUrl); // photo de profil pour <Avatar/>
       connectSocket(); // login réussi : ouvre le socket chat (JWT au handshake)
@@ -98,13 +105,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // mémoire, elle, reste. Lancé AVANT clearToken : apiFetch lit le jeton au moment de l'appel.
     if (canUseAssistant(user?.role)) db.assistantReset().catch(() => {});
     disconnectSocket(); // fermeture propre du socket : pas de connexion fantôme
+    db.logoutMedia(); // efface le cookie des /uploads (fichiers privés depuis le 12/10/2026)
     clearToken();
     sessionStorage.clear();
     setUser(null);
+    // ⚠️ Rechargement COMPLET (12/10/2026) : la coque v2 ne s'installe qu'une fois par page — sans lui, le compte
+    // suivant héritait du Dock, des menus, des fenêtres et des données du précédent (constaté : un chef de site
+    // connecté après Master voyait les 16 icônes). Différé d'un instant pour laisser partir `logoutMedia`.
+    setTimeout(() => window.location.reload(), 150);
   };
 
   // Profil du user CONNECTÉ uniquement — passe par PUT /api/auth/me.
-  const updateProfile = async (updatedUser: User) => {
+  const updateProfile = async (updatedUser: User, oldPassword?: string) => {
     try {
       const me = await db.updateMe({
         name: updatedUser.name,
@@ -113,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // « champ absent = inchangé, valeur vide = effacement » (routes/auth.ts).
         // Envoyer `undefined` rendrait impossible d'effacer sa date de naissance.
         birthdate: updatedUser.birthdate ?? '',
-        ...(updatedUser.password ? { password: updatedUser.password } : {})
+        ...(updatedUser.password ? { password: updatedUser.password, oldPassword: oldPassword || '' } : {})
       });
       // ⚠️ `me` (réponse serveur) est étalé APRÈS `updatedUser` : c'est volontaire, le
       // serveur est la source de vérité. Corollaire à ne pas oublier — tout champ que

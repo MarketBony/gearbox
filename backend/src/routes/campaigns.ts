@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticateToken, requireRole } from '../auth/middleware';
+import { UNSCOPED_READ_ROLES } from '../auth/roles';
 import { emitEvent } from '../realtime';
 import { withDates } from '../utils/dates';
 import { prisma } from '../db';
@@ -7,7 +8,7 @@ import { prisma } from '../db';
 const router = Router();
 const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator'];
 
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', authenticateToken, requireRole(UNSCOPED_READ_ROLES), async (req, res) => {
   const campaigns = await prisma.campaign.findMany();
   res.json(campaigns);
 });
