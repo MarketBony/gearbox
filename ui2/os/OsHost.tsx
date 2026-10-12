@@ -5,6 +5,7 @@ import overridesCss from './overrides.css?inline';
 // Rubriques NÉES dans la v2 (sans équivalent dans la maquette) : leur feuille, après celle de la maquette.
 import postitCss from '../apps/todo/postit.css?inline';
 import formsCss from '../apps/forms/forms.css?inline';
+import crmCss from '../apps/crm/crm.css?inline';
 import assistantCss from '../apps/assistant/assistant.css?inline';
 import { boot } from './engine/boot';
 import DataHub from './DataHub';
@@ -128,7 +129,7 @@ const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, on
       Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '0' });
       const shadow = host.attachShadow({ mode: 'open' });
       const style = document.createElement('style');
-      style.textContent = `${css}\n${overridesCss}\n${postitCss}\n${formsCss}\n${assistantCss}\n${bubblesCss}\n${widgetsCss}`;
+      style.textContent = `${css}\n${overridesCss}\n${postitCss}\n${formsCss}\n${crmCss}\n${assistantCss}\n${bubblesCss}\n${widgetsCss}`;
       const body = document.createElement('div');
       body.className = 'gx-body';
       shadow.append(style, body);

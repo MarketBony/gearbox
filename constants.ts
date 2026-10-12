@@ -744,6 +744,11 @@ export const EXPORT_ALLOWED_ROLES: string[] = ['Master', 'Administrator', 'Direc
 // Alignée sur `FORMS_ROLES` de backend/src/auth/roles.ts, qui est le VRAI refus (chaque route de /api/forms).
 export const FORMS_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
 export const canSeeForms = (role: string | undefined | null) => FORMS_ROLES.includes(role ?? '');
+// Rubrique CRM (référentiel client unique, interface v2 SEULEMENT, 12/10/2026). Cible : les rôles de Jeux (Director et
+// chef de site exclus). Pendant la construction : **Master seul** (Théo). Alignée sur `CRM_ROLES` de
+// backend/src/auth/roles.ts, le VRAI refus. Données nominatives : jamais d'External ni de Guest.
+export const CRM_ALLOWED_ROLES: string[] = ['Master'];
+export const canSeeCrm = (role: string | undefined | null) => CRM_ALLOWED_ROLES.includes(role ?? '');
 // Assistant IA « mIAouss » (interface v2 SEULEMENT, 08/10/2026) : équipe marketing seulement — ni Guest, ni External,
 // ni chef de site (décision de Théo). Alignée sur `ASSISTANT_ROLES` de backend/src/auth/roles.ts, le VRAI refus.
 export const ASSISTANT_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];

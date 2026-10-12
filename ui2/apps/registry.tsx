@@ -16,6 +16,7 @@ import GamesApp from './games/GamesApp';
 import SettingsApp from './settings/SettingsApp';
 import ChatApp from './chat/ChatApp';
 import FormsApp from './forms/FormsApp';
+import CrmApp from './crm/CrmApp';
 
 /** Composant React de chaque rubrique portée (ids : ./ids.ts). */
 export const PORTED_APPS: Record<string, React.ComponentType<AppProps>> = {
@@ -37,4 +38,5 @@ export const PORTED_APPS: Record<string, React.ComponentType<AppProps>> = {
   settings: SettingsApp,
   chat: ChatApp,
   forms: FormsApp,
+  crm: CrmApp,
 };

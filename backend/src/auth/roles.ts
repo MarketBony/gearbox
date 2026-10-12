@@ -51,6 +51,11 @@ export const USER_DELETE_ROLES = ['Master', 'Administrator'];
 // Doit rester aligné sur `GAMES_ALLOWED_ROLES` de `constants.ts` côté frontend.
 export const GAMES_ROLES = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'];
 
+// Rubrique CRM (référentiel client unique, 12/10/2026). Cible : les rôles de Jeux (Director et chef de site
+// EXCLUS, décision de Théo). Le temps de la construire : **Master seul**. Élargir = remplacer par GAMES_ROLES,
+// ici ET dans `CRM_ALLOWED_ROLES` de `constants.ts`. Ces données sont nominatives : jamais d'External ni de Guest.
+export const CRM_ROLES = ['Master'];
+
 // --- Chef de site (05/08/2026) ------------------------------------------------
 //
 // Le nom du rôle et son test vivent ICI, avec les autres constantes de rôle, et non

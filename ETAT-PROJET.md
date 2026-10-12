@@ -3,9 +3,14 @@
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
-## ▶ POINT DE REPRISE — 12/10/2026, fin de session (lire en premier)
-- **ÉTAT : tout est en production (correctifs 80 et 81 livrés le 12/10), RIEN en cours de code, `master` = `origin` = prod**
-  (`61b930a`). Dernier déploiement : correctif 81, `web` seul. Aucune branche en cours.
+## ▶ POINT DE REPRISE — 12/10/2026, soir (lire en premier)
+- **CHANTIER EN COURS : CRM / RCU (référentiel client unique).** Cadrage : `RCU-CADRAGE.md` (décisions R1–R13) + page
+  `maquettes/crm/rcu-cartographie.html` ; maquette validée : `maquettes/crm/v2/`. **Lot 1 en production (correctif 82)** :
+  base `rcu-db` sur le VPS, worker d'import, compte SFTP `dcs`, écran Imports (Master seul). **Ensuite, dans l'ordre** :
+  lot 2 (client unique : rapprochement, arbitrage, liste + fiche client de la maquette), lot 3 (couche Bony), lot 4
+  (relances), lot 5 (GRID). **13/10 : brancher les 2 requêtes automatiques du Requêteur DCS sur le SFTP** (VN, VO).
+  ⚠️ Figeac, Millau et Carmaux absents des extractions (droits DCS de Théo à faire ouvrir par l'IT).
+- **Avant le CRM, le 12/10 : correctifs 80 et 81 en production.**
 - **Fait le 12/10** (détail : fiches 80 et 81) :
   - **80 — lot sécurité serveur** : lectures gardées par rôle (`INTERNAL_ROLES` / `UNSCOPED_READ_ROLES` / `CHAT_ROLES`,
     `auth/roles.ts`) ; l'External ne lit plus AUCUN projet (ni budget, dépenses, fichiers projet), ni par l'API ni par le temps
@@ -60,7 +65,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 81 (12/10)** — **v2, verre Liquid Glass des widgets** (rognage `clip-path`) et listes des widgets
+- **En production : correctif 82 (12/10)** — **CRM lot 1** (base `rcu-db`, import DCS, écran Imports ; `api` ET `web` +
+  `rcu-db` et `rcu-worker`). Avant lui le **correctif 81 (12/10)** — **v2, verre Liquid Glass des widgets** (rognage `clip-path`) et listes des widgets
   sans barre horizontale, `web` seul. Avant lui le **correctif 80 (12/10)** — **lot sécurité serveur** (lectures gardées par rôle, Chat fermé au chef de
   site, `/uploads` sous connexion, photo et mot de passe vérifiés, météo par le serveur et par coordonnées, rechargement au
   changement de compte), `api` ET `web`, aucune migration, variable `OPENWEATHER_API_KEY`. Avant lui le **correctif 79 (09/10)** — **petites corrections** (Campagnes retirée de la v2, filtre Site des Dépenses,
@@ -616,6 +622,31 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 82 — 12/10 : CRM, lot 1 — référentiel client unique (RCU), socle et import** (branche `feat/crm-rcu-lot1`,
+  **`api` ET `web` + 2 conteneurs NOUVEAUX `rcu-db` et `rcu-worker`**, aucune migration Supabase ; migrations SQL du RCU
+  `backend/rcu-migrations/001_socle.sql` et `002_demandes.sql`, appliquées par le worker au démarrage). Cadrage validé par Théo :
+  `RCU-CADRAGE.md` + page `maquettes/crm/rcu-cartographie.html` (table de correspondance, règles, lots) ; maquette de
+  l'interface validée : `maquettes/crm/v2/` (servie par la config `maquettes` de `.claude/launch.json`).
+  - **Base DÉDIÉE `rcu-db`** (Postgres 17 du VPS, AUCUN port publié, volume `rcu_data`) : elle ne quitte jamais le VPS — ni
+    Supabase, ni dump GitHub. Seule porte : `backend/src/rcu/db.ts` (`pg`, pas Prisma : l'import est ensembliste).
+  - **Import** (`src/rcu/parse.ts`, `importer.ts`) : TXT tabulé cp1252 du Requêteur DCSNETneo, colonnes lues PAR NOM ; une
+    transaction par fichier ; garde-fous : ligne de total (= fin de fichier), colonnes obligatoires, **chute de volume > 10 % →
+    refusé**, fichier identique au dernier appliqué → ignoré. Couche DCS seulement (`identite_source`, `vehicule`, `vente`) ;
+    une vente disparue d'un export complet est MARQUÉE, jamais supprimée. Tables de référence = données (`ref_*`).
+  - **Worker** (`src/rcu/worker.ts`, conteneur `rcu-worker`) : surveille `/srv/dcs/depot` (SFTP, compte `dcs`) toutes les 5 min,
+    archive 14 jours (`/srv/rcu/archive`), traite toutes les 30 s les demandes « appliquer quand même » du Master.
+  - **Interface** : rubrique **CRM** de la v2 (Dock, Launchpad), **Master seul** pendant la construction (`CRM_ROLES` /
+    `CRM_ALLOWED_ROLES`, cible = rôles de Jeux) ; écran **Imports** (journal, contrôles, exclusions, changements, « Appliquer
+    quand même… », « Classer… » un site inconnu).
+  - **Mesuré sur les vrais fichiers (base locale)** : VN 54 947 ventes (45 491 retenues) en 36 s ; VO 53 713 (52 253) en 28 s ;
+    ancienne base Sud-Ouest 197 396 en 95 s ; 0 site à classer, 0 affaire inconnue. Garde-fous rejoués : même contenu → rien ne
+    bouge ; tronqué → refusé ; sans total / total faux → refusé ; forcé puis fichier complet → 19 475 ventes réapparues.
+  - **Piège payé en route** : sans `ANALYZE` du tampon après remplissage, Postgres le croit vide et compare chaque ligne à chaque
+    ligne (360 000² sur l'ancienne base : plus de 10 minutes). Corrigé (`analyze rcu.tampon`, `analyze r`).
+  - **Décisions de Théo** (R1–R13 de `RCU-CADRAGE.md`) : particuliers ET sociétés ; écartés : transferts, loueurs, VS, LLD Bony,
+    VD agent (vente au garage), COBA, LLD Bony ; Nissan Cusset / Bellerive = Nissan Vichy ; Carmaux = Blaye-les-Mines ;
+    mIAouss n'a aucun accès au CRM.
+
 - **Correctif 81 — 12/10 : artefact du verre Liquid Glass sur les widgets** (branche `fix/liquid-glass-widgets`, **`web` seul**,
   aucune migration). Signalé par Théo : « traits / carrés dans le verre, surtout les widgets, quand j'interagis », en Liquid Glass
   SEULEMENT (Pixel et Opaque sains). Puce Intel, Direct3D 11. **Cause** : une ligne NETTE ~30 px sous le haut des widgets posés
@@ -947,11 +978,14 @@
 ## Déploiement
 - En ligne : https://gearbox.bonyauto-mobile.com (VPS OVH, vps-58e5eff3.vps.ovh.net,
   51.83.75.181)
-- Architecture : 3 conteneurs Docker (api / web / caddy), HTTPS auto via Caddy/Let's
-  Encrypt, base Supabase (pas de Postgres local)
+- Architecture : 5 conteneurs Docker (api / web / caddy + `rcu-db` / `rcu-worker` du CRM depuis le correctif 82), HTTPS auto
+  via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 81** (12 octobre 2026) — verre Liquid Glass des widgets,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 82** (12 octobre 2026) — CRM lot 1 (RCU : base, import, écran
+  Imports), **`api` ET `web` + `rcu-db` et `rcu-worker` (nouveaux)**, aucune migration Supabase, nouvelle variable
+  `RCU_DB_PASSWORD` (`.env` du VPS), compte SFTP `dcs`, crontab root `backup-rcu.sh`. Procédure : DEPLOIEMENT.md § CRM.
+  Avant lui le **correctif 81** (12 octobre 2026) — verre Liquid Glass des widgets,
   **`web` seul**, aucune migration. Avant lui le **correctif 80** (12 octobre 2026) — lot sécurité serveur, **`api` ET `web`**,
   aucune migration, **nouvelle variable `OPENWEATHER_API_KEY`** (`.env` du VPS + `docker-compose.yml`). Avant lui le **correctif 79** (9 octobre 2026) — petites corrections, **`api` ET `web`**, aucune migration.
   Avant lui le **correctif 78** (9 octobre 2026) — bureau v2 enregistré sur le serveur. **`api` ET `web`**,

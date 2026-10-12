@@ -33,6 +33,8 @@ services:
       CLOUDFLARE_AI_TOKEN: ${CLOUDFLARE_AI_TOKEN:-}
       # Météo (relais /api/weather, 12/10/2026) : la clé ne doit plus figurer dans le code client.
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+      # CRM / RCU (12/10/2026) : base dédiée `rcu-db` ci-dessous, sur le réseau interne seulement.
+      RCU_DATABASE_URL: postgresql://rcu:${RCU_DB_PASSWORD}@rcu-db:5432/rcu
       NODE_ENV: production
       PORT: 3000
     volumes:
@@ -43,6 +45,40 @@ services:
     networks:
       - app-network
     command: sh -c "npx prisma migrate deploy && node dist/index.js"
+
+  # ─── CRM / RCU (référentiel client unique, 12/10/2026) ─────────────────────────────
+  # Base DÉDIÉE : elle ne quitte jamais le VPS (ni Supabase, ni dump GitHub). AUCUN port publié :
+  # joignable seulement par `api` et `rcu-worker` sur le réseau interne (le pare-feu ufw du VPS est inactif).
+  rcu-db:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: rcu
+      POSTGRES_USER: rcu
+      POSTGRES_PASSWORD: ${RCU_DB_PASSWORD}
+    volumes:
+      - rcu_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  # Import du soir : surveille le dossier de dépôt SFTP (/srv/dcs/depot, compte `dcs`), applique les
+  # migrations du RCU au démarrage, archive les fichiers 14 jours (/srv/rcu/archive, root seul).
+  rcu-worker:
+    build: ./backend
+    restart: always
+    environment:
+      RCU_DATABASE_URL: postgresql://rcu:${RCU_DB_PASSWORD}@rcu-db:5432/rcu
+      RCU_DEPOT: /depot
+      RCU_ARCHIVE: /archive
+      NODE_ENV: production
+    volumes:
+      - /srv/dcs/depot:/depot
+      - /srv/rcu/archive:/archive
+    depends_on:
+      - rcu-db
+    networks:
+      - app-network
+    command: node dist/rcu/worker.js
 
   web:
     build:
@@ -72,6 +108,7 @@ services:
       - app-network
 
 volumes:
+  rcu_data:
   uploads_data:
   bonyforms_files:
   caddy_data:

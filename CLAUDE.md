@@ -264,7 +264,7 @@ pour `passwordHash`.
 
 **Les autres portes uniques du backend, à connaître avant d'écrire une route :**
 `utils/publicUser.ts` (jamais l'objet Prisma brut d'un `User`), `utils/gameView.ts`
-(jamais une partie non redactée), `db.ts` (une seule instance de `PrismaClient`), `auth/mediaAccess.ts` (seule porte de lecture des `/uploads`, 12/10/2026),
+(jamais une partie non redactée), `db.ts` (une seule instance de `PrismaClient`), `rcu/db.ts` (seule porte vers la base du CRM, `rcu-db` sur le VPS, 12/10/2026), `auth/mediaAccess.ts` (seule porte de lecture des `/uploads`, 12/10/2026),
 les listes de lecture `INTERNAL_ROLES` / `UNSCOPED_READ_ROLES` / `CHAT_ROLES` de `auth/roles.ts` (une route de lecture ne
 recopie jamais « tout sauf External »), `utils/avatarUrl.ts` (seule règle d'une `avatarUrl`), `google/client.ts`
 (seul module qui parle à Google et touche au jeton, jamais renvoyé au navigateur), `bonyforms/worker.ts`

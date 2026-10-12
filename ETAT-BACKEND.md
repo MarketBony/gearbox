@@ -37,6 +37,27 @@ ne pas les réécrire.
 > rendre :
 > `grep -rn "new PrismaClient" backend/src --include=*.ts | grep -v "src/db.ts"`
 
+### 🗂️ CRM / RCU — base dédiée `rcu-db`, `/api/crm`, worker d'import (12/10/2026, correctif 82)
+
+- **Deuxième base, sur le VPS** : conteneur `rcu-db` (Postgres 17, volume `rcu_data`, **aucun port publié**), schéma `rcu`.
+  Distincte de Supabase : elle ne quitte jamais le VPS (décision R1, `RCU-CADRAGE.md`). Seule porte : `src/rcu/db.ts`
+  (`pg`, pool de 5) — contrôle : `grep -rn "new Pool" backend/src --include=*.ts | grep -v "src/rcu/db.ts"` ne rend rien.
+  `RCU_DATABASE_URL` absente → `/api/crm` répond 503 (l'API démarre quand même).
+- **Migrations** : SQL numérotées `backend/rcu-migrations/NNN_*.sql`, appliquées par `rcu-worker` au démarrage
+  (`src/rcu/migrate.ts`, table `public.rcu_migration`). L'API ne migre jamais le RCU. Additives seulement.
+  001 : référentiels (`ref_affaire`, `ref_site_libelle`, `ref_compte_bso`, `ref_type_vente`, `ref_financement`), journal
+  `import_run`, couche DCS (`identite_source`, `vehicule`, `vente`), `tampon`. 002 : `import_demande`, traçabilité des sites classés.
+- **Import** (`src/rcu/parse.ts` pur, `src/rcu/importer.ts`) : une transaction par fichier ; `ANALYZE` du tampon OBLIGATOIRE
+  après remplissage (sinon boucle imbriquée 360 000²). Clés : vente = (source, `affaire|dossier`) ; identité = (source,
+  société, n° client) — le n° DCS n'est unique que PAR SOCIÉTÉ ; véhicule = VIN (sinon `IMMAT:`). « Déjà appliqué » = identique
+  au DERNIER import appliqué de la source (pas « appliqué un jour »).
+- **Routes** (`src/routes/crm.ts`, `CRM_ROLES` = Master pendant la construction, cible = `GAMES_ROLES`) :
+  `GET /imports`, `GET /apercu`, `POST /imports/:id/forcer` (refus de VOLUME seulement → demande traitée par le worker),
+  `POST /sites` (classer un libellé inconnu ; site validé contre `ALL_SITES` de `siteScope.ts`).
+- **Worker** (`src/rcu/worker.ts`) : dépôt `/depot` (= `/srv/dcs/depot`, SFTP), archive `/archive` (= `/srv/rcu/archive`,
+  `appliques/` et `refuses/`, 14 jours), tour toutes les 5 min (fichier stable depuis 2 min), demandes toutes les 30 s.
+  Import manuel : `docker compose exec rcu-worker node dist/rcu/worker.js --fichier <chemin> [--forcer]`.
+
 ### 🔐 Lot sécurité serveur — lectures par rôle, `/uploads` sous session, météo (12/10/2026, correctif 80)
 - **Listes de lecture** (`auth/roles.ts`, en soustraction) : `INTERNAL_ROLES` (tout sauf External) sur `GET /api/projects`,
   `/api/budget`, `/api/fixed-expenses`, `/api/project-files/:id` ; `UNSCOPED_READ_ROLES` (ni External ni chef de site) sur

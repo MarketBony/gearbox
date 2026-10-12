@@ -40,6 +40,7 @@ import widgetRoutes from './routes/widgets';
 import formsRoutes from './routes/forms';
 import bonyFormsRoutes from './routes/bonyForms';
 import assistantRoutes from './routes/assistant';
+import crmRoutes from './routes/crm';
 import { setupRealtime, withEmitterContext } from './realtime';
 import { startPurgeJob } from './jobs/purge';
 import { chargerReglages } from './settings/appSettings';
@@ -133,6 +134,9 @@ app.use('/api/bony-forms', bonyFormsRoutes);
 
 // Assistant IA « mIAouss » : équipe marketing seulement (ASSISTANT_ROLES sur chaque route), données de l'interlocuteur.
 app.use('/api/assistant', assistantRoutes);
+
+// CRM : référentiel client unique, base DÉDIÉE sur le VPS (`rcu/db.ts`). CRM_ROLES sur chaque route.
+app.use('/api/crm', crmRoutes);
 
 // Fichiers uploadés servis en statique (URLs relatives renvoyées par la route).
 //

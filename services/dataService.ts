@@ -543,6 +543,20 @@ class DataService {
     return apiFetch('/storage');
   }
 
+  // --- CRM (référentiel client unique, base dédiée du VPS, 12/10/2026) — CRM_ROLES côté serveur ---
+  async getCrmImports(): Promise<any[]> {
+    return apiFetch('/crm/imports');
+  }
+  async getCrmApercu(): Promise<any> {
+    return apiFetch('/crm/apercu');
+  }
+  async forcerCrmImport(id: number): Promise<{ ok: boolean }> {
+    return apiFetch(`/crm/imports/${id}/forcer`, { method: 'POST' });
+  }
+  async classerCrmSite(body: { affaire?: string; libelle?: string; compte?: string; site: string }): Promise<{ ok: boolean }> {
+    return apiFetch('/crm/sites', { method: 'POST', body: JSON.stringify(body) });
+  }
+
   // --- JEUX (branchés backend le 05/08/2026) ---
   // Avant, défis et parties vivaient dans le localStorage : défier un collègue
   // était impossible. Tout passe désormais par le serveur, et les parties
