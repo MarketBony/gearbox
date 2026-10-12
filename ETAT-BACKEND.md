@@ -58,6 +58,17 @@ ne pas les réécrire.
   `appliques/` et `refuses/`, 14 jours), tour toutes les 5 min (fichier stable depuis 2 min), demandes toutes les 30 s.
   Import manuel : `docker compose exec rcu-worker node dist/rcu/worker.js --fichier <chemin> [--forcer]`.
 
+### 👥 CRM / RCU — le client unique (12/10/2026, correctif 83)
+
+- **Migration 003** : `client` (résumé recalculé + `recherche` trigramme), `client_identite` (identité → client + règle),
+  `decision` (fusion / séparation sur des paires d'IDENTITÉS, rejouées), `contact_suspect`, `identite_generique`, `candidat`
+  (file d'arbitrage), `rapprochement_run` ; fonctions `rcu.civilite_norm`, `rcu.type_personne` (SEULES règles de civilité).
+- **`src/rcu/rapprochement.ts`** : recalcul complet en mémoire après chaque import appliqué (worker) ou `--rapprocher`.
+  ⚠️ Jamais `id = any(<tableau de 180 000>)` (quadratique) : tables temporaires + jointures, et écriture des seules
+  différences. **`src/rcu/resume.ts`** : seule porte du résumé client, appelée aussi par les décisions d'arbitrage.
+- **Routes** `/api/crm` (CRM_ROLES) : `/apercu`, `/clients`, `/clients/:id`, `/arbitrage`, `/clients/:id/separer` — contrat
+  `ui2/apps/crm/CONTRAT-API.md`. Une décision prend effet tout de suite ET s'inscrit dans `decision` pour le recalcul suivant.
+
 ### 🔐 Lot sécurité serveur — lectures par rôle, `/uploads` sous session, météo (12/10/2026, correctif 80)
 - **Listes de lecture** (`auth/roles.ts`, en soustraction) : `INTERNAL_ROLES` (tout sauf External) sur `GET /api/projects`,
   `/api/budget`, `/api/fixed-expenses`, `/api/project-files/:id` ; `UNSCOPED_READ_ROLES` (ni External ni chef de site) sur

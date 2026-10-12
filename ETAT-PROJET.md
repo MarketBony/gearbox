@@ -5,9 +5,9 @@
 
 ## ▶ POINT DE REPRISE — 12/10/2026, soir (lire en premier)
 - **CHANTIER EN COURS : CRM / RCU (référentiel client unique).** Cadrage : `RCU-CADRAGE.md` (décisions R1–R13) + page
-  `maquettes/crm/rcu-cartographie.html` ; maquette validée : `maquettes/crm/v2/`. **Lot 1 en production (correctif 82)** :
-  base `rcu-db` sur le VPS, worker d'import, compte SFTP `dcs`, écran Imports (Master seul). **Ensuite, dans l'ordre** :
-  lot 2 (client unique : rapprochement, arbitrage, liste + fiche client de la maquette), lot 3 (couche Bony), lot 4
+  `maquettes/crm/rcu-cartographie.html` ; maquette validée : `maquettes/crm/v2/`. **Lots 1 et 2 en production (correctifs 82 et 83)** :
+  base `rcu-db` sur le VPS, import, compte SFTP `dcs`, client unique (rapprochement, arbitrage), rubrique CRM complète de la
+  maquette (Master seul). **Ensuite, dans l'ordre** : lot 3 (couche Bony : vendeur référent, ne plus contacter, échanges), lot 4
   (relances), lot 5 (GRID). **13/10 : brancher les 2 requêtes automatiques du Requêteur DCS sur le SFTP** (VN, VO).
   ⚠️ Figeac, Millau et Carmaux absents des extractions (droits DCS de Théo à faire ouvrir par l'IT).
 - **Avant le CRM, le 12/10 : correctifs 80 et 81 en production.**
@@ -65,7 +65,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 82 (12/10)** — **CRM lot 1** (base `rcu-db`, import DCS, écran Imports ; `api` ET `web` +
+- **En production : correctif 83 (12/10)** — **CRM lot 2** (client unique, interface complète ; `api`, `web`, `rcu-worker`).
+  Avant lui le **correctif 82 (12/10)** — **CRM lot 1** (base `rcu-db`, import DCS, écran Imports ; `api` ET `web` +
   `rcu-db` et `rcu-worker`). Avant lui le **correctif 81 (12/10)** — **v2, verre Liquid Glass des widgets** (rognage `clip-path`) et listes des widgets
   sans barre horizontale, `web` seul. Avant lui le **correctif 80 (12/10)** — **lot sécurité serveur** (lectures gardées par rôle, Chat fermé au chef de
   site, `/uploads` sous connexion, photo et mot de passe vérifiés, météo par le serveur et par coordonnées, rechargement au
@@ -622,6 +623,25 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 83 — 12/10 : CRM, lot 2 — le CLIENT UNIQUE et l'interface de la maquette** (branche `feat/crm-rcu-lot2`,
+  **`api` ET `web` + `rcu-worker`**, migration RCU `003_clients.sql` appliquée par le worker, puis un rapprochement lancé à la main).
+  - **Rapprochement** (`backend/src/rcu/rapprochement.ts`, recalcul COMPLET et déterministe après chaque import appliqué, ~30 s) :
+    coordonnées suspectes (partagées par > 3 noms, domaine Bony, bidon), identités génériques (> 20 véhicules, « Groupe Bony »),
+    union par règles (nom + prénom + portable — **tout 06/07, quelle que soit la colonne** —, + e-mail, + adresse, raison sociale +
+    CP, même véhicule + même nom), décisions humaines rejouées (fusions APRÈS les règles ; une séparation interdit l'union),
+    file d'arbitrage (même nom + prénom + CP, rien d'autre). Identifiants de client STABLES ; un client absorbé pointe vers son
+    absorbeur (`fusionne_dans`). Résumé des clients : `src/rcu/resume.ts`, n'écrit QUE les lignes qui changent.
+  - **Règles de civilité et de type de personne** : fonctions SQL `rcu.civilite_norm` / `rcu.type_personne` (seule source).
+  - **Routes** (contrat : `ui2/apps/crm/CONTRAT-API.md`) : `/apercu`, `/clients` (paginé serveur, recherche nom / téléphone /
+    e-mail / plaque / VIN, filtres), `/clients/:id`, `/arbitrage` (GET, POST), `/clients/:id/separer`.
+  - **Interface** (portée de `maquettes/crm/v2/`) : Accueil, Clients (liste + fiche à onglets), À arbitrer (F / S / P), Imports.
+  - **Mesuré (base locale = prod)** : 180 427 clients pour 190 939 identités utiles, 9 009 multi-identités, 485 génériques,
+    455 coordonnées suspectes, 1 799 paires à arbitrer. Plus gros groupe : 79 fiches d'une même société (ancienne base) — juste.
+  - **Trouvés et corrigés avant la prod** : portable rangé en « domicile » par l'ancienne base (+268 fusions) ; « LOA · Aucun »
+    (104 ventes DCS incohérentes → organisme inconnu) ; écriture quadratique (`id = any(180 000 ids)`, 69 s) et réécriture de tous
+    les résumés chaque nuit (77 s) → 29 s au total.
+  - **Pas encore fait** : fenêtre séparée « fiche client » ; « ne plus contacter », vendeur référent modifiable, échanges (lot 3).
+
 - **Correctif 82 — 12/10 : CRM, lot 1 — référentiel client unique (RCU), socle et import** (branche `feat/crm-rcu-lot1`,
   **`api` ET `web` + 2 conteneurs NOUVEAUX `rcu-db` et `rcu-worker`**, aucune migration Supabase ; migrations SQL du RCU
   `backend/rcu-migrations/001_socle.sql` et `002_demandes.sql`, appliquées par le worker au démarrage). Cadrage validé par Théo :
@@ -982,7 +1002,9 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 82** (12 octobre 2026) — CRM lot 1 (RCU : base, import, écran
+- master = prod, synchronisés. Dernier lot déployé : **correctif 83** (12 octobre 2026) — CRM lot 2 (client unique),
+  **`api` ET `web` + `rcu-worker`**, migration RCU `003_clients.sql` (appliquée par le worker), puis
+  `docker compose exec rcu-worker node dist/rcu/worker.js --rapprocher`. Avant lui le **correctif 82** (12 octobre 2026) — CRM lot 1 (RCU : base, import, écran
   Imports), **`api` ET `web` + `rcu-db` et `rcu-worker` (nouveaux)**, aucune migration Supabase, nouvelle variable
   `RCU_DB_PASSWORD` (`.env` du VPS), compte SFTP `dcs`, crontab root `backup-rcu.sh`. Procédure : DEPLOIEMENT.md § CRM.
   Avant lui le **correctif 81** (12 octobre 2026) — verre Liquid Glass des widgets,

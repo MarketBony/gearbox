@@ -3,6 +3,7 @@ import path from 'path';
 import { closeRcu, rcu } from './db';
 import { migrateRcu } from './migrate';
 import { importerFichier } from './importer';
+import { rapprocher } from './rapprochement';
 
 /**
  * Worker du RCU — conteneur `rcu-worker` (même image que `api`, autre commande).
@@ -10,6 +11,9 @@ import { importerFichier } from './importer';
  *   node dist/rcu/worker.js                      surveille RCU_DEPOT (défaut /depot) toutes les 5 minutes
  *   node dist/rcu/worker.js --fichier <chemin>   importe un fichier une fois (ancienne base Sud-Ouest, poste local)
  *        [--forcer]                              passe outre le garde-fou de volume
+ *   node dist/rcu/worker.js --rapprocher         recalcule seulement le client unique (lot 2)
+ *
+ * Après chaque import APPLIQUÉ, le client unique est recalculé (`rapprochement.ts`).
  *
  * Un fichier déposé par SFTP peut être en cours d'écriture : il n'est lu que s'il n'a pas bougé depuis
  * 2 minutes, et l'import vérifie en plus la ligne de total. Après traitement, il part dans RCU_ARCHIVE
@@ -24,6 +28,13 @@ const STABLE_MS = 2 * 60 * 1000;
 const RETENTION_MS = 14 * 24 * 3600 * 1000;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), '[rcu]', ...a);
+
+async function apresImport(): Promise<void> {
+  try {
+    const st = await rapprocher();
+    log(`rapprochement : ${st.clients} clients (${st.clientsMultiIdentites} multi-identités), ${st.aArbitrer} à arbitrer, ${st.dureeSecondes} s`);
+  } catch (e) { log('rapprochement en échec :', (e as Error).message); }
+}
 
 function archiver(chemin: string, sousDossier: string, runId: number | null): void {
   const dir = path.join(ARCHIVE, sousDossier);
@@ -56,6 +67,7 @@ async function tour(): Promise<void> {
     const r = await importerFichier(chemin, { recuLe: st.mtime });
     log(`${path.basename(chemin)} → ${r.statut} (import ${r.runId ?? '-'}) : ${r.message}`);
     archiver(chemin, r.statut === 'applique' || r.statut === 'deja_applique' ? 'appliques' : 'refuses', r.runId);
+    if (r.statut === 'applique') await apresImport();
   }
   purgerArchive();
 }
@@ -74,7 +86,7 @@ async function demandes(): Promise<void> {
       resultat = `${r.statut} (import ${r.runId ?? '-'}) : ${r.message}`;
       if (r.runId) await rcu().query(`update rcu.import_run set message = $2 where id = $1`,
         [r.runId, `Appliqué de force à la demande de ${d.demandeur} (refus de l'import n° ${d.run_id}). ${r.message}`]);
-      if (r.statut === 'applique') archiver(chemin, 'appliques', r.runId);
+      if (r.statut === 'applique') { archiver(chemin, 'appliques', r.runId); await apresImport(); }
     }
     await rcu().query(`update rcu.import_demande set traitee_le = now(), resultat = $2 where id = $1`, [d.id, resultat]);
     log(`demande ${d.id} (import ${d.run_id}, ${d.demandeur}) → ${resultat}`);
@@ -89,8 +101,15 @@ async function main(): Promise<void> {
   if (i > 0) {
     const r = await importerFichier(process.argv[i + 1], { force: process.argv.includes('--forcer') });
     console.log(JSON.stringify(r, null, 2));
+    if (r.statut === 'applique') await apresImport();
     await closeRcu();
     process.exit(r.statut === 'applique' || r.statut === 'deja_applique' ? 0 : 1);
+  }
+
+  if (process.argv.includes('--rapprocher')) {
+    console.log(JSON.stringify(await rapprocher(), null, 2));
+    await closeRcu();
+    process.exit(0);
   }
 
   log(`surveillance de ${DEPOT} toutes les ${INTERVALLE_MS / 60000} min, demandes toutes les ${DEMANDES_MS / 1000} s`);
