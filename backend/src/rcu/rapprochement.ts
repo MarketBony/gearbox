@@ -1,5 +1,6 @@
 import { rcu } from './db';
 import { majResumes } from './resume';
+import { rafraichirVentesClients } from './requete';
 
 /**
  * Rapprochement : des identités DCS aux CLIENTS uniques (RCU-CADRAGE.md § 4). Recalcul COMPLET, déterministe, après chaque
@@ -222,12 +223,14 @@ export async function rapprocher(): Promise<StatsRapprochement> {
     phase('ecriture');
     const resumes = await majResumes(client);
     phase('resumes');
+    const ventesRequeteur = await rafraichirVentesClients(client);
+    phase('requeteur');
     const stats: StatsRapprochement = {
       identites: ids.length, eligibles: ids.filter((x) => x.eligible).length, generiques: generiques.size,
       clients: membres.size, clientsMultiIdentites: [...membres.values()].filter((m) => m.length > 1).length,
       clientsNouveaux: nouveaux.length, clientsAbsorbes: absorbes.length, fusions, unionsRefuseesParSeparation: refusees,
       aArbitrer: pa.length, suspectsTel: sk.filter(([k]) => k.startsWith('tel:')).length, suspectsEmail: sk.filter(([k]) => k.startsWith('email:')).length,
-      resumes, phases, dureeSecondes: Math.round((Date.now() - t0) / 100) / 10,
+      resumes, ventesRequeteur, phases, dureeSecondes: Math.round((Date.now() - t0) / 100) / 10,
     };
     await client.query(`update rcu.rapprochement_run set fin = now(), stats = $2 where id = $1`, [runId, stats]);
     await client.query('commit');

@@ -114,7 +114,7 @@ const ArbitrageView: React.FC<{ onTotal: (n: number) => void; keyRef: React.Muta
           {done.slice().reverse().slice(0, 8).map((d, i) => <div key={i} className="list-row">{d.dec === 'merge' ? <span style={{ color: 'var(--ok)' }}><Icon name="check" size="sm" /></span> : d.dec === 'split' ? <span style={{ color: 'var(--warn)' }}><Icon name="close" size="sm" /></span> : <span className="faint"><Icon name="clock" size="sm" /></span>}
             <span className="grow ellipsis">{d.p.a.client.nom} {d.p.a.client.prenom} <span className="faint">· {{ merge: 'fusionnés', split: 'séparés', later: 'reporté' }[d.dec]}</span></span></div>)}
           {!done.length ? <div className="crm-note">Aucune pour l’instant.</div> : null}</div>
-          <div className="crm-note">Fusion : le client le plus ancien garde son identifiant RCU, l’autre est journalisé. Séparation : les deux ne seront plus proposés ensemble.</div></div>
+          <div className="crm-note">Fusion : le client le plus ancien garde son identifiant SPARK, l’autre est journalisé. Séparation : les deux ne seront plus proposés ensemble.</div></div>
       </aside>
     </div></div>
   );

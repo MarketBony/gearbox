@@ -25,7 +25,8 @@ export async function majResumes(db: Pool | PoolClient, ids: number[] | null = n
       from ve order by client_id, coalesce(date_livraison, date_commande) desc nulls last, id desc
     ), agg as (
       select client_id, array_remove(array_agg(distinct site), null) as sites, array_agg(distinct source) as sources,
-             count(distinct vehicule_id)::int as nbv
+             count(distinct vehicule_id)::int as nbv, min(coalesce(date_livraison, date_commande)) as premiere,
+             coalesce(bool_or(type_vente = 'VENTE A SOCIETE'), false) as vente_societe
       from ve group by client_id
     ), mq as (
       select ve.client_id, array_remove(array_agg(distinct vh.marque), null) as marques,
@@ -43,16 +44,39 @@ export async function majResumes(db: Pool | PoolClient, ids: number[] | null = n
     ), rech as (
       select client_id, string_agg(distinct concat_ws(' ', nom, prenom, nom_client, ville, cp, tel_port, tel_dom, email), ' ') as t
       from ci group by client_id
+    ), em as (
+      -- coordonnées VALIDES (jamais une suspecte), la plus récente d'abord
+      select distinct on (client_id) client_id, email from ci
+      where email ~* '^[^@[:space:]]+@[^@[:space:]]+[.][a-z]{2,}$'
+        and not exists (select 1 from rcu.contact_suspect s where s.type = 'email' and s.valeur = ci.email)
+      order by client_id, derniere_vente desc nulls last, id desc
+    ), tels as (
+      select client_id, t, derniere_vente, id from (
+        select client_id, tel_port as t, derniere_vente, id from ci union all select client_id, tel_dom, derniere_vente, id from ci) x
+      where t is not null and not exists (select 1 from rcu.contact_suspect s where s.type = 'tel' and s.valeur = x.t)
+    ), po as (
+      select distinct on (client_id) client_id, t from tels where t ~ '^0[67][0-9]{8}$' order by client_id, derniere_vente desc nulls last, id desc
+    ), fx as (
+      select distinct on (client_id) client_id, t from tels where t ~ '^0[1-589][0-9]{8}$' order by client_id, derniere_vente desc nulls last, id desc
     ), n as (
       select iden.client_id,
-        rcu.type_personne(iden.civilite, iden.nom, iden.prenom) as type,
-        case when rcu.type_personne(iden.civilite, iden.nom, iden.prenom) = 'societe' then 'societe'
-             else rcu.civilite_norm(iden.civilite) end as civilite,
+        -- « Professionnel » (société) : civilité ou forme juridique de la fiche, OU fiche sans civilité ni prénom dont une
+        -- vente DCS est « VENTE A SOCIETE » (4 341 ventes de ce type tombaient en « particulier », 13/10/2026). Une seule
+        -- notion à l'écran : le type de vente DCS n'est plus un filtre courant.
+        case when rcu.type_personne(iden.civilite, iden.nom, iden.prenom) = 'societe'
+               or (rcu.civilite_norm(iden.civilite) is null and coalesce(btrim(iden.prenom), '') = '' and agg.vente_societe)
+             then 'societe' else 'particulier' end as type,
+        case when rcu.type_personne(iden.civilite, iden.nom, iden.prenom) = 'societe'
+               or (rcu.civilite_norm(iden.civilite) is null and coalesce(btrim(iden.prenom), '') = '' and agg.vente_societe)
+             then 'societe' else rcu.civilite_norm(iden.civilite) end as civilite,
         iden.civilite as civilite_dcs, iden.nom, iden.prenom, iden.num_rue, iden.type_rue, iden.rue, iden.cp, iden.ville,
         dern.site, coalesce(agg.sites, '{}') as sites, coalesce(mq.marques, '{}') as marques, coalesce(agg.sources, '{}') as sources,
         dern.d as derniere_vente, dern.source as source_derniere, dern.vehicule_id, coalesce(agg.nbv, 0) as nb_vehicules,
         dern.vendeur, fin.fin_famille, fin.fin_organisme, fin.fin_fin, sus.client_id is not null as suspect,
-        upper(unaccent(concat_ws(' ', rech.t, mq.rech))) as recherche
+        upper(unaccent(concat_ws(' ', rech.t, mq.rech))) as recherche,
+        agg.premiere as premiere_vente, em.email, po.t as portable, fx.t as fixe,
+        coalesce(iden.rue is not null and iden.cp ~ '^[0-9]{5}$' and iden.ville is not null, false) as adresse_complete,
+        rcu.energie_norm(vhe.energie, vhe.version, vhe.modele) as energie
       from iden
       left join dern on dern.client_id = iden.client_id
       left join agg on agg.client_id = iden.client_id
@@ -60,6 +84,10 @@ export async function majResumes(db: Pool | PoolClient, ids: number[] | null = n
       left join fin on fin.client_id = iden.client_id
       left join sus on sus.client_id = iden.client_id
       left join rech on rech.client_id = iden.client_id
+      left join em on em.client_id = iden.client_id
+      left join po on po.client_id = iden.client_id
+      left join fx on fx.client_id = iden.client_id
+      left join rcu.vehicule vhe on vhe.id = dern.vehicule_id
     )
     -- N'écrit que les lignes qui CHANGENT : réécrire 180 000 lignes chaque nuit recalculerait l'index trigramme pour rien.
     update rcu.client c set
@@ -67,15 +95,16 @@ export async function majResumes(db: Pool | PoolClient, ids: number[] | null = n
       type_rue = n.type_rue, rue = n.rue, cp = n.cp, ville = n.ville, site = n.site, sites = n.sites, marques = n.marques,
       sources = n.sources, derniere_vente = n.derniere_vente, source_derniere = n.source_derniere, vehicule_id = n.vehicule_id,
       nb_vehicules = n.nb_vehicules, vendeur = n.vendeur, fin_famille = n.fin_famille, fin_organisme = n.fin_organisme,
-      fin_fin = n.fin_fin, suspect = n.suspect, recherche = n.recherche
+      fin_fin = n.fin_fin, suspect = n.suspect, recherche = n.recherche, premiere_vente = n.premiere_vente, email = n.email,
+      portable = n.portable, fixe = n.fixe, adresse_complete = n.adresse_complete, energie = n.energie
     from n
     where c.id = n.client_id
       and (c.type, c.civilite, c.civilite_dcs, c.nom, c.prenom, c.num_rue, c.type_rue, c.rue, c.cp, c.ville, c.site, c.sites,
            c.marques, c.sources, c.derniere_vente, c.source_derniere, c.vehicule_id, c.nb_vehicules, c.vendeur, c.fin_famille,
-           c.fin_organisme, c.fin_fin, c.suspect, c.recherche)
+           c.fin_organisme, c.fin_fin, c.suspect, c.recherche, c.premiere_vente, c.email, c.portable, c.fixe, c.adresse_complete, c.energie)
       is distinct from
           (n.type, n.civilite, n.civilite_dcs, n.nom, n.prenom, n.num_rue, n.type_rue, n.rue, n.cp, n.ville, n.site, n.sites,
            n.marques, n.sources, n.derniere_vente, n.source_derniere, n.vehicule_id, n.nb_vehicules, n.vendeur, n.fin_famille,
-           n.fin_organisme, n.fin_fin, n.suspect, n.recherche)`, ids ? [ids] : []);
+           n.fin_organisme, n.fin_fin, n.suspect, n.recherche, n.premiere_vente, n.email, n.portable, n.fixe, n.adresse_complete, n.energie)`, ids ? [ids] : []);
   return r.rowCount ?? 0;
 }

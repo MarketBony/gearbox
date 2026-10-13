@@ -6,16 +6,16 @@
 <meta name="theme-color" content="#0b0a10" />
 <!-- Maquette de la rubrique CRM, branchée sur la coque Gearbox OS de maquettes/v2 SANS la recopier :
      <base> fait pointer tous les chemins relatifs (CSS, scripts, logos des fonds d'écran) vers ../../v2/.
-     Seul js/crm.js est propre à cette maquette (chargé par ../crm/v2/crm.js, relatif à la base).
+     Seuls crm.js et requeteur.js (onglet Requêteur) sont propres à cette maquette (chargés par ../crm/v2/…, relatif à la base).
      À ouvrir servi : python -m http.server 4173 --directory maquettes  →  http://localhost:4173/crm/v2/index.html -->
 <base href="../../v2/" />
-<title>Gearbox OS · CRM (maquette)</title>
+<title>Gearbox OS · SPARK (maquette)</title>
 <link rel="icon" href="icon-mark.svg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700&family=Syncopate:wght@700&display=swap" rel="stylesheet" />
 <script>
-  /* Sans ?app=…, la coque restaurerait la session du bureau v2 : on ouvre directement la rubrique CRM.
+  /* Sans ?app=…, la coque restaurerait la session du bureau v2 : on ouvre directement la rubrique SPARK (id technique : crm).
      Le Launchpad (F4) et la barre de menus « Aller » restent utilisables pour les autres rubriques. */
   if (!new URLSearchParams(location.search).has('app')) { try { history.replaceState(null, '', location.pathname + '?app=crm' + location.hash); } catch (e) {} }
   window.__V = Date.now();
@@ -25,7 +25,7 @@
 <body>
 <!-- Noyau et rubriques de maquettes/v2 (inchangés), puis la rubrique CRM -->
 <script>
-  ['js/core.js', 'js/data.js', 'js/charts.js', 'js/pickers.js', 'js/controls.js', 'js/icons.js', 'js/wallpapers.js', 'js/widgets.js', 'js/wm.js', 'js/shell.js', 'js/mobile.js', 'js/apps/dashboard.js', 'js/apps/projects.js', 'js/apps/todo.js', 'js/apps/digital.js', 'js/apps/campaigns.js', 'js/apps/chat.js', 'js/apps/hello.js', 'js/apps/agenda.js', 'js/apps/budget.js', 'js/apps/fixed.js', 'js/apps/material.js', 'js/apps/conges.js', 'js/apps/export.js', 'js/apps/games.js', 'js/apps/settings.js', 'js/apps/system.js', '../crm/v2/crm.js'].forEach((src) => document.write(`<script src="${src}?v=${__V}"><\/script>`));
+  ['js/core.js', 'js/data.js', 'js/charts.js', 'js/pickers.js', 'js/controls.js', 'js/icons.js', 'js/wallpapers.js', 'js/widgets.js', 'js/wm.js', 'js/shell.js', 'js/mobile.js', 'js/apps/dashboard.js', 'js/apps/projects.js', 'js/apps/todo.js', 'js/apps/digital.js', 'js/apps/campaigns.js', 'js/apps/chat.js', 'js/apps/hello.js', 'js/apps/agenda.js', 'js/apps/budget.js', 'js/apps/fixed.js', 'js/apps/material.js', 'js/apps/conges.js', 'js/apps/export.js', 'js/apps/games.js', 'js/apps/settings.js', 'js/apps/system.js', '../crm/v2/crm.js', '../crm/v2/requeteur.js'].forEach((src) => document.write(`<script src="${src}?v=${__V}"><\/script>`));
 </script>
 <script>
   /* Identique à maquettes/v2/index.html : téléphone → coque mobile ; tablette et ordinateur → Bureau. */

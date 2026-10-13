@@ -85,7 +85,8 @@ export const initials = (c: ClientRow) => {
   return x || '?';
 };
 export const avC = (id: number) => AV_C[Math.abs(id) % AV_C.length];
-export const rcuId = (id: number) => `RCU-${String(id).padStart(7, '0')}`;
+/** Identifiant affiché (« SPK-0000123 ») — le nom technique RCU n'apparaît jamais à l'écran. */
+export const rcuId = (id: number) => `SPK-${String(id).padStart(7, '0')}`;
 
 /** Mois restants avant la fin d'un financement. */
 export const finLeft = (fin: string) => mDiff(today(), fin);

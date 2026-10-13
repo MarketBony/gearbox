@@ -7,6 +7,12 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   `rcu.ref_affaire` : rien à coder, ils seront importés dès qu'ils remonteront.
 - [ ] **VPS : pare-feu `ufw` inactif** (constaté le 12/10 en préparant le CRM). Rien n'est exposé à tort aujourd'hui (Caddy 80/443
   et SSH seulement ; `rcu-db` n'a AUCUN port publié), mais aucun filet si un conteneur publiait un port par erreur.
+- [x] **SPARK, trouvés avant la prod (correctif 84)** : 4 341 ventes « à une société » chez des clients classés particuliers
+  (fiches DCS sans civilité) → règle Professionnel élargie ; compteurs emballés de 13 min (sous-requête ligne à ligne, tri sur
+  disque) qui ont verrouillé `rcu.client` → énergie précalculée, `work_mem` 64 Mo, `statement_timeout` ; plage de flotte qui ne
+  s'appliquait qu'à la sortie du champ (perdue au rendu) → appliquée pendant la frappe.
+- [ ] **SPARK : mention STOP allmysms provisoire** (« STOP au 36XXX ») — à remplacer par la vraie mention fournie par allmysms.
+- [ ] **SPARK : `nb_parc` (taille de flotte) recalculé la nuit seulement**, pas après une fusion / séparation manuelle.
 - [x] **CRM, trouvés en recette locale avant la prod (correctif 83)** : portable rangé en « téléphone domicile » par l'ancienne
   base → non rapproché (règle étendue à tout 06/07) ; « LOA · Aucun » sur 104 ventes DCS incohérentes (organisme affiché inconnu) ;
   rapprochement en 155 s (écriture quadratique, résumés réécrits chaque nuit) → 29 s.
