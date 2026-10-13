@@ -66,7 +66,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 84 (13/10)** — **SPARK lot 3 : le Requêteur** (`api`, `web`, `rcu-worker`, migration RCU 004).
+- **En production : correctif 85 (13/10)** — SPARK, export Excel des flottes (taille, parc complet, une ligne par véhicule).
+  Avant lui le **correctif 84 (13/10)** — **SPARK lot 3 : le Requêteur** (`api`, `web`, `rcu-worker`, migration RCU 004).
   Avant lui le **correctif 83 (12/10)** — **CRM lot 2** (client unique, interface complète ; `api`, `web`, `rcu-worker`).
   Avant lui le **correctif 82 (12/10)** — **CRM lot 1** (base `rcu-db`, import DCS, écran Imports ; `api` ET `web` +
   `rcu-db` et `rcu-worker`). Avant lui le **correctif 81 (12/10)** — **v2, verre Liquid Glass des widgets** (rognage `clip-path`) et listes des widgets
@@ -625,6 +626,13 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 85 — 13/10 : SPARK, export Excel des flottes** (branche `fix/spark-export-flottes`, **`api` ET `web`**, aucune
+  migration). Retour de Théo après un export « pros, Clermont, flotte de 5 ou plus » : pas de taille de parc dans le fichier et un
+  seul modèle par client. Colonne « Flotte » cochée d'office (Complet, Phoning) ; nouveau préréglage **Flottes** (choisi d'office
+  pour une requête de professionnels) ; nouvelle colonne **« Parc actuel (tous les véhicules) »** (`parc_liste`, marque modèle
+  (immat) de chaque véhicule encore au parc) ; choix **« Une ligne par client / par véhicule encore au parc »** dans le volet
+  Excel (niveau `vehicule` + `au_parc` ajoutés à la seule requête d'export). Mesuré : 101 sociétés / 819 véhicules.
+
 - **Correctif 84 — 13/10 : SPARK, lot 3 — le REQUÊTEUR** (branche `feat/spark-lot3-requeteur`, **`api` ET `web` + `rcu-worker`**,
   migration RCU `004_requeteur.sql` appliquée par le worker, puis `--rapprocher`). Le CRM s'appelle désormais **SPARK** à l'écran
   (Dock, titre, identifiants `SPK-…`) ; « RCU » reste le nom technique. Lots renumérotés : 3 = Requêteur, 4 = couche Bony
@@ -1037,7 +1045,8 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 84** (13 octobre 2026) — SPARK lot 3 (Requêteur), **`api` ET
+- master = prod, synchronisés. Dernier lot déployé : **correctif 85** (13 octobre 2026) — SPARK, export Excel des flottes,
+  **`api` ET `web`**, aucune migration. Avant lui le **correctif 84** (13 octobre 2026) — SPARK lot 3 (Requêteur), **`api` ET
   `web` + `rcu-worker`**, migration RCU `004_requeteur.sql` (appliquée par le worker), puis `--rapprocher`. Avant lui le
   **correctif 83** (12 octobre 2026) — CRM lot 2 (client unique),
   **`api` ET `web` + `rcu-worker`**, migration RCU `003_clients.sql` (appliquée par le worker), puis

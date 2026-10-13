@@ -233,6 +233,11 @@ export const COLONNES: Colonne[] = [
   { cle: 'derniere_vente', libelle: 'Dernier achat', groupe: 'Client', sql: d('c.derniere_vente') },
   { cle: 'nb_vehicules', libelle: 'Véhicules achetés (depuis toujours)', groupe: 'Client', sql: 'c.nb_vehicules' },
   { cle: 'nb_parc', libelle: 'Flotte (véhicules au parc)', groupe: 'Client', sql: 'c.nb_parc' },
+  // Tous les véhicules ENCORE au client (pas seulement celui retenu par la requête) : indispensable pour une flotte.
+  { cle: 'parc_liste', libelle: 'Parc actuel (tous les véhicules)', groupe: 'Client', sql: `(select string_agg(concat_ws(' ', initcap(p.marque), p.modele, nullif('(' || coalesce(p.immat, '') || ')', '()')), ' · ' order by p.date_achat desc nulls last)
+      from (select distinct on (x.vehicule_id) x.vehicule_id, x.marque, x.modele, x.immat, x.date_achat from rcu.client_identite pi
+            join rcu.cv x on x.identite_id = pi.identite_id where pi.client_id = c.id and x.actuel and x.vehicule_id is not null
+            order by x.vehicule_id, x.date_achat desc nulls last) p)` },
   { cle: 'marque', libelle: 'Marque', groupe: 'Véhicule', sql: 'm.marque' },
   { cle: 'modele', libelle: 'Modèle', groupe: 'Véhicule', sql: 'm.modele' },
   { cle: 'version', libelle: 'Version', groupe: 'Véhicule', sql: 'm.version' },
