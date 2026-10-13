@@ -151,6 +151,7 @@ génériques ne sont jamais des clients.
   (100 000 lignes au plus). Le navigateur fabrique le fichier. CHAQUE appel est inscrit au journal.
 - `POST /requetes/lignes` `{ requete, page, tri? }` → `{ page, taille: 50, tri, colonnes, lignes }` — vue « Voir les clients » ;
   `tri` ∈ recent | flotte | echeance | nom.
+- Colonnes exportables ajoutées (13/10) : `nb_parc` (taille de flotte), `parc_liste` (tous les véhicules encore au parc, une cellule).
 - `GET /exports` → `{ id, cree_le, auteur, format, fichier, requete_nom, nb_lignes }[]` (200 derniers).
 - `GET /requetes` → requêtes enregistrées (les miennes + les partagées) :
   `{ id, nom, requete, partagee, auteur, auteur_id, cree_le, maj_le, dernier_compte, dernier_lancement }[]`.

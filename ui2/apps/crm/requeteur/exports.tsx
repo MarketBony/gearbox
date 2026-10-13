@@ -24,9 +24,9 @@ export interface ExpCtx {
 type Close = (v?: unknown) => void;
 const cv = (c: string) => ({ '--c': c } as React.CSSProperties);
 
-async function lancer(ctx: ExpCtx, format: Format, colonnes: string[]) {
+async function lancer(ctx: ExpCtx, format: Format, colonnes: string[], requete: Requete = ctx.req) {
   const fichier = fname(format, ctx.q.name, ctx.who);
-  const r = await db.exporterCrmRequete({ requete: ctx.req, colonnes, format, fichier, ...(ctx.savedId ? { requete_id: ctx.savedId } : {}), requete_nom: ctx.q.name });
+  const r = await db.exporterCrmRequete({ requete, colonnes, format, fichier, ...(ctx.savedId ? { requete_id: ctx.savedId } : {}), requete_nom: ctx.q.name });
   return { fichier, lignes: (r?.lignes || []) as Ligne[], colonnes: (r?.colonnes || []) as Colonne[] };
 }
 /** Bouton principal d'un volet : exporte, fabrique le fichier, trace, ferme. */
@@ -47,7 +47,7 @@ const Head: React.FC<{ k: Format; t: string; sub: string; name: string }> = ({ k
 const Foot: React.FC<{ k: Format; ctx: ExpCtx; label: string; busy: boolean; disabled?: boolean; onGo: () => void }> = ({ k, ctx, label, busy, disabled, onGo }) => (<>
   <div className="rq-fname"><Ico name={FMT[k][1]} /><span className="crm-mono">{fname(k, ctx.q.name, ctx.who)}</span></div>
   <div className="crm-note" style={{ marginTop: 8 }}><Icon name="lock" size="sm" /> Ouvert à tous les rôles qui ont SPARK, et tracé dans l’historique (qui, quand, combien, quelle requête). Le nom du fichier porte l’exportateur et la date. Les coordonnées suspectes ne sortent jamais.</div>
-  <div className="foot"><button className="btn" data-sheet="">Annuler</button><button className="btn primary" disabled={busy || disabled} onClick={onGo}><Icon name="download" size="sm" />{busy ? 'Export en cours…' : `${label} · ${nf(ctx.main)} lignes`}</button></div>
+  <div className="foot"><button className="btn" data-sheet="">Annuler</button><button className="btn primary" disabled={busy || disabled} onClick={onGo}><Icon name="download" size="sm" />{busy ? 'Export en cours…' : Number.isFinite(ctx.main) ? `${label} · ${nf(ctx.main)} lignes` : label}</button></div>
 </>);
 const Warn: React.FC<{ children: React.ReactNode }> = ({ children }) => <div className="rq-warn" style={{ marginTop: 12 }}><div style={cv('var(--warn)')}><Icon name="alert" size="sm" /><span>{children}</span></div></div>;
 
@@ -57,22 +57,31 @@ const cellXl = (v: unknown) => (typeof v === 'number' ? v : (isoFR(v) as string 
 
 // ---------------------------------------------------------------- Excel
 const PRESETS: Record<string, string[]> = {
-  tous: ['id_spark', 'civilite', 'nom', 'prenom', 'cp', 'ville', 'portable', 'email', 'site', 'vendeur', 'marque', 'modele', 'immat', 'date_achat', 'fin_organisme', 'fin_famille', 'fin_fin'],
+  tous: ['id_spark', 'civilite', 'nom', 'prenom', 'cp', 'ville', 'portable', 'email', 'site', 'vendeur', 'nb_parc', 'marque', 'modele', 'immat', 'date_achat', 'fin_organisme', 'fin_famille', 'fin_fin'],
+  pro: ['id_spark', 'nom', 'cp', 'ville', 'portable', 'fixe', 'email', 'site', 'vendeur', 'nb_parc', 'parc_liste', 'derniere_vente'],
   email: ['civilite', 'prenom', 'nom', 'email', 'modele', 'fin_fin', 'vendeur', 'site'],
   sms: ['prenom', 'portable', 'modele', 'fin_fin', 'vendeur', 'site'],
-  phoning: ['civilite', 'nom', 'prenom', 'portable', 'fixe', 'marque', 'modele', 'immat', 'fin_fin', 'date_achat', 'vendeur'],
+  phoning: ['civilite', 'nom', 'prenom', 'portable', 'fixe', 'nb_parc', 'marque', 'modele', 'immat', 'fin_fin', 'date_achat', 'vendeur'],
   courrier: ['civilite', 'nom', 'prenom', 'adresse', 'cp', 'ville'],
 };
 export const ExcelSheet: React.FC<{ ctx: ExpCtx; close: Close }> = ({ ctx, close }) => {
   const all = ctx.R?.colonnes || [], known = new Set(all.map((c) => c.cle));
   const preset = (k: string) => (PRESETS[k] || PRESETS.tous).filter((x) => known.has(x));
-  const on = (ctx.xl || preset(ctx.q.canal === 'tous' ? 'tous' : ctx.q.canal)).filter((x) => known.has(x));
+  // Requête de professionnels : préréglage « Flottes » par défaut (taille + liste du parc).
+  const pro = ctx.req.briques.some((b: any) => b.type === 'type_personne' && b.actif !== false && !b.sauf && (b.valeurs || []).includes('societe'));
+  const on = (ctx.xl || preset(ctx.q.canal === 'tous' ? (pro ? 'pro' : 'tous') : ctx.q.canal)).filter((x) => known.has(x));
+  // Une ligne par client (le véhicule retenu par la requête) ou une ligne par véhicule ENCORE au parc.
+  const [parVeh, setParVeh] = useState(ctx.req.niveau === 'vehicule');
+  const reqExport = (): Requete => (!parVeh ? ctx.req : {
+    ...ctx.req, niveau: 'vehicule',
+    briques: ctx.req.briques.some((b: any) => b.type === 'au_parc' && b.actif !== false && !b.sauf) ? ctx.req.briques : [...ctx.req.briques, { id: 'export-au-parc', type: 'au_parc', actif: true, valeur: true } as any],
+  });
   const set = ctx.setXl, col = (k: string) => all.find((c) => c.cle === k);
   const off = all.filter((c) => !on.includes(c.cle));
   const mv = (k: string, d: number) => { const i = on.indexOf(k), j = i + d, n = on.slice(); [n[i], n[j]] = [n[j], n[i]]; set(n); };
   const { busy, go } = useGo(ctx, close);
   const run = () => go(async () => {
-    const r = await lancer(ctx, 'excel', on);
+    const r = await lancer(ctx, 'excel', on, reqExport());
     const cols = r.colonnes.length ? r.colonnes : on.map((k) => col(k)!).filter(Boolean);
     await writeSheetFile(r.fichier, 'SPARK', cols.map((c) => c.libelle), r.lignes.map((l) => cols.map((c) => cellXl(l[c.cle]))));
     return { fichier: r.fichier, n: r.lignes.length };
@@ -80,7 +89,10 @@ export const ExcelSheet: React.FC<{ ctx: ExpCtx; close: Close }> = ({ ctx, close
   return (<>
     <Head k="excel" t="Export Excel" sub="choisissez et ordonnez les colonnes" name={ctx.q.name} />
     <div className="crm-lbl" style={{ margin: '14px 0 6px' }}>Préréglage</div>
-    <Seg value="" style={{ maxWidth: '100%', overflowX: 'auto' }} onChange={(v) => set(preset(v))} options={[['tous', 'Complet'], ['email', 'E-mailing'], ['sms', 'SMS'], ['phoning', 'Phoning'], ['courrier', 'Courrier']]} />
+    <Seg value="" style={{ maxWidth: '100%', overflowX: 'auto' }} onChange={(v) => set(preset(v))} options={[['tous', 'Complet'], ['pro', 'Flottes'], ['email', 'E-mailing'], ['sms', 'SMS'], ['phoning', 'Phoning'], ['courrier', 'Courrier']]} />
+    <div className="crm-lbl" style={{ margin: '14px 0 6px' }}>Une ligne par</div>
+    <Seg value={parVeh ? 'veh' : 'client'} onChange={(v) => setParVeh(v === 'veh')} options={[['client', 'Client'], ['veh', 'Véhicule encore au parc']]} />
+    <div className="crm-note" style={{ marginTop: 6 }}>{parVeh ? 'Chaque véhicule encore au parc des clients de la cible sur sa propre ligne (marque, modèle, immatriculation, financement…).' : 'Un client par ligne. Ajoutez la colonne « Parc actuel » pour lister tous ses véhicules dans une seule cellule.'}</div>
     <div className="row" style={{ justifyContent: 'space-between', margin: '14px 0 6px' }}><span className="crm-lbl">Colonnes · <span>{on.length} sur {all.length}</span></span><span className="crm-note">Flèches = ordre dans le fichier</span></div>
     {all.length ? <div className="rq-cols">
       {on.map((k, i) => <div key={k}><input type="checkbox" className="check" checked onChange={() => set(on.filter((x) => x !== k))} /><span className="grow">{col(k)?.libelle || k}</span>
@@ -92,7 +104,7 @@ export const ExcelSheet: React.FC<{ ctx: ExpCtx; close: Close }> = ({ ctx, close
       <tbody>{ctx.apercu.slice(0, 3).map((l, i) => <tr key={i}>{on.map((k) => <td key={k} style={{ whiteSpace: 'nowrap' }}>{k in l ? String(cellXl(l[k]) ?? '') : <span className="faint">…</span>}</td>)}</tr>)}</tbody></table></div>
     <div className="crm-note" style={{ marginTop: 6 }}>Aperçu sur les premières lignes ; « … » = colonne remplie au moment de l’export.</div>
     <div style={{ marginTop: 14 }} />
-    <Foot k="excel" ctx={ctx} label="Télécharger le .xlsx" busy={busy} disabled={!on.length} onGo={run} />
+    <Foot k="excel" ctx={parVeh ? { ...ctx, main: NaN } : ctx} label="Télécharger le .xlsx" busy={busy} disabled={!on.length} onGo={run} />
   </>);
 };
 
