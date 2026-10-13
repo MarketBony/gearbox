@@ -5,10 +5,11 @@
 
 ## ▶ POINT DE REPRISE — 12/10/2026, soir (lire en premier)
 - **CHANTIER EN COURS : CRM / RCU (référentiel client unique).** Cadrage : `RCU-CADRAGE.md` (décisions R1–R13) + page
-  `maquettes/crm/rcu-cartographie.html` ; maquette validée : `maquettes/crm/v2/`. **Lots 1 et 2 en production (correctifs 82 et 83)** :
+  `maquettes/crm/rcu-cartographie.html` ; maquette validée : `maquettes/crm/v2/`. **Lots 1, 2 et 3 en production (correctifs 82, 83, 84 ; outil renommé SPARK à l'écran)** :
   base `rcu-db` sur le VPS, import, compte SFTP `dcs`, client unique (rapprochement, arbitrage), rubrique CRM complète de la
-  maquette (Master seul). **Ensuite, dans l'ordre** : lot 3 (couche Bony : vendeur référent, ne plus contacter, échanges), lot 4
-  (relances), lot 5 (GRID). **13/10 : brancher les 2 requêtes automatiques du Requêteur DCS sur le SFTP** (VN, VO).
+  maquette (Master seul). Lot 3 = **Requêteur** (exports Excel, Sarbacane, allmysms, phoning, courrier). **Ensuite, dans l'ordre** : lot 4 (couche Bony :
+  référentiel vendeurs — fichier « MAEVA Vendeurs » de Théo —, réattribution par secteur CP, ne plus contacter, échanges), lot 5
+  (relances), lot 6 (GRID). Projet futur : plateforme d'e-mailing maison via Resend (budget Sarbacane). **13/10 : brancher les 2 requêtes automatiques du Requêteur DCS sur le SFTP** (VN, VO).
   ⚠️ Figeac, Millau et Carmaux absents des extractions (droits DCS de Théo à faire ouvrir par l'IT).
 - **Avant le CRM, le 12/10 : correctifs 80 et 81 en production.**
 - **Fait le 12/10** (détail : fiches 80 et 81) :
@@ -65,7 +66,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 83 (12/10)** — **CRM lot 2** (client unique, interface complète ; `api`, `web`, `rcu-worker`).
+- **En production : correctif 84 (13/10)** — **SPARK lot 3 : le Requêteur** (`api`, `web`, `rcu-worker`, migration RCU 004).
+  Avant lui le **correctif 83 (12/10)** — **CRM lot 2** (client unique, interface complète ; `api`, `web`, `rcu-worker`).
   Avant lui le **correctif 82 (12/10)** — **CRM lot 1** (base `rcu-db`, import DCS, écran Imports ; `api` ET `web` +
   `rcu-db` et `rcu-worker`). Avant lui le **correctif 81 (12/10)** — **v2, verre Liquid Glass des widgets** (rognage `clip-path`) et listes des widgets
   sans barre horizontale, `web` seul. Avant lui le **correctif 80 (12/10)** — **lot sécurité serveur** (lectures gardées par rôle, Chat fermé au chef de
@@ -623,6 +625,39 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 84 — 13/10 : SPARK, lot 3 — le REQUÊTEUR** (branche `feat/spark-lot3-requeteur`, **`api` ET `web` + `rcu-worker`**,
+  migration RCU `004_requeteur.sql` appliquée par le worker, puis `--rapprocher`). Le CRM s'appelle désormais **SPARK** à l'écran
+  (Dock, titre, identifiants `SPK-…`) ; « RCU » reste le nom technique. Lots renumérotés : 3 = Requêteur, 4 = couche Bony
+  (vendeurs, ne plus contacter, échanges), 5 = relances, 6 = GRID.
+  - **Moteur** (`backend/src/rcu/requete.ts`, SEULE porte requête → SQL) : liste FERMÉE de briques (client, véhicule / achat /
+    financement sur le MÊME achat, coordonnées), valeurs toujours en paramètres, brique inconnue → 400, garde-fous de canal posés
+    par le serveur (e-mail / portable / téléphone / adresse valides, jamais une coordonnée suspecte), dédoublonnage par canal,
+    `statement_timeout` 20 s (compter) / 120 s (export) — deux comptes emballés de 13 min avaient verrouillé `rcu.client`.
+    Table de travail `rcu.cv` (une ligne par vente retenue, à plat), reconstruite par le rapprochement. Compteurs mis en cache
+    15 min (clé = requête + dernier rapprochement).
+  - **Données ajoutées au client** : coordonnées valides (e-mail, portable 06/07 quelle que soit la colonne, fixe), adresse
+    complète, 1er achat, énergie (déduite de la version quand DCS ne la donne pas), **taille de flotte `nb_parc`** (véhicules
+    encore au parc). Zones de chalandise (`ref_zone`) et agent GGE SERVEL rattaché au Puy (`ref_agent`) : règles de la feuille
+    « EXTRACTION DCSNET » de Bony.
+  - **Particulier / Professionnel** : une seule notion. Professionnel = civilité ou forme juridique, OU fiche sans civilité ni
+    prénom ayant une vente « VENTE A SOCIETE » → +2 139 professionnels (13 867) ; ventes « à une société » chez un particulier :
+    4 341 → 583 (entrepreneurs identifiés par leur prénom). Le type de vente DCS n'est plus un filtre visible.
+  - **Interface** (refaite après la recette de Théo, maquettes sur canevas : piste B + phrase de A + tableau de C) : 4 cartes
+    Qui ? (Particuliers / Professionnels, taille de flotte « de … à … véhicules », sites, zone) / Quel véhicule ? (marques en
+    pastilles visibles d'emblée, encore à eux) / À quel moment ? (fin de contrat, CT, anniversaire, sans nouvelles, histogramme
+    des échéances) / Comment les joindre ? (nombre exact par canal) ; résumé en une phrase + gros chiffre + export du canal +
+    « Exporter vers Excel » toujours visible ; « Voir les clients » = filtres en étiquettes + tableau paginé serveur (50) triable
+    (récent, flotte, échéance, nom). Recettes, mes requêtes, historique en volets ; réglages fins derrière « préciser ».
+  - **Exports** (fichier fabriqué dans le navigateur, CHAQUE export journalisé avec la liste des clients — `rcu.export_journal`,
+    `rcu.export_client`, pour « déjà ciblés » au lot 4) : Excel, **Sarbacane** (CSV « ; » + champs personnalisés), **allmysms**
+    (numéros 33… / +33…, expéditeur ≤ 11 car., 160 / 153 car.), phoning imprimable (une page par vendeur), courrier (Excel
+    publipostage). Ouverts à tous les rôles qui ont SPARK (Théo). Requêtes enregistrées perso / partagées.
+  - **Mesuré** : « fins de LOA / LLD 3–6 mois, encore au parc » 741 clients en 0,2 s ; en SMS 665 joignables ; événement
+    Clermont sans agent 34 054 ; base entière 3,8 s (le pire cas).
+  - **Pas fait / à suivre** : mention STOP réelle d'allmysms (provisoire « STOP au 36XXX ») ; planche d'étiquettes courrier ;
+    téléchargements réels des 5 formats à recetter par Théo en prod ; vieilles règles CSS `.rq-*` de la 1re mise en page encore
+    dans `crm.css` (sans effet) ; `nb_parc` recalculé la nuit seulement (pas après une fusion manuelle).
+
 - **Correctif 83 — 12/10 : CRM, lot 2 — le CLIENT UNIQUE et l'interface de la maquette** (branche `feat/crm-rcu-lot2`,
   **`api` ET `web` + `rcu-worker`**, migration RCU `003_clients.sql` appliquée par le worker, puis un rapprochement lancé à la main).
   - **Rapprochement** (`backend/src/rcu/rapprochement.ts`, recalcul COMPLET et déterministe après chaque import appliqué, ~30 s) :
@@ -1002,7 +1037,9 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 83** (12 octobre 2026) — CRM lot 2 (client unique),
+- master = prod, synchronisés. Dernier lot déployé : **correctif 84** (13 octobre 2026) — SPARK lot 3 (Requêteur), **`api` ET
+  `web` + `rcu-worker`**, migration RCU `004_requeteur.sql` (appliquée par le worker), puis `--rapprocher`. Avant lui le
+  **correctif 83** (12 octobre 2026) — CRM lot 2 (client unique),
   **`api` ET `web` + `rcu-worker`**, migration RCU `003_clients.sql` (appliquée par le worker), puis
   `docker compose exec rcu-worker node dist/rcu/worker.js --rapprocher`. Avant lui le **correctif 82** (12 octobre 2026) — CRM lot 1 (RCU : base, import, écran
   Imports), **`api` ET `web` + `rcu-db` et `rcu-worker` (nouveaux)**, aucune migration Supabase, nouvelle variable

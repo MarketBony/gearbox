@@ -9,7 +9,7 @@ import { type Run, Badge, quand } from './ImportsView';
  * n'ont pas de route au lot 2 : ils ne sont PAS affichés (aucun chiffre fabriqué côté client).
  */
 
-export type Shortcut = 'search' | 'all' | 'fin6' | 'arb' | 'sus' | 'imports';
+export type Shortcut = 'search' | 'all' | 'fin6' | 'arb' | 'sus' | 'imports' | 'req';
 
 const SrcLine: React.FC<{ k: Source; runs: Run[]; canImports: boolean; onRun: (id: number) => void }> = ({ k, runs, canImports, onRun }) => {
   const mine = runs.filter((x) => x.source === k).sort((a, b) => b.id - a.id);
@@ -51,8 +51,8 @@ const HomeView: React.FC<{ apercu: any; runs: Run[] | null; arbTotal: number | n
         <button onClick={() => go('sus')} style={{ '--c': 'var(--danger)' } as React.CSSProperties}><span className="ico"><Icon name="alert" /></span><span>Coordonnées suspectes<small>{typeof a.suspects === 'number' ? `${nf(a.suspects)} clients concernés` : 'clients concernés'}</small></span></button>
         {canImports ? <button onClick={() => go('imports')} style={{ '--c': 'var(--info)' } as React.CSSProperties}><span className="ico"><Icon name="upload" /></span><span>Imports<small>rapports et sites à classer</small></span></button> : null}
       </div></div>
-      <div className="crm-g2"><div className="crm-soon"><Icon name="message" size="lg" /><div><b style={{ color: 'var(--text)' }}>Échanges et vendeur référent · lot 3</b><div className="crm-note" style={{ marginTop: 4 }}>Notes d’appel, visites, qualification, « ne plus contacter », réattribution quand un vendeur part.</div></div></div>
-        <div className="crm-soon"><Icon name="bell" size="lg" /><div><b style={{ color: 'var(--text)' }}>Relances · lot 4</b><div className="crm-note" style={{ marginTop: 4 }}>Fin de financement, prochain CT, anniversaire, âge du véhicule, sans achat depuis X ans. Règles réglables, listes exportables.</div></div></div></div>
+      <div className="crm-g2"><div className="crm-soon"><Icon name="message" size="lg" /><div><b style={{ color: 'var(--text)' }}>Échanges et vendeur référent · lot 4</b><div className="crm-note" style={{ marginTop: 4 }}>Notes d’appel, visites, qualification, « ne plus contacter », réattribution quand un vendeur part.</div></div></div>
+        <div className="crm-soon" onClick={() => go('req')} style={{ cursor: 'pointer', borderStyle: 'solid' }}><Icon name="bell" size="lg" /><div><b style={{ color: 'var(--text)' }}>Requêteur · lot 3</b><div className="crm-note" style={{ marginTop: 4 }}>Fin de financement, prochain CT, anniversaire, âge du véhicule, sans achat depuis X ans… Des listes construites en phrases, exportables vers Excel, Sarbacane, allmysms, phoning et courrier.</div></div></div></div>
     </div></div>
   );
 };

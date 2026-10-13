@@ -50,7 +50,7 @@ export function computeNav({ role, gamesEnabled, voitConges, ui2 = false }: NavC
     ...(!ui2 ? [I('campaigns', Megaphone, 'Campagnes')] : []),
     ...(ui2 && canSeeForms(role) ? [I('forms', ClipboardList, 'Forms')] : []),
     // CRM : interface v2 seulement (12/10/2026), comme Forms.
-    ...(ui2 && canSeeCrm(role) ? [I('crm', Handshake, 'CRM')] : []),
+    ...(ui2 && canSeeCrm(role) ? [I('crm', Handshake, 'SPARK')] : []),
     I('material', Package, 'Matériel'),
     I('agenda', CalendarDays, 'Agenda'),
     I('budget', PiggyBank, 'Budget'),

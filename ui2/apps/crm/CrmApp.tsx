@@ -8,18 +8,20 @@ import ImportsView, { type Run, quand } from './ImportsView';
 import HomeView, { type Shortcut } from './HomeView';
 import ClientsView, { type ClientsState, type Filtres, F0 } from './ClientsView';
 import ArbitrageView from './ArbitrageView';
+import RequeteurView, { type RqStore } from './requeteur/RequeteurView';
 
 /**
- * Rubrique CRM — référentiel client unique (RCU), base dédiée du VPS. Maquette validée : maquettes/crm/v2/.
+ * Rubrique SPARK (id technique : crm) — référentiel client unique (RCU), base dédiée du VPS. Maquette validée : maquettes/crm/v2/.
+ * « RCU » est le nom technique : il n'apparaît jamais à l'écran (l'outil s'appelle SPARK).
  * Contrat d'API : ./CONTRAT-API.md (tout passe par `db.*`, jamais `fetch` direct).
  *
  * Lot 1 (12/10/2026) : l'écran « Imports ». Lot 2 : Accueil, Clients (liste paginée par le serveur + fiche),
- * À arbitrer. Accès : CRM_ALLOWED_ROLES (Master pendant la construction) — le refus réel est côté serveur
+ * À arbitrer. Lot 3 : Requêteur (./requeteur/). Accès : CRM_ALLOWED_ROLES (Master pendant la construction) — le refus réel est côté serveur
  * (`/api/crm`, CRM_ROLES). Onglet Imports : Master seul (maquette).
  */
 
-type View = 'home' | 'clients' | 'arb' | 'imports';
-const VIEW_L: Record<View, string> = { home: 'Accueil', clients: 'Clients', arb: 'À arbitrer', imports: 'Imports' };
+type View = 'home' | 'clients' | 'arb' | 'req' | 'imports';
+const VIEW_L: Record<View, string> = { home: 'Accueil', clients: 'Clients', arb: 'À arbitrer', req: 'Requêteur', imports: 'Imports' };
 
 const perToCtx = (): string[] => {
   const p = gx().ctx?.perimetre;
@@ -44,6 +46,7 @@ export default function CrmApp({ win, inst }: AppProps) {
   const fiches = useRef(new Map<number, FicheT>()).current;
   const keyRef = useRef<((e: React.KeyboardEvent) => void) | null>(null);
   const lastPer = useRef(gx().ctx?.perimetre);
+  const rqStore = useRef<RqStore | null>(null);
 
   const load = useCallback(() => {
     db.getCrmApercu().then((a) => { setApercu(a); setErreur(null); if (typeof a?.a_arbitrer === 'number') setArbTotal(a.a_arbitrer); })
@@ -61,7 +64,7 @@ export default function CrmApp({ win, inst }: AppProps) {
     lastPer.current = p; setCs((s) => ({ ...s, f: { ...s.f, sites: perToCtx() }, page: 0, selId: null }));
   });
 
-  useEffect(() => { if (view !== 'clients') win.setTitle('CRM', VIEW_L[view]); }, [view, win]);
+  useEffect(() => { if (view !== 'clients') win.setTitle('SPARK', VIEW_L[view]); }, [view, win]);
   // Une décision d’arbitrage peut fusionner des fiches déjà ouvertes : le cache des fiches est vidé.
   const onArbTotal = useCallback((n: number) => { fiches.clear(); setArbTotal(n); }, [fiches]);
 
@@ -80,14 +83,18 @@ export default function CrmApp({ win, inst }: AppProps) {
     sus: () => go('clients', { filters: { suspect: true }, showF: true }),
     arb: () => go('arb'),
     imports: () => go('imports', { run }),
+    req: () => go('req'),
   }[k]());
 
-  const views: View[] = ['home', 'clients', 'arb', ...(canImports ? ['imports' as View] : [])];
+  const views: View[] = ['home', 'clients', 'arb', 'req', ...(canImports ? ['imports' as View] : [])];
   inst.command = (c: string) => {
     if (c === 'search') go('clients', { filters: {}, focus: true });
     if (c === 'arbitrage') go('arb');
+    if (c === 'requeteur') go('req');
     if (typeof c === 'string' && c.startsWith('client:')) { const id = Number(c.slice(7)); if (id) { setCs((s) => ({ ...s, selId: id, autoSel: false })); go('clients'); } }
   };
+  // Aperçu du Requêteur → fiche du client dans l'onglet Clients.
+  const openClient = useCallback((id: number) => { setCs((s) => ({ ...s, selId: id, autoSel: false })); go('clients'); }, [go]);
   const setSort = (s: Filtres['sort']) => { setCs((x) => ({ ...x, f: { ...x.f, sort: s }, page: 0 })); go('clients'); };
   inst.menus = () => ({
     'Fichier': [{ label: 'Rechercher un client', icon: 'search', kbd: '/', action: () => go('clients', { focus: true }) }, { label: 'Actualiser', icon: 'refresh', action: () => { fiches.clear(); load(); } }],
@@ -98,7 +105,7 @@ export default function CrmApp({ win, inst }: AppProps) {
   });
 
   const lastVN = runs?.filter((r) => r.source === 'VN' && r.statut === 'applique').sort((a, b) => b.id - a.id)[0];
-  const sub = apercu ? `Référentiel client unique${typeof apercu.clients === 'number' ? ` · ${nf(apercu.clients)} clients` : ''}${lastVN ? ` · mis à jour ${quand(lastVN.fin)}` : ''}` : 'Référentiel client unique';
+  const sub = apercu ? [typeof apercu.clients === 'number' ? `${nf(apercu.clients)} clients` : '', lastVN ? `mis à jour ${quand(lastVN.fin)}` : ''].filter(Boolean).join(' · ') : '';
 
   const onKey = (e: React.KeyboardEvent) => {
     const t = e.target as HTMLElement;
@@ -110,6 +117,7 @@ export default function CrmApp({ win, inst }: AppProps) {
   let body: React.ReactNode;
   if (view === 'clients') body = <ClientsView st={cs} setSt={setCs} compact={compact} win={win} cache={fiches} keyRef={keyRef} focusSearch={focusSearch} />;
   else if (view === 'arb') body = <ArbitrageView onTotal={onArbTotal} keyRef={keyRef} />;
+  else if (view === 'req') body = <RequeteurView win={win} store={rqStore} per={perToCtx()[0] || null} userId={String(user?.id ?? '')} who={user?.name || 'inconnu'} openClient={openClient} />;
   else if (view === 'imports') body = runs ? <ImportsView runs={runs} win={win} reload={load} compact={compact} selId={runSel} onSel={setRunSel} /> : <div className="empty" style={{ height: '100%' }}>Chargement…</div>;
   else body = erreur && !apercu ? <div className="empty" style={{ height: '100%' }}><Icon name="alert" />{erreur}<button className="btn sm" onClick={load}>Réessayer</button></div>
     : !apercu ? <div className="empty" style={{ height: '100%' }}>Chargement…</div>
@@ -117,7 +125,7 @@ export default function CrmApp({ win, inst }: AppProps) {
 
   return (
     <div className="app crm" ref={rootRef} tabIndex={-1} onKeyDown={onKey}>
-      <div className="app-head"><div className="ah-t"><span className="ah-eye">Relation client</span><h1>CRM</h1><span className="sub">{sub}</span></div>
+      <div className="app-head"><div className="ah-t"><span className="ah-eye">Relation client</span><h1>SPARK</h1><span className="sub">{sub}</span></div>
         <div className="ah-tabs"><Tabs value={view} onChange={(v) => go(v)} options={views.map((k) => [k, <>{VIEW_L[k]}{k === 'arb' && arbTotal ? <span className="count" style={{ background: 'var(--warn)', marginLeft: 4 }}>{nf(arbTotal)}</span> : null}</>] as [View, React.ReactNode])} /></div></div>
       <div className="crm-view">{body}</div>
     </div>

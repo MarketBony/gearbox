@@ -6,6 +6,7 @@ import { CRM_ROLES } from '../auth/roles';
 import { PoolClient } from 'pg';
 import { rcu, rcuConfigured } from '../rcu/db';
 import { majResumes } from '../rcu/resume';
+import { COLONNES, COLONNES_APERCU, COLONNES_TABLEAU, TRIS, Requete, RequeteInvalide, compter, lignes, lireRequete } from '../rcu/requete';
 
 /**
  * Rubrique CRM — lecture du RCU (référentiel client unique), base dédiée du VPS.
@@ -203,6 +204,136 @@ router.get('/clients/:id', async (req, res) => {
   const f = await fiche(Number(req.params.id));
   if (!f) return res.status(404).json({ error: 'Client introuvable.' });
   res.json(f);
+});
+
+// ─── Requêteur (lot 3) ────────────────────────────────────────────────────────────
+// Toute la traduction requête → SQL est dans `rcu/requete.ts` (liste fermée de briques, valeurs en paramètres).
+
+const requeteDe = (req: AuthRequest, res: any): Requete | null => {
+  try { return lireRequete(req.body?.requete); } catch (e) {
+    if (e instanceof RequeteInvalide) { res.status(400).json({ error: e.message }); return null; }
+    throw e;
+  }
+};
+const repondre = async (res: any, f: () => Promise<unknown>) => {
+  try { res.json(await f()); } catch (e) {
+    if (e instanceof RequeteInvalide) return res.status(400).json({ error: e.message });
+    // 57014 = annulée par statement_timeout (garde-fou de rcu/requete.ts)
+    if ((e as { code?: string }).code === '57014') return res.status(408).json({ error: 'La requête a pris trop de temps. Ajoutez un critère pour la resserrer.' });
+    throw e;
+  }
+};
+
+// GET /api/crm/requetes/referentiels — listes de choix des briques et colonnes exportables.
+router.get('/requetes/referentiels', async (_req, res) => {
+  const q = (sql: string) => rcu().query(sql).then((r) => r.rows.map((x) => x.v));
+  const [zones, agents, vendeurs, marques, familles, types, sites] = await Promise.all([
+    rcu().query(`select concession, departements from rcu.ref_zone order by concession`).then((r) => r.rows),
+    q(`select intermediaire as v from rcu.cv where intermediaire is not null group by 1 order by count(*) desc, 1`),
+    q(`select v from (select unnest(vendeurs) as v from rcu.cv where date_achat >= current_date - interval '3 years') x group by 1 having count(*) >= 5 order by 1`),
+    q(`select marque as v from rcu.cv where marque is not null group by 1 order by count(*) desc`),
+    q(`select fin_famille as v from rcu.cv where fin_famille is not null group by 1 order by count(*) desc`),
+    q(`select type_vente as v from rcu.cv where type_vente is not null group by 1 order by count(*) desc`),
+    q(`select site as v from rcu.cv where site is not null group by 1 order by 1`),
+  ]);
+  res.json({ zones, agents, vendeurs, marques, familles, types_vente: types, sites,
+    colonnes: COLONNES.map(({ cle, libelle, groupe }) => ({ cle, libelle, groupe })) });
+});
+
+// POST /api/crm/requetes/compter { requete } — le résultat en direct.
+// Cache de 15 min, clé = requête + dernier rapprochement : la base ne bouge qu'à l'import du soir, et l'écran relance
+// les mêmes comptes (estimations des recettes, impact de chaque « Sauf »), qui coûtent jusqu'à quelques secondes.
+const cacheComptes = new Map<string, { t: number; v: unknown }>();
+router.post('/requetes/compter', async (req: AuthRequest, res) => {
+  const r = requeteDe(req, res); if (!r) return;
+  await repondre(res, async () => {
+    const run = (await rcu().query(`select max(id) as id from rcu.rapprochement_run where fin is not null`)).rows[0].id;
+    const cle = `${run}|${JSON.stringify({ ...r, briques: r.briques.map(({ id, ...b }) => b) })}`;
+    const c = cacheComptes.get(cle);
+    if (c && Date.now() - c.t < 15 * 60 * 1000) return c.v;
+    const v = await compter(r);
+    if (cacheComptes.size > 500) cacheComptes.delete(cacheComptes.keys().next().value as string);
+    cacheComptes.set(cle, { t: Date.now(), v });
+    return v;
+  });
+});
+
+// POST /api/crm/requetes/lignes { requete, page } — vue « Voir les clients » : 50 lignes par page, mêmes règles que l'export.
+router.post('/requetes/lignes', async (req: AuthRequest, res) => {
+  const r = requeteDe(req, res); if (!r) return;
+  const page = Math.max(0, Math.min(2000, Math.floor(Number(req.body?.page) || 0)));
+  const tri = typeof req.body?.tri === 'string' && req.body.tri in TRIS ? req.body.tri : 'recent';
+  await repondre(res, async () => ({ page, taille: 50, tri, ...(await lignes(r, COLONNES_TABLEAU, 50, undefined, page * 50, tri)) }));
+});
+
+// POST /api/crm/requetes/apercu { requete } — 20 lignes, colonnes par défaut.
+router.post('/requetes/apercu', async (req: AuthRequest, res) => {
+  const r = requeteDe(req, res); if (!r) return;
+  await repondre(res, async () => ({ lignes: (await lignes(r, COLONNES_APERCU, 20)).lignes }));
+});
+
+// POST /api/crm/requetes/export — lignes à mettre en fichier (le navigateur fabrique le fichier). TOUJOURS journalisé,
+// avec la liste des clients exportés (lot 4 : « déjà ciblés »). Ouvert à tous les rôles du CRM (décision de Théo).
+const FORMATS = ['excel', 'sarbacane', 'allmysms', 'phoning', 'courrier'];
+router.post('/requetes/export', async (req: AuthRequest, res) => {
+  const r = requeteDe(req, res); if (!r) return;
+  const { colonnes, format, fichier, requete_id, requete_nom } = req.body ?? {};
+  if (!Array.isArray(colonnes) || !FORMATS.includes(format) || typeof fichier !== 'string' || !fichier || fichier.length > 200) {
+    return res.status(400).json({ error: 'Colonnes, format ou nom de fichier invalides.' });
+  }
+  const auteur = await nomDe(req);
+  await repondre(res, async () => {
+    const out = await lignes(r, colonnes.map(String), 100000);
+    const db = await rcu().connect();
+    try {
+      await db.query('begin');
+      const id = Number((await db.query(`insert into rcu.export_journal (auteur_id, auteur, format, fichier, requete_id, requete_nom, spec, nb_lignes)
+        values ($1, $2, $3, $4, (select id from rcu.requete where id = $5), $6, $7, $8) returning id`,
+      [req.user!.id, auteur, format, fichier, Number(requete_id) || null, typeof requete_nom === 'string' ? requete_nom.slice(0, 200) : null, r, out.lignes.length])).rows[0].id);
+      const ids = [...new Set(out.lignes.map((l) => Number(l.client_id)))];
+      await db.query(`insert into rcu.export_client (export_id, client_id) select $1, unnest($2::bigint[])`, [id, ids]);
+      await db.query('commit');
+      return { export_id: id, ...out };
+    } catch (e) { await db.query('rollback').catch(() => undefined); throw e; } finally { db.release(); }
+  });
+});
+
+// GET /api/crm/exports — journal (200 derniers).
+router.get('/exports', async (_req, res) => {
+  const { rows } = await rcu().query(`select id, cree_le, auteur, format, fichier, requete_nom, nb_lignes
+    from rcu.export_journal order by id desc limit 200`);
+  res.json(rows);
+});
+
+// Requêtes enregistrées : les miennes + les partagées. Modifier / supprimer : l'auteur seulement.
+router.get('/requetes', async (req: AuthRequest, res) => {
+  const { rows } = await rcu().query(`select id, nom, spec as requete, partagee, auteur, auteur_id, cree_le, maj_le, dernier_compte, dernier_lancement
+    from rcu.requete where auteur_id = $1 or partagee order by maj_le desc`, [req.user!.id]);
+  res.json(rows);
+});
+const corpsRequete = (req: AuthRequest, res: any) => {
+  const { nom, partagee } = req.body ?? {};
+  if (typeof nom !== 'string' || !nom.trim() || nom.length > 120) { res.status(400).json({ error: 'Nom de requête invalide.' }); return null; }
+  const r = requeteDe(req, res); if (!r) return null;
+  return { nom: nom.trim(), partagee: !!partagee, r };
+};
+router.post('/requetes', async (req: AuthRequest, res) => {
+  const c = corpsRequete(req, res); if (!c) return;
+  const { rows } = await rcu().query(`insert into rcu.requete (nom, spec, partagee, auteur_id, auteur) values ($1, $2, $3, $4, $5) returning id`,
+    [c.nom, c.r, c.partagee, req.user!.id, await nomDe(req)]);
+  res.json({ id: rows[0].id });
+});
+router.put('/requetes/:id', async (req: AuthRequest, res) => {
+  const c = corpsRequete(req, res); if (!c) return;
+  const r = await rcu().query(`update rcu.requete set nom = $1, spec = $2, partagee = $3, maj_le = now() where id = $4 and auteur_id = $5`,
+    [c.nom, c.r, c.partagee, Number(req.params.id), req.user!.id]);
+  if (!r.rowCount) return res.status(404).json({ error: 'Requête introuvable, ou vous n’en êtes pas l’auteur.' });
+  res.json({ ok: true });
+});
+router.delete('/requetes/:id', async (req: AuthRequest, res) => {
+  const r = await rcu().query(`delete from rcu.requete where id = $1 and auteur_id = $2`, [Number(req.params.id), req.user!.id]);
+  if (!r.rowCount) return res.status(404).json({ error: 'Requête introuvable, ou vous n’en êtes pas l’auteur.' });
+  res.json({ ok: true });
 });
 
 // ─── Arbitrage ────────────────────────────────────────────────────────────────────

@@ -65,3 +65,94 @@ interface ClientRow {
   chaque import).
 - `POST /clients/:id/separer` `{ identite: id }` → `{ ok: true, client: <nouvel id> }`.
 - Inchangées (lot 1) : `GET /imports`, `POST /imports/:id/forcer`, `POST /sites`.
+
+---
+
+# Lot 3 — Requêteur (12/10/2026)
+
+Tout reste sous `/api/crm`, derrière `CRM_ROLES`. **Le navigateur n'envoie jamais de SQL** : il envoie une `Requete` (JSON),
+que le serveur traduit à partir d'une liste FERMÉE de briques (`backend/src/rcu/requete.ts`). Une brique inconnue → 400.
+
+## Format d'une requête
+
+```ts
+type Canal = 'tous' | 'email' | 'sms' | 'phoning' | 'courrier';
+interface Requete {
+  niveau: 'client' | 'vehicule';   // une ligne par client, ou une ligne par (client, véhicule)
+  canal: Canal;                    // ajoute les garde-fous du canal CÔTÉ SERVEUR (voir plus bas)
+  dedoublonnage: boolean;          // un envoi par e-mail (email), par portable (sms), par téléphone (phoning), par adresse (courrier)
+  briques: Brique[];               // ET entre les briques ; OU entre les valeurs d'une même brique
+}
+interface Brique { id: string; type: TypeBrique; actif: boolean; sauf?: boolean; /* + paramètres ci-dessous */ }
+```
+`sauf: true` = la brique EXCLUT (« Sauf … »). Une brique `actif: false` est ignorée.
+
+### Briques CLIENT (portent sur le client)
+| type | paramètres | sens |
+|---|---|---|
+| `type_personne` | `valeurs: ('particulier'\|'societe')[]` | |
+| `civilite` | `valeurs: ('homme'\|'femme'\|'couple'\|'societe')[]` | |
+| `site_client` | `valeurs: string[]`, `mode: 'achat' \| 'dernier'` | a acheté sur l'un de ces sites / dernier achat sur l'un d'eux |
+| `zone` | `concession: string` | domicilié dans les départements de la zone (GET `/requetes/referentiels` → `zones`) |
+| `geo` | `departements?: string[]`, `cps?: string[]`, `villes?: string[]` | |
+| `anciennete` | `min?: number`, `max?: number` (années depuis le 1er achat) | |
+| `sans_achat_depuis` | `annees: number` | dernier achat il y a plus de N ans |
+| `nb_vehicules` | `min?: number`, `max?: number` | |
+| `vendeur_client` | `valeurs: string[]` | vendeur de la dernière vente |
+| `flotte` | `min?: number`, `max?: number` | taille de flotte = véhicules ENCORE au parc (13/10/2026) |
+| `sources` | `valeurs: ('VN'\|'VO'\|'BSO')[]` | |
+
+### Briques VÉHICULE / ACHAT / FINANCEMENT (portent toutes sur LE MÊME véhicule acheté)
+| type | paramètres |
+|---|---|
+| `marque` | `valeurs: string[]` (RENAULT, DACIA…) |
+| `modele` | `valeurs: string[]` (contient, sans casse : « CLIO » trouve « CLIO V ») |
+| `energie` | `valeurs: ('Essence'\|'Diesel'\|'Hybride'\|'Électrique'\|'GPL')[]` (déduite de la version quand DCS ne la donne pas) |
+| `genre` | `valeurs: ('VP'\|'VU')[]` |
+| `age_vehicule` | `min?: number`, `max?: number` (années depuis la mise en circulation) |
+| `au_parc` | `valeur: boolean` (le client en est le dernier acheteur connu) |
+| `ct` | `dans_min_mois?: number`, `dans_max_mois?: number` (prochain contrôle technique) |
+| `achat_type` | `valeurs: ('VN'\|'VO'\|'BSO')[]` |
+| `livraison` | `de?: 'AAAA-MM-JJ'`, `a?: …`, `il_y_a_min_mois?: number`, `il_y_a_max_mois?: number` |
+| `anniversaire` | `annees: number`, `fenetre_jours: number` (livré il y a N ans, à ± fenêtre) |
+| `type_vente` | `valeurs: string[]` |
+| `montant` | `min?: number`, `max?: number` (montant tarif TTC) |
+| `reprise` | `valeur: boolean` |
+| `site_achat` | `valeurs: string[]` |
+| `vendeur_achat` | `valeurs: string[]` |
+| `agent` | `mode: 'sans' \| 'tous' \| 'liste'`, `valeurs?: string[]` (intermédiaire R2) |
+| `fin_organisme` | `valeurs: ('DIAC'\|'Autre banque'\|'Aucun')[]` |
+| `fin_famille` | `valeurs: string[]` (LOA, LLD, Crédit, Crédit-bail, Crédit ballon…) |
+| `fin_echeance` | `dans_min_mois?: number`, `dans_max_mois?: number`, `de?`, `a?` |
+| `fin_duree` | `min?: number`, `max?: number` (mois) |
+| `fin_ecoule` | `min?: number`, `max?: number` (% du contrat écoulé) |
+| `garantie` | `valeur: boolean` |
+
+### Briques COORDONNÉES
+`a_email` · `a_portable` · `a_telephone` (portable ou fixe) · `a_adresse` · `a_portable_ou_email` — sans paramètre.
+Une coordonnée SUSPECTE ne compte jamais comme valide.
+
+### Garde-fous du canal (appliqués PAR LE SERVEUR, quoi qu'envoie le navigateur)
+email → e-mail valide · sms → portable valide · phoning → portable ou fixe · courrier → adresse complète. Les identités
+génériques ne sont jamais des clients.
+
+## Routes
+- `GET /requetes/referentiels` → `{ zones: { concession, departements: string[] }[], agents: string[], vendeurs: string[],
+  marques: string[], familles: string[], types_vente: string[], sites: string[], colonnes: Colonne[] }`
+  (`Colonne = { cle, libelle, groupe }` : colonnes exportables).
+- `POST /requetes/compter` `{ requete }` → `{ clients, vehicules, lignes, entonnoir: { total, email, portable, telephone,
+  adresse }, avant_canal: number, doublons_retires: number, par_site: {cle,n}[], par_marque: {cle,n}[],
+  par_mois_echeance: {cle:'AAAA-MM',n}[], par_energie: {cle,n}[], ms: number }`.
+  `avant_canal` = clients avant garde-fous du canal (l'écart = ceux sans coordonnée valide pour ce canal).
+- `POST /requetes/apercu` `{ requete }` → `{ lignes: Ligne[] }` (20 lignes). `Ligne` = objet `{ client_id, <cle de colonne>: valeur, … }`
+  avec les colonnes « par défaut ».
+- `POST /requetes/export` `{ requete, colonnes: string[], format: 'excel'|'sarbacane'|'allmysms'|'phoning'|'courrier',
+  fichier: string, requete_id?: number, requete_nom?: string }` → `{ export_id, colonnes: Colonne[], lignes: Ligne[] }`
+  (100 000 lignes au plus). Le navigateur fabrique le fichier. CHAQUE appel est inscrit au journal.
+- `POST /requetes/lignes` `{ requete, page, tri? }` → `{ page, taille: 50, tri, colonnes, lignes }` — vue « Voir les clients » ;
+  `tri` ∈ recent | flotte | echeance | nom.
+- `GET /exports` → `{ id, cree_le, auteur, format, fichier, requete_nom, nb_lignes }[]` (200 derniers).
+- `GET /requetes` → requêtes enregistrées (les miennes + les partagées) :
+  `{ id, nom, requete, partagee, auteur, auteur_id, cree_le, maj_le, dernier_compte, dernier_lancement }[]`.
+- `POST /requetes` `{ nom, requete, partagee }` → `{ id }` · `PUT /requetes/:id` (même corps, auteur seulement) ·
+  `DELETE /requetes/:id` (auteur seulement).

@@ -579,6 +579,40 @@ class DataService {
   async separerCrmIdentite(clientId: number, identiteId: number): Promise<{ ok: boolean; client: number }> {
     return apiFetch(`/crm/clients/${clientId}/separer`, { method: 'POST', body: JSON.stringify({ identite: identiteId }) });
   }
+  // Lot 3 — Requêteur (contrat : ui2/apps/crm/CONTRAT-API.md § « Lot 3 »). Le navigateur envoie une `Requete` (JSON), jamais
+  // de SQL. `signal` : le compteur en direct abandonne la requête précédente quand une condition change.
+  async getCrmReferentiels(): Promise<any> {
+    return apiFetch('/crm/requetes/referentiels');
+  }
+  async compterCrmRequete(requete: unknown, signal?: AbortSignal): Promise<any> {
+    return apiFetch('/crm/requetes/compter', { method: 'POST', body: JSON.stringify({ requete }), signal });
+  }
+  async apercuCrmRequete(requete: unknown, signal?: AbortSignal): Promise<{ lignes: any[] }> {
+    return apiFetch('/crm/requetes/apercu', { method: 'POST', body: JSON.stringify({ requete }), signal });
+  }
+  /** « Voir les clients » : le résultat paginé PAR LE SERVEUR (50 lignes par page), jamais chargé en masse. */
+  async getCrmLignes(requete: unknown, page: number, signal?: AbortSignal, tri = 'recent'): Promise<{ page: number; taille: number; colonnes: { cle: string; libelle: string; groupe: string }[]; lignes: any[] }> {
+    return apiFetch('/crm/requetes/lignes', { method: 'POST', body: JSON.stringify({ requete, page, tri }), signal });
+  }
+  /** Inscrit TOUJOURS l'export au journal (serveur) ; le navigateur fabrique le fichier avec les lignes reçues. */
+  async exporterCrmRequete(body: { requete: unknown; colonnes: string[]; format: 'excel' | 'sarbacane' | 'allmysms' | 'phoning' | 'courrier'; fichier: string; requete_id?: number; requete_nom?: string }): Promise<{ export_id: number; colonnes: { cle: string; libelle: string; groupe: string }[]; lignes: any[] }> {
+    return apiFetch('/crm/requetes/export', { method: 'POST', body: JSON.stringify(body) });
+  }
+  async getCrmExports(): Promise<any[]> {
+    return apiFetch('/crm/exports');
+  }
+  async getCrmRequetes(): Promise<any[]> {
+    return apiFetch('/crm/requetes');
+  }
+  async saveCrmRequete(body: { nom: string; requete: unknown; partagee: boolean }): Promise<{ id: number }> {
+    return apiFetch('/crm/requetes', { method: 'POST', body: JSON.stringify(body) });
+  }
+  async updateCrmRequete(id: number, body: { nom: string; requete: unknown; partagee: boolean }): Promise<any> {
+    return apiFetch(`/crm/requetes/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+  }
+  async deleteCrmRequete(id: number): Promise<any> {
+    return apiFetch(`/crm/requetes/${id}`, { method: 'DELETE' });
+  }
 
   // --- JEUX (branchés backend le 05/08/2026) ---
   // Avant, défis et parties vivaient dans le localStorage : défier un collègue

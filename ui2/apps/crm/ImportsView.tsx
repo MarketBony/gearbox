@@ -143,7 +143,7 @@ const Detail: React.FC<{ run: Run | undefined; runs: Run[]; win: AppProps['win']
               <td>{classes[k] ? <span className="badge" style={{ '--c': 'var(--ok)' } as React.CSSProperties}><Icon name="check" size="sm" />{classes[k]}</span>
                 : <button className="btn sm" onClick={(e) => classer(e.currentTarget, a, k)}><Icon name="pin" size="sm" />Classer…</button>}</td></tr>); })}
         </tbody></table></div></div> : null}
-      <div className="crm-note">Fichier archivé 14 jours sur le VPS. La base du CRM ne quitte jamais le VPS.</div>
+      <div className="crm-note">Fichier archivé 14 jours sur le VPS. La base de SPARK ne quitte jamais le VPS (R1).</div>
     </div>
   );
 };

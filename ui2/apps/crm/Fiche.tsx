@@ -161,7 +161,7 @@ const CoordTab: React.FC<{ f: FicheT }> = ({ f }) => {
 const NUM_L: Record<Source, string> = { BSO: 'n° de fiche', VN: 'n° client propriétaire', VO: 'n° compte client' };
 const SrcTab: React.FC<{ f: FicheT; onSep: (identite: FicheT['identites'][number]) => void }> = ({ f, onSep }) => (
   <>
-    <div className="crm-note">Une <b>identité source</b> est ce que DCS appelle un client : clé source · société · numéro (le numéro DCS n’est unique que par société, et le VO a sa propre numérotation). Le client RCU regroupe ses identités ; ses attributs viennent de la vente la plus récente. Une décision manuelle est <b>rejouée à chaque import</b>.</div>
+    <div className="crm-note">Une <b>identité source</b> est ce que DCS appelle un client : clé source · société · numéro (le numéro DCS n’est unique que par société, et le VO a sa propre numérotation). Le client SPARK regroupe ses identités ; ses attributs viennent de la vente la plus récente. Une décision manuelle est <b>rejouée à chaque import</b>.</div>
     <div className="crm-idgrid">{f.identites.map((x) => {
       const manuel = /à la main/i.test(x.regle), origine = /seule|référence/i.test(x.regle);
       return (
@@ -182,7 +182,7 @@ const SrcTab: React.FC<{ f: FicheT; onSep: (identite: FicheT['identites'][number
 // ---------------------------------------------------------------- Échanges, Relances (lots 3 et 4)
 const SoonTab: React.FC<{ k: 'ech' | 'rel'; f: FicheT; ventes: Vente[] }> = ({ k, f, ventes }) => {
   if (k === 'ech') return (
-    <div className="crm-soon"><Icon name="message" size="lg" /><div><b style={{ color: 'var(--text)' }}>Échanges — arrive avec le lot 3</b>
+    <div className="crm-soon"><Icon name="message" size="lg" /><div><b style={{ color: 'var(--text)' }}>Échanges — arrive avec le lot 4</b>
       <div className="crm-note" style={{ marginTop: 4 }}>Appels, visites, e-mails et notes des vendeurs, qualification du client, réattribution du vendeur. Couche Bony : saisie par les utilisateurs, jamais touchée par l’import du soir.</div>
       <button className="btn sm" style={{ marginTop: 12 }} disabled><Icon name="plus" size="sm" />Noter un échange</button></div></div>
   );
@@ -194,7 +194,7 @@ const SoonTab: React.FC<{ k: 'ech' | 'rel'; f: FicheT; ventes: Vente[] }> = ({ k
   const last = ventes.map(venteDate).filter(Boolean).sort().pop();
   if (last) { const y = Math.floor(mDiff(last, T) / 12); if (y >= 4) out.push(['refresh', `Sans achat depuis ${y} ans`, `dernier : ${dFR(last)}`]); }
   return (
-    <div className="crm-soon"><Icon name="bell" size="lg" /><div className="grow"><b style={{ color: 'var(--text)' }}>Relances — moteur prévu au lot 4</b>
+    <div className="crm-soon"><Icon name="bell" size="lg" /><div className="grow"><b style={{ color: 'var(--text)' }}>Relances — suivi par client au lot 4</b> <span className="faint" style={{ fontWeight: 500 }}>· les listes se construisent dès le lot 3 dans le Requêteur</span>
       <div className="crm-note" style={{ marginTop: 4 }}>Règles réglables (fin de financement, CT, anniversaire, âge du véhicule, sans achat depuis X ans), listes exportables. Aperçu de ce que ce client déclencherait :</div>
       <div className="crm-rel" style={{ marginTop: 12 }}>{out.length ? out.map(([i, l, h], j) => <div key={j}><Icon name={i} size="sm" /><span className="grow">{l}</span><span className="faint">{h}</span></div>) : <div>Aucun déclencheur pour l’instant.</div>}</div></div></div>
   );
@@ -216,13 +216,13 @@ export const FicheView: React.FC<{ f: FicheT; win: AppProps['win']; onChanged: (
   const last = ventes[0];
   const addr = [[c.num_rue, c.type_rue, c.rue].filter(Boolean).join(' '), [c.cp, c.ville].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
   const tabs: [FTab, string, number | string][] = [['veh', 'Véhicules', f.vehicules.length], ['ventes', 'Ventes', ventes.length], ['fin', 'Financements et garanties', ventes.filter(finOk).length],
-    ['coord', 'Coordonnées', f.contacts.length], ['src', 'Sources', f.identites.length], ['ech', 'Échanges', 'lot 3'], ['rel', 'Relances', 'lot 4']];
+    ['coord', 'Coordonnées', f.contacts.length], ['src', 'Sources', f.identites.length], ['ech', 'Échanges', 'lot 4'], ['rel', 'Relances', 'lot 4']];
   const goto = (t: FTab) => { setTab(t); tabsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }); };
 
   const more = (el: HTMLElement) => gx().menu.open([
-    { header: 'Couche Bony — lot 3' },
+    { header: 'Couche Bony — lot 4' },
     { label: 'Réattribuer le vendeur référent…', icon: 'handshake', disabled: true },
-    '-', { label: 'Copier l’identifiant RCU', icon: 'copy', action: () => { try { navigator.clipboard?.writeText(rcuId(c.id)); } catch { /* presse-papier refusé */ } hud(`${rcuId(c.id)} copié`); } },
+    '-', { label: 'Copier l’identifiant SPARK', icon: 'copy', action: () => { try { navigator.clipboard?.writeText(rcuId(c.id)); } catch { /* presse-papier refusé */ } hud(`${rcuId(c.id)} copié`); } },
   ], el, { align: 'right' });
 
   const esc = gx().esc;
@@ -234,7 +234,7 @@ export const FicheView: React.FC<{ f: FicheT; win: AppProps['win']; onChanged: (
 
   return (
     <div className="crm-fiche">
-      <div className="crm-crumb"><span className="c">Clients <span>/</span> <b className="ellipsis" style={{ maxWidth: 300 }}>{nameOf(c)}</b><span className="num hide-s crm-mono" style={{ marginLeft: 8 }} data-tip="Identifiant RCU : attribué à vie, survit aux fusions">{rcuId(c.id)}</span></span>
+      <div className="crm-crumb"><span className="c">Clients <span>/</span> <b className="ellipsis" style={{ maxWidth: 300 }}>{nameOf(c)}</b><span className="num hide-s crm-mono" style={{ marginLeft: 8 }} data-tip="Identifiant SPARK : attribué à vie, survit aux fusions">{rcuId(c.id)}</span></span>
         <div className="acts"><button className="btn" aria-label="Plus d’actions" data-tip="Vendeur référent, copier l’identifiant…" onClick={(e) => more(e.currentTarget)}><Icon name="more" size="sm" /></button></div></div>
       <div className="crm-idt"><span className="av" style={cv(avC(c.id))}>{initials(c)}</span><div className="grow">
         <div className="crm-eye">{c.type === 'societe' ? 'Société' : 'Particulier'}{first ? ` · client depuis ${first.slice(0, 4)}` : ''}</div>
@@ -244,7 +244,7 @@ export const FicheView: React.FC<{ f: FicheT; win: AppProps['win']; onChanged: (
           {c.civilite ? <span className="badge" style={cv('var(--info)')} data-tip={`Civilité normalisée (4 valeurs). Libellé DCS : « ${c.civilite_dcs || '—'} »`}><Icon name={c.type === 'societe' ? 'building' : 'user'} size="sm" />{CIV[c.civilite]?.l}</span> : null}
           {c.site ? <span className="badge" data-tip="Site principal : celui de la dernière vente"><Icon name="pin" size="sm" />{c.site}</span> : null}
           <BrandChips brands={c.marques.map(brandName)} />
-          {c.vendeur ? <span className="badge" style={cv('var(--bony-violet)')} data-tip="Par défaut : vendeur de la dernière vente. Réattribuable au lot 3 (R6)."><Icon name="handshake" size="sm" />Vendeur référent : {c.vendeur}</span> : null}
+          {c.vendeur ? <span className="badge" style={cv('var(--bony-violet)')} data-tip="Par défaut : vendeur de la dernière vente. Réattribuable au lot 4 (R6)."><Icon name="handshake" size="sm" />Vendeur référent : {c.vendeur}</span> : null}
           {nSus ? <span className="badge" style={cv('var(--danger)')}><Icon name="alert" size="sm" />{nSus} coordonnée{nSus > 1 ? 's' : ''} suspecte{nSus > 1 ? 's' : ''}</span> : null}
         </div></div></div>
       <div className="crm-facts">

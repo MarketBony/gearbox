@@ -91,7 +91,7 @@ const ClientsView: React.FC<{
 
   const sel = st.selId;
   const selRow = res?.rows.find((c) => c.id === sel);
-  useEffect(() => { win.setTitle('CRM', selRow && !(compact && !pile) ? nameOf(selRow) : 'Clients'); }, [selRow, compact, pile, win]);
+  useEffect(() => { win.setTitle('SPARK', selRow && !(compact && !pile) ? nameOf(selRow) : 'Clients'); }, [selRow, compact, pile, win]);
 
   const select = useCallback((id: number) => {
     setSt((s) => ({ ...s, selId: id, autoSel: false }));

@@ -58,6 +58,18 @@ ne pas les réécrire.
   `appliques/` et `refuses/`, 14 jours), tour toutes les 5 min (fichier stable depuis 2 min), demandes toutes les 30 s.
   Import manuel : `docker compose exec rcu-worker node dist/rcu/worker.js --fichier <chemin> [--forcer]`.
 
+### 🔎 SPARK (RCU) — le Requêteur (13/10/2026, correctif 84)
+
+- **`src/rcu/requete.ts`** = SEULE porte requête (JSON) → SQL : briques en liste fermée (`CLIENT`, `VENTE`, `COORD`), valeurs
+  en paramètres, garde-fous de canal et dédoublonnage côté serveur, `statement_timeout` (20 s compter, 120 s export), tris en
+  liste fermée (`TRIS`). Contrat : `ui2/apps/crm/CONTRAT-API.md` § Lot 3 (+ brique `flotte`, route `/requetes/lignes` avec `tri`).
+- **Migration 004** : colonnes de `rcu.client` (email, portable, fixe, adresse_complete, premiere_vente, energie, nb_parc),
+  `rcu.energie_norm()`, table de travail `rcu.cv` (reconstruite par `rafraichirVentesClients`, appelée par le rapprochement,
+  qui recalcule aussi `nb_parc`), `ref_zone`, `ref_agent`, `requete`, `export_journal`, `export_client`.
+- **Routes** `/api/crm/requetes/*` (referentiels, compter [cache 15 min], apercu, lignes, export [journalisé], CRUD requêtes),
+  `/api/crm/exports`. Ouvertes à `CRM_ROLES` (export compris).
+- Classement Particulier / Professionnel (`resume.ts`) : professionnel aussi si fiche sans civilité ni prénom ET vente « VENTE A SOCIETE ».
+
 ### 👥 CRM / RCU — le client unique (12/10/2026, correctif 83)
 
 - **Migration 003** : `client` (résumé recalculé + `recherche` trigramme), `client_identite` (identité → client + règle),
