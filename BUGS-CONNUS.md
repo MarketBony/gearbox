@@ -5,6 +5,10 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [ ] **CRM : Figeac, Millau et Carmaux absents des extractions DCS** (12/10). Ni VN ni VO pour `VNVORFIG`, `VNVORMILLAU`,
   `VNVORCARM` : le compte DCS de Théo n'a pas ces sites (droits à faire ouvrir par l'IT). Leurs codes sont déjà dans
   `rcu.ref_affaire` : rien à coder, ils seront importés dès qu'ils remonteront.
+- [ ] **v2 : widgets du bureau déplacés au redimensionnement** (Théo, 15/10, « franchement désastreux ») : réduire la fenêtre du
+  navigateur puis la remettre en grand déplace les widgets ; des widgets censés occuper le même nombre de cases ne s'alignent
+  plus. Non reproduit à ce jour. Piste : la grille recalcule les positions à la largeur RÉDUITE et les enregistre sur le serveur
+  (`/api/widgets`, correctif 78) au lieu de garder la disposition de référence.
 - [x] **v2 : molette bloquée au survol d'un tableau** (Théo, 15/10) : `overscroll-behavior: contain` sur `.scroll` (deux axes).
   Corrigé au correctif 89 (axe x seulement). ⚠️ À confirmer par Théo sur la prod (non reproductible avec l'outil).
 - [x] **SPARK : fiche ouverte depuis le Requêteur (ou Équipes › À attribuer) remplacée par le 1er client de la liste** quand le
