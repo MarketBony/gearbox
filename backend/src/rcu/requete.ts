@@ -1,5 +1,6 @@
 import { Pool, PoolClient } from 'pg';
 import { rcu } from './db';
+import { AvanceInvalide, Groupe, Liste, groupeSQL, groupeSurAchat, lireAvance, listeSQL } from './avance';
 
 /**
  * Requêteur de SPARK — SEULE porte qui traduit une requête (JSON envoyé par le navigateur) en SQL.
@@ -15,7 +16,11 @@ import { rcu } from './db';
 export class RequeteInvalide extends Error {}
 
 type Brique = { id?: string; type: string; actif?: boolean; sauf?: boolean; [k: string]: unknown };
-export interface Requete { niveau: 'client' | 'vehicule'; canal: 'tous' | 'email' | 'sms' | 'phoning' | 'courrier'; dedoublonnage: boolean; briques: Brique[] }
+export interface Requete {
+  niveau: 'client' | 'vehicule'; canal: 'tous' | 'email' | 'sms' | 'phoning' | 'courrier'; dedoublonnage: boolean; briques: Brique[];
+  /** Mode avancé (avance.ts) : groupes de conditions (ET entre groupes) et liste collée. */
+  groupes?: Groupe[]; liste?: Liste | null;
+}
 type Arg = (v: unknown) => string;
 
 // ─── Lecture prudente des paramètres ─────────────────────────────────────────────
@@ -165,7 +170,9 @@ export function lireRequete(v: unknown): Requete {
       throw new RequeteInvalide(`Brique inconnue : ${String((b as Brique)?.type)}.`);
     }
   }
-  return { niveau: r.niveau, canal: r.canal, dedoublonnage: !!r.dedoublonnage, briques: r.briques };
+  let av: { groupes: Groupe[]; liste: Liste | null };
+  try { av = lireAvance(r); } catch (e) { if (e instanceof AvanceInvalide) throw new RequeteInvalide(e.message); throw e; }
+  return { niveau: r.niveau, canal: r.canal, dedoublonnage: !!r.dedoublonnage, briques: r.briques, groupes: av.groupes, liste: av.liste };
 }
 
 /**
@@ -192,6 +199,16 @@ export function construire(req: Requete, params: unknown[] = []): { sql: string;
       if (b.type.startsWith('fin_')) finConds = true;
     }
   }
+  // Mode avancé : chaque groupe actif filtre le client ; un groupe « même véhicule » désigne aussi l'achat retenu.
+  try {
+    (req.groupes || []).forEach((g, k) => {
+      if (g.actif === false) return;
+      condClient.push(groupeSQL(g, a, k));
+      const surAchat = groupeSurAchat(g, a);
+      if (surAchat) { condVente.push(surAchat); if (g.conditions.some((c) => c.champ.startsWith('fin.'))) finConds = true; }
+    });
+    if (req.liste) condClient.push(listeSQL(req.liste, a));
+  } catch (e) { if (e instanceof AvanceInvalide) throw new RequeteInvalide(e.message); throw e; }
   const aVente = condVente.length > 0 || req.niveau === 'vehicule';
   const prio = finConds ? 'cv.fin_fin nulls last, cv.date_achat desc nulls last' : 'cv.date_achat desc nulls last';
   const base = aVente
@@ -344,6 +361,36 @@ export async function compter(req: Requete, pool: Pool = rcu()) {
          from rr group by 1 order by 2 desc) x) as par_energie`, params);
   await db.query('commit');
   return { ...res.rows[0], ms: Date.now() - t0 };
+  } catch (e) { await db.query('rollback').catch(() => undefined); throw e; } finally { db.release(); }
+}
+
+/** Mode avancé : nombre de clients (avant le canal) après chaque groupe, et après chaque condition DANS son groupe,
+ *  dans l'ordre affiché — ce que la maquette montre à droite de chaque ligne. */
+export async function compterDetails(req: Requete, pool: Pool = rcu()) {
+  const db = await pool.connect();
+  const n = async (r: Requete) => {
+    const { sql, params } = construire(r);
+    return Number((await db.query(`with ${sql} select count(distinct client_id)::int as n from base`, params)).rows[0].n);
+  };
+  try {
+    await db.query('begin');
+    await db.query(`set local statement_timeout = '60s'`);
+    await db.query(`set local work_mem = '64MB'`);
+    const sans = { ...req, groupes: [] as Groupe[], liste: null };
+    const out = { base: await n(sans), groupes: [] as { apres: number; conditions: number[] }[], liste: null as number | null };
+    const G = req.groupes || [];
+    for (let i = 0; i < G.length; i++) {
+      const avant = G.slice(0, i);
+      const conditions: number[] = [];
+      for (let j = 0; j < G[i].conditions.length; j++) {
+        const g = { ...G[i], conditions: G[i].conditions.slice(0, j + 1) };
+        conditions.push(G[i].actif === false || G[i].conditions[j].actif === false ? NaN : await n({ ...sans, groupes: [...avant, g] }));
+      }
+      out.groupes.push({ apres: await n({ ...sans, groupes: G.slice(0, i + 1) }), conditions: conditions.map((x) => (Number.isNaN(x) ? -1 : x)) });
+    }
+    if (req.liste) out.liste = await n(req);
+    await db.query('commit');
+    return out;
   } catch (e) { await db.query('rollback').catch(() => undefined); throw e; } finally { db.release(); }
 }
 

@@ -3,6 +3,7 @@ import { Icon, Seg, gx } from '../../ui/kit';
 import { brandHex, brandName, dFR, nf } from '../common';
 import { CANAL, SRC_L, TY, depL, has, hasT, type Canal, type Compte, type Enregistree, type Format, type Ligne, type Q } from './modele';
 import { fenetre } from './Cartes';
+import { groupesPhrase } from './avanceModele';
 import { FMT, FMT_ORDER, Ico, REC, nomL } from './outils';
 
 /**
@@ -57,6 +58,9 @@ export function phrase(q: Q): string {
   const rest = pos.filter((b) => !used.has(b.id)).length, sauf = q.bricks.filter((b) => b.on && b.sauf && !TY[b.t]?.ui).length;
   if (rest) s += `, avec ${rest} autre${rest > 1 ? 's' : ''} condition${rest > 1 ? 's' : ''}`;
   if (sauf) s += `, hors ${sauf} exclusion${sauf > 1 ? 's' : ''}`;
+  // Mode avancé : une phrase par groupe (et la liste collée).
+  const av = groupesPhrase(q.groupes, undefined, q.liste);
+  if (av.length) s += ` ; ${av.join(' ; ')}`;
   return s + '.';
 }
 

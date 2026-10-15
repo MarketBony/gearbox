@@ -1,6 +1,7 @@
 import React from 'react';
 import { gx } from '../../ui/kit';
 import { FAM_C, brandHex, brandName, dFR } from '../common';
+import { envoi, lireGroupes, type Champ, type Groupe, type Liste } from './avanceModele';
 
 /**
  * Requêteur de SPARK — modèle : types du contrat (CONTRAT-API.md § « Lot 3 »), catalogue des briques, canaux, recettes.
@@ -17,9 +18,11 @@ import { FAM_C, brandHex, brandName, dFR } from '../common';
 export type Canal = 'tous' | 'email' | 'sms' | 'phoning' | 'courrier';
 export type Format = 'excel' | 'sarbacane' | 'allmysms' | 'phoning' | 'courrier';
 export interface Brique { id: string; type: string; actif: boolean; sauf?: boolean; [k: string]: unknown }
-export interface Requete { niveau: 'client' | 'vehicule'; canal: Canal; dedoublonnage: boolean; briques: Brique[] }
+export interface Requete { niveau: 'client' | 'vehicule'; canal: Canal; dedoublonnage: boolean; briques: Brique[]; groupes?: Groupe[]; liste?: Liste | null }
 export interface Colonne { cle: string; libelle: string; groupe: string }
 export interface Referentiels {
+  /** Mode avancé : liste FERMÉE des champs et de leurs opérateurs. */
+  champs?: Champ[];
   zones: { concession: string; departements: string[] }[]; agents: string[]; vendeurs: string[]; marques: string[];
   familles: string[]; types_vente: string[]; sites: string[]; colonnes: Colonne[];
 }
@@ -41,7 +44,11 @@ export interface Enregistree {
 export type Fam = 'client' | 'veh' | 'achat' | 'fin' | 'coord' | 'sauf';
 /** Brique à l'écran : `t` = type du contrat (ou brique d'écran : generic, lot4_*), `p` = paramètres d'édition. */
 export interface UB { id: string; t: string; p: Record<string, any>; on: boolean; sauf?: boolean; per?: boolean }
-export interface Q { name: string; bricks: UB[]; level: 'client' | 'vehicule'; canal: Canal; dedupe: boolean; savedId: number | null; from: string | null }
+export interface Q {
+  name: string; bricks: UB[]; level: 'client' | 'vehicule'; canal: Canal; dedupe: boolean; savedId: number | null; from: string | null;
+  /** Mode avancé (même requête que le mode simple, combinée en ET) : groupes, liste collée, mode d'affichage. */
+  groupes?: Groupe[]; liste?: Liste | null; mode?: 'simple' | 'avance';
+}
 
 let seq = 0;
 export const nid = () => `b${Date.now().toString(36)}${++seq}`;
@@ -328,7 +335,8 @@ export function toRequete(q: Q): Requete {
     const o = T.out(b.p); if (!o) continue;
     briques.push({ id: b.id, type: T.type ? T.type(b.p) : b.t, actif: b.on, ...(b.sauf ? { sauf: true } : {}), ...o });
   }
-  return { niveau: q.level, canal: q.canal, dedoublonnage: q.dedupe, briques };
+  const { groupes } = envoi(q.groupes);
+  return { niveau: q.level, canal: q.canal, dedoublonnage: q.dedupe, briques, ...(groupes.length ? { groupes } : {}), ...(q.liste?.valeurs.length ? { liste: q.liste } : {}) };
 }
 /** Contrat → écran (recettes, requêtes enregistrées). Les briques « Sauf » d'écran sont rajoutées. */
 export function fromRequete(r: Requete, R: R_, o: Partial<Q> = {}): Q {
@@ -338,7 +346,9 @@ export function fromRequete(r: Requete, R: R_, o: Partial<Q> = {}): Q {
     if (!T || T.ui) continue;
     bricks.push({ id: typeof B.id === 'string' && B.id ? B.id : nid(), t, p: { ...T.def(R), ...(T.inn ? T.inn(B) : {}) }, on: B.actif !== false, ...(B.sauf ? { sauf: true } : {}) });
   }
-  return { name: 'Nouvelle requête', bricks: [...bricks, ...SAUF0(R)], level: r.niveau === 'vehicule' ? 'vehicule' : 'client', canal: r.canal || 'tous', dedupe: r.dedoublonnage !== false, savedId: null, from: null, ...o };
+  const groupes = lireGroupes(r.groupes), liste = r.liste?.valeurs?.length ? r.liste : null;
+  return { name: 'Nouvelle requête', bricks: [...bricks, ...SAUF0(R)], level: r.niveau === 'vehicule' ? 'vehicule' : 'client', canal: r.canal || 'tous', dedupe: r.dedoublonnage !== false, savedId: null, from: null,
+    groupes, liste, mode: groupes.length || liste ? 'avance' : 'simple', ...o };
 }
 /** Périmètre de la barre de menus → brique Site préremplie (comme le filtre de l'onglet Clients). */
 export function applyPer(q: Q, site: string | null): Q {
@@ -347,7 +357,9 @@ export function applyPer(q: Q, site: string | null): Q {
   if (i >= 0) return { ...q, bricks: q.bricks.map((b, j) => (j === i ? { ...b, p: { ...b.p, v: [site] } } : b)) };
   return { ...q, bricks: [{ id: nid(), t: 'site_client', p: { v: [site], mode: 'dernier' }, on: true, per: true }, ...q.bricks] };
 }
-export const cloneQ = (q: Q): Q => ({ ...q, bricks: q.bricks.map((b) => ({ ...b, id: nid(), p: JSON.parse(JSON.stringify(b.p)) })) });
+export const cloneQ = (q: Q): Q => ({ ...q, bricks: q.bricks.map((b) => ({ ...b, id: nid(), p: JSON.parse(JSON.stringify(b.p)) })),
+  groupes: lireGroupes((q.groupes || []).map((g) => ({ ...JSON.parse(JSON.stringify(g)), id: '', conditions: g.conditions.map((c) => ({ ...JSON.parse(JSON.stringify(c)), id: '' })) }))),
+  liste: q.liste ? { ...q.liste, valeurs: [...q.liste.valeurs] } : null });
 
 // ---------------------------------------------------------------- canaux
 export interface CanalDef { l: string; icon: string; key?: 'email' | 'portable' | 'telephone' | 'adresse'; coord?: string; dd?: string; say?: React.ReactNode }

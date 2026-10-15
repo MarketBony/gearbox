@@ -590,6 +590,13 @@ class DataService {
   async apercuCrmRequete(requete: unknown, signal?: AbortSignal): Promise<{ lignes: any[] }> {
     return apiFetch('/crm/requetes/apercu', { method: 'POST', body: JSON.stringify({ requete }), signal });
   }
+  // Mode avancé (CONTRAT-API.md § « Mode avancé du Requêteur ») : compteurs par groupe / condition, valeurs réelles d'un champ.
+  async getCrmDetails(requete: unknown, signal?: AbortSignal): Promise<{ base: number; groupes: { apres: number; conditions: number[] }[]; liste: number | null }> {
+    return apiFetch('/crm/requetes/details', { method: 'POST', body: JSON.stringify({ requete }), signal });
+  }
+  async getCrmValeurs(champ: string, q: string, signal?: AbortSignal): Promise<{ v: string; n: number }[]> {
+    return apiFetch(`/crm/requetes/valeurs?champ=${encodeURIComponent(champ)}&q=${encodeURIComponent(q)}`, { signal });
+  }
   /** « Voir les clients » : le résultat paginé PAR LE SERVEUR (50 lignes par page), jamais chargé en masse. */
   async getCrmLignes(requete: unknown, page: number, signal?: AbortSignal, tri = 'recent'): Promise<{ page: number; taille: number; colonnes: { cle: string; libelle: string; groupe: string }[]; lignes: any[] }> {
     return apiFetch('/crm/requetes/lignes', { method: 'POST', body: JSON.stringify({ requete, page, tri }), signal });

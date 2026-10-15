@@ -10,6 +10,8 @@ import Bibliotheque, { type LibF } from './Bibliotheque';
 import Cartes from './Cartes';
 import Resume, { mainOf } from './Resume';
 import VoirClients from './VoirClients';
+import Avance, { ListeSheet } from './Avance';
+import { envoi, setChamps, type Details } from './avanceModele';
 import { CourrierSheet, ExcelSheet, type ExpCtx, JournalSheet, PhoningSheet, SarbacaneSheet, SmsSheet } from './exports';
 
 /**
@@ -17,6 +19,8 @@ import { CourrierSheet, ExcelSheet, type ExpCtx, JournalSheet, PhoningSheet, Sar
  * en-tête (titre, « Partir d'une recette », « Mes requêtes »), 4 cartes-questions (./Cartes.tsx), colonne « En résumé »
  * (./Resume.tsx) et la vue « Voir les clients » (./VoirClients.tsx). Contrat : ../CONTRAT-API.md § « Lot 3 ».
  * Résultat EN DIRECT : POST /requetes/compter + /apercu, temporisés à 400 ms ; une réponse périmée est abandonnée.
+ * Mode avancé (15/10, planche D) : segmenté Simple / Avancé, MÊME requête (briques + groupes + liste) ; en avancé,
+ * ./Avance.tsx édite groupes et liste, et POST /requetes/details (temporisé à 800 ms) donne les compteurs par groupe / condition.
  * L'état (requête en cours, préférences) survit aux changements d'onglet : il vit dans `store`, tenu par CrmApp.
  */
 
@@ -32,7 +36,8 @@ const RequeteurView: React.FC<{
 }> = ({ win, store, per, userId, who, openClient }) => {
   const S0 = store.current;
   const [q, setQState] = useState<Q>(() => S0?.q ?? recipeQ(RECIPES[1], S0?.R ?? null, per));
-  const [R, setR] = useState<Referentiels | null>(S0?.R ?? null);
+  const [R, setR] = useState<Referentiels | null>(() => { setChamps(S0?.R?.champs); return S0?.R ?? null; });
+  const [det, setDet] = useState<{ d: Details | null; key: string }>({ d: null, key: '' });
   const [vue, setVue] = useState<'cartes' | 'clients'>(S0?.vue ?? 'cartes');
   const [wantCounts, setWantCounts] = useState(false);
   const [libF, setLibF] = useState<LibF>(S0?.libF ?? 'all');
@@ -58,7 +63,7 @@ const RequeteurView: React.FC<{
   // ---------------------------------------------------------------- chargements
   useEffect(() => {
     if (R) return;
-    db.getCrmReferentiels().then((r) => setR(r)).catch((e) => hud(`Listes de choix indisponibles : ${e?.message || 'erreur'}`));
+    db.getCrmReferentiels().then((r) => { setChamps(r?.champs); setR(r); }).catch((e) => hud(`Listes de choix indisponibles : ${e?.message || 'erreur'}`));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const loadSaved = useCallback(() => { db.getCrmRequetes().then((l) => { setSaved(l || []); setSavedErr(null); }).catch((e) => setSavedErr(e?.message || 'Chargement impossible.')); }, []);
   const loadJournal = useCallback(() => { db.getCrmExports().then((l) => setJournal(l || [])).catch(() => setJournal((j) => j ?? [])); }, []);
@@ -93,6 +98,21 @@ const RequeteurView: React.FC<{
     }, 400);
     return () => { clearTimeout(t); ac.abort(); };
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mode avancé : clients restants après chaque groupe et chaque condition (plus lent : temporisation 800 ms).
+  const avance = q.mode === 'avance' && !!(req.groupes?.length || req.liste);
+  useEffect(() => {
+    if (!avance) return;
+    const ac = new AbortController();
+    const t = setTimeout(() => {
+      db.getCrmDetails(req, ac.signal).then((d) => { if (!ac.signal.aborted) setDet({ d, key }); })
+        .catch(() => { if (!ac.signal.aborted) setDet({ d: null, key }); });
+    }, 800);
+    return () => { clearTimeout(t); ac.abort(); };
+  }, [key, avance]); // eslint-disable-line react-hooks/exhaustive-deps
+  const carte = useMemo(() => envoi(q.groupes, R?.champs).carte, [q.groupes, R]);
+  const nSimple = q.bricks.filter((b) => b.on && !TY[b.t]?.ui && TY[b.t]?.out?.(b.p)).length;
+  const listeSheet = () => openSheet((close) => <ListeSheet liste={qRef.current.liste} close={close} onApply={(l) => setQState((x) => ({ ...x, from: null, liste: l }))} />, { width: 620 });
 
   // Estimations des recettes (≈ clients) : à la première ouverture du volet, une fois par périmètre, l'une après l'autre.
   const countsFor = useRef<string | null | undefined>(S0?.countsPer);
@@ -139,7 +159,7 @@ const RequeteurView: React.FC<{
     <div className="foot"><button className="btn" data-sheet="">Annuler</button><button className="btn primary" data-sheet="ok" style={{ background: 'var(--danger)' }}>Supprimer</button></div></>),
   { width: 440, onClose: (v) => { if (v !== 'ok') return; db.deleteCrmRequete(s.id).then(() => { setQState((x) => (x.savedId === s.id ? { ...x, savedId: null } : x)); loadSaved(); hud('Requête supprimée'); }).catch((e) => hud(e?.message || 'Suppression refusée.')); } });
   const more = (el: HTMLElement) => gx().menu.open([
-    { label: 'Nouvelle requête vide', icon: 'plus', action: () => { setQState(applyPer(fromRequete({ niveau: 'client', canal: 'tous', dedoublonnage: true, briques: [] }, R, { name: 'Nouvelle requête' }), per)); setOpen(null); } },
+    { label: 'Nouvelle requête vide', icon: 'plus', action: () => { setQState((x) => applyPer(fromRequete({ niveau: 'client', canal: 'tous', dedoublonnage: true, briques: [] }, R, { name: 'Nouvelle requête', mode: x.mode }), per)); setOpen(null); } },
     { label: 'Dupliquer', icon: 'copy', action: () => { setQState((x) => ({ ...cloneQ(x), name: x.name + ' (copie)', savedId: null })); hud('Requête dupliquée : pensez à l’enregistrer'); } },
     '-', { label: 'Réactiver toutes les conditions', icon: 'refresh', disabled: !q.bricks.some((b) => !b.on && !TY[b.t]?.ui), action: () => setQState((x) => ({ ...x, bricks: x.bricks.map((b) => ({ ...b, on: true })) })) },
     { label: 'Historique des exports', icon: 'clock', action: journalSheet },
@@ -179,11 +199,14 @@ const RequeteurView: React.FC<{
           <div className="rq2-title"><textarea ref={taRef} className="rq-title" rows={1} aria-label="Nom de la requête" spellCheck={false} value={q.name}
             onChange={(e) => setQState((x) => ({ ...x, name: e.target.value.replace(/\n/g, ' ') }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }} />
             <span className="crm-tag" data-tip={sv ? `Enregistrée par ${sv.auteur}` : 'Pas encore enregistrée'}>{sv ? (sv.partagee ? <><Icon name="users" size="sm" /> Partagée</> : <><Icon name="user" size="sm" /> Perso</>) : 'Brouillon'}</span></div>
-          <div className="rq2-hacts"><button className="btn" onClick={() => libSheet('recettes')}><Icon name="star" size="sm" />Partir d’une recette</button>
+          <div className="rq2-hacts"><Seg<'simple' | 'avance'> value={q.mode === 'avance' ? 'avance' : 'simple'} onChange={(v) => setQState((x) => ({ ...x, mode: v }))} options={[['simple', 'Simple'], ['avance', 'Avancé']]} />
+            <button className="btn" onClick={() => libSheet('recettes')}><Icon name="star" size="sm" />Partir d’une recette</button>
             <button className="btn" onClick={() => libSheet('mes')}><Icon name="file" size="sm" />Mes requêtes</button>
             <button className="btn" aria-label="Plus d’actions" data-tip="Nouvelle, dupliquer, programmer…" onClick={(e) => more(e.currentTarget)}><Icon name="more" size="sm" /></button></div>
         </header>
-        <Cartes {...P} />
+        {q.mode === 'avance'
+          ? <Avance q={q} setQ={setQ} champs={R?.champs || null} details={det.d} carte={carte} dBusy={det.key !== key} simple={nSimple} onSimple={() => setQState((x) => ({ ...x, mode: 'simple' }))} onListe={listeSheet} />
+          : <div className="rq2-main">{q.groupes?.length || q.liste ? <div className="rq3-rappel" style={{ alignSelf: 'flex-start' }}>+ {(q.groupes || []).length} groupe{(q.groupes || []).length > 1 ? 's' : ''}{q.liste ? ' et une liste collée' : ''} du mode avancé <button className="rq2-link" onClick={() => setQState((x) => ({ ...x, mode: 'avance' }))}>voir</button></div> : null}<Cartes {...P} /></div>}
         <Resume q={q} c={res.c} lignes={res.lignes} busy={busy} err={res.err} saved={sv} onExport={exportSheet} onVoir={() => setVue('clients')} onSave={saveSheet} onClient={openClient} />
       </div>
       {portals}

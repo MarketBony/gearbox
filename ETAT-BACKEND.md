@@ -58,6 +58,13 @@ ne pas les réécrire.
   `appliques/` et `refuses/`, 14 jours), tour toutes les 5 min (fichier stable depuis 2 min), demandes toutes les 30 s.
   Import manuel : `docker compose exec rcu-worker node dist/rcu/worker.js --fichier <chemin> [--forcer]`.
 
+### 🧩 SPARK — mode avancé du Requêteur (15/10/2026, correctif 86)
+
+- `src/rcu/avance.ts` : `CHAMPS` (liste fermée, SQL par champ) et `OPERATEURS` par type ; `groupeSQL` / `groupeSurAchat` / `listeSQL`
+  compilent groupes et liste collée ; `lireAvance` valide (champ inconnu, opérateur impossible, valeur manquante → 400). Appelé
+  UNIQUEMENT par `requete.ts` (`lireRequete`, `construire`, `compterDetails`). `suggestionsSQL` : valeurs réelles d'un champ.
+- Routes `/api/crm/requetes/details` et `/api/crm/requetes/valeurs`.
+
 ### 🔎 SPARK (RCU) — le Requêteur (13/10/2026, correctif 84)
 
 - **`src/rcu/requete.ts`** = SEULE porte requête (JSON) → SQL : briques en liste fermée (`CLIENT`, `VENTE`, `COORD`), valeurs
