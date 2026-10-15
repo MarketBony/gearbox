@@ -606,7 +606,7 @@ const AIDE = { facile: 'longue', normal: 'ligne', expert: 'force' };
 const ORDRE = ['p1', 'p2'];
 let io = null, raf = 0, ro = null, visee = null, trace = [], secousse = 0, flash = {}, chute = null;
 let etat = null;          // { h, board, ctx, balles: [[x, y, dedans, visible]], horloge0, t0, aide }
-let anim = null, enAttente = null, dernierVu = undefined, attendu = null, changementTrou = 0;
+let anim = null, enAttente = null, dernierVu = undefined, attendu = null, changementTrou = 0, pauseTrou = false;
 const cleDe = (d) => (d ? [d.i, d.joueur, d.horloge, d.angle, d.puissance].join('|') : null);
 const horlogeLocale = () => (etat ? etat.horloge0 + (performance.now() - etat.t0) / 1000 : 0);
 
@@ -624,12 +624,14 @@ const ballesDe = (board, tour) => ORDRE.map((m) => [board.balles[m].x, board.bal
 /** Affiche le plateau tel que le serveur l'a renvoyé (sans animation). */
 function appliquer(board, ctx) {
   const h = TROU_PAR_ID[board.trous[board.i]], nouveau = !etat || etat.h !== h;
+  pauseTrou = false;
   etat = { h, board, ctx, balles: ballesDe(board, ctx.tour), horloge0: board.horloge, t0: performance.now(), aide: AIDE[board.cfg.diff] || 'ligne' };
   if (nouveau) { trace = []; parts = []; chute = null; flash = {}; C = null; ajuster(); if (!ctx.fini) io?.annonce(`Trou ${board.i + 1}`, `${h.nom} · par ${h.par}`); }
 }
 /** Rejoue le dernier coup (le sien ou celui de l'adversaire) à partir de l'état AVANT le coup. */
 function rejouer(board, ctx, local) {
   const d = board.dernier, h = TROU_PAR_ID[board.trous[d.i]], j = ORDRE.indexOf(d.joueur);
+  pauseTrou = false;
   if (!etat || etat.h !== h) { etat = { h, board, ctx, balles: [], horloge0: d.horloge, t0: performance.now(), aide: AIDE[board.cfg.diff] }; C = null; ajuster(); }
   const avant = d.avant, balles = ORDRE.map((m) => ({ x: avant[m].x, y: avant[m].y, dedans: avant[m].dedans || (!avant[m].pose && m !== d.joueur) }));
   const res = simuler(h, { balles, horloge: d.horloge }, { balle: j, angle: d.angle, puissance: d.puissance }, { choc: board.cfg.choc });
@@ -639,7 +641,12 @@ function rejouer(board, ctx, local) {
   gerbe('brin', avant[d.joueur].x, avant[d.joueur].y, Math.round(4 + d.puissance * 10), { ang: d.angle + Math.PI, cone: 1.4, v: 60 + d.puissance * 140, vie: 0.6, c: [C?.a?.gazon?.[1] || '#4aa854', C?.a?.frange || '#2f7a39'] });
 }
 function finAnim() {
-  const { d, ctx, j } = anim, nom = ctx.joueurs[j] || '';
+  // Son propre coup fini AVANT la réponse du serveur : la balle reste où elle s'est arrêtée, on attend le plateau
+  // (maj() le range dans enAttente, et la boucle rappelle finAnim à l'image suivante).
+  if (anim.local && !enAttente) return;
+  // Le coup tel que le serveur l'a joué (rentré, eau, ramassé), pas la copie locale qui n'en sait rien.
+  const dS = enAttente?.board?.dernier, d = dS && cleDe(dS) === anim.cle ? dS : anim.d;
+  const { ctx, j } = anim, nom = ctx.joueurs[j] || '';
   const a = AMB[(enAttente?.board || anim.board).cfg.amb] || AMB.ete, A = a.annonces || {}, tr = (s) => A[s] || s;
   const fin = enAttente || { board: anim.board, ctx: anim.ctx }; anim = null; enAttente = null;
   const b = fin.board;
@@ -652,7 +659,7 @@ function finAnim() {
   else if (d.ramasse) io?.annonce(tr('Balle ramassée'), `${nom} · maximum atteint`);
   if (b.i !== d.i || fin.ctx.fini) {
     // Trou terminé : on laisse voir la balle au fond du trou avant de passer au suivant.
-    etat.balles = etat.balles.map((x) => x.slice()); const id = ++changementTrou;
+    etat.balles = etat.balles.map((x) => x.slice()); const id = ++changementTrou; pauseTrou = true;
     setTimeout(() => { if (id === changementTrou && !anim) { appliquer(b, fin.ctx); suite(); } }, 1900);
   } else { appliquer(b, fin.ctx); suite(); }
 }
@@ -675,18 +682,20 @@ export function maj(board, ctx) {
     if (board.dernier && board.dernier.joueur !== ctx.moi && board.dernier.i === board.i && !ctx.fini) { appliquer(board, ctx); rejouer(board, ctx); return; }
     appliquer(board, ctx); return;
   }
+  if (attendu && cle === attendu) attendu = null;
   if (cle && cle !== dernierVu) { dernierVu = cle; rejouer(board, ctx); return; }
+  if (pauseTrou) { etat.ctx = ctx; return; } // la pause de fin de trou appliquera ce plateau
   appliquer(board, ctx);
 }
-const peutJouer = () => etat && !anim && !attendu && !etat.ctx.fini && etat.ctx.tour === etat.ctx.moi && !etat.board.fini[etat.ctx.moi] && etat.board.i === (etat.board.dernier?.i ?? etat.board.i) && TROU_PAR_ID[etat.board.trous[etat.board.i]] === etat.h;
+const peutJouer = () => etat && !anim && !attendu && !pauseTrou && !etat.ctx.fini && etat.ctx.tour === etat.ctx.moi && !etat.board.fini[etat.ctx.moi] && TROU_PAR_ID[etat.board.trous[etat.board.i]] === etat.h;
 function jouer(angle, puissance) {
-  const board = etat.board, ctx = etat.ctx, horloge = Math.max(board.horloge, horlogeLocale());
+  const board = etat.board, ctx = etat.ctx, horloge = Math.min(board.horloge + 3500, Math.max(board.horloge, horlogeLocale()));
   // Coup joué tout de suite à l'écran (même moteur que le serveur) ; le plateau du serveur fera foi à la fin.
   const d = { joueur: ctx.moi, i: board.i, angle, puissance, horloge, avant: JSON.parse(JSON.stringify(board.balles)), eau: 0, rentre: false, ramasse: false };
   attendu = cleDe(d); dernierVu = attendu;
   rejouer({ ...board, dernier: d }, ctx, true);
   Promise.resolve(io?.jouer({ angle, puissance, horloge })).then((r) => {
-    if (r?.error) { attendu = null; anim = null; io?.erreur(r.error); appliquer(etat.board, etat.ctx); }
+    if (r?.error) { attendu = null; anim = null; enAttente = null; io?.erreur(r.error); if (etat) appliquer(etat.board, etat.ctx); }
   });
 }
 function versMonde(ev) { const r = cv.getBoundingClientRect(); return [((ev.clientX - r.left) * vue.dpr - vue.ox) / vue.k, ((ev.clientY - r.top) * vue.dpr - vue.oy) / vue.k]; }
@@ -752,7 +761,7 @@ function evenement(e, h) {
 }
 
 export function monter(canvas, callbacks) {
-  cv = canvas; g = cv.getContext('2d'); io = callbacks; etat = null; anim = null; enAttente = null; dernierVu = undefined; attendu = null; C = null; parts = [];
+  cv = canvas; g = cv.getContext('2d'); io = callbacks; etat = null; anim = null; enAttente = null; dernierVu = undefined; attendu = null; pauseTrou = false; C = null; parts = [];
   cv.addEventListener('pointerdown', onDown); cv.addEventListener('pointermove', onMove); cv.addEventListener('pointerup', onUp); addEventListener('keydown', onKey);
   ro = new ResizeObserver(() => { C = null; }); ro.observe(cv);
   raf = requestAnimationFrame(boucle);

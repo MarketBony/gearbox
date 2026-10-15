@@ -4,7 +4,8 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 15/10/2026 (lire en premier)
-- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 90**
+- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 91**
+  (15/10, `web` seul : minigolf, tour par tour réparé — tir bloqué dès le trou 2, coups en double). Avant lui le **90**
   (15/10, `api` + `web` + migration Supabase `game_challenge_options` : **4e jeu, le MINIGOLF**, v2 seulement). Avant lui le
   **89** (15/10, `web` seul : molette bloquée au survol d'un tableau, v2). Avant lui le **88** (15/10, `rcu-worker` + `api` + `web` :
   SPARK lot 4, Équipes et portefeuilles, **calcul des portefeuilles DÉSACTIVÉ en prod**).
@@ -105,7 +106,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 90 (15/10)** — Jeux : 4e jeu, le minigolf (`api` + `web`, migration `game_challenge_options`).
+- **En production : correctif 91 (15/10)** — minigolf : tour par tour réparé (`web` seul).
+  Avant lui le **correctif 90 (15/10)** — Jeux : 4e jeu, le minigolf (`api` + `web`, migration `game_challenge_options`).
   Avant lui le **correctif 89 (15/10)** — v2 : la molette ne se bloque plus au survol d'un tableau (`web` seul).
   Avant lui le **correctif 88 (15/10)** — SPARK lot 4, Équipes et portefeuilles (`rcu-worker` + `api` + `web`, migration RCU 005).
   Avant lui le **correctif 87 (15/10)** — SPARK, requêtes DCS sur le SFTP + archivage du worker (`rcu-worker` seul).
@@ -670,6 +672,24 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 91 — 15/10 : minigolf, tour par tour injouable** (branche `fix/minigolf-tour-par-tour`, **`web` seul**, aucune
+  migration). Premiers retours de Théo après le 90 : « soit ça joue pas, soit ça joue en double, soit ça marche pas ». Trois causes,
+  toutes dans l'orchestration de `ui2/apps/games/minigolf/rendu.ts` (règles serveur hors de cause) :
+  1. `peutJouer()` comparait le trou courant à celui du DERNIER coup — celui du trou précédent dès le changement de trou : plus
+     personne ne pouvait tirer à partir du trou 2 ;
+  2. coup court fini AVANT la réponse du serveur : la balle revenait à sa position de départ et le verrou `attendu` n'était
+     jamais levé (il ne l'était que pendant une animation) → plus aucun tir possible. Désormais la balle reste où elle s'est
+     arrêtée, l'animation attend le plateau, et l'annonce (birdie, plouf…) vient du coup tel que le serveur l'a joué ;
+  3. pendant la pause de 1,9 s de fin de trou, le tir restait permis sur l'ANCIEN trou alors que le serveur le jouait sur le
+     nouveau (« en double ») → verrou `pauseTrou`. Et l'horloge envoyée est plafonnée à + 3 500 s (le serveur refuse au-delà d'1 h).
+  ⚠️ Pourquoi le test du 90 n'a rien vu : la partie d'essai tirait par `onMove` directement, SANS passer par `peutJouer()`.
+  Test du 91 (page d'essai locale temporaire, rien en base) : moi = p1 par vrais événements souris, robot = p2, chaque plateau
+  livré DEUX fois avec latence (diffusion socket puis accusé, comme en prod). Ancien code : bloqué au trou 2 (reproduit).
+  Nouveau : partie de 3 trous complète, 18 tirs envoyés = 18 coups comptés, aucun refus à mon tour, 70 tentatives pendant une
+  animation / pause toutes bloquées. ⚠️ Piège de test : Vite sert un module modifié avec `?t=…` — l'importer à la main depuis
+  la console donne une AUTRE instance (état vide) ; passer par un module qui l'importe normalement. Partie réelle entre deux
+  comptes toujours à confirmer par Théo sur la prod.
+
 - **Correctif 90 — 15/10 : JEUX, 4e jeu — le MINIGOLF** (branche `feat/jeux-minigolf-gearbox`, **`api` + `web`**, migration
   Supabase `20261015180000_game_challenge_options`, appliquée et inscrite AVANT le déploiement). Demande de Théo : un vrai minigolf
   2D vu de dessus, beaucoup de trous tirés au hasard, un pré-lobby où celui qui lance choisit difficulté / nombre de trous /
@@ -1189,7 +1209,8 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 90** (15 octobre 2026) — Jeux, 4e jeu : le minigolf,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 91** (15 octobre 2026) — minigolf, tour par tour réparé,
+  **`web` seul**, aucune migration. Avant lui le **correctif 90** (15 octobre 2026) — Jeux, 4e jeu : le minigolf,
   **`api` + `web`**, migration Supabase `20261015180000_game_challenge_options` (colonne `GameChallenge.options`, additive),
   appliquée par `db execute` + `migrate resolve --applied` avant le déploiement. Avant lui le **correctif 89** (15 octobre 2026) —
   molette bloquée au survol d'un tableau (v2), **`web` seul**, aucune migration. Avant lui le **correctif 88** (15 octobre 2026) — SPARK lot 4, Équipes et portefeuilles,
