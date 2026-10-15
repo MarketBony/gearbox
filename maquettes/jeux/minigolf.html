@@ -463,18 +463,18 @@ const TROUS = [
   // ---------------------------------------------------------------- FACILE
   T({ id: 'f1', nom: 'Le Jardin', diff: 'facile', par: 2, bord: couloir([[80, 250], [260, 160], [470, 310], [680, 230]], 150), depart: [96, 246], trou: [650, 236],
     rocs: [{ x: 372, y: 238, r: 26, style: 'massif' }] }),
-  T({ id: 'f2', nom: 'La Butte', diff: 'facile', par: 2, bord: salle(0, 0, 780, 270, 70), depart: [80, 135], trou: [700, 135],
-    bosses: [{ x: 390, y: 135, r: 170, h: 16 }] }),
+  T({ id: 'f2', nom: 'Le Slalom', diff: 'facile', par: 2, bord: salle(0, 0, 800, 270, 70), depart: [80, 135], trou: [720, 135],
+    rocs: [{ x: 250, y: 135, r: 26, style: 'massif' }, { x: 400, y: 72, r: 22, style: 'massif' }, { x: 400, y: 198, r: 22, style: 'massif' }, { x: 550, y: 135, r: 26, style: 'massif' }] }),
   T({ id: 'f3', nom: 'Le Fer à cheval', diff: 'facile', par: 3, bord: couloir([[90, 90], [430, 90], [580, 195], [430, 300], [90, 300]], 124), depart: [104, 90], trou: [118, 300],
     rocs: [{ x: 300, y: 196, r: 22, style: 'roc' }] }),
   T({ id: 'f4', nom: 'Les Champignons', diff: 'facile', par: 2, bord: salle(0, 0, 660, 380, 80), depart: [80, 190], trou: [580, 190],
     bumpers: [{ x: 330, y: 132, r: 17 }, { x: 330, y: 248, r: 17 }, { x: 450, y: 190, r: 19 }] }),
-  T({ id: 'f5', nom: 'La Cuvette', diff: 'facile', par: 2, bord: couloir([[80, 210], [380, 170], [660, 230]], 170), depart: [96, 208], trou: [615, 224],
-    bosses: [{ x: 615, y: 224, r: 180, h: -10 }, { x: 330, y: 115, r: 90, h: 9 }, { x: 330, y: 255, r: 90, h: 9 }] }),
+  T({ id: 'f5', nom: "L'Entonnoir", diff: 'facile', par: 2, bord: salle(0, 0, 720, 380, 70), depart: [80, 190], trou: [640, 190],
+    murs: [{ pts: [[300, 40], [540, 160]] }, { pts: [[300, 340], [540, 220]] }], bumpers: [{ x: 300, y: 190, r: 16 }] }),
   maison(T({ id: 'f6', nom: 'La Chaumière', diff: 'facile', par: 2, bord: couloir([[80, 180], [720, 180]], 140), depart: [96, 180], trou: [670, 180] }), 400, 180, 0, { large: 150 }),
   // ---------------------------------------------------------------- NORMAL
   maison(T({ id: 'n1', nom: 'Le Moulin', diff: 'normal', par: 3, bord: salle(0, 0, 840, 300, 60), depart: [80, 150], trou: [750, 150],
-    bosses: [{ x: 620, y: 150, r: 130, h: 8 }] }), 420, 150, 0, { large: 160, pales: 4, w: 1.25 }),
+    rocs: [{ x: 620, y: 90, r: 20, style: 'roc' }, { x: 620, y: 210, r: 20, style: 'roc' }] }), 420, 150, 0, { large: 160, pales: 4, w: 1.25 }),
   T({ id: 'n2', nom: 'Le Ruisseau', diff: 'normal', par: 3, bord: salle(0, 0, 840, 380, 50), depart: [80, 300], trou: [760, 90],
     zones: [{ type: 'eau', pts: lisse([[325, -20], [455, -20], [470, 80], [445, 190], [470, 300], [450, 400], [320, 400], [300, 290], [330, 180], [305, 80]]) },
       { type: 'pont', pts: rect(290, 150, 200, 64) }],
@@ -483,8 +483,9 @@ const TROUS = [
     zones: [{ type: 'sable', pts: ellipse(610, 120, 80, 62, 22, 0.15, 2) }, { type: 'sable', pts: ellipse(520, 330, 40, 56, 18, 0.12, 4) }] }),
   T({ id: 'n4', nom: 'Les Tapis', diff: 'normal', par: 3, bord: salle(0, 0, 800, 360, 50), depart: [80, 270], trou: [720, 90],
     zones: [{ type: 'tapis', pts: rect(320, 40, 72, 280), vx: 0, vy: 170 }, { type: 'tapis', pts: rect(408, 40, 72, 280), vx: 0, vy: -170 }] }),
-  T({ id: 'n5', nom: 'Les Collines', diff: 'normal', par: 3, bord: salle(0, 0, 820, 430, 70), depart: [74, 215], trou: [745, 250],
-    bosses: [{ x: 240, y: 130, r: 150, h: 13 }, { x: 290, y: 320, r: 130, h: 10 }, { x: 470, y: 215, r: 170, h: 15 }, { x: 620, y: 110, r: 120, h: 11 }, { x: 640, y: 340, r: 120, h: -9 }, { x: 745, y: 250, r: 90, h: -4 }] }),
+  T({ id: 'n5', nom: 'Le Flipper', diff: 'normal', par: 3, bord: salle(0, 0, 820, 430, 70), depart: [74, 215], trou: [745, 215],
+    bumpers: [{ x: 240, y: 120, r: 17 }, { x: 240, y: 310, r: 17 }, { x: 380, y: 215, r: 20 }, { x: 520, y: 110, r: 17 }, { x: 520, y: 320, r: 17 }, { x: 640, y: 215, r: 15 }],
+    murs: [{ pts: [[690, 120], [690, 175]] }, { pts: [[690, 255], [690, 310]] }] }),
   T({ id: 'n6', nom: 'Le Tourniquet', diff: 'normal', par: 3, bord: salle(0, 0, 780, 420, 70), depart: [74, 210], trou: [705, 210],
     zones: [{ type: 'tourniquet', x: 390, y: 210, r: 120, w: 1.7 }], rocs: [{ x: 390, y: 50, r: 22, style: 'roc' }, { x: 390, y: 370, r: 22, style: 'roc' }], bumpers: [{ x: 600, y: 120, r: 15 }, { x: 600, y: 300, r: 15 }] }),
   // ---------------------------------------------------------------- EXPERT
@@ -495,9 +496,9 @@ const TROUS = [
     murs: [{ pts: [[175, 192], [530, 192]] }, { pts: [[175, 248], [530, 248]] }],
     mobiles: [{ type: 'porte', a: [345, 170], b: [345, 270], taille: [24, 40], periode: 2.8 }], bumpers: [{ x: 760, y: 220, r: 15 }] }),
   maison(maison(T({ id: 'e3', nom: 'Les Deux Moulins', diff: 'expert', par: 3, bord: salle(0, 0, 920, 300, 50), depart: [70, 150], trou: [850, 150],
-    bosses: [{ x: 460, y: 150, r: 120, h: 9 }] }), 280, 150, 0, { large: 300, pales: 3, w: 1.7, ouverture: 0.5 }), 640, 150, 0, { large: 300, pales: 4, w: -2.1, phase: 1, ouverture: 0.42 }),
-  T({ id: 'e4', nom: 'Le Volcan', diff: 'expert', par: 3, bord: salle(0, 0, 780, 460, 90), depart: [80, 230], trou: [520, 230],
-    bosses: [{ x: 520, y: 230, r: 300, h: 26 }, { x: 520, y: 230, r: 70, h: -9 }], rocs: [{ x: 300, y: 100, r: 20, style: 'roc' }, { x: 300, y: 360, r: 20, style: 'roc' }, { x: 700, y: 90, r: 18, style: 'roc' }] }),
+    rocs: [{ x: 460, y: 150, r: 26, style: 'massif' }] }), 280, 150, 0, { large: 300, pales: 3, w: 1.7, ouverture: 0.5 }), 640, 150, 0, { large: 300, pales: 4, w: -2.1, phase: 1, ouverture: 0.42 }),
+  T({ id: 'e4', nom: 'Le Cratère', diff: 'expert', par: 3, bord: salle(0, 0, 780, 460, 90), depart: [80, 230], trou: [530, 230],
+    murs: [{ pts: arcPts(530, 230, 78, 0.6, 2 * Math.PI - 0.6, 22) }], zones: [{ type: 'sable', pts: ellipse(680, 230, 50, 120, 22, 0.1, 3) }], rocs: [{ x: 300, y: 100, r: 20, style: 'roc' }, { x: 300, y: 360, r: 20, style: 'roc' }, { x: 700, y: 90, r: 18, style: 'roc' }] }),
   T({ id: 'e5', nom: 'Le Labyrinthe', diff: 'expert', par: 4, bord: salle(0, 0, 780, 460, 40), depart: [90, 70], trou: [680, 90],
     murs: [{ bloc: true, pts: rect(180, 0, 30, 340) }, { bloc: true, pts: rect(370, 120, 30, 340) }, { bloc: true, pts: rect(560, 0, 30, 340) }],
     tuyaux: [{ a: [90, 405], b: [700, 410], dir: 0 }], zones: [{ type: 'sable', pts: ellipse(470, 405, 50, 30, 16, 0.1, 2) }] }),
@@ -506,9 +507,9 @@ const TROUS = [
     rocs: [{ x: 420, y: 40, r: 18, style: 'roc' }], bumpers: [{ x: 700, y: 230, r: 15 }] }),
 ];
 const DIFFS = {
-  facile: { l: 'Facile', d: 'Trajectoire prévue affichée jusqu’au premier rebond.', tirage: ['facile'] },
-  normal: { l: 'Normal', d: 'Sable, eau, moulins, tapis. Direction affichée.', tirage: ['normal', 'facile'] },
-  expert: { l: 'Expert', d: 'Îles, volcan, labyrinthe. Seule la force est affichée.', tirage: ['expert', 'normal'] },
+  facile: { l: 'Facile', d: 'Parcours ouverts, grande flèche de visée.', tirage: ['facile'] },
+  normal: { l: 'Normal', d: 'Sable, eau, moulins, tapis. Petite flèche de visée.', tirage: ['normal', 'facile'] },
+  expert: { l: 'Expert', d: 'Îles, cratère, labyrinthe. Seule la force est affichée.', tirage: ['expert', 'normal'] },
 };
 /*TROUS-FIN*/
 
@@ -525,7 +526,7 @@ const AMB = {
   nuit: { l: 'Nocturne UV', sol: '#0a0718', gazon: ['#1b1747', '#211c57'], frange: '#120f33', rail: 'neon', railC: ['#ff3cac', '#5b0d3d', '#ffc2e6'],
     sable: ['#d9f24a', '#a2b91f', '#f2ff9e'], eau: ['#1238c9', '#2f7bff', '#7ef9ff'], glace: ['#7ef9ff', '#1aa6d8'], drapeau: '#b6ff3a',
     toit: ['#3ae0ff', '#0b5a78'], maison: '#140f36', bumper: ['#3ae0ff', '#ff3cac'], tapis: ['#140f36', '#3ae0ff'], tourniquet: ['#140f36', '#b6ff3a'], pont: ['#2a2360', '#ff3cac'], neon: true },
-  manif: { l: 'Manif', sol: '#4a4c51', gazon: ['#44a04b', '#4fae55'], frange: '#33803a', rail: 'vauban', railC: ['#c7ccd3', '#5c636d', '#eef1f5'],
+  manif: { l: 'Grève CGT', sol: '#4a4c51', gazon: ['#44a04b', '#4fae55'], frange: '#33803a', rail: 'vauban', railC: ['#c7ccd3', '#5c636d', '#eef1f5'],
     sable: ['#d9b26a', '#b58b43', '#f0d39b'], eau: ['#4f6a78', '#7a95a2', '#c9d8de'], glace: ['#dfe9ef', '#a8bccb'], drapeau: '#e3001b',
     toit: ['#e3001b', '#8f0010'], maison: '#f1ece2', bumper: ['#ffffff', '#e3001b'], tapis: ['#2b2d31', '#e3001b'], tourniquet: ['#f1ece2', '#e3001b'], pont: ['#8a8f96', '#5c636d'],
     annonces: { 'Trou en un !': 'Grève générale !', Eagle: 'Victoire sociale', Birdie: 'Acquis social', Par: 'Statu quo', Bogey: 'Recul', 'Double bogey': 'Casse sociale', Plouf: 'Dans la flaque', 'Balle ramassée': 'Évacuée' } },
@@ -653,16 +654,15 @@ function rocher(x, cx, cy, r, rnd, a) {
   x.fillStyle = 'rgba(255,255,255,.25)'; x.beginPath(); x.ellipse(cx - r * 0.25, cy - r * 0.28, r * 0.3, r * 0.16, -0.6, 0, 7); x.fill();
   x.strokeStyle = 'rgba(0,0,0,.18)'; x.lineWidth = 1; x.beginPath(); x.moveTo(cx - r * 0.1, cy - r * 0.2); x.lineTo(cx + r * 0.2, cy + r * 0.25); x.stroke();
 }
-function embleme(x, cx, cy, r) { // logo de la « Confédération Générale du Minigolf » (inventé)
+function embleme(x, cx, cy, r) { // logo CGT : bloc rouge arrondi, « cgt » en minuscules blanches
   x.save(); x.translate(cx, cy);
-  x.fillStyle = '#e3001b'; x.beginPath(); x.arc(0, 0, r, 0, 7); x.fill();
-  x.strokeStyle = '#fff'; x.lineWidth = r * 0.09; x.beginPath(); x.arc(0, 0, r * 0.8, 0, 7); x.stroke();
-  x.fillStyle = '#fff'; x.font = `${r * 0.62}px "Bowlby One SC", Impact, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('CGM', 0, r * 0.08);
-  x.strokeStyle = '#fff'; x.lineWidth = r * 0.06; x.beginPath(); x.moveTo(r * 0.38, -r * 0.62); x.lineTo(r * 0.38, -r * 0.3); x.stroke();
-  x.fillStyle = '#ffd400'; x.beginPath(); x.moveTo(r * 0.38, -r * 0.62); x.lineTo(r * 0.6, -r * 0.54); x.lineTo(r * 0.38, -r * 0.46); x.fill();
+  x.fillStyle = '#e3001b'; x.beginPath(); x.roundRect(-r, -r, 2 * r, 2 * r, r * 0.22); x.fill();
+  x.fillStyle = '#fff'; x.font = `800 ${r * 1.08}px "Arial Rounded MT Bold", "Arial Black", Arial, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText('cgt', 0, -r * 0.06, r * 1.8);
   x.restore();
 }
-const SLOGANS = ['PAS DE TROU SANS NOUS', 'LE PAR À 60 ANS !', 'TOUS ENSEMBLE AU 18', 'NON À LA RÉFORME DU PAR', 'BIRDIE POUR TOUS', 'LA BALLE EST À NOUS', 'CGM · ON NE LÂCHE RIEN'];
+const SLOGANS = ['LE MARKETING EN GRÈVE', 'PAS DE CAMPAGNE SANS NOUS', 'DES LEADS, PAS DES BLEUS', 'TOUCHE PAS À MON GEARBOX', 'BONY : LE BUDGET COM’ AU MARKETING !', 'NON AU BRIEF DU VENDREDI 18 H', 'FLYERS OUI, HEURES SUP NON', 'LE PAR À 60 ANS !', 'TOUS ENSEMBLE AU 18', 'BIRDIE POUR TOUS'];
+const PANCARTES = ['GRÈVE', 'MARKETING EN LUTTE', 'PLUS DE BUDGET', 'NON AU BRIEF À 18 H', 'GEARBOX VAINCRA', 'BONY ÉCOUTE-NOUS', 'LEADS = SALAIRES', 'ON LÂCHE RIEN'];
 
 /** Construit les calques fixes du trou affiché et la liste des éléments animés du décor. */
 function preparerScene(h, a) {
@@ -704,15 +704,6 @@ function preparerScene(h, a) {
   c.save(); c.globalAlpha = a.neon ? 0.35 : 0.45; c.fillStyle = a.gazon[1]; c.translate((bb.x0 + bb.x1) / 2, (bb.y0 + bb.y1) / 2); c.rotate(0.35);
   for (let x = -900; x < 900; x += 90) c.fillRect(x, -900, 45, 1800); c.restore();
   c.strokeStyle = a.frange; c.globalAlpha = 0.55; c.lineWidth = 34; chemin(c, h.bord); c.stroke(); c.globalAlpha = 1;
-  // relief : ombrage calculé (lumière venant du haut à gauche) et courbes de niveau discrètes
-  if ((h.bosses || []).length) {
-    const pas = 3, img = toile((bb.x1 - bb.x0) / pas, (bb.y1 - bb.y0) / pas), ix = img.getContext('2d'), id = ix.createImageData(img.width, img.height);
-    for (let j = 0; j < img.height; j++) for (let i = 0; i < img.width; i++) {
-      const [, gx, gy] = relief(h, bb.x0 + i * pas, bb.y0 + j * pas), l = (gx * 0.7 + gy * 0.7) * 5.5, o = (j * img.width + i) * 4;
-      if (l > 0) { id.data[o] = id.data[o + 1] = id.data[o + 2] = 255; id.data[o + 3] = Math.min(a.neon ? 55 : 130, l * 255); } else { id.data[o + 3] = Math.min(a.neon ? 120 : 160, -l * 255); }
-    }
-    ix.putImageData(id, 0, 0); c.imageSmoothingEnabled = true; c.drawImage(img, bb.x0, bb.y0, bb.x1 - bb.x0, bb.y1 - bb.y0);
-  }
   // zones
   for (const z of h.zones || []) {
     if (z.type === 'sable') {
@@ -787,10 +778,21 @@ function preparerScene(h, a) {
   if (a === AMB.mer) for (let i = 0; i < 2; i++) dyn.push({ type: 'mouette', ph: rnd() * 40, y: vy0 + rnd() * (vy1 - vy0), v: 40 + rnd() * 30 });
   if (a === AMB.nuit) { for (let i = 0; i < 40; i++) dyn.push({ type: 'luciole', x: vx0 + rnd() * (vx1 - vx0), y: vy0 + rnd() * (vy1 - vy0), ph: rnd() * 6, c: ['#ff3cac', '#3ae0ff', '#b6ff3a'][i % 3] }); place(4, 10, 10, (x, y) => dyn.push({ type: 'lampe', x, y, ph: rnd() * 6, c: ['#ff3cac', '#3ae0ff'][Math.floor(rnd() * 2)], r: 14 })); }
   if (a === AMB.manif) {
-    place(4, 40, 40, (x, y) => dyn.push({ type: 'banderole', x, y, w: 150, txt: SLOGANS[Math.floor(rnd() * SLOGANS.length)], ph: rnd() * 6, r: 70 }));
-    place(5, 16, 16, (x, y) => dyn.push({ type: 'drapeau', x, y, ph: rnd() * 6, r: 30 }));
-    place(3, 18, 18, (x, y) => dyn.push({ type: 'brasero', x, y, ph: rnd() * 6, r: 26 }));
-    place(4, 12, 12, (x, y) => dyn.push({ type: 'ballon', x, y, ph: rnd() * 6, r: 18 }));
+    let sl = Math.floor(rnd() * SLOGANS.length);
+    place(Math.max(4, Math.round(essais / 5)), 70, 70, (x, y) => dyn.push({ type: 'banderole', x, y, w: 210, txt: SLOGANS[sl++ % SLOGANS.length], ph: rnd() * 6, r: 95 }));
+    place(1, 50, 50, (x, y) => dyn.push({ type: 'stand', x, y, ph: rnd() * 6, r: 60 }));
+    place(Math.max(3, Math.round(essais / 9)), 20, 20, (x, y) => dyn.push({ type: 'brasero', x, y, ph: rnd() * 6, r: 30 }));
+    place(Math.max(5, Math.round(essais / 6)), 12, 12, (x, y) => dyn.push({ type: 'ballon', x, y, ph: rnd() * 6, r: 18 }));
+    // la foule : une grille serrée de manifestants dans toute la place libre
+    const PEAUX = ['#f1c7a5', '#e0ac85', '#c68b62', '#8d5a3b', '#5c3a26'], VESTES = ['#2d3a4f', '#3b3f45', '#6b2737', '#2f5d50', '#7a6a55', '#1f2933', '#8b8f94', '#a33a2b'];
+    for (let y = vy0 + 10; y < vy1; y += 21) for (let x = vx0 + 10 + (Math.round(y / 21) % 2) * 10; x < vx1; x += 21) {
+      const px = x + (rnd() - 0.5) * 12, py = y + (rnd() - 0.5) * 12;
+      if (rnd() < 0.18 || !libre(px, py, 8)) continue;
+      const v = rnd(), porte = v < 0.1 ? 'drapeau' : v < 0.22 ? 'pancarte' : null;
+      dyn.push({ type: 'manif', x: px, y: py, r: 8, ph: rnd() * 6, peau: PEAUX[Math.floor(rnd() * PEAUX.length)], veste: rnd() < 0.35 ? 'chasuble' : VESTES[Math.floor(rnd() * VESTES.length)],
+        porte, txt: PANCARTES[Math.floor(rnd() * PANCARTES.length)], ang: (rnd() - 0.5) * 0.6 - Math.PI / 2, cheveux: rnd() < 0.5 ? '#2b1d14' : rnd() < 0.5 ? '#6b4a2e' : '#c9a36b' });
+    }
+    dyn.sort((a, b) => (a.type === 'manif') - (b.type === 'manif') || a.y - b.y);
     place(6, 8, 8, (x, y) => { cone(L.sol.getContext('2d'), x, y, true); dyn.push({ x, y, r: 10 }); });
   }
   C = { h, a, L, dyn, vx0, vy0, vx1, vy1 };
@@ -967,12 +969,36 @@ function dessinerDecorAnime(c, a, t) {
     } else if (d.type === 'lampe') {
       const p = 0.6 + 0.4 * Math.sin(t * 2 + d.ph); c.save(); const gr = c.createRadialGradient(d.x, d.y, 2, d.x, d.y, 60); gr.addColorStop(0, d.c); gr.addColorStop(1, 'rgba(0,0,0,0)'); c.globalAlpha = 0.35 * p; c.fillStyle = gr; c.beginPath(); c.arc(d.x, d.y, 60, 0, 7); c.fill();
       c.globalAlpha = 1; c.fillStyle = '#222'; c.beginPath(); c.arc(d.x, d.y, 7, 0, 7); c.fill(); c.shadowColor = d.c; c.shadowBlur = 16 * p; c.fillStyle = d.c; c.beginPath(); c.arc(d.x, d.y, 4, 0, 7); c.fill(); c.restore();
+    } else if (d.type === 'manif') {
+      const b = Math.sin(t * 3.2 + d.ph) * 0.9, mx = d.x + Math.sin(t * 0.6 + d.ph) * 1.5, my = d.y + b;
+      c.save(); c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(mx + 3, my + 4, 8.5, 6, 0, 0, 7); c.fill(); c.restore();
+      c.save(); c.translate(mx, my); c.rotate(d.ang + Math.PI / 2);
+      if (d.veste === 'chasuble') { c.fillStyle = '#e3001b'; c.beginPath(); c.ellipse(0, 0, 8, 5.2, 0, 0, 7); c.fill(); c.fillStyle = '#fff'; c.fillRect(-8, -1, 16, 2); }
+      else { c.fillStyle = d.veste; c.beginPath(); c.ellipse(0, 0, 8, 5.2, 0, 0, 7); c.fill(); }
+      c.fillStyle = d.peau; c.beginPath(); c.arc(0, 0.5, 3.6, 0, 7); c.fill(); c.fillStyle = d.cheveux; c.beginPath(); c.arc(0, 1.6, 3.4, 0, Math.PI); c.fill();
+      c.restore();
+      if (d.porte === 'drapeau') {
+        c.save(); c.translate(mx + 5, my - 2); c.strokeStyle = '#ccc'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -16); c.stroke();
+        c.beginPath(); c.moveTo(0, -16); for (let i = 0; i <= 8; i++) c.lineTo(i * 2.6, -16 + Math.sin(t * 6 + d.ph - i * 0.7) * 1.6 * i / 8); for (let i = 8; i >= 0; i--) c.lineTo(i * 2.6, -4 + Math.sin(t * 6 + d.ph - i * 0.7) * 1.6 * i / 8); c.closePath();
+        c.fillStyle = '#e3001b'; c.fill(); embleme(c, 10.4, -10 + Math.sin(t * 6 + d.ph - 3) * 0.8, 3.6); c.restore();
+      } else if (d.porte === 'pancarte') {
+        const lev = Math.max(0, Math.sin(t * 2.4 + d.ph)) * 3;
+        c.save(); c.translate(mx, my - 8 - lev); c.fillStyle = 'rgba(0,0,0,.25)'; c.fillRect(-15, -4, 32, 14);
+        c.fillStyle = '#fbf8f0'; c.fillRect(-16, -8, 32, 14); c.strokeStyle = '#e3001b'; c.lineWidth = 1.2; c.strokeRect(-16, -8, 32, 14);
+        c.fillStyle = '#e3001b'; c.font = '4.6px "Bowlby One SC", Impact, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(d.txt, 0, -1, 29); c.restore();
+      }
+    } else if (d.type === 'stand') {
+      c.save(); c.translate(d.x, d.y); c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(-36, -18, 80, 46);
+      for (let i = 0; i < 8; i++) { c.fillStyle = i % 2 ? '#fff' : '#e3001b'; c.fillRect(-40 + i * 10, -24, 10, 30); }
+      c.fillStyle = '#3b3f45'; c.fillRect(-34, 8, 68, 14); c.fillStyle = '#ff8a00'; for (let i = 0; i < 6; i++) { c.beginPath(); c.ellipse(-26 + i * 10, 15, 4, 1.8, 0, 0, 7); c.fill(); }
+      c.fillStyle = '#e3001b'; c.fillRect(-30, -14, 52, 14); c.fillStyle = '#fff'; c.font = '9px "Bowlby One SC", Impact, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('MERGUEZ', -4, -7); embleme(c, 32, -12, 7); c.restore();
+      if (Math.random() < 0.3) particule({ type: 'fumee', x: d.x + (Math.random() - 0.5) * 50, y: d.y + 12, vx: 6 + Math.random() * 8, vy: -14 - Math.random() * 8, vie: 3, taille: 5 });
     } else if (d.type === 'banderole') {
-      c.save(); c.translate(d.x, d.y); const w = d.w, hh = 26;
+      c.save(); c.translate(d.x, d.y); const w = d.w, hh = 34;
       c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(-w / 2 + 6, -hh / 2 + 8, w, hh);
       c.beginPath(); for (let i = 0; i <= 20; i++) c.lineTo(-w / 2 + w * i / 20, -hh / 2 + Math.sin(t * 2 + d.ph + i * 0.5) * 2); for (let i = 20; i >= 0; i--) c.lineTo(-w / 2 + w * i / 20, hh / 2 + Math.sin(t * 2 + d.ph + i * 0.5) * 2); c.closePath();
-      c.fillStyle = '#e3001b'; c.fill(); c.fillStyle = '#fff'; c.font = '9.5px "Bowlby One SC", Impact, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(d.txt, 8, Math.sin(t * 2 + d.ph + 10) * 1.5, w - 30);
-      embleme(c, -w / 2 + 12, Math.sin(t * 2 + d.ph) * 2, 9); c.fillStyle = '#6b5a45'; c.fillRect(-w / 2 - 3, -hh / 2 - 4, 4, hh + 8); c.fillRect(w / 2 - 1, -hh / 2 - 4, 4, hh + 8); c.restore();
+      c.fillStyle = '#e3001b'; c.fill(); c.fillStyle = '#fff'; c.font = '12px "Bowlby One SC", Impact, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(d.txt, 12, Math.sin(t * 2 + d.ph + 10) * 1.5, w - 40);
+      embleme(c, -w / 2 + 16, Math.sin(t * 2 + d.ph) * 2, 11); c.fillStyle = '#6b5a45'; c.fillRect(-w / 2 - 3, -hh / 2 - 4, 4, hh + 8); c.fillRect(w / 2 - 1, -hh / 2 - 4, 4, hh + 8); c.restore();
     } else if (d.type === 'drapeau') {
       c.save(); c.translate(d.x, d.y); c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.arc(3, 3, 4, 0, 7); c.fill(); c.fillStyle = '#ddd'; c.beginPath(); c.arc(0, 0, 3, 0, 7); c.fill();
       c.beginPath(); c.moveTo(0, 0); for (let i = 0; i <= 10; i++) c.lineTo(i * 3.4, -22 + Math.sin(t * 5 + d.ph - i * 0.6) * 2.4 * i / 10); for (let i = 10; i >= 0; i--) c.lineTo(i * 3.4, Math.sin(t * 5 + d.ph - i * 0.6) * 2.4 * i / 10); c.closePath();
@@ -1187,11 +1213,7 @@ function boucle(now) {
 function dessinerVisee(c, a, b, t) {
   const d = sub(visee.p0, visee.p), Ld = len(d); if (Ld < 8) return;
   const pw = Math.min(1, Ld / DRAG_MAX), ang = Math.atan2(d[1], d[0]), col = pw < 0.5 ? '#9be36d' : pw < 0.8 ? '#ffc93c' : '#ff5a3c', aide = CFG.aide;
-  if (aide === 'trajet') {
-    const r = simuler(partie.trou.h, { balles: [{ x: b.x, y: b.y }], horloge: t }, { balle: 0, angle: ang, puissance: pw }, { seul: true, tmax: 3, premierChoc: true });
-    c.fillStyle = 'rgba(255,255,255,.8)'; r.images.forEach((im, i) => { if (i % 3) return; c.beginPath(); c.arc(im[0][0], im[0][1], 2.1 * (1 - i / r.images.length * 0.6), 0, 7); c.fill(); });
-  }
-  const lg = aide === 'force' ? 22 : 24 + pw * 120;
+  const lg = aide === 'force' ? 22 : aide === 'longue' ? 40 + pw * 170 : 24 + pw * 90;
   c.save(); c.translate(b.x, b.y); c.rotate(ang); c.strokeStyle = col; c.lineWidth = 3; c.setLineDash(aide === 'force' ? [] : [7, 6]);
   c.beginPath(); c.moveTo(R + 4, 0); c.lineTo(R + lg, 0); c.stroke(); c.setLineDash([]);
   c.fillStyle = col; c.beginPath(); c.moveTo(R + lg + 9, 0); c.lineTo(R + lg - 2, -6.5); c.lineTo(R + lg - 2, 6.5); c.closePath(); c.fill(); c.restore();
@@ -1236,7 +1258,7 @@ function afficherScore(fin) {
 }
 function lancer(trous, entrainement) {
   const n1 = $('n1').value.trim() || 'Joueur 1', n2 = $('n2').value.trim() || 'Joueur 2', joueurs = CFG.mode === 'solo' || entrainement ? [n1] : [n1, n2];
-  const AIDE = { facile: 'trajet', normal: 'ligne', expert: 'force' };
+  const AIDE = { facile: 'longue', normal: 'ligne', expert: 'force' };
   CFG.aide = entrainement ? AIDE[trous[0].diff] : AIDE[CFG.diff];
   $('eLobby').hidden = true; $('eScore').hidden = true; $('vAtelier').hidden = true; $('hud').hidden = false; $('consigne').hidden = false;
   setTimeout(() => ($('consigne').hidden = true), 7000);
@@ -1257,7 +1279,7 @@ function apercu(cnv, a) {
   dessinerRail(x, a, pts, true, 6);
   x.fillStyle = '#000'; x.beginPath(); x.arc(212, 80, 5, 0, 7); x.fill(); x.strokeStyle = '#fff'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(212, 80); x.lineTo(212, 58); x.stroke(); x.fillStyle = a.drapeau; x.beginPath(); x.moveTo(212, 58); x.lineTo(224, 62); x.lineTo(212, 67); x.fill();
   x.fillStyle = '#fff'; x.beginPath(); x.arc(42, 92, 3.5, 0, 7); x.fill();
-  if (a === AMB.manif) { embleme(x, 228, 26, 15); x.fillStyle = '#e3001b'; x.fillRect(10, 128, 150, 22); x.fillStyle = '#fff'; x.font = '10px "Bowlby One SC", Impact'; x.fillText('PAS DE TROU SANS NOUS', 16, 143); }
+  if (a === AMB.manif) { embleme(x, 228, 26, 15); x.fillStyle = '#e3001b'; x.fillRect(10, 128, 150, 22); x.fillStyle = '#fff'; x.font = '10px "Bowlby One SC", Impact'; x.fillText('LE MARKETING EN GRÈVE', 16, 143); }
   if (a === AMB.ete) { x.drawImage(spriteArbre(a, 26, graine(4)), 196, 104, 54, 54); }
   if (a === AMB.nuit) { x.drawImage(spriteArbre(a, 14, graine(9)), 20, 120, 30, 30); x.drawImage(spriteArbre(a, 12, graine(5)), 200, 20, 26, 26); }
 }
