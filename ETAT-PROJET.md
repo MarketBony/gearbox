@@ -3,15 +3,34 @@
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
-## ▶ POINT DE REPRISE — 12/10/2026, soir (lire en premier)
-- **CHANTIER EN COURS : CRM / RCU (référentiel client unique).** Cadrage : `RCU-CADRAGE.md` (décisions R1–R13) + page
-  `maquettes/crm/rcu-cartographie.html` ; maquette validée : `maquettes/crm/v2/`. **Lots 1, 2 et 3 en production (correctifs 82, 83, 84 ; outil renommé SPARK à l'écran)** :
-  base `rcu-db` sur le VPS, import, compte SFTP `dcs`, client unique (rapprochement, arbitrage), rubrique CRM complète de la
-  maquette (Master seul). Lot 3 = **Requêteur** (exports Excel, Sarbacane, allmysms, phoning, courrier). **Ensuite, dans l'ordre** : lot 4 (couche Bony :
-  référentiel vendeurs — fichier « MAEVA Vendeurs » de Théo —, réattribution par secteur CP, ne plus contacter, échanges), lot 5
-  (relances), lot 6 (GRID). Projet futur : plateforme d'e-mailing maison via Resend (budget Sarbacane). **13/10 : brancher les 2 requêtes automatiques du Requêteur DCS sur le SFTP** (VN, VO).
-  ⚠️ Figeac, Millau et Carmaux absents des extractions (droits DCS de Théo à faire ouvrir par l'IT).
-- **Avant le CRM, le 12/10 : correctifs 80 et 81 en production.**
+## ▶ POINT DE REPRISE — 15/10/2026 (lire en premier)
+- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 86**
+  (15/10, `api` + `web`). Aucune branche ouverte.
+- **CHANTIER EN COURS : SPARK** (le CRM ; « RCU » = nom technique invisible). Cadrage : `RCU-CADRAGE.md` (R1–R13) + page
+  `maquettes/crm/rcu-cartographie.html` ; maquettes : `maquettes/crm/v2/` (rubrique + Requêteur) et le canevas
+  https://claude.ai/artifact/YQAT1pvBU1w6aMj2GB8Kv4 (planches A–D du Requêteur). **En production** :
+  - 82 (12/10) lot 1 : base `rcu-db` sur le VPS (jamais exposée, jamais hors VPS), worker d'import (`rcu-worker`), compte SFTP
+    `dcs` (chroot `/srv/dcs`, dépôt `/srv/dcs/depot`) — **SANS mot de passe ni clé à ce jour**, écran Imports ;
+  - 83 (12/10) lot 2 : client unique (rapprochement, arbitrage, fiche) — 180 427 clients ;
+  - 84 (13/10) lot 3 : **Requêteur** (4 cartes Qui / Quel véhicule / À quel moment / Comment les joindre, résumé en phrase,
+    « Voir les clients » en tableau trié, exports Excel / Sarbacane / allmysms / phoning / courrier journalisés) ;
+  - 85 (13/10) : export Excel des flottes (taille, parc complet, une ligne par véhicule) ;
+  - 86 (15/10) : **mode avancé** (opérateurs par type, groupes ET / OU à un niveau, exclusions, liste collée, suggestions).
+  Rubrique visible du **Master seul** (`CRM_ROLES` / `CRM_ALLOWED_ROLES`) ; cible = rôles de Jeux, quand Théo le dira.
+- **PROCHAINE ÉTAPE (Théo, 15/10) : brancher les 2 requêtes automatiques du Requêteur DCSNETneo sur le SFTP** (VN et VO, TXT
+  tabulé, mêmes colonnes que les fichiers « Clients VN - REQ.txt » / « Clients VO - REQ (1).txt » de Théo). À faire : demander à
+  Théo ce que DCS accepte (mot de passe ou clé SSH, IP d'envoi fixe ?, nom de fichier, heure) ; poser l'accès du compte `dcs`
+  (si mot de passe : bloc `Match User dcs` avec `PasswordAuthentication yes` dans `/etc/ssh/sshd_config.d/70-dcs-sftp.conf`,
+  `sudo sshd -t` AVANT `systemctl reload ssh`, session gardée ouverte) ; test de dépôt ; vérifier dans SPARK › Imports
+  (refus si chute > 10 % : « Appliquer quand même » du Master). Requête du soir complète ou glissante : à mesurer (cadrage § 8).
+- **ENSUITE** : lot 4 (couche Bony : référentiel vendeurs depuis le fichier « MAEVA Vendeurs - affaires.xlsx » de Théo — 138
+  vendeurs, secteurs en CP, règles de la feuille « EXTRACTION DCSNET » —, réattribution auto par secteur, « ne plus contacter »,
+  coordonnées refusées, échanges, « déjà ciblés » via `rcu.export_client`), lot 5 (relances), lot 6 (GRID). Projet futur :
+  plateforme d'e-mailing maison via Resend (budget Sarbacane).
+- **En attente de Théo sur SPARK** : vraie mention STOP d'allmysms (provisoire « STOP au 36XXX ») ; retour sur le mode avancé
+  (menu des opérateurs à la souris, « Coller une liste », champs date / nombre) ; droits DCS de Figeac, Millau et Carmaux à
+  faire ouvrir par l'IT (absents des extractions).
+- **Avant SPARK, le 12/10 : correctifs 80 et 81 en production.**
 - **Fait le 12/10** (détail : fiches 80 et 81) :
   - **80 — lot sécurité serveur** : lectures gardées par rôle (`INTERNAL_ROLES` / `UNSCOPED_READ_ROLES` / `CHAT_ROLES`,
     `auth/roles.ts`) ; l'External ne lit plus AUCUN projet (ni budget, dépenses, fichiers projet), ni par l'API ni par le temps
