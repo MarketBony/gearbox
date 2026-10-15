@@ -40,7 +40,16 @@ function archiver(chemin: string, sousDossier: string, runId: number | null): vo
   const dir = path.join(ARCHIVE, sousDossier);
   fs.mkdirSync(dir, { recursive: true });
   const horodatage = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-  fs.renameSync(chemin, path.join(dir, `${horodatage}_run${runId ?? 'x'}_${path.basename(chemin)}`));
+  const cible = path.join(dir, `${horodatage}_run${runId ?? 'x'}_${path.basename(chemin)}`);
+  try {
+    fs.renameSync(chemin, cible);
+  } catch (e) {
+    // Sur le VPS, /depot et /archive sont deux montages : rename y lève EXDEV (mesuré le 15/10/2026, le
+    // fichier restait dans le dépôt et bloquait les suivants). Copie puis suppression.
+    if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e;
+    fs.copyFileSync(chemin, cible);
+    fs.unlinkSync(chemin);
+  }
 }
 
 function purgerArchive(): void {
@@ -64,10 +73,15 @@ async function tour(): Promise<void> {
   for (const chemin of fichiers) {
     const st = fs.statSync(chemin);
     if (Date.now() - st.mtimeMs < STABLE_MS) { log(`en cours de dépôt, attente : ${path.basename(chemin)}`); continue; }
-    const r = await importerFichier(chemin, { recuLe: st.mtime });
-    log(`${path.basename(chemin)} → ${r.statut} (import ${r.runId ?? '-'}) : ${r.message}`);
-    archiver(chemin, r.statut === 'applique' || r.statut === 'deja_applique' ? 'appliques' : 'refuses', r.runId);
-    if (r.statut === 'applique') await apresImport();
+    // Un fichier en erreur ne bloque pas les suivants (VN et VO arrivent le même soir).
+    try {
+      const r = await importerFichier(chemin, { recuLe: st.mtime });
+      log(`${path.basename(chemin)} → ${r.statut} (import ${r.runId ?? '-'}) : ${r.message}`);
+      try {
+        archiver(chemin, r.statut === 'applique' || r.statut === 'deja_applique' ? 'appliques' : 'refuses', r.runId);
+      } catch (e) { log(`archivage en échec : ${path.basename(chemin)} :`, (e as Error).message); }
+      if (r.statut === 'applique') await apresImport();
+    } catch (e) { log(`import en échec, nouvel essai au prochain tour : ${path.basename(chemin)} :`, (e as Error).message); }
   }
   purgerArchive();
 }

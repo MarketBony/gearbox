@@ -209,7 +209,14 @@ Mise en place (une fois) :
 8. **Client unique (correctif 83)** : recalculé par le worker après chaque import appliqué. À la main (après un déploiement
    qui change les règles) : `sudo docker compose exec rcu-worker node dist/rcu/worker.js --rapprocher` (~30 s).
 
-Au quotidien : DCS dépose ses TXT dans `depot/` ; le worker les importe et les range dans l'archive. Le journal est dans
+9. **Accès de DCS (15/10/2026, correctif 87)** : compte `dcs` ouvert **par mot de passe** (DCSNETneo n'a pas été testé avec une
+   clé) — `PasswordAuthentication yes` dans le bloc `Match User dcs` ; mot de passe dans `ACCES-INFRA-SECRET.md`. Le changer :
+   `printf 'dcs:%s
+' "<nouveau>" | sudo chpasswd`, puis le ressaisir dans DCSNETneo (configuration SFTP « SPGR »). Côté DCS :
+   serveur `51.83.75.181`, port 22, répertoire `/depot`, fichiers `/depot/clients-VN` et `/depot/clients-VO` (+ `.txt`), titre et
+   en-têtes cochés, exports COMPLETS (le worker marque « disparue » toute vente absente et refuse une chute > 10 %).
+
+Au quotidien (depuis le 16/10 : chaque vendredi soir, VN 23 h 30, VO 23 h 45) : DCS dépose ses TXT dans `depot/` ; le worker les importe et les range dans l'archive. Le journal est dans
 Gearbox (CRM › Imports, Master). Un import refusé pour baisse de volume s'applique depuis Gearbox (« Appliquer quand même… »).
 
 ## Worker Cloudflare des Forms Bony (`forms-worker/`, 01/10/2026)
