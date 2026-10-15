@@ -665,8 +665,8 @@ class DataService {
   async getGameSession(id: string): Promise<GameSession> {
     return apiFetch(`/games/sessions/${id}`);
   }
-  async sendGameChallenge(toUserId: string, game: GameType): Promise<GameChallenge> {
-    return apiFetch('/games/challenges', { method: 'POST', body: JSON.stringify({ toUserId, game }) });
+  async sendGameChallenge(toUserId: string, game: GameType, options?: unknown): Promise<GameChallenge> {
+    return apiFetch('/games/challenges', { method: 'POST', body: JSON.stringify({ toUserId, game, options }) });
   }
   async refuseGameChallenge(id: string): Promise<GameChallenge> {
     return apiFetch(`/games/challenges/${id}/refuse`, { method: 'POST' });

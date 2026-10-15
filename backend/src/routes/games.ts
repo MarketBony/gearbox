@@ -3,6 +3,7 @@ import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware'
 import { GAMES_ROLES } from '../auth/roles';
 import { jeuxActives } from '../settings/appSettings';
 import { isGameType, initBoard, initStatus } from '../utils/gameRules';
+import { lireOptions } from '../games/minigolfRules';
 import { projectSessionFor, projectSessionSummary } from '../utils/gameView';
 import { notifyChallenge, notifySessionToPlayers } from '../realtime';
 import { prisma } from '../db';
@@ -79,6 +80,8 @@ router.get('/sessions/:id', async (req: AuthRequest, res) => {
 router.post('/challenges', async (req: AuthRequest, res) => {
   const me = req.user!.id;
   const { toUserId, game } = req.body ?? {};
+  // Minigolf : réglages choisis par celui qui lance (validés et complétés par lireOptions).
+  const options = game === 'minigolf' ? lireOptions(req.body?.options) : undefined;
 
   if (typeof toUserId !== 'string' || !toUserId) {
     return res.status(400).json({ error: 'Destinataire requis.' });
@@ -102,7 +105,7 @@ router.post('/challenges', async (req: AuthRequest, res) => {
   if (existant) return res.json(existant);
 
   const challenge = await prisma.gameChallenge.create({
-    data: { fromUserId: me, toUserId, game, status: 'pending' },
+    data: { fromUserId: me, toUserId, game, status: 'pending', options: options as any },
   });
 
   // Événement ciblé + notification push : c'est précisément ce qui manquait,
@@ -155,7 +158,7 @@ router.post('/challenges/:id/accept', async (req: AuthRequest, res) => {
       player1Id: challenge.fromUserId,
       player2Id: me,
       currentTurn: challenge.fromUserId,
-      board: initBoard(challenge.game) as any,
+      board: initBoard(challenge.game, challenge.options) as any,
       status: initStatus(challenge.game),
     },
   });

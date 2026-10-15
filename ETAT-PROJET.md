@@ -4,10 +4,14 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 15/10/2026 (lire en premier)
-- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 89**
-  (15/10, `web` seul : molette bloquée au survol d'un tableau, v2). Avant lui le **88** (15/10, `rcu-worker` + `api` + `web` :
+- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 90**
+  (15/10, `api` + `web` + migration Supabase `game_challenge_options` : **4e jeu, le MINIGOLF**, v2 seulement). Avant lui le
+  **89** (15/10, `web` seul : molette bloquée au survol d'un tableau, v2). Avant lui le **88** (15/10, `rcu-worker` + `api` + `web` :
   SPARK lot 4, Équipes et portefeuilles, **calcul des portefeuilles DÉSACTIVÉ en prod**).
   Aucune branche ouverte.
+- **PROCHAINS LOTS (Théo, 15/10)** : JEUX — rendre aux 3 autres jeux leur rendu « en partie » de la v1 dans la v2 (lobby v2
+  gardé) ; puis le **SSH** ci-dessous, **juste avant le déploiement officiel de la v2** : fail2ban + clé seule pour `ubuntu`,
+  exception `Match User dcs` conservée. Confirmer sur la prod la partie de minigolf entre deux vrais comptes (non jouée en local).
 - **🚨 URGENT (Théo, 15/10) — SSH du VPS** : le mot de passe est accepté pour TOUS les comptes (`50-cloud-init.conf`, ubuntu
   compris), 80 800 tentatives en 11 jours, pas de fail2ban. À faire : `PasswordAuthentication no` global (le bloc `Match User dcs`
   garde l'exception), `sudo sshd -t`, session ouverte, test de la clé dans une 2e session. Vérifier d'abord l'accès à la console
@@ -101,7 +105,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 89 (15/10)** — v2 : la molette ne se bloque plus au survol d'un tableau (`web` seul).
+- **En production : correctif 90 (15/10)** — Jeux : 4e jeu, le minigolf (`api` + `web`, migration `game_challenge_options`).
+  Avant lui le **correctif 89 (15/10)** — v2 : la molette ne se bloque plus au survol d'un tableau (`web` seul).
   Avant lui le **correctif 88 (15/10)** — SPARK lot 4, Équipes et portefeuilles (`rcu-worker` + `api` + `web`, migration RCU 005).
   Avant lui le **correctif 87 (15/10)** — SPARK, requêtes DCS sur le SFTP + archivage du worker (`rcu-worker` seul).
   Avant lui le **correctif 86 (15/10)** — SPARK, mode avancé du Requêteur (opérateurs, groupes ET / OU, liste collée).
@@ -665,6 +670,37 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 90 — 15/10 : JEUX, 4e jeu — le MINIGOLF** (branche `feat/jeux-minigolf-gearbox`, **`api` + `web`**, migration
+  Supabase `20261015180000_game_challenge_options`, appliquée et inscrite AVANT le déploiement). Demande de Théo : un vrai minigolf
+  2D vu de dessus, beaucoup de trous tirés au hasard, un pré-lobby où celui qui lance choisit difficulté / nombre de trous /
+  ambiance (la même pour les deux joueurs). Prototype validé après 4 versions : `maquettes/jeux/minigolf.html` (« énorme »).
+  Retours intégrés au fil des versions : ni trajectoire en pointillés ni dénivelé (abandonné, « catastrophique »), trous
+  redessinés, thème « Grève CGT » avec le VRAI logo CGT (SVG fourni par Théo), foule limitée (ça ramait), slogans sur Bony en
+  général façon CGT, pancartes lisibles.
+  - **Moteur partagé** `shared/minigolf.ts` (canonique) recopié OCTET POUR OCTET dans `backend/src/games/minigolf.ts`, contrôlé par
+    `scripts/check-minigolf-sync.mjs` (predev / prebuild, ignoré en build Docker) : pas fixe 240 Hz, sous-pas, 18 trous
+    (f1–f6 facile, n1–n6 normal, e1–e6 expert), tous vérifiés jouables par un solveur. On modifie le canonique, puis `cp`.
+  - **Le serveur décide** (`backend/src/games/minigolfRules.ts`, appelé par `applyMove`) : le navigateur n'envoie que
+    `{ angle, puissance, horloge }`, le serveur SIMULE le coup, place les balles, compte (eau = +1, balle ramassée à par + 4),
+    alterne (celui qui a rentré laisse la main), passe au trou suivant (honneur au mieux classé), désigne le vainqueur (plus petit
+    total, égalité = nul). Le navigateur rejoue la trajectoire (`dernier` + état `avant`) puis se cale sur le plateau du serveur.
+    Rien à redacter : `gameView.ts` ne masque que la bataille navale, le plateau du minigolf est public par nature.
+  - **Options du défi** : `GameChallenge.options` (JSONB, nullable), lues par `lireOptions()` (tout ce qui est inconnu prend la
+    valeur par défaut) puis passées à `initBoard()` à l'acceptation, qui tire les trous.
+  - **v2** : carte « Minigolf » dans Lancer un défi + pré-lobby (Facile / Normal / Expert, 3 / 6 / 9 trous, balles qui se
+    percutent, 4 ambiances avec vignette dessinée par le moteur : Parc en été, Bord de mer, Nocturne UV, Grève CGT), réglages
+    mémorisés ; options résumées sur le défi reçu ; partie plein cadre (`ui2/apps/games/minigolf/Minigolf.tsx` + `rendu.ts`),
+    barre trou / par / coups, carte de score, son coupé par défaut ; onglet « Minigolf » au classement. Polices ajoutées dans
+    `index.html` : Bowlby One SC, Patrick Hand.
+  - **v1** : le minigolf ne s'y lance pas ; une partie en cours y affiche « se joue dans la nouvelle interface ».
+  - Tests : partie serveur complète en script (refus hors tour / coup invalide) ; en local, pré-lobby dans l'interface avec le
+    compte de Théo, puis une partie de 3 trous jouée de bout en bout avec le VRAI composant et les VRAIES règles serveur
+    exécutées dans le navigateur (page d'essai temporaire, supprimée — rien écrit en base). ⚠️ Le trajet réel entre DEUX comptes
+    (socket, acceptation) n'a pas été joué en local faute de second compte : à confirmer par Théo sur la prod.
+  - `tsc` : 9 à la racine (référence), 0 au backend ; `vite build` OK.
+  - **Reste dans les Jeux** : rendre aux 3 autres jeux leur rendu « en partie » de la v1 dans la v2 (lobby v2 conservé, accord
+    de Théo du 15/10), éventuellement un bowling low-poly ensuite.
+
 - **Correctif 89 — 15/10 : v2, molette bloquée au survol d'un tableau** (branche `fix/scroll-molette`, **`web` seul**). Signalé par
   Théo : en faisant défiler une rubrique, la molette s'arrêtait dès que la souris passait sur un tableau. Cause : `.scroll`
   (`ui2/os/maquette.css`, et `.bud-tscroll` / `.fix-scroll`) portait `overscroll-behavior: contain` sur les DEUX axes ; un tableau
@@ -1153,8 +1189,10 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 89** (15 octobre 2026) — molette bloquée au survol d'un tableau
-  (v2), **`web` seul**, aucune migration. Avant lui le **correctif 88** (15 octobre 2026) — SPARK lot 4, Équipes et portefeuilles,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 90** (15 octobre 2026) — Jeux, 4e jeu : le minigolf,
+  **`api` + `web`**, migration Supabase `20261015180000_game_challenge_options` (colonne `GameChallenge.options`, additive),
+  appliquée par `db execute` + `migrate resolve --applied` avant le déploiement. Avant lui le **correctif 89** (15 octobre 2026) —
+  molette bloquée au survol d'un tableau (v2), **`web` seul**, aucune migration. Avant lui le **correctif 88** (15 octobre 2026) — SPARK lot 4, Équipes et portefeuilles,
   **`rcu-worker` (migration RCU `005_portefeuilles.sql`) puis `api` + `web`**, puis chargement du référentiel MAEVA
   (`--vendeurs`) ; calcul des portefeuilles laissé DÉSACTIVÉ. Avant lui le **correctif 87** (15 octobre 2026) — SPARK, requêtes DCS sur le SFTP
   (compte `dcs` ouvert par mot de passe, hors git) et archivage du worker, **`rcu-worker` seul**, aucune migration. Avant lui le

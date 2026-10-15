@@ -12,8 +12,8 @@
 // une case ; il ne décide de rien.
 // ============================================================================
 
-export type GameType = 'morpion' | 'connect4' | 'battleship';
-export const GAME_TYPES: GameType[] = ['morpion', 'connect4', 'battleship'];
+export type GameType = 'morpion' | 'connect4' | 'battleship' | 'minigolf';
+export const GAME_TYPES: GameType[] = ['morpion', 'connect4', 'battleship', 'minigolf'];
 export const isGameType = (v: unknown): v is GameType =>
   typeof v === 'string' && (GAME_TYPES as string[]).includes(v);
 
@@ -30,6 +30,9 @@ export interface MoveResult {
 }
 
 export class IllegalMoveError extends Error {}
+// Importé APRÈS la classe : minigolfRules s'en sert (import circulaire volontaire, résolu à l'appel).
+// eslint-disable-next-line import/first
+import { appliquerCoupMinigolf, plateauInitial } from '../games/minigolfRules';
 
 const autre = (session: { player1Id: string; player2Id: string }, userId: string) =>
   userId === session.player1Id ? session.player2Id : session.player1Id;
@@ -346,11 +349,15 @@ export const applyMove = (session: SessionLike, userId: string, move: any): Move
     };
   }
 
+  // Minigolf : le serveur simule le coup avec le moteur partagé (games/minigolfRules.ts).
+  if (session.game === 'minigolf') return appliquerCoupMinigolf(session, marque, move);
+
   throw new IllegalMoveError('Jeu inconnu.');
 };
 
 // Plateau initial selon le jeu. La bataille navale commence en 'placing'.
-export const initBoard = (game: GameType) =>
-  game === 'morpion' ? emptyMorpion() : game === 'connect4' ? emptyConnect4() : emptyBattleship();
+// `options` : réglages du défi (minigolf : difficulté, nombre de trous, ambiance, chocs).
+export const initBoard = (game: GameType, options?: unknown) =>
+  game === 'morpion' ? emptyMorpion() : game === 'connect4' ? emptyConnect4() : game === 'minigolf' ? plateauInitial(options) : emptyBattleship();
 export const initStatus = (game: GameType): 'placing' | 'playing' =>
   game === 'battleship' ? 'placing' : 'playing';

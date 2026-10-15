@@ -352,6 +352,23 @@ ne ferme pas une route. C'est la leçon qui a coûté deux passes au lot du chef
 Temps réel : `tasks:updated` / `tasks:deleted`, entrée `RT_EVENTS.tasks` distincte de
 `projects` — une mutation de l'un ne concerne pas l'autre.
 
+### ⛳ Jeux — le minigolf, simulé par le serveur (15/10/2026, correctif 90)
+
+Migration `20261015180000_game_challenge_options` : `GameChallenge.options` (JSONB, nullable) — les réglages choisis par celui
+qui lance (`diff` facile / normal / expert, `nb` 3 / 6 / 9, `amb` ete / mer / nuit / manif, `choc`). `POST /api/games/challenges`
+les passe par `lireOptions()` (`games/minigolfRules.ts`) : tout ce qui n'est pas reconnu prend la valeur par défaut, jamais
+d'erreur. À l'acceptation, `initBoard(game, challenge.options)` tire les trous.
+
+- **Une seule porte pour la physique : `src/games/minigolf.ts`**, COPIE octet pour octet de `shared/minigolf.ts` (canonique,
+  lu par le navigateur pour rejouer l'animation). Contrôle : `node scripts/check-minigolf-sync.mjs` (lancé par predev / prebuild).
+  Une divergence serait silencieuse : l'écran rejouerait une trajectoire différente de celle que le serveur a calculée.
+- **Le client propose, le serveur décide** : `game:move` porte `{ angle, puissance, horloge }` ; `applyMove` délègue à
+  `appliquerCoupMinigolf` (puissance dans ]0, 1], horloge ≥ celle du plateau et < + 3600 s, balle pas déjà rentrée), qui
+  simule le coup et rend le plateau, le joueur suivant et, en fin de partie, le vainqueur (`'draw'` à égalité).
+- `gameRules.ts` ↔ `minigolfRules.ts` s'importent mutuellement (`IllegalMoveError` d'un côté, les règles de l'autre) :
+  voulu, sans effet au chargement (rien n'est appelé à l'import).
+- `gameView.ts` ne redacte rien pour le minigolf : son plateau ne cache rien.
+
 ### 🎮 Jeux — modèles, règles serveur et anti-triche (05/08/2026)
 
 Migration `20260805131643_add_games` : `GameChallenge` et `GameSession`. Deux tables

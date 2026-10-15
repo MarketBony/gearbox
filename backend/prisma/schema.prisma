@@ -535,8 +535,10 @@ model GameChallenge {
   id         String   @id @default(uuid())
   fromUserId String
   toUserId   String
-  game       String // 'morpion' | 'connect4' | 'battleship'
+  game       String // 'morpion' | 'connect4' | 'battleship' | 'minigolf'
   status     String // 'pending' | 'accepted' | 'refused'
+  // Réglages du défi (minigolf : difficulté, nombre de trous, ambiance, chocs entre balles). Null pour les autres jeux.
+  options    Json?
   // La session créée à l'acceptation, pour que les deux joueurs y soient renvoyés.
   sessionId  String?
   createdAt  DateTime @default(now())

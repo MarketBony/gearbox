@@ -12,6 +12,8 @@ import { useWorkspace } from '../../store/workspace';
 import { gx, hud, Icon, Seg, useEngineEvent, Avatar } from '../ui/kit';
 import { computeStats, computeRivalries, computeStreak } from './logic';
 import { Morpion, Connect4, Battleship } from './boards';
+import { Minigolf } from './minigolf/Minigolf';
+import { apercuAmbiance, AMBIANCES } from './minigolf/rendu';
 
 // =====================================================================
 // Rubrique « Jeux » — transposition de maquettes/v2/js/apps/games.js (même balisage, mêmes
@@ -25,12 +27,17 @@ import { Morpion, Connect4, Battleship } from './boards';
 // =====================================================================
 
 type Tab = 'lobby' | GameType | 'global';
-const TABS: [Tab, string][] = [['lobby', 'Lobby'], ['morpion', 'Morpion'], ['connect4', 'Puissance 4'], ['battleship', 'Bataille navale'], ['global', 'Classement']];
+const TABS: [Tab, string][] = [['lobby', 'Lobby'], ['morpion', 'Morpion'], ['connect4', 'Puissance 4'], ['battleship', 'Bataille navale'], ['minigolf', 'Minigolf'], ['global', 'Classement']];
 const GAMES: { id: GameType; pitch: string; c: string; icon: string }[] = [
   { id: 'morpion', pitch: 'Trois cases alignées. Deux minutes, pas plus.', c: 'var(--bony-orange)', icon: 'grid' },
   { id: 'connect4', pitch: 'Quatre pions, la gravité en plus.', c: 'var(--bony-violet)', icon: 'target' },
   { id: 'battleship', pitch: 'Placez votre flotte, coulez la sienne.', c: 'var(--bony-blue)', icon: 'flag' },
+  { id: 'minigolf', pitch: 'Moulins, îles, tapis roulants : le moins de coups gagne.', c: 'var(--ok)', icon: 'pin' },
 ];
+const MG_DIFF: [string, string][] = [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']];
+const mgResume = (o: any) => (o ? `${MG_DIFF.find((d) => d[0] === o.diff)?.[1] ?? ''} · ${o.nb} trous · ${AMBIANCES[o.amb] ?? ''}` : '');
+/** Vignette d'ambiance du pré-lobby (même dessin que le jeu). */
+const Vignette: React.FC<{ amb: string }> = ({ amb }) => { const r = useRef<HTMLCanvasElement>(null); useEffect(() => { if (r.current) apercuAmbiance(r.current, amb); }, [amb]); return <canvas ref={r} width={256} height={160} style={{ width: '100%', aspectRatio: '16 / 10', borderRadius: 6, display: 'block' }} />; };
 const gOf = (id: GameType) => GAMES.find((g) => g.id === id) || GAMES[0];
 const PODIUM_H: Record<number, number> = { 1: 96, 2: 64, 3: 48 };
 
@@ -59,6 +66,9 @@ export default function GamesApp({ win, inst }: AppProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('lobby');           // non persisté (comme la page)
   const [pick, setPick] = useState<GameType>('morpion');
+  // Pré-lobby du minigolf : réglages choisis par celui qui lance, mémorisés pour le prochain défi.
+  const [mg, setMgState] = useState<any>(() => ({ diff: 'normal', nb: 6, amb: 'ete', choc: true, ...(gx().store.get('games.minigolf', {}) || {}) }));
+  const setMg = (p: any) => { const n = { ...mg, ...p }; setMgState(n); gx().store.set('games.minigolf', n); };
   const [target, setTarget] = useState<string | null>(null);
   const [leaving, setLeaving] = useState<string | null>(null);   // défi refusé en train de sortir
   const paneRef = useRef<HTMLDivElement>(null);
@@ -105,8 +115,8 @@ export default function GamesApp({ win, inst }: AppProps) {
   // ---------------------------------------------------------------- actions
   const dare = async (to: string) => {
     try {
-      await db.sendGameChallenge(to, pick);
-      setTarget(null); hud(`Défi envoyé à ${first(to)} · ${GAME_LABELS[pick]}`);
+      await db.sendGameChallenge(to, pick, pick === 'minigolf' ? mg : undefined);
+      setTarget(null); hud(`Défi envoyé à ${first(to)} · ${GAME_LABELS[pick]}${pick === 'minigolf' ? ` (${mgResume(mg)})` : ''}`);
       await loadLobby();
     } catch (e) { setError(errMsg(e, "Échec de l'envoi du défi.")); }
   };
@@ -209,13 +219,15 @@ export default function GamesApp({ win, inst }: AppProps) {
       {!won && !draw ? <span className="muted" style={{ fontSize: 13 }}>La revanche est un clic dans le lobby.</span> : null}
       <button className="btn" style={{ marginTop: 6 }} onClick={() => openGame(null)}><Icon name="back" size="sm" />Retour au lobby</button></div> : null;
     const props = { s: active, myId, onMove: move, onPlaceFleet: placeFleet, end };
+    const plein = active.game === 'minigolf';
     return (
       <div className="app" onKeyDown={onKey} tabIndex={-1}>
         <div className="app-head gme-head"><button className="gme-back" data-tip="Retour au lobby" aria-label="Retour au lobby" onClick={() => openGame(null)}><Icon name="back" /></button>
           <div className="ah-t"><span className="ah-eye">Détente</span><h1>{GAME_LABELS[active.game]}</h1><span className="sub gme-vs">{player(myId, true)}<span className="faint">vs</span>{player(active.opponentId, true)}</span></div>
           <div className="ah-f">{!over ? <button className="btn ghost" style={{ color: 'var(--danger)' }} onClick={abandon}><Icon name="flag" size="sm" />Abandonner</button> : null}</div></div>
-        <div className="gme-pane scroll" ref={paneRef}>
-          {active.game === 'morpion' ? <Morpion key={active.id} {...props} playRef={playKey} /> : active.game === 'connect4' ? <Connect4 key={active.id} {...props} playRef={playKey} /> : <Battleship key={active.id} {...props} />}
+        <div className={plein ? 'gme-pane' : 'gme-pane scroll'} ref={paneRef} style={plein ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : undefined}>
+          {plein ? <Minigolf key={active.id} s={active} myId={myId} onMove={move} end={end} nomDe={uName} />
+            : active.game === 'morpion' ? <Morpion key={active.id} {...props} playRef={playKey} /> : active.game === 'connect4' ? <Connect4 key={active.id} {...props} playRef={playKey} /> : <Battleship key={active.id} {...props} />}
         </div>
       </div>
     );
@@ -235,7 +247,7 @@ export default function GamesApp({ win, inst }: AppProps) {
     const dareBox = received.length ? (
       <section className={`gme-card gme-dare gme-sec enter ${running.length ? '' : 'solo'}`}><h2 className="gme-h2"><Icon name="flag" size="sm" />On vous défie <span className="faint">({received.length})</span></h2><div className="gme-list">
         {received.map((c) => (
-          <div key={c.id} className="gme-lrow" data-ch={c.id}>{av(c.fromUserId)}<div className="t"><b>{uName(c.fromUserId)}</b><small>{GAME_LABELS[c.game]} · {gx().fmt.ago(new Date(c.createdAt).getTime())}</small></div>
+          <div key={c.id} className="gme-lrow" data-ch={c.id}>{av(c.fromUserId)}<div className="t"><b>{uName(c.fromUserId)}</b><small>{GAME_LABELS[c.game]}{c.game === 'minigolf' && c.options ? ` (${mgResume(c.options)})` : ''} · {gx().fmt.ago(new Date(c.createdAt).getTime())}</small></div>
             <button className="icon-btn" aria-label="Refuser" data-tip="Refuser" style={{ color: 'var(--danger)' }} disabled={leaving === c.id} onClick={(e) => refuse(c, e.currentTarget.closest('.gme-lrow'))}><Icon name="close" size="sm" /></button>
             <button className="btn primary" aria-label="Accepter" disabled={leaving === c.id} onClick={() => accept(c)}><Icon name="check" size="sm" />Jouer</button></div>
         ))}</div></section>) : null;
@@ -252,6 +264,17 @@ export default function GamesApp({ win, inst }: AppProps) {
           <div className="gme-games">{GAMES.map((g) => (
             <button key={g.id} className="gme-gcard" aria-pressed={pick === g.id} onClick={() => setPick(g.id)}><span className="gme-gico" style={{ '--c': g.c } as React.CSSProperties}><Icon name={g.icon} /></span><span className="nm">{GAME_LABELS[g.id]}</span><span className="ds">{g.pitch}</span></button>
           ))}</div>
+          {pick === 'minigolf' ? (
+            <div className="gme-card" style={{ display: 'grid', gap: 12, padding: 14, marginTop: 12 }}>
+              <div className="row wrap" style={{ gap: 14, alignItems: 'end' }}>
+                <div style={{ display: 'grid', gap: 6 }}><span className="label">Difficulté</span><Seg value={mg.diff} onChange={(v: string) => setMg({ diff: v })} options={MG_DIFF} /></div>
+                <div style={{ display: 'grid', gap: 6 }}><span className="label">Trous</span><Seg value={String(mg.nb)} onChange={(v: string) => setMg({ nb: Number(v) })} options={[['3', '3'], ['6', '6'], ['9', '9']]} /></div>
+                <label className="row" style={{ gap: 8, fontSize: 13.5 }}><input type="checkbox" checked={mg.choc} onChange={(e) => setMg({ choc: e.target.checked })} />Les balles peuvent se percuter</label>
+              </div>
+              <div style={{ display: 'grid', gap: 6 }}><span className="label">Ambiance — la même pour les deux joueurs</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>{Object.entries(AMBIANCES).map(([k, l]) => (
+                  <button key={k} className="gme-gcard" aria-pressed={mg.amb === k} style={{ padding: 6, gap: 6, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }} onClick={() => setMg({ amb: k })}><Vignette amb={k} /><span className="nm" style={{ fontSize: 13 }}>{l as string}</span></button>))}</div></div>
+            </div>) : null}
           <div className="gme-opps">{opponents.length ? opponents.map((u: User) => {
             const already = sent.some((c) => c.toUserId === u.id), online = gx().data.USERS?.find((x: any) => x.id === u.id)?.online;
             return (
