@@ -1,6 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
 import type { AppProps } from '../types';
-import { BrandChips, Icon, Seg, gx, hud, useEngineStore } from '../ui/kit';
+import { BrandChips, Icon, Seg, gx, hud, useEngineStore, useSheets } from '../ui/kit';
+import { useAuth } from '../../../contexts/AuthContext';
+import { EchangesTab, PfBadges, RefusBanner, ouvrirPortefeuille, ouvrirRefus } from './equipes/Portefeuille';
 import { db } from '../../../services/dataService';
 import {
   type Fiche as FicheT, type Source, type Vehicule, type Vente, CIV, FAM_C, VH_C, VhPill, Plate, EtatBadge, Tabs,
@@ -8,9 +10,8 @@ import {
 } from './common';
 
 /**
- * Fiche client (GET /clients/:id) — maquette : `ficheHTML` et ses onglets. Lecture seule au lot 2, sauf « Séparer »
- * une identité (POST /clients/:id/separer). Couche Bony (vendeur référent réattribuable, « ne plus contacter »,
- * refus d'une coordonnée, échanges) : lot 3 — rien n'en est affiché comme s'il existait.
+ * Fiche client (GET /clients/:id) — maquette : `ficheHTML` et ses onglets. « Séparer » une identité (POST /clients/:id/separer).
+ * Couche Bony (lot 4, ./equipes/Portefeuille.tsx) : vendeur du portefeuille, agent, « ne plus contacter » par canal, échanges.
  */
 
 type FTab = 'veh' | 'ventes' | 'fin' | 'coord' | 'src' | 'ech' | 'rel';
@@ -179,13 +180,8 @@ const SrcTab: React.FC<{ f: FicheT; onSep: (identite: FicheT['identites'][number
   </>
 );
 
-// ---------------------------------------------------------------- Échanges, Relances (lots 3 et 4)
-const SoonTab: React.FC<{ k: 'ech' | 'rel'; f: FicheT; ventes: Vente[] }> = ({ k, f, ventes }) => {
-  if (k === 'ech') return (
-    <div className="crm-soon"><Icon name="message" size="lg" /><div><b style={{ color: 'var(--text)' }}>Échanges — arrive avec le lot 4</b>
-      <div className="crm-note" style={{ marginTop: 4 }}>Appels, visites, e-mails et notes des vendeurs, qualification du client, réattribution du vendeur. Couche Bony : saisie par les utilisateurs, jamais touchée par l’import du soir.</div>
-      <button className="btn sm" style={{ marginTop: 12 }} disabled><Icon name="plus" size="sm" />Noter un échange</button></div></div>
-  );
+// ---------------------------------------------------------------- Relances (plus tard)
+const SoonTab: React.FC<{ f: FicheT; ventes: Vente[] }> = ({ f, ventes }) => {
   const T = today(), c = f.client, out: [string, string, string][] = [];
   if (c.fin?.fin) out.push(['euro', `Fin de ${c.fin.famille || 'financement'} le ${dFR(c.fin.fin)}`, finTxt(c.fin.fin)]);
   const cur = f.vehicules.filter((v) => v.actuel);
@@ -194,7 +190,7 @@ const SoonTab: React.FC<{ k: 'ech' | 'rel'; f: FicheT; ventes: Vente[] }> = ({ k
   const last = ventes.map(venteDate).filter(Boolean).sort().pop();
   if (last) { const y = Math.floor(mDiff(last, T) / 12); if (y >= 4) out.push(['refresh', `Sans achat depuis ${y} ans`, `dernier : ${dFR(last)}`]); }
   return (
-    <div className="crm-soon"><Icon name="bell" size="lg" /><div className="grow"><b style={{ color: 'var(--text)' }}>Relances — suivi par client au lot 4</b> <span className="faint" style={{ fontWeight: 500 }}>· les listes se construisent dès le lot 3 dans le Requêteur</span>
+    <div className="crm-soon"><Icon name="bell" size="lg" /><div className="grow"><b style={{ color: 'var(--text)' }}>Relances — suivi par client à venir</b> <span className="faint" style={{ fontWeight: 500 }}>· les listes se construisent dès le lot 3 dans le Requêteur</span>
       <div className="crm-note" style={{ marginTop: 4 }}>Règles réglables (fin de financement, CT, anniversaire, âge du véhicule, sans achat depuis X ans), listes exportables. Aperçu de ce que ce client déclencherait :</div>
       <div className="crm-rel" style={{ marginTop: 12 }}>{out.length ? out.map(([i, l, h], j) => <div key={j}><Icon name={i} size="sm" /><span className="grow">{l}</span><span className="faint">{h}</span></div>) : <div>Aucun déclencheur pour l’instant.</div>}</div></div></div>
   );
@@ -205,6 +201,8 @@ export const FicheView: React.FC<{ f: FicheT; win: AppProps['win']; onChanged: (
   const [tab, setTab] = useEngineStore<FTab>('crm.ftab', 'veh');
   const tabsRef = useRef<HTMLDivElement>(null);
   const c = f.client;
+  const { user } = useAuth();
+  const { open, portals } = useSheets(win);
   const ventes = useMemo(() => f.ventes.filter((v) => v.retenue).sort((a, b) => (venteDate(b) || '').localeCompare(venteDate(a) || '')), [f]);
   const T = today();
   const nb = (k: Source) => ventes.filter((s) => s.source === k).length;
@@ -216,12 +214,13 @@ export const FicheView: React.FC<{ f: FicheT; win: AppProps['win']; onChanged: (
   const last = ventes[0];
   const addr = [[c.num_rue, c.type_rue, c.rue].filter(Boolean).join(' '), [c.cp, c.ville].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
   const tabs: [FTab, string, number | string][] = [['veh', 'Véhicules', f.vehicules.length], ['ventes', 'Ventes', ventes.length], ['fin', 'Financements et garanties', ventes.filter(finOk).length],
-    ['coord', 'Coordonnées', f.contacts.length], ['src', 'Sources', f.identites.length], ['ech', 'Échanges', 'lot 4'], ['rel', 'Relances', 'lot 4']];
+    ['coord', 'Coordonnées', f.contacts.length], ['src', 'Sources', f.identites.length], ['ech', 'Échanges', f.bony?.echanges.length ?? 0], ['rel', 'Relances', 'bientôt']];
   const goto = (t: FTab) => { setTab(t); tabsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }); };
 
   const more = (el: HTMLElement) => gx().menu.open([
-    { header: 'Couche Bony — lot 4' },
-    { label: 'Réattribuer le vendeur référent…', icon: 'handshake', disabled: true },
+    { header: 'Portefeuille et contact' },
+    { label: 'Changer le vendeur du portefeuille…', icon: 'handshake', action: () => ouvrirPortefeuille(open, f, onChanged) },
+    { label: 'Ne plus contacter…', icon: 'belloff', action: () => ouvrirRefus(open, f, onChanged) },
     '-', { label: 'Copier l’identifiant SPARK', icon: 'copy', action: () => { try { navigator.clipboard?.writeText(rcuId(c.id)); } catch { /* presse-papier refusé */ } hud(`${rcuId(c.id)} copié`); } },
   ], el, { align: 'right' });
 
@@ -235,7 +234,7 @@ export const FicheView: React.FC<{ f: FicheT; win: AppProps['win']; onChanged: (
   return (
     <div className="crm-fiche">
       <div className="crm-crumb"><span className="c">Clients <span>/</span> <b className="ellipsis" style={{ maxWidth: 300 }}>{nameOf(c)}</b><span className="num hide-s crm-mono" style={{ marginLeft: 8 }} data-tip="Identifiant SPARK : attribué à vie, survit aux fusions">{rcuId(c.id)}</span></span>
-        <div className="acts"><button className="btn" aria-label="Plus d’actions" data-tip="Vendeur référent, copier l’identifiant…" onClick={(e) => more(e.currentTarget)}><Icon name="more" size="sm" /></button></div></div>
+        <div className="acts"><button className="btn" aria-label="Plus d’actions" data-tip="Vendeur du portefeuille, ne plus contacter, copier l’identifiant…" onClick={(e) => more(e.currentTarget)}><Icon name="more" size="sm" /></button></div></div>
       <div className="crm-idt"><span className="av" style={cv(avC(c.id))}>{initials(c)}</span><div className="grow">
         <div className="crm-eye">{c.type === 'societe' ? 'Société' : 'Particulier'}{first ? ` · client depuis ${first.slice(0, 4)}` : ''}</div>
         <h2 className="crm-name">{fullName(c)}</h2>
@@ -244,9 +243,10 @@ export const FicheView: React.FC<{ f: FicheT; win: AppProps['win']; onChanged: (
           {c.civilite ? <span className="badge" style={cv('var(--info)')} data-tip={`Civilité normalisée (4 valeurs). Libellé DCS : « ${c.civilite_dcs || '—'} »`}><Icon name={c.type === 'societe' ? 'building' : 'user'} size="sm" />{CIV[c.civilite]?.l}</span> : null}
           {c.site ? <span className="badge" data-tip="Site principal : celui de la dernière vente"><Icon name="pin" size="sm" />{c.site}</span> : null}
           <BrandChips brands={c.marques.map(brandName)} />
-          {c.vendeur ? <span className="badge" style={cv('var(--bony-violet)')} data-tip="Par défaut : vendeur de la dernière vente. Réattribuable au lot 4 (R6)."><Icon name="handshake" size="sm" />Vendeur référent : {c.vendeur}</span> : null}
+          <PfBadges f={f} />
           {nSus ? <span className="badge" style={cv('var(--danger)')}><Icon name="alert" size="sm" />{nSus} coordonnée{nSus > 1 ? 's' : ''} suspecte{nSus > 1 ? 's' : ''}</span> : null}
         </div></div></div>
+      <RefusBanner f={f} onEdit={() => ouvrirRefus(open, f, onChanged)} />
       <div className="crm-facts">
         <div className="card crm-fact" onClick={() => goto('veh')}><span className="crm-lbl">Parc actuel</span><span className="v">{plural(cur.length, 'véhicule')}</span><span className="h">{f.vehicules.length - cur.length ? `+ ${f.vehicules.length - cur.length} en historique` : 'aucun historique'}</span></div>
         <div className="card crm-fact" onClick={() => goto('ventes')}><span className="crm-lbl">Ventes</span><span className="v">{ventes.length}</span><span className="h">{[nb('VN') && `${nb('VN')} VN`, nb('VO') && `${nb('VO')} VO`, nb('BSO') && `${nb('BSO')} anc. base`].filter(Boolean).join(' · ')}{last ? ` · dernière ${mY(venteDate(last))}` : ''}</span></div>
@@ -258,8 +258,10 @@ export const FicheView: React.FC<{ f: FicheT; win: AppProps['win']; onChanged: (
       <div className="crm-tabsbar" ref={tabsRef}><Tabs value={tab} onChange={setTab} options={tabs.map(([k, l, n]) => [k, <>{l}{typeof n === 'number' ? <> <span className="k">{n}</span></> : <> <span className="soon">{n}</span></>}{k === 'coord' && nSus ? <span style={{ color: 'var(--danger)', display: 'inline-flex' }}><Icon name="alert" size="sm" /></span> : null}</>] as [FTab, React.ReactNode])} /></div>
       <div className="crm-tabc">
         {tab === 'ventes' ? <VentesTab f={f} ventes={ventes} /> : tab === 'fin' ? <FinTab f={f} ventes={ventes} /> : tab === 'coord' ? <CoordTab f={f} />
-          : tab === 'src' ? <SrcTab f={f} onSep={separer} /> : tab === 'ech' || tab === 'rel' ? <SoonTab k={tab} f={f} ventes={ventes} /> : <VehTab f={f} />}
+          : tab === 'src' ? <SrcTab f={f} onSep={separer} /> : tab === 'ech' ? <EchangesTab f={f} open={open} userId={String(user?.id ?? '')} isMaster={user?.role === 'Master'} onChanged={onChanged} />
+          : tab === 'rel' ? <SoonTab f={f} ventes={ventes} /> : <VehTab f={f} />}
       </div>
+      {portals}
     </div>
   );
 };

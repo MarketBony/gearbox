@@ -4,8 +4,13 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 15/10/2026 (lire en premier)
-- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 87**
-  (15/10, `rcu-worker` seul : requêtes DCS sur le SFTP + archivage du worker). Aucune branche ouverte.
+- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 88**
+  (15/10, `rcu-worker` + `api` + `web` : SPARK lot 4, Équipes et portefeuilles, **calcul des portefeuilles DÉSACTIVÉ en prod**).
+  Aucune branche ouverte.
+- **🚨 URGENT (Théo, 15/10) — SSH du VPS** : le mot de passe est accepté pour TOUS les comptes (`50-cloud-init.conf`, ubuntu
+  compris), 80 800 tentatives en 11 jours, pas de fail2ban. À faire : `PasswordAuthentication no` global (le bloc `Match User dcs`
+  garde l'exception), `sudo sshd -t`, session ouverte, test de la clé dans une 2e session. Vérifier d'abord l'accès à la console
+  de secours OVH. Détail : `BUGS-CONNUS.md`. « On en reparle prochainement » : ne pas le faire sans son go.
 - **CHANTIER EN COURS : SPARK** (le CRM ; « RCU » = nom technique invisible). Cadrage : `RCU-CADRAGE.md` (R1–R13) + page
   `maquettes/crm/rcu-cartographie.html` ; maquettes : `maquettes/crm/v2/` (rubrique + Requêteur) et le canevas
   https://claude.ai/artifact/YQAT1pvBU1w6aMj2GB8Kv4 (planches A–D du Requêteur). **En production** :
@@ -18,17 +23,23 @@
   - 86 (15/10) : **mode avancé** (opérateurs par type, groupes ET / OU à un niveau, exclusions, liste collée, suggestions) ;
   - 87 (15/10) : **requêtes DCS branchées** — compte SFTP `dcs` ouvert par mot de passe (`ACCES-INFRA-SECRET.md`), config
     DCSNETneo « SPGR », exports COMPLETS hebdomadaires (`Clients VN` vendredi 23 h 30, `Clients VO` 23 h 45, `/depot/clients-VN|VO.txt`) ;
-    worker : archivage `EXDEV` réparé (le VO n'aurait jamais été importé).
+    worker : archivage `EXDEV` réparé (le VO n'aurait jamais été importé) ;
+  - 88 (15/10) : **lot 4 — Équipes et portefeuilles** : référentiel vendeurs (SPARK = source ; GRID le lira), noms DCS, règles,
+    portefeuille par client recalculé, « à attribuer », « ne plus contacter » par canal, échanges. Calcul DÉSACTIVÉ en prod.
   Rubrique visible du **Master seul** (`CRM_ROLES` / `CRM_ALLOWED_ROLES`) ; cible = rôles de Jeux, quand Théo le dira.
+- **À FAIRE PAR THÉO dans SPARK › Équipes (prod), AVANT d'activer le calcul** : classer les ~220 noms DCS « à traiter »
+  (beaucoup de vendeurs actifs absents de MAEVA : Segura, Chary, Berge, Nore, Ramage… → « Créer ce vendeur ») ; marques des
+  vendeurs du Sud-Ouest (MAEVA dit « Renault » partout : les clients Dacia d'Albi tombent « à attribuer ») ; codes postaux des
+  8 vendeurs Secteur qui n'en ont pas ; départs / arrivées notés dans les feuilles par plaque (« départ fin octobre »…, non repris).
+  Puis Règles › Simuler › « Activer et lancer le premier calcul ».
 - **PROCHAINE ÉTAPE : contrôler le PREMIER envoi DCS (samedi 17/10 ou lundi)** — SPARK › Imports doit montrer deux imports
   VN et VO du vendredi 16/10 au soir (`sudo docker compose logs --since 72h rcu-worker`). Risques non vérifiés : ligne de TOTAL
   absente (refus « Ligne de total absente » → voir si DCSNETneo a une option), titre non reconnu (« clients VN » attendu), noms
   de fichier. Si refus : le fichier est dans `/srv/rcu/archive/refuses/`, le lire avant de toucher au code. Garde-fou de volume :
   chute > 10 % → « Appliquer quand même » du Master. Puis, si Théo le veut, changer le mot de passe `dcs` (passé en clair dans
   la discussion du 15/10) et le ressaisir dans DCS.
-- **ENSUITE** : lot 4 (couche Bony : référentiel vendeurs depuis le fichier « MAEVA Vendeurs - affaires.xlsx » de Théo — 138
-  vendeurs, secteurs en CP, règles de la feuille « EXTRACTION DCSNET » —, réattribution auto par secteur, « ne plus contacter »,
-  coordonnées refusées, échanges, « déjà ciblés » via `rcu.export_client`), lot 5 (relances), lot 6 (GRID). Projet futur :
+- **ENSUITE** : « déjà ciblés » (gardé dans les tuyaux, `rcu.export_client` existe), lot 5 (relances : une vue des « à rappeler »
+  des échanges en fait partie), lot 6 (GRID, qui lira les vendeurs de SPARK). Projet futur :
   plateforme d'e-mailing maison via Resend (budget Sarbacane).
 - **En attente de Théo sur SPARK** : vraie mention STOP d'allmysms (provisoire « STOP au 36XXX ») ; retour sur le mode avancé
   (menu des opérateurs à la souris, « Coller une liste », champs date / nombre) ; droits DCS de Figeac, Millau et Carmaux à
@@ -88,7 +99,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 87 (15/10)** — SPARK, requêtes DCS sur le SFTP + archivage du worker (`rcu-worker` seul).
+- **En production : correctif 88 (15/10)** — SPARK lot 4, Équipes et portefeuilles (`rcu-worker` + `api` + `web`, migration RCU 005).
+  Avant lui le **correctif 87 (15/10)** — SPARK, requêtes DCS sur le SFTP + archivage du worker (`rcu-worker` seul).
   Avant lui le **correctif 86 (15/10)** — SPARK, mode avancé du Requêteur (opérateurs, groupes ET / OU, liste collée).
   Avant lui le **correctif 85 (13/10)** — SPARK, export Excel des flottes (taille, parc complet, une ligne par véhicule).
   Avant lui le **correctif 84 (13/10)** — **SPARK lot 3 : le Requêteur** (`api`, `web`, `rcu-worker`, migration RCU 004).
@@ -650,6 +662,32 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 88 — 15/10 : SPARK lot 4 — ÉQUIPES ET PORTEFEUILLES** (branche `feat/spark-lot4-portefeuilles`, **`rcu-worker` +
+  `api` + `web`**, migration RCU `005_portefeuilles.sql`, aucune migration Supabase). Maquette validée : `maquettes/crm/v2/equipes.js`.
+  Décisions de Théo (15/10) : **SPARK est la source des vendeurs** (GRID, trop limité — pas de secteur —, les lira plus tard) ;
+  modèle repris de GRID (plaque → site → vendeur, encadrement chef de site / chef des ventes VN / VO, entrée / sortie, marques,
+  archivage) ; **UN vendeur par client** ; l'**agent est une seconde variable** (le client reste au vendeur de chez nous) ;
+  « déjà ciblés » reporté ; 4a + 4b d'un coup.
+  - **Moteur** `backend/src/rcu/portefeuille.ts` (SEULE porte du portefeuille) : verrou manuel → vendeur du dernier achat (un nouvel
+    achat remet en jeu) → vendeur présent gardé (pas de rééquilibrage) → remplaçant désigné au départ → règles particulières →
+    Sociétés → Secteur (CP précis avant département) → Hall au moins chargé → « à attribuer ». Hors portefeuille au-delà de
+    `anciennete_ans` (10) sans achat. Déterministe, ~3 s pour 180 000 clients. Tourne après chaque import, chaque nuit (départs
+    datés : dernier jour = `sortie`) et à chaque changement du référentiel. Simulation et aperçu de départ sans écriture.
+    **Interrupteur `rcu.portefeuille_param.actif`, FAUX à l'installation** : sans lui, un nom DCS non rattaché ferait redistribuer
+    les clients d'un vendeur actif.
+  - **Noms DCS** (`rcu.vendeur_alias`) : identiques → auto, proches (1-2 lettres, nom seul, prénom tronqué) → à valider.
+  - **Chargement MAEVA** : `scripts/spark-vendeurs-maeva.py` (feuilles « Infos » + « ipn ») → JSON (hors git) → `worker --vendeurs`.
+    132 vendeurs, 25 encadrants, 3 règles « ancien vendeur » (Ranson → Bert, Zarlenga → Boissonnade, Trouche → Allègre) ;
+    112 noms DCS rattachés d'office, 8 à valider, ~220 inconnus récents. Seulement 29 IPN.
+  - **Ne plus contacter** (`rcu.contact_refus`, tout ou par canal) appliqué dans la GARDE du canal du Requêteur (`requete.ts`) :
+    exclu de tous les comptages et exports. **Échanges** (`rcu.echange`) sur la fiche. Les deux suivent les fusions (`suivreFusions`).
+  - Requêteur : colonnes « Vendeur du portefeuille » (+ téléphone), champs avancés « Vendeur du portefeuille », « Échange à rappeler ».
+  - Écrans : `ui2/apps/crm/equipes/` (EquipesView, Portefeuille, modele) ; routes `backend/src/routes/crmEquipes.ts`.
+  - **Défaut préexistant corrigé** : ouvrir une fiche depuis le Requêteur ou « À attribuer » ouvrait le 1er client de la liste
+    (`ClientsView.tsx`, sélection automatique).
+  - Testé en local (base `rcu` locale, compte Master) : simulation, activation, aperçu de départ, départ programmé / annulé, verrou
+    qui résiste au recalcul, refus e-mail + SMS (compte exact au Requêteur), échange ajouté / supprimé ; données de test nettoyées.
+
 - **Correctif 87 — 15/10 : SPARK, requêtes DCS branchées sur le SFTP + archivage du worker** (branche
   `fix/rcu-worker-archivage`, **`rcu-worker` seul**, aucune migration).
   - **Accès SFTP du compte `dcs`** (VPS, hors git) : `PasswordAuthentication yes` ajouté au bloc `Match User dcs` de
@@ -1104,7 +1142,9 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 87** (15 octobre 2026) — SPARK, requêtes DCS sur le SFTP
+- master = prod, synchronisés. Dernier lot déployé : **correctif 88** (15 octobre 2026) — SPARK lot 4, Équipes et portefeuilles,
+  **`rcu-worker` (migration RCU `005_portefeuilles.sql`) puis `api` + `web`**, puis chargement du référentiel MAEVA
+  (`--vendeurs`) ; calcul des portefeuilles laissé DÉSACTIVÉ. Avant lui le **correctif 87** (15 octobre 2026) — SPARK, requêtes DCS sur le SFTP
   (compte `dcs` ouvert par mot de passe, hors git) et archivage du worker, **`rcu-worker` seul**, aucune migration. Avant lui le
   **correctif 86** (15 octobre 2026) — SPARK, mode avancé du Requêteur,
   **`api` ET `web`**, aucune migration. Avant lui le **correctif 85** (13 octobre 2026) — SPARK, export Excel des flottes,

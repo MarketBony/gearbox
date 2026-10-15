@@ -50,6 +50,16 @@ export interface Fiche {
   vehicules: Vehicule[];
   ventes: Vente[];
   identites: Identite[];
+  /** Couche Bony (lot 4) : portefeuille, refus de contact, échanges. */
+  bony?: Bony;
+}
+export interface Echange { id: number; type: 'appel' | 'email' | 'sms' | 'visite' | 'note'; le: string; resultat: string | null; rappel: string | null; texte: string; auteur: string | null; auteur_id: string | null }
+export interface Bony {
+  portefeuille: { vendeur_id: number | null; vendeur: string | null; vendeur_site: string | null; vendeur_service: string | null; origine: string; detail: string | null; verrou: boolean; depuis: string; par: string | null } | null;
+  portefeuille_actif: boolean;
+  historique: { le: string; origine: string; detail: string | null; par: string | null; de: string | null; vers: string | null }[];
+  refus: { canal: 'tout' | 'email' | 'sms' | 'tel' | 'courrier'; motif: string | null; par: string | null; le: string }[];
+  echanges: Echange[];
 }
 export interface Paire { a: Fiche; b: Fiche; raison: string }
 

@@ -216,6 +216,14 @@ Mise en place (une fois) :
    serveur `51.83.75.181`, port 22, répertoire `/depot`, fichiers `/depot/clients-VN` et `/depot/clients-VO` (+ `.txt`), titre et
    en-têtes cochés, exports COMPLETS (le worker marque « disparue » toute vente absente et refuse une chute > 10 %).
 
+10. **Lot 4 — Équipes et portefeuilles (correctif 88)** : la migration RCU 005 s'applique au démarrage de `rcu-worker` — le
+    reconstruire AVANT `api` (sinon l'API interroge des tables absentes). Chargement UNIQUE du référentiel :
+    sur le poste `python -I scripts/spark-vendeurs-maeva.py "<MAEVA….xlsx>" vendeurs.json` (données de salariés : jamais dans git),
+    `scp vendeurs.json ubuntu@51.83.75.181:/tmp/`, puis `sudo mv /tmp/vendeurs.json /srv/rcu/archive/manuel/` et
+    `sudo docker compose exec rcu-worker node dist/rcu/worker.js --vendeurs /archive/manuel/vendeurs.json`, puis supprimer le
+    fichier. Refusé si des vendeurs existent déjà. Le calcul des portefeuilles reste DÉSACTIVÉ jusqu'au clic de Théo
+    (SPARK › Équipes › Règles). À la main : `… worker.js --portefeuilles [--simuler]`.
+
 Au quotidien (depuis le 16/10 : chaque vendredi soir, VN 23 h 30, VO 23 h 45) : DCS dépose ses TXT dans `depot/` ; le worker les importe et les range dans l'archive. Le journal est dans
 Gearbox (CRM › Imports, Master). Un import refusé pour baisse de volume s'applique depuis Gearbox (« Appliquer quand même… »).
 

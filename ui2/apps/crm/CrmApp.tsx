@@ -9,6 +9,7 @@ import HomeView, { type Shortcut } from './HomeView';
 import ClientsView, { type ClientsState, type Filtres, F0 } from './ClientsView';
 import ArbitrageView from './ArbitrageView';
 import RequeteurView, { type RqStore } from './requeteur/RequeteurView';
+import EquipesView from './equipes/EquipesView';
 
 /**
  * Rubrique SPARK (id technique : crm) — référentiel client unique (RCU), base dédiée du VPS. Maquette validée : maquettes/crm/v2/.
@@ -16,12 +17,12 @@ import RequeteurView, { type RqStore } from './requeteur/RequeteurView';
  * Contrat d'API : ./CONTRAT-API.md (tout passe par `db.*`, jamais `fetch` direct).
  *
  * Lot 1 (12/10/2026) : l'écran « Imports ». Lot 2 : Accueil, Clients (liste paginée par le serveur + fiche),
- * À arbitrer. Lot 3 : Requêteur (./requeteur/). Accès : CRM_ALLOWED_ROLES (Master pendant la construction) — le refus réel est côté serveur
+ * À arbitrer. Lot 3 : Requêteur (./requeteur/). Lot 4 : Équipes et portefeuilles (./equipes/). Accès : CRM_ALLOWED_ROLES (Master pendant la construction) — le refus réel est côté serveur
  * (`/api/crm`, CRM_ROLES). Onglet Imports : Master seul (maquette).
  */
 
-type View = 'home' | 'clients' | 'arb' | 'req' | 'imports';
-const VIEW_L: Record<View, string> = { home: 'Accueil', clients: 'Clients', arb: 'À arbitrer', req: 'Requêteur', imports: 'Imports' };
+type View = 'home' | 'clients' | 'arb' | 'req' | 'equipes' | 'imports';
+const VIEW_L: Record<View, string> = { home: 'Accueil', clients: 'Clients', arb: 'À arbitrer', req: 'Requêteur', equipes: 'Équipes', imports: 'Imports' };
 
 const perToCtx = (): string[] => {
   const p = gx().ctx?.perimetre;
@@ -86,7 +87,7 @@ export default function CrmApp({ win, inst }: AppProps) {
     req: () => go('req'),
   }[k]());
 
-  const views: View[] = ['home', 'clients', 'arb', 'req', ...(canImports ? ['imports' as View] : [])];
+  const views: View[] = ['home', 'clients', 'arb', 'req', 'equipes', ...(canImports ? ['imports' as View] : [])];
   inst.command = (c: string) => {
     if (c === 'search') go('clients', { filters: {}, focus: true });
     if (c === 'arbitrage') go('arb');
@@ -118,6 +119,7 @@ export default function CrmApp({ win, inst }: AppProps) {
   if (view === 'clients') body = <ClientsView st={cs} setSt={setCs} compact={compact} win={win} cache={fiches} keyRef={keyRef} focusSearch={focusSearch} />;
   else if (view === 'arb') body = <ArbitrageView onTotal={onArbTotal} keyRef={keyRef} />;
   else if (view === 'req') body = <RequeteurView win={win} store={rqStore} per={perToCtx()[0] || null} userId={String(user?.id ?? '')} who={user?.name || 'inconnu'} openClient={openClient} />;
+  else if (view === 'equipes') body = <EquipesView win={win} compact={compact} openClient={openClient} />;
   else if (view === 'imports') body = runs ? <ImportsView runs={runs} win={win} reload={load} compact={compact} selId={runSel} onSel={setRunSel} /> : <div className="empty" style={{ height: '100%' }}>Chargement…</div>;
   else body = erreur && !apercu ? <div className="empty" style={{ height: '100%' }}><Icon name="alert" />{erreur}<button className="btn sm" onClick={load}>Réessayer</button></div>
     : !apercu ? <div className="empty" style={{ height: '100%' }}>Chargement…</div>

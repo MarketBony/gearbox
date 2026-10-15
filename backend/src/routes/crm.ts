@@ -8,6 +8,8 @@ import { rcu, rcuConfigured } from '../rcu/db';
 import { majResumes } from '../rcu/resume';
 import { CHAMPS_PUBLICS, suggestionsSQL } from '../rcu/avance';
 import { compterDetails } from '../rcu/requete';
+import { ficheBony } from '../rcu/bony';
+import { suivreFusions } from '../rcu/portefeuille';
 import { COLONNES, COLONNES_APERCU, COLONNES_TABLEAU, TRIS, Requete, RequeteInvalide, compter, lignes, lireRequete } from '../rcu/requete';
 
 /**
@@ -37,7 +39,7 @@ router.get('/imports', async (_req, res) => {
   res.json(rows);
 });
 
-const nomDe = async (req: AuthRequest) =>
+export const nomDe = async (req: AuthRequest) =>
   (await prisma.user.findUnique({ where: { id: req.user!.id }, select: { name: true } }))?.name ?? req.user!.id;
 
 // POST /api/crm/imports/:id/forcer — « Appliquer quand même » un import REFUSÉ par le garde-fou de volume.
@@ -198,7 +200,7 @@ async function fiche(id: number): Promise<any> {
       where ci.client_id = $1 order by i.derniere_vente desc nulls last, i.id`, [id]),
   ]);
   delete c.actif; delete c.fusionne_dans;
-  return { client: c, contacts: contacts.rows, vehicules: vehicules.rows, ventes: ventes.rows, identites: identites.rows };
+  return { client: c, contacts: contacts.rows, vehicules: vehicules.rows, ventes: ventes.rows, identites: identites.rows, bony: await ficheBony(id) };
 }
 
 // GET /api/crm/clients/:id
@@ -402,6 +404,7 @@ router.post('/arbitrage', async (req: AuthRequest, res) => {
       await db.query(`update rcu.client set actif = false, fusionne_dans = $1 where id = $2`, [garde, absorbe]);
       await db.query(`delete from rcu.candidat where client_a = $1 or client_b = $1`, [absorbe]);
       await majResumes(db, [garde]);
+      await suivreFusions(db);   // échanges et refus du client absorbé → client gardé (lot 4)
     }
     await db.query('commit');
     res.json({ ok: true, client: garde });

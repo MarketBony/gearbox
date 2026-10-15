@@ -150,9 +150,11 @@ const COORD: Record<string, string> = {
   a_portable_ou_email: '(c.portable is not null or c.email is not null)',
 };
 
-const GARDE: Record<Requete['canal'], string | null> = {
-  tous: null, email: 'c.email is not null', sms: 'c.portable is not null',
-  phoning: 'coalesce(c.portable, c.fixe) is not null', courrier: 'c.adresse_complete',
+// « Ne plus contacter » (lot 4, rcu.contact_refus) : exclu de TOUT résultat, sur le canal visé ou en entier (« tout »).
+const refus = (canal: string | null) => `not exists (select 1 from rcu.contact_refus z where z.client_id = c.id and z.canal in ('tout'${canal ? `, '${canal}'` : ''}))`;
+const GARDE: Record<Requete['canal'], string> = {
+  tous: refus(null), email: `c.email is not null and ${refus('email')}`, sms: `c.portable is not null and ${refus('sms')}`,
+  phoning: `coalesce(c.portable, c.fixe) is not null and ${refus('tel')}`, courrier: `c.adresse_complete and ${refus('courrier')}`,
 };
 const CLE_DOUBLON: Record<Requete['canal'], string | null> = {
   tous: null, email: 'lower(c.email)', sms: 'c.portable', phoning: 'coalesce(c.portable, c.fixe)',
@@ -246,6 +248,8 @@ export const COLONNES: Colonne[] = [
   { cle: 'fixe', libelle: 'Téléphone fixe', groupe: 'Coordonnées', sql: 'c.fixe' },
   { cle: 'site', libelle: 'Site (dernier achat)', groupe: 'Client', sql: 'c.site' },
   { cle: 'vendeur', libelle: 'Vendeur (dernier achat)', groupe: 'Client', sql: 'c.vendeur' },
+  { cle: 'vendeur_pf', libelle: 'Vendeur du portefeuille', groupe: 'Client', sql: `(select concat_ws(' ', v.prenom, v.nom) from rcu.portefeuille p join rcu.vendeur v on v.id = p.vendeur_id where p.client_id = c.id)` },
+  { cle: 'tel_vendeur_pf', libelle: 'Téléphone du vendeur du portefeuille', groupe: 'Client', sql: `(select v.telephone from rcu.portefeuille p join rcu.vendeur v on v.id = p.vendeur_id where p.client_id = c.id)` },
   { cle: 'premiere_vente', libelle: 'Client depuis', groupe: 'Client', sql: d('c.premiere_vente') },
   { cle: 'derniere_vente', libelle: 'Dernier achat', groupe: 'Client', sql: d('c.derniere_vente') },
   { cle: 'nb_vehicules', libelle: 'Véhicules achetés (depuis toujours)', groupe: 'Client', sql: 'c.nb_vehicules' },

@@ -4,6 +4,7 @@ import { closeRcu, rcu } from './db';
 import { migrateRcu } from './migrate';
 import { importerFichier } from './importer';
 import { rapprocher } from './rapprochement';
+import { chargerMaeva, majAlias, recalculer } from './portefeuille';
 
 /**
  * Worker du RCU — conteneur `rcu-worker` (même image que `api`, autre commande).
@@ -12,6 +13,8 @@ import { rapprocher } from './rapprochement';
  *   node dist/rcu/worker.js --fichier <chemin>   importe un fichier une fois (ancienne base Sud-Ouest, poste local)
  *        [--forcer]                              passe outre le garde-fou de volume
  *   node dist/rcu/worker.js --rapprocher         recalcule seulement le client unique (lot 2)
+ *   node dist/rcu/worker.js --vendeurs <json>    charge le référentiel vendeurs (fichier MAEVA converti, une seule fois)
+ *   node dist/rcu/worker.js --portefeuilles [--simuler]  recalcule les portefeuilles vendeurs (lot 4)
  *
  * Après chaque import APPLIQUÉ, le client unique est recalculé (`rapprochement.ts`).
  *
@@ -33,7 +36,17 @@ async function apresImport(): Promise<void> {
   try {
     const st = await rapprocher();
     log(`rapprochement : ${st.clients} clients (${st.clientsMultiIdentites} multi-identités), ${st.aArbitrer} à arbitrer, ${st.dureeSecondes} s`);
-  } catch (e) { log('rapprochement en échec :', (e as Error).message); }
+  } catch (e) { log('rapprochement en échec :', (e as Error).message); return; }
+  await portefeuilles('import');
+}
+
+/** Portefeuilles vendeurs (lot 4) : après chaque import, et une fois par jour pour les départs et arrivées datés. */
+async function portefeuilles(declencheur: string): Promise<void> {
+  try {
+    await majAlias(rcu());
+    const r = await recalculer({ declencheur });
+    if (r) log(`portefeuilles (${declencheur}) : ${r.clients} clients, ${r.changements} changements, ${r.a_attribuer} à attribuer, ${r.ms} ms`);
+  } catch (e) { log('portefeuilles en échec :', (e as Error).message); }
 }
 
 function archiver(chemin: string, sousDossier: string, runId: number | null): void {
@@ -120,6 +133,20 @@ async function main(): Promise<void> {
     process.exit(r.statut === 'applique' || r.statut === 'deja_applique' ? 0 : 1);
   }
 
+  const iv = process.argv.indexOf('--vendeurs');
+  if (iv > 0) {
+    console.log(JSON.stringify(await chargerMaeva(JSON.parse(fs.readFileSync(process.argv[iv + 1], 'utf8'))), null, 2));
+    await closeRcu();
+    process.exit(0);
+  }
+  if (process.argv.includes('--portefeuilles')) {
+    const simu = process.argv.includes('--simuler');
+    await majAlias(rcu());
+    console.log(JSON.stringify(await recalculer({ ecrire: !simu, forcer: true, declencheur: 'manuel' }), null, 2));
+    await closeRcu();
+    process.exit(0);
+  }
+
   if (process.argv.includes('--rapprocher')) {
     console.log(JSON.stringify(await rapprocher(), null, 2));
     await closeRcu();
@@ -128,7 +155,11 @@ async function main(): Promise<void> {
 
   log(`surveillance de ${DEPOT} toutes les ${INTERVALLE_MS / 60000} min, demandes toutes les ${DEMANDES_MS / 1000} s`);
   let prochainTour = 0;
+  let jourFait = '';
   for (;;) {
+    // Une fois par jour, après 1 h : un vendeur parti la veille rend ses clients, un vendeur arrivé entre dans la répartition.
+    const maintenant = new Date(), jour = maintenant.toISOString().slice(0, 10);
+    if (jour !== jourFait && maintenant.getHours() >= 1) { jourFait = jour; await portefeuilles('nuit'); }
     try { await demandes(); } catch (e) { log('erreur sur les demandes :', (e as Error).message); }
     if (Date.now() >= prochainTour) {
       try { await tour(); } catch (e) { log('erreur de tour :', (e as Error).message); }

@@ -85,7 +85,9 @@ const ClientsView: React.FC<{
   // Sélection automatique du premier client (fenêtre large seulement), comme la maquette.
   useEffect(() => {
     if (!res || compact) return;
-    if (!st.selId || !res.rows.some((c) => c.id === st.selId)) setSt((s) => ({ ...s, selId: res.rows[0]?.id ?? null, autoSel: true }));
+    // Un client ouvert à la main (Requêteur, Équipes › À attribuer) reste ouvert même s'il n'est pas dans la page affichée
+    // (avant le 15/10/2026, il était remplacé par le premier client de la liste).
+    if (!st.selId || (st.autoSel && !res.rows.some((c) => c.id === st.selId))) setSt((s) => ({ ...s, selId: res.rows[0]?.id ?? null, autoSel: true }));
   }, [res, compact]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!compact) setPile(false); }, [compact]);
 
