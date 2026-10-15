@@ -5,6 +5,12 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [ ] **CRM : Figeac, Millau et Carmaux absents des extractions DCS** (12/10). Ni VN ni VO pour `VNVORFIG`, `VNVORMILLAU`,
   `VNVORCARM` : le compte DCS de Théo n'a pas ces sites (droits à faire ouvrir par l'IT). Leurs codes sont déjà dans
   `rcu.ref_affaire` : rien à coder, ils seront importés dès qu'ils remonteront.
+- [x] **SPARK : le worker n'archivait aucun fichier du dépôt SFTP** (trouvé au test de dépôt du 15/10, avant le premier envoi
+  DCS). `rename` de `/depot` vers `/archive` → `EXDEV` (deux montages) : fichier laissé dans le dépôt, tour interrompu, **le
+  fichier suivant jamais importé** (le VO derrière le VN). Correctif 87 : copie + suppression, erreur isolée par fichier.
+- [ ] **VPS : connexion SSH par mot de passe ouverte à TOUS les comptes** (constaté le 15/10) : `50-cloud-init.conf` (19/06) met
+  `PasswordAuthentication yes` (ubuntu compris ; root `prohibit-password`), pas de fail2ban. Seul `dcs` en a besoin (bloc `Match`
+  du `70-dcs-sftp.conf`). À arbitrer par Théo : passer le global à `no` (clé seule pour ubuntu), après `sshd -t`, session ouverte.
 - [ ] **VPS : pare-feu `ufw` inactif** (constaté le 12/10 en préparant le CRM). Rien n'est exposé à tort aujourd'hui (Caddy 80/443
   et SSH seulement ; `rcu-db` n'a AUCUN port publié), mais aucun filet si un conteneur publiait un port par erreur.
 - [x] **SPARK, trouvés avant la prod (correctif 84)** : 4 341 ventes « à une société » chez des clients classés particuliers

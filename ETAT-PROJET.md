@@ -4,8 +4,8 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 15/10/2026 (lire en premier)
-- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 86**
-  (15/10, `api` + `web`). Aucune branche ouverte.
+- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 87**
+  (15/10, `rcu-worker` seul : requêtes DCS sur le SFTP + archivage du worker). Aucune branche ouverte.
 - **CHANTIER EN COURS : SPARK** (le CRM ; « RCU » = nom technique invisible). Cadrage : `RCU-CADRAGE.md` (R1–R13) + page
   `maquettes/crm/rcu-cartographie.html` ; maquettes : `maquettes/crm/v2/` (rubrique + Requêteur) et le canevas
   https://claude.ai/artifact/YQAT1pvBU1w6aMj2GB8Kv4 (planches A–D du Requêteur). **En production** :
@@ -15,14 +15,17 @@
   - 84 (13/10) lot 3 : **Requêteur** (4 cartes Qui / Quel véhicule / À quel moment / Comment les joindre, résumé en phrase,
     « Voir les clients » en tableau trié, exports Excel / Sarbacane / allmysms / phoning / courrier journalisés) ;
   - 85 (13/10) : export Excel des flottes (taille, parc complet, une ligne par véhicule) ;
-  - 86 (15/10) : **mode avancé** (opérateurs par type, groupes ET / OU à un niveau, exclusions, liste collée, suggestions).
+  - 86 (15/10) : **mode avancé** (opérateurs par type, groupes ET / OU à un niveau, exclusions, liste collée, suggestions) ;
+  - 87 (15/10) : **requêtes DCS branchées** — compte SFTP `dcs` ouvert par mot de passe (`ACCES-INFRA-SECRET.md`), config
+    DCSNETneo « SPGR », exports COMPLETS hebdomadaires (`Clients VN` vendredi 23 h 30, `Clients VO` 23 h 45, `/depot/clients-VN|VO.txt`) ;
+    worker : archivage `EXDEV` réparé (le VO n'aurait jamais été importé).
   Rubrique visible du **Master seul** (`CRM_ROLES` / `CRM_ALLOWED_ROLES`) ; cible = rôles de Jeux, quand Théo le dira.
-- **PROCHAINE ÉTAPE (Théo, 15/10) : brancher les 2 requêtes automatiques du Requêteur DCSNETneo sur le SFTP** (VN et VO, TXT
-  tabulé, mêmes colonnes que les fichiers « Clients VN - REQ.txt » / « Clients VO - REQ (1).txt » de Théo). À faire : demander à
-  Théo ce que DCS accepte (mot de passe ou clé SSH, IP d'envoi fixe ?, nom de fichier, heure) ; poser l'accès du compte `dcs`
-  (si mot de passe : bloc `Match User dcs` avec `PasswordAuthentication yes` dans `/etc/ssh/sshd_config.d/70-dcs-sftp.conf`,
-  `sudo sshd -t` AVANT `systemctl reload ssh`, session gardée ouverte) ; test de dépôt ; vérifier dans SPARK › Imports
-  (refus si chute > 10 % : « Appliquer quand même » du Master). Requête du soir complète ou glissante : à mesurer (cadrage § 8).
+- **PROCHAINE ÉTAPE : contrôler le PREMIER envoi DCS (samedi 17/10 ou lundi)** — SPARK › Imports doit montrer deux imports
+  VN et VO du vendredi 16/10 au soir (`sudo docker compose logs --since 72h rcu-worker`). Risques non vérifiés : ligne de TOTAL
+  absente (refus « Ligne de total absente » → voir si DCSNETneo a une option), titre non reconnu (« clients VN » attendu), noms
+  de fichier. Si refus : le fichier est dans `/srv/rcu/archive/refuses/`, le lire avant de toucher au code. Garde-fou de volume :
+  chute > 10 % → « Appliquer quand même » du Master. Puis, si Théo le veut, changer le mot de passe `dcs` (passé en clair dans
+  la discussion du 15/10) et le ressaisir dans DCS.
 - **ENSUITE** : lot 4 (couche Bony : référentiel vendeurs depuis le fichier « MAEVA Vendeurs - affaires.xlsx » de Théo — 138
   vendeurs, secteurs en CP, règles de la feuille « EXTRACTION DCSNET » —, réattribution auto par secteur, « ne plus contacter »,
   coordonnées refusées, échanges, « déjà ciblés » via `rcu.export_client`), lot 5 (relances), lot 6 (GRID). Projet futur :
@@ -85,7 +88,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 86 (15/10)** — SPARK, mode avancé du Requêteur (opérateurs, groupes ET / OU, liste collée).
+- **En production : correctif 87 (15/10)** — SPARK, requêtes DCS sur le SFTP + archivage du worker (`rcu-worker` seul).
+  Avant lui le **correctif 86 (15/10)** — SPARK, mode avancé du Requêteur (opérateurs, groupes ET / OU, liste collée).
   Avant lui le **correctif 85 (13/10)** — SPARK, export Excel des flottes (taille, parc complet, une ligne par véhicule).
   Avant lui le **correctif 84 (13/10)** — **SPARK lot 3 : le Requêteur** (`api`, `web`, `rcu-worker`, migration RCU 004).
   Avant lui le **correctif 83 (12/10)** — **CRM lot 2** (client unique, interface complète ; `api`, `web`, `rcu-worker`).
@@ -646,6 +650,24 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 87 — 15/10 : SPARK, requêtes DCS branchées sur le SFTP + archivage du worker** (branche
+  `fix/rcu-worker-archivage`, **`rcu-worker` seul**, aucune migration).
+  - **Accès SFTP du compte `dcs`** (VPS, hors git) : `PasswordAuthentication yes` ajouté au bloc `Match User dcs` de
+    `/etc/ssh/sshd_config.d/70-dcs-sftp.conf` (ancienne version : `/root/70-dcs-sftp.conf.bak-20261015`), `sshd -t` puis reload ;
+    mot de passe aléatoire posé (`chpasswd`), rangé dans `ACCES-INFRA-SECRET.md`. Toute IP (celle de DCS est inconnue).
+    Vérifié : connexion SFTP, chroot (`/` = racine non inscriptible, `/depot`), shell refusé (« sftp connections only »).
+  - **Côté DCSNETneo (fait par Théo)** : configuration SFTP « SPGR » (51.83.75.181:22, `dcs`, `/depot`) — « Connexion valide »
+    depuis les serveurs de DCS (le réseau du bureau bloque le 22). Deux exportations **hebdomadaires, COMPLÈTES** : `Clients VN`
+    le vendredi 23 h 30 → `/depot/clients-VN.txt`, `Clients VO` le vendredi 23 h 45 → `/depot/clients-VO.txt` (texte tabulé,
+    titre + en-têtes). **Premier envoi : vendredi 16/10.** ⚠️ Non vérifié : que DCS écrive bien la ligne de TOTAL (sinon refus
+    « Ligne de total absente ») et que le titre contienne « VN » / « VO » en mot isolé (description nommée `Clients VN/VO` pour ça).
+  - **Bug trouvé au test de dépôt** : `rename` de `/depot` vers `/archive` → `EXDEV` (deux montages Docker) ; le fichier restait
+    dans le dépôt, le tour s'arrêtait et **le fichier suivant (VO) n'était jamais importé**. Correctif (`worker.ts`) : copie +
+    suppression sur `EXDEV`, et une erreur par fichier ne bloque plus les suivants. Testé en local (base `rcu` locale, vrai worker,
+    `EXDEV` simulé) : l'ancien code reproduit la panne, le nouveau archive les deux fichiers.
+  - ⚠️ **Constaté, non touché** : `/etc/ssh/sshd_config.d/50-cloud-init.conf` (19/06) met `PasswordAuthentication yes` pour TOUS
+    les comptes (ubuntu compris ; root reste `prohibit-password`). Pas de fail2ban. À arbitrer par Théo (backlog § Sécurité).
+
 - **Correctif 86 — 15/10 : SPARK, MODE AVANCÉ du Requêteur** (branche `feat/spark-mode-avance`, **`api` ET `web`**, aucune
   migration). Retour de Théo : « il manque des conditions et/ou/contient/commence par… », impossible de cibler plusieurs modèles.
   Maquette validée (planche D du canevas). Bouton Simple / Avancé sur la MÊME requête (briques simples + groupes, combinés en ET).
@@ -1082,7 +1104,9 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 86** (15 octobre 2026) — SPARK, mode avancé du Requêteur,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 87** (15 octobre 2026) — SPARK, requêtes DCS sur le SFTP
+  (compte `dcs` ouvert par mot de passe, hors git) et archivage du worker, **`rcu-worker` seul**, aucune migration. Avant lui le
+  **correctif 86** (15 octobre 2026) — SPARK, mode avancé du Requêteur,
   **`api` ET `web`**, aucune migration. Avant lui le **correctif 85** (13 octobre 2026) — SPARK, export Excel des flottes,
   **`api` ET `web`**, aucune migration. Avant lui le **correctif 84** (13 octobre 2026) — SPARK lot 3 (Requêteur), **`api` ET
   `web` + `rcu-worker`**, migration RCU `004_requeteur.sql` (appliquée par le worker), puis `--rapprocher`. Avant lui le

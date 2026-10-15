@@ -56,6 +56,8 @@ ne pas les réécrire.
   `POST /sites` (classer un libellé inconnu ; site validé contre `ALL_SITES` de `siteScope.ts`).
 - **Worker** (`src/rcu/worker.ts`) : dépôt `/depot` (= `/srv/dcs/depot`, SFTP), archive `/archive` (= `/srv/rcu/archive`,
   `appliques/` et `refuses/`, 14 jours), tour toutes les 5 min (fichier stable depuis 2 min), demandes toutes les 30 s.
+  ⚠️ `/depot` et `/archive` sont deux montages : `rename` lève `EXDEV`, l'archivage copie puis supprime (correctif 87) ; une
+  erreur sur un fichier n'arrête plus le tour. Envois DCS : hebdomadaires, complets (vendredi soir, `clients-VN.txt` / `clients-VO.txt`).
   Import manuel : `docker compose exec rcu-worker node dist/rcu/worker.js --fichier <chemin> [--forcer]`.
 
 ### 🧩 SPARK — mode avancé du Requêteur (15/10/2026, correctif 86)
