@@ -64,14 +64,15 @@
   `GOOGLE_CLIENT_SECRET`), puis `sudo docker compose up -d api` (variables seules, pas de rebuild).
 - **BASCULE : PAS ENCORE** (Théo, 12/10) — ne pas la lancer ni la reproposer comme « prochaine étape » sans son feu vert ; la
   date (annoncée ~16/10) est à reconfirmer avec lui.
-- **EN ATTENTE DE RETOURS (Théo + équipe)** :
-  - **Liquid Glass ailleurs que sur les widgets** (Dock, menus, panneaux, fenêtres) : non rognés ; si une ligne du même genre y
-    est signalée, même correctif (`clip-path`). Méthode : capture d'ÉCRAN de Théo, agrandie et mesurée (cf. Pièges) ;
-  - **bulles de discussion (76)** : pastille de non-lus et VRAI envoi depuis une bulle jamais testés ;
-  - **widgets (77–78)** : cocher une tâche, déplacer une carte du widget To-do, jouer / refuser un défi (écritures non testées) ;
-  - **fonds d'écran (75)** : mesurer sur un PC qui chauffait (gestionnaire de tâches de Chrome) ;
-  - **Chat (72), mIAouss (71 : réponses + mascotte, `ui2/apps/assistant/mascot.ts`), navigation téléphone (70, iPhone /
-    Pixel)**, **Jeux (79** : pastille et bannières) : retours toujours attendus.
+- **RETOURS DE THÉO DU 15/10** : Liquid Glass hors widgets **OK** ; bulles de discussion **OK** ; fonds d'écran **OK** ;
+  navigation sur Pixel **OK** (iPhone non dit) ; mIAouss « OK mais peu sollicité, pas assez utile » ; mode avancé du Requêteur
+  pas encore vraiment testé.
+  - **🐞 WIDGETS DU BUREAU « désastreux »** (à corriger, lot dédié) : réduire la fenêtre du navigateur puis l'agrandir DÉPLACE les
+    widgets ; des widgets de même taille en cases ne s'alignent plus. Fiche dans `BUGS-CONNUS.md`. Méthode : reproduire en
+    redimensionnant, demander une capture de l'écran de Théo avant / après.
+  - **Vision mIAouss (Théo, 15/10)** : à terme une IA qui AGIT dans Gearbox (créer des projets, faire des extractions SPARK,
+    rédiger des éditos…). Contrainte inchangée : aucun service d'IA payant. C'est la suite P2 / P3 déjà prévue, en plus large.
+  - Toujours attendus : widgets en écriture (cocher une tâche, carte To-do, défi), Chat (72), Jeux (79), iPhone (70).
 - **Non vérifié du correctif 80** (à faire au passage) : le temps réel SANS charge pour l'External (vérifié dans le code
   seulement — test : un onglet Master modifie un projet de test, regarder ce que reçoit l'External) ; le Chat de l'ANCIENNE
   interface avec un External.
@@ -4498,6 +4499,10 @@
 ### Fonctionnel / produit
 - **Chantiers d'octobre 2026 (liste de Théo du 01/10) — arbitrages, ne pas les rediscuter :**
   - Nouveautés **dans la v2 seulement**.
+  - **SPARK, second temps (Théo, 15/10)** : **relances** (lot 5 : règles réglables, « à rappeler » des échanges) et **GRID**
+    (lot 6 : GRID lit les vendeurs de SPARK, comptes vendeurs, fiches dans GRID). Aussi « déjà ciblés ».
+  - **Widgets du bureau v2** : repositionnement anarchique au redimensionnement (voir `BUGS-CONNUS.md`).
+  - **mIAouss « qui agit »** (créer des projets, extractions SPARK, éditos), sans service payant.
   - ~~Photos de profil absentes, widget Chat « que mes messages »~~ → **fait, correctif 60**.
   - **Prestataire sur les dépenses** : texte libre + auto-complétion des valeurs déjà saisies, sur les tâches ET les
     dépenses (`Task.provider` existe déjà ; `FixedExpense` n'a rien). Vérifier la validation d'écriture de
