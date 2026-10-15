@@ -5,6 +5,7 @@ import { brandHex, dFR, nf, tel } from '../common';
 import { CANAL, TY, sayOf, type Compte, type Ligne, type Q, type Requete } from './modele';
 import type { SetQ } from './Briques';
 import { civA } from './outils';
+import { groupesPhrase } from './avanceModele';
 
 /**
  * « Voir les clients » (piste C) : les filtres en étiquettes supprimables, la barre de joignabilité, et le résultat en
@@ -42,6 +43,11 @@ const VoirClients: React.FC<{
         <div className="rq2-chips">
           {tags.map((b) => <span key={b.id} className={`rq2-chip ${b.sauf ? 'sauf' : ''}`}>{b.sauf ? null : <span className="faint">{TY[b.t].l} :</span>}<span className="v">{sayOf(b)}</span>
             <button aria-label="Retirer ce filtre" onClick={() => setQ((x) => ({ ...x, from: null, bricks: x.bricks.filter((y) => y.id !== b.id) }))}><Icon name="close" size="sm" /></button></span>)}
+          {(q.groupes || []).map((g, i) => { const ph = groupesPhrase([g], undefined, null)[0]; return ph ? (
+            <span key={g.id} className={`rq2-chip ${g.exclure ? 'sauf' : ''}`}><span className="faint">{g.exclure ? 'Exclusion' : `Groupe ${i + 1}`} :</span><span className="v" data-tip={ph}>{ph}</span>
+              <button aria-label="Retirer ce groupe" onClick={() => setQ((x) => ({ ...x, from: null, groupes: (x.groupes || []).filter((y) => y.id !== g.id) }))}><Icon name="close" size="sm" /></button></span>) : null; })}
+          {q.liste?.valeurs.length ? <span className={`rq2-chip ${q.liste.exclure ? 'sauf' : ''}`}><span className="faint">Liste :</span><span className="v">{groupesPhrase([], undefined, q.liste)[0]}</span>
+            <button aria-label="Retirer la liste" onClick={() => setQ((x) => ({ ...x, from: null, liste: null }))}><Icon name="close" size="sm" /></button></span> : null}
           {G.key ? <span className="rq2-chip canal"><span className="faint">Canal :</span><span className="v">{G.l}</span><button aria-label="Retirer le canal" onClick={() => setQ((x) => ({ ...x, canal: 'tous' }))}><Icon name="close" size="sm" /></button></span> : null}
           <button className="rq2-chip add" onClick={onBack}><Icon name="plus" size="sm" />Filtre</button></div>
         {c ? <div className="rq2-bar"><b>{nf(main)}</b> {q.level === 'vehicule' ? 'lignes' : 'clients'} · <b>{nf(c.entonnoir.email)}</b> e-mail · <b>{nf(c.entonnoir.portable)}</b> portable · <b>{nf(c.entonnoir.telephone)}</b> téléphone · <b>{nf(c.entonnoir.adresse)}</b> adresse

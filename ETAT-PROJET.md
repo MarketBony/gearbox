@@ -66,7 +66,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 85 (13/10)** — SPARK, export Excel des flottes (taille, parc complet, une ligne par véhicule).
+- **En production : correctif 86 (15/10)** — SPARK, mode avancé du Requêteur (opérateurs, groupes ET / OU, liste collée).
+  Avant lui le **correctif 85 (13/10)** — SPARK, export Excel des flottes (taille, parc complet, une ligne par véhicule).
   Avant lui le **correctif 84 (13/10)** — **SPARK lot 3 : le Requêteur** (`api`, `web`, `rcu-worker`, migration RCU 004).
   Avant lui le **correctif 83 (12/10)** — **CRM lot 2** (client unique, interface complète ; `api`, `web`, `rcu-worker`).
   Avant lui le **correctif 82 (12/10)** — **CRM lot 1** (base `rcu-db`, import DCS, écran Imports ; `api` ET `web` +
@@ -626,6 +627,23 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 86 — 15/10 : SPARK, MODE AVANCÉ du Requêteur** (branche `feat/spark-mode-avance`, **`api` ET `web`**, aucune
+  migration). Retour de Théo : « il manque des conditions et/ou/contient/commence par… », impossible de cibler plusieurs modèles.
+  Maquette validée (planche D du canevas). Bouton Simple / Avancé sur la MÊME requête (briques simples + groupes, combinés en ET).
+  - **Moteur** `backend/src/rcu/avance.ts` (branché sur la seule porte `requete.ts`) : 51 champs en liste FERMÉE (client,
+    coordonnées, véhicule, achat, financement), opérateurs par type (texte : est / n'est pas / contient / ne contient pas /
+    commence par / finit par / vide ; liste ; tableau ; nombre ; date : avant / après / entre / prochains / il y a entre / il y a
+    plus de / tombe en (mois) ; booléen), valeurs en paramètres, casse et accents ignorés. **Groupes, un seul niveau** (Théo) :
+    portée client / même véhicule / au moins un véhicule / aucun véhicule, mode ET / OU, exclusion ; un groupe « même véhicule »
+    désigne aussi le véhicule exporté. **Liste collée** (VIN, immat, noms, identifiants SPARK, 20 000 max) à cibler ou exclure.
+  - **Routes** : `POST /requetes/details` (clients après chaque groupe et chaque condition), `GET /requetes/valeurs` (valeurs
+    réelles + nombre, pour les suggestions), `champs` dans `/requetes/referentiels`. Contrat : CONTRAT-API.md § Mode avancé.
+  - **Mesuré** : exemple de la maquette retrouvé au client près (43 679 → 3 801 → 3 774 → 569 ; 561 ; 524) en 0,4 s ; détails
+    en ~3 s ; pros 5–35 véhicules avec un Master ou Trafic : 267. Testé à l'écran avec Théo : CLIO + CAPTUR (227), exclusion
+    Dacia (−16 → 211). Corrigé en route : grille empilée selon la largeur de la CARTE (container query), pas de la fenêtre.
+  - **Non testé à l'écran** : ouverture du menu des opérateurs à la souris (réglé par script pendant le test), coller une liste,
+    champs date / nombre. Phrase du résumé encore mécanique en mode avancé.
+
 - **Correctif 85 — 13/10 : SPARK, export Excel des flottes** (branche `fix/spark-export-flottes`, **`api` ET `web`**, aucune
   migration). Retour de Théo après un export « pros, Clermont, flotte de 5 ou plus » : pas de taille de parc dans le fichier et un
   seul modèle par client. Colonne « Flotte » cochée d'office (Complet, Phoning) ; nouveau préréglage **Flottes** (choisi d'office
@@ -1045,7 +1063,8 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 85** (13 octobre 2026) — SPARK, export Excel des flottes,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 86** (15 octobre 2026) — SPARK, mode avancé du Requêteur,
+  **`api` ET `web`**, aucune migration. Avant lui le **correctif 85** (13 octobre 2026) — SPARK, export Excel des flottes,
   **`api` ET `web`**, aucune migration. Avant lui le **correctif 84** (13 octobre 2026) — SPARK lot 3 (Requêteur), **`api` ET
   `web` + `rcu-worker`**, migration RCU `004_requeteur.sql` (appliquée par le worker), puis `--rapprocher`. Avant lui le
   **correctif 83** (12 octobre 2026) — CRM lot 2 (client unique),

@@ -11,6 +11,8 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   (fiches DCS sans civilité) → règle Professionnel élargie ; compteurs emballés de 13 min (sous-requête ligne à ligne, tri sur
   disque) qui ont verrouillé `rcu.client` → énergie précalculée, `work_mem` 64 Mo, `statement_timeout` ; plage de flotte qui ne
   s'appliquait qu'à la sortie du champ (perdue au rendu) → appliquée pendant la frappe.
+- [ ] **SPARK, mode avancé : à vérifier en usage réel** — ouverture du menu des opérateurs à la souris (non obtenue par clic simulé
+  le 15/10), « Coller une liste », champs date / nombre ; phrase du résumé mécanique (« marque est l'un de DACIA »).
 - [ ] **SPARK : mention STOP allmysms provisoire** (« STOP au 36XXX ») — à remplacer par la vraie mention fournie par allmysms.
 - [ ] **SPARK : `nb_parc` (taille de flotte) recalculé la nuit seulement**, pas après une fusion / séparation manuelle.
 - [x] **CRM, trouvés en recette locale avant la prod (correctif 83)** : portable rangé en « téléphone domicile » par l'ancienne

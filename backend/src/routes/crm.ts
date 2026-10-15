@@ -6,6 +6,8 @@ import { CRM_ROLES } from '../auth/roles';
 import { PoolClient } from 'pg';
 import { rcu, rcuConfigured } from '../rcu/db';
 import { majResumes } from '../rcu/resume';
+import { CHAMPS_PUBLICS, suggestionsSQL } from '../rcu/avance';
+import { compterDetails } from '../rcu/requete';
 import { COLONNES, COLONNES_APERCU, COLONNES_TABLEAU, TRIS, Requete, RequeteInvalide, compter, lignes, lireRequete } from '../rcu/requete';
 
 /**
@@ -236,7 +238,7 @@ router.get('/requetes/referentiels', async (_req, res) => {
     q(`select type_vente as v from rcu.cv where type_vente is not null group by 1 order by count(*) desc`),
     q(`select site as v from rcu.cv where site is not null group by 1 order by 1`),
   ]);
-  res.json({ zones, agents, vendeurs, marques, familles, types_vente: types, sites,
+  res.json({ zones, agents, vendeurs, marques, familles, types_vente: types, sites, champs: CHAMPS_PUBLICS,
     colonnes: COLONNES.map(({ cle, libelle, groupe }) => ({ cle, libelle, groupe })) });
 });
 
@@ -264,6 +266,21 @@ router.post('/requetes/lignes', async (req: AuthRequest, res) => {
   const page = Math.max(0, Math.min(2000, Math.floor(Number(req.body?.page) || 0)));
   const tri = typeof req.body?.tri === 'string' && req.body.tri in TRIS ? req.body.tri : 'recent';
   await repondre(res, async () => ({ page, taille: 50, tri, ...(await lignes(r, COLONNES_TABLEAU, 50, undefined, page * 50, tri)) }));
+});
+
+// POST /api/crm/requetes/details { requete } — mode avancé : clients après chaque groupe et chaque condition.
+router.post('/requetes/details', async (req: AuthRequest, res) => {
+  const r = requeteDe(req, res); if (!r) return;
+  await repondre(res, () => compterDetails(r));
+});
+
+// GET /api/crm/requetes/valeurs?champ=veh.modele&q=cli — valeurs réelles d'un champ (mode avancé), avec leur nombre.
+router.get('/requetes/valeurs', async (req, res) => {
+  const sql = suggestionsSQL(String(req.query.champ ?? ''));
+  if (!sql) return res.status(400).json({ error: 'Ce champ ne propose pas de valeurs.' });
+  const q = String(req.query.q ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[%_\\]/g, '').slice(0, 60);
+  const { rows } = await rcu().query(sql, [`${q}%`]);
+  res.json(rows);
 });
 
 // POST /api/crm/requetes/apercu { requete } — 20 lignes, colonnes par défaut.

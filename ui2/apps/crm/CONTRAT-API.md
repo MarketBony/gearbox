@@ -157,3 +157,52 @@ génériques ne sont jamais des clients.
   `{ id, nom, requete, partagee, auteur, auteur_id, cree_le, maj_le, dernier_compte, dernier_lancement }[]`.
 - `POST /requetes` `{ nom, requete, partagee }` → `{ id }` · `PUT /requetes/:id` (même corps, auteur seulement) ·
   `DELETE /requetes/:id` (auteur seulement).
+
+---
+
+# Mode avancé du Requêteur (15/10/2026)
+
+La `Requete` gagne deux champs FACULTATIFS, combinés en ET avec les briques du mode simple (une requête peut mêler les deux) :
+
+```ts
+interface Requete { /* … niveau, canal, dedoublonnage, briques … */ groupes?: Groupe[]; liste?: Liste | null }
+interface Groupe {
+  id?: string;
+  portee: 'client' | 'meme_vehicule' | 'un_vehicule' | 'aucun_vehicule';
+  mode: 'et' | 'ou';            // toutes les conditions / au moins une
+  exclure?: boolean;            // « Exclure les clients qui… »
+  actif?: boolean;
+  conditions: Condition[];      // 30 au plus ; 12 groupes au plus ; UN SEUL niveau de groupes
+}
+interface Condition {
+  id?: string; champ: string; op: string; actif?: boolean;
+  valeurs?: string[];           // texte / liste / tableau / mois_annee ('1'..'12')
+  n?: number; min?: number; max?: number;   // nombre, et dates relatives
+  de?: 'AAAA-MM-JJ'; a?: 'AAAA-MM-JJ';      // dates absolues
+  unite?: 'jours' | 'mois' | 'annees';      // dates relatives (défaut : mois)
+}
+interface Liste { type: 'vin' | 'immat' | 'nom' | 'id_spark'; valeurs: string[]; exclure?: boolean }   // 20 000 valeurs au plus
+```
+
+**Portée** : `client` (une condition « véhicule » y vaut « au moins un véhicule » chacune) · `meme_vehicule` (un même achat remplit le
+groupe ; c'est aussi lui qui sort à l'export / en « une ligne par véhicule ») · `un_vehicule` (chaque condition par n'importe quel
+achat) · `aucun_vehicule` (aucun achat ne remplit le groupe).
+
+**Champs et opérateurs** : liste FERMÉE dans `GET /requetes/referentiels` → `champs: { cle, libelle, groupe, type, portee, operateurs[],
+suggestions }[]`. Types et opérateurs :
+- texte : `est`, `n_est_pas`, `contient`, `ne_contient_pas`, `commence_par`, `finit_par` (valeurs[], OU entre elles), `vide`, `non_vide`
+- liste : `est_un_de`, `aucun_de` (valeurs[]), `vide`, `non_vide`
+- tableau : `contient_un_de`, `aucun_de` (valeurs[])
+- nombre : `eq`, `ne`, `gt`, `ge`, `lt`, `le` (n), `entre` (min, max), `vide`, `non_vide`
+- date : `avant`, `apres` (de), `entre` (de, a), `prochains` (min, max, unite), `derniers` (min, max, unite : « il y a entre min et max »),
+  `il_y_a_plus_de` (n, unite), `mois_annee` (valeurs '1'..'12'), `vide`, `non_vide`
+- booleen : `vrai`, `faux`
+La casse et les accents sont ignorés côté serveur (texte comparé en majuscules sans accents).
+
+**Routes**
+- `POST /requetes/details { requete }` → `{ base, groupes: { apres, conditions: number[] }[], liste }` : clients (AVANT canal) sans les
+  groupes, puis cumulés après chaque groupe et, dans chaque groupe, après chaque condition (−1 = condition ou groupe inactif).
+  Plus lent que `/compter` (~2 s pour 3 groupes) : à appeler avec une temporisation plus longue (~800 ms).
+- `GET /requetes/valeurs?champ=veh.modele&q=cli` → `{ v, n }[]` (30 au plus) : valeurs réelles commençant par `q`, avec leur nombre.
+  Disponible si `suggestions: true` ou type liste / tableau.
+- `/requetes/compter`, `/apercu`, `/lignes`, `/export`, requêtes enregistrées : inchangés, ils acceptent `groupes` et `liste`.
