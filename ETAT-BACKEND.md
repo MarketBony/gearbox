@@ -60,6 +60,19 @@ ne pas les réécrire.
   erreur sur un fichier n'arrête plus le tour. Envois DCS : hebdomadaires, complets (vendredi soir, `clients-VN.txt` / `clients-VO.txt`).
   Import manuel : `docker compose exec rcu-worker node dist/rcu/worker.js --fichier <chemin> [--forcer]`.
 
+### 🧩 SPARK lot 4 — Équipes et portefeuilles (15/10/2026, correctif 88)
+- Migration RCU `005_portefeuilles.sql` (appliquée par `rcu-worker` au démarrage) : `equipe_site`, `encadrement`, `vendeur`
+  (+ `remplacant_id`), `vendeur_secteur`, `vendeur_alias`, `vendeur_journal`, `regle_portefeuille`, `portefeuille`,
+  `portefeuille_histo`, `portefeuille_run`, `portefeuille_param` (interrupteur `actif`, FAUX à l'installation), `contact_refus`,
+  `echange`. Couche Bony : jamais écrite par l'import.
+- **Seule porte du portefeuille : `src/rcu/portefeuille.ts`** (`recalculer`, `majAlias`, `suivreFusions`, `chargerMaeva`). Les
+  routes n'écrivent que des choix humains (`attribuer()` de `routes/crmEquipes.ts`).
+- Routes `routes/crmEquipes.ts` (montées sur `/api/crm`, `CRM_ROLES`) : `GET /equipes`, vendeurs (CRUD, archiver, aperçu de
+  départ, transfert), encadrement, noms DCS, règles, recalcul (simulation), paramètres, à attribuer ; fiche client :
+  `PUT /clients/:id/portefeuille`, `PUT /clients/:id/refus`, `POST|DELETE /clients/:id/echanges`. `GET /clients/:id` rend `bony`.
+- Requêteur : `GARDE` du canal exclut `rcu.contact_refus` (« tout » ou le canal) — tous les comptages et exports.
+- Worker : `--vendeurs <json>` (chargement unique), `--portefeuilles [--simuler]`, recalcul après import et une fois par jour.
+
 ### 🧩 SPARK — mode avancé du Requêteur (15/10/2026, correctif 86)
 
 - `src/rcu/avance.ts` : `CHAMPS` (liste fermée, SQL par champ) et `OPERATEURS` par type ; `groupeSQL` / `groupeSurAchat` / `listeSQL`

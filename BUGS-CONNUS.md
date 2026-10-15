@@ -5,6 +5,13 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [ ] **CRM : Figeac, Millau et Carmaux absents des extractions DCS** (12/10). Ni VN ni VO pour `VNVORFIG`, `VNVORMILLAU`,
   `VNVORCARM` : le compte DCS de Théo n'a pas ces sites (droits à faire ouvrir par l'IT). Leurs codes sont déjà dans
   `rcu.ref_affaire` : rien à coder, ils seront importés dès qu'ils remonteront.
+- [x] **SPARK : fiche ouverte depuis le Requêteur (ou Équipes › À attribuer) remplacée par le 1er client de la liste** quand le
+  client n'était pas dans la page affichée (sélection automatique de `ClientsView.tsx`). Corrigé au correctif 88.
+- [ ] **SPARK, portefeuilles : à faire par Théo avant d'activer le calcul en prod** — ~220 noms DCS à classer ; marques des
+  vendeurs du Sud-Ouest (« Renault » partout dans MAEVA : clients Dacia d'Albi « à attribuer ») ; 8 vendeurs Secteur sans code
+  postal ; 29 IPN seulement ; notes des feuilles par plaque (départs / arrivées) non reprises.
+- [ ] **SPARK : l'écran Équipes attend la fin du recalcul (3-5 s) à chaque enregistrement** (bouton « Recalcul… ») — acceptable,
+  à revoir si le référentiel grossit.
 - [x] **SPARK : le worker n'archivait aucun fichier du dépôt SFTP** (trouvé au test de dépôt du 15/10, avant le premier envoi
   DCS). `rename` de `/depot` vers `/archive` → `EXDEV` (deux montages) : fichier laissé dans le dépôt, tour interrompu, **le
   fichier suivant jamais importé** (le VO derrière le VN). Correctif 87 : copie + suppression, erreur isolée par fichier.

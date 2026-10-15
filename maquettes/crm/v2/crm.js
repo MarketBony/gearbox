@@ -525,7 +525,7 @@
     const vn = c.sales.filter((s) => s.source === 'VN').length, vo = c.sales.filter((s) => s.source === 'VO').length, bso = c.sales.filter((s) => s.source === 'BSO').length;
     const cts = c.cur.map((v) => v.ctProchain).filter(Boolean).sort()[0];
     const nSus = c.contacts.filter((k) => k.etat === 'suspect').length;
-    const tabs = [['veh', 'Véhicules', c.vehicles.length], ['ventes', 'Ventes', c.sales.length], ['fin', 'Financements et garanties', c.sales.filter((s) => s.fin && s.fin.famille !== 'Comptant').length], ['coord', 'Coordonnées', c.contacts.length], ['src', 'Sources', c.ids.length], ['ech', 'Échanges', 'lot 4'], ['rel', 'Relances', 'lot 4']];
+    const tabs = [['veh', 'Véhicules', c.vehicles.length], ['ventes', 'Ventes', c.sales.length], ['fin', 'Financements et garanties', c.sales.filter((s) => s.fin && s.fin.famille !== 'Comptant').length], ['coord', 'Coordonnées', c.contacts.length], ['src', 'Sources', c.ids.length], ['ech', 'Échanges', GX.crmEquipes ? GX.crmEquipes.echCount(c) : 'lot 4'], ['rel', 'Relances', 'lot 4']];
     const civ = CIV[c.civ];
     return `<div class="crm-fiche">
       <div class="crm-crumb"><span class="c">${mode === 'doc' ? 'SPARK' : 'Clients'} <span>/</span> <b class="ellipsis" style="max-width:300px">${esc(nameOf(c))}</b><span class="num hide-s crm-mono" style="margin-left:8px" data-tip="Identifiant SPARK : attribué à vie, survit aux fusions">${c.id}</span></span>
@@ -538,10 +538,10 @@
           <span class="badge" style="--c:var(--info)" data-tip="Civilité normalisée (4 valeurs). Libellé DCS : « ${esc(c.civRaw)} »">${GX.icon(c.soc ? 'building' : 'user', 'sm')}${civ.l}</span>
           <span class="badge" data-tip="Site principal : celui de la dernière vente">${GX.icon('pin', 'sm')}${esc(c.site)}</span>
           ${GX.r.brandChips(c.brands)}
-          <span class="badge" style="--c:var(--bony-violet)" data-tip="${c.vendeurRefBy ? `Réattribué par ${esc(c.vendeurRefBy)}` : 'Par défaut : vendeur de la dernière vente. Réattribuable (lot 4, R6).'}">${GX.icon('handshake', 'sm')}Vendeur référent : ${esc(c.vendeurRef)}</span>
+          ${GX.crmEquipes ? GX.crmEquipes.pfBadge(c) : `<span class="badge" style="--c:var(--bony-violet)">${GX.icon('handshake', 'sm')}Vendeur référent : ${esc(c.vendeurRef)}</span>`}
           ${nSus ? `<span class="badge" style="--c:var(--danger)">${GX.icon('alert', 'sm')}${nSus} coordonnée${nSus > 1 ? 's' : ''} suspecte${nSus > 1 ? 's' : ''}</span>` : ''}
         </div></div></div>
-      ${c.nplc ? `<div class="crm-stop">${GX.icon('belloff')}<div class="grow"><b>Ne plus contacter</b> — ${esc(c.nplc.motif)}. Saisi par ${esc(c.nplc.by)} le ${c.nplc.date}. Ce client est exclu de toutes les relances ; aucun import ne lève ce statut.</div><button class="btn sm" data-act="nplc">Lever</button></div>` : ''}
+      ${c.nplc ? `<div class="crm-stop">${GX.icon('belloff')}<div class="grow"><b>Ne plus contacter</b> — ${esc(c.nplc.motif)}. Saisi par ${esc(c.nplc.by)} le ${c.nplc.date}. Ce client est exclu de toutes les relances ; aucun import ne lève ce statut.</div><button class="btn sm" data-act="nplc">Modifier</button></div>` : ''}${GX.crmEquipes ? GX.crmEquipes.nplcBanner(c) : ''}
       <div class="crm-facts">
         <div class="card crm-fact" data-goto="veh"><span class="crm-lbl">Parc actuel</span><span class="v">${plural(c.cur.length, 'véhicule')}</span><span class="h">${c.vehicles.length - c.cur.length ? `+ ${c.vehicles.length - c.cur.length} en historique` : 'aucun historique'}</span></div>
         <div class="card crm-fact" data-goto="ventes"><span class="crm-lbl">Ventes</span><span class="v">${c.sales.length}</span><span class="h">${[vn && `${vn} VN`, vo && `${vo} VO`, bso && `${bso} anc. base`].filter(Boolean).join(' · ')} · dernière ${mY(c.last.date)}</span></div>
@@ -634,6 +634,7 @@
           <span>Rattachement</span><b>${x.separee ? '<span class="badge" style="--c:var(--warn)">Séparée — client distinct au prochain recalcul</span>' : j === 0 ? '<span class="badge" style="--c:var(--text-3)">Identité d’origine (la plus ancienne survit)</span>' : `<span class="badge" style="--c:${x.rule.startsWith('Arbitrage') ? 'var(--bony-violet)' : 'var(--ok)'}">${esc(x.rule)}</span>`}</b></div></div>`).join('')}</div>`;
   }
   function soonHTML(k, c) {
+    if (k === 'ech' && GX.crmEquipes) return GX.crmEquipes.echHTML(c);
     if (k === 'ech') return `<div class="crm-soon">${GX.icon('message', 'lg')}<div><b style="color:var(--text)">Échanges — arrive avec le lot 4</b><div class="crm-note" style="margin-top:4px">Appels, visites, e-mails et notes des vendeurs, qualification du client, réattribution du vendeur. Couche Bony : saisie par les utilisateurs, jamais touchée par l’import du soir.</div>
       <button class="btn sm" style="margin-top:12px" disabled>${GX.icon('plus', 'sm')}Noter un échange</button></div></div>`;
     const T2 = [];
@@ -652,17 +653,18 @@
     host.querySelector('[data-ftabs]')?.addEventListener('change', (e) => { st.tab = e.detail; rt(); GX.store.set('crm.ftab', st.tab); });
     host.querySelectorAll('[data-goto]').forEach((el) => el.addEventListener('click', () => { st.tab = el.dataset.goto; const b = host.querySelector(`[data-ftabs] [data-v="${st.tab}"]`); b?.click(); host.querySelector('.crm-tabsbar')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }));
     host.querySelector('[data-act=window]')?.addEventListener('click', (e) => openWindow ? openWindow(c, e.currentTarget) : openList?.());
-    host.querySelector('[data-act=nplc]')?.addEventListener('click', () => toggleNplc(c, win, refresh));
+    host.querySelectorAll('[data-act=nplc]').forEach((b) => b.addEventListener('click', () => toggleNplc(c, win, refresh)));
     host.querySelector('[data-act=more]')?.addEventListener('click', (e) => GX.menu.open([
-      { header: 'Couche Bony — lot 4' },
-      { label: 'Réattribuer le vendeur référent…', icon: 'handshake', action: () => reassign(c, win, refresh) },
-      { label: c.nplc ? 'Lever « ne plus contacter »' : 'Marquer « ne plus contacter »…', icon: 'belloff', action: () => toggleNplc(c, win, refresh) },
+      { header: 'Portefeuille et contact' },
+      { label: 'Changer le vendeur du portefeuille…', icon: 'handshake', action: () => reassign(c, win, refresh) },
+      { label: 'Ne plus contacter…', icon: 'belloff', action: () => toggleNplc(c, win, refresh) },
       '-', { label: 'Copier l’identifiant SPARK', icon: 'copy', action: () => { try { navigator.clipboard?.writeText(c.id); } catch (er) {} GX.shell.hud(`${c.id} copié`); } },
     ], e.currentTarget, { align: 'right' }));
     function wireTab() {
       host.querySelector('[data-vf]')?.addEventListener('change', (e) => { st.vf = e.detail; setTimeout(rt, 140); });
       host.querySelectorAll('[data-ref]').forEach((b) => b.addEventListener('click', () => { const k = c.contacts.find((x) => x.id === b.dataset.ref); k.etat = 'refuse'; k.motif = `Refusé par le client — saisi par Théo L. le ${dFR(TODAY)}`; GX.shell.hud('Coordonnée refusée · exclue des relances'); rt(); }));
       host.querySelectorAll('[data-unref]').forEach((b) => b.addEventListener('click', () => { const k = c.contacts.find((x) => x.id === b.dataset.unref); k.etat = 'valide'; k.motif = ''; rt(); }));
+      if (GX.crmEquipes && st.tab === 'ech') GX.crmEquipes.wireEch(host, c, win, rt);
       host.querySelectorAll('[data-sep]').forEach((b) => b.addEventListener('click', () => {
         const x = c.ids.find((i) => i.id === b.dataset.sep);
         win.sheet(`<h3>Séparer cette identité ?</h3><div class="muted" style="line-height:1.55">L’identité <b style="color:var(--text)">${x.source} · ${esc(x.societe)} · ${x.numero}</b> sera détachée de ${esc(nameOf(c))} et deviendra un client distinct.<br><br>La décision est enregistrée et <b style="color:var(--text)">rejouée à chaque import</b> : la nuit ne la défera pas.</div>
@@ -672,12 +674,14 @@
     wireTab();
   }
   function reassign(c, win, refresh) {
+    if (GX.crmEquipes) return GX.crmEquipes.reassign(c, win, refresh);
     const opts = [...new Set([...(VENDEURS[c.site] || []), ...c.sales.flatMap((s) => s.vendeurs)])];
     win.sheet(`<div class="label" style="color:var(--bony-violet)">Couche Bony · lot 4</div><h3 style="margin:2px 0 8px">Vendeur référent</h3><div class="muted" style="line-height:1.5">Par défaut, le vendeur de la dernière vente. Quand un vendeur quitte le groupe, ses clients sont réattribués (R6). L’import ne modifie jamais ce choix.</div>
       <label class="field" style="margin-top:14px"><span class="label">Vendeur</span><select class="select" id="crmVr">${opts.map((o) => `<option ${o === c.vendeurRef ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></label>
       <div class="foot"><button class="btn" data-sheet="">Annuler</button><button class="btn primary" data-sheet="ok">Enregistrer</button></div>`, { width: 460, onClose: (v) => { const s = document.getElementById('crmVr')?.value; if (v === 'ok' && s) { c.vendeurRef = s; c.vendeurRefBy = `Théo L. le ${dFR(TODAY)}`; GX.shell.hud('Vendeur référent réattribué'); refresh(); } } });
   }
   function toggleNplc(c, win, refresh) {
+    if (GX.crmEquipes) return GX.crmEquipes.nplcSheet(c, win, refresh);
     if (c.nplc) { c.nplc = null; GX.shell.hud('Statut « ne plus contacter » levé'); return refresh(); }
     win.sheet(`<div class="label" style="color:var(--danger)">Couche Bony · lot 4</div><h3 style="margin:2px 0 8px">Ne plus contacter ${esc(nameOf(c))} ?</h3><div class="muted" style="line-height:1.5">Le client sort de toutes les listes de relance. Aucun import ne lève ce statut : seul un utilisateur le peut.</div>
       <label class="field" style="margin-top:14px"><span class="label">Motif</span><input class="input" id="crmNm" value="Demande du client" /></label>
@@ -688,7 +692,7 @@
      Rubrique
      ===================================================================== */
   function mount(body, win) {
-    const views = () => [['home', 'Accueil'], ['clients', 'Clients'], ['arb', 'À arbitrer'], ['req', 'Requêteur'], ...(canImports() ? [['imports', 'Imports']] : [])];
+    const views = () => [['home', 'Accueil'], ['clients', 'Clients'], ['arb', 'À arbitrer'], ['req', 'Requêteur'], ['equipes', 'Équipes'], ...(canImports() ? [['imports', 'Imports']] : [])];
     const st = { view: GX.store.get('crm.view', 'home'), arbTotal: ARB_TOTAL0 };
     if (!views().some(([k]) => k === st.view)) st.view = 'home';
     const perToCtx = () => GX.ctx.perimetre && GX.ctx.perimetre !== 'Tout le réseau' && GX.data.SITES.includes(GX.ctx.perimetre) ? [GX.ctx.perimetre] : [];
@@ -726,6 +730,7 @@
       if (st.view === 'clients') return clientsBuild();
       if (st.view === 'arb') return arbBuild();
       if (st.view === 'imports') return importsBuild();
+      if (st.view === 'equipes' && GX.crmEquipes) return GX.crmEquipes.build(vhost, { win, compact, openClient: (id, el) => { const c = byId.get(id); if (!c) return; if (compact) { cs.selId = id; cs.autoSel = false; go('clients'); } else fcb().openWindow(c, el); } });
       if (st.view === 'req' && GX.crmReq) return GX.crmReq.build(vhost, { win, compact, openClient: (id, el) => { const c = byId.get(id); if (!c) return; if (compact) { cs.selId = id; cs.autoSel = false; go('clients'); } else fcb().openWindow(c, el); } });
       return homeBuild();
     }

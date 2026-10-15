@@ -620,6 +620,40 @@ class DataService {
   async deleteCrmRequete(id: number): Promise<any> {
     return apiFetch(`/crm/requetes/${id}`, { method: 'DELETE' });
   }
+  // Lot 4 — Équipes, portefeuilles, ne plus contacter, échanges (routes : backend/src/routes/crmEquipes.ts).
+  async getCrmEquipes(): Promise<any> { return apiFetch('/crm/equipes'); }
+  async getCrmVendeur(id: number): Promise<any> { return apiFetch(`/crm/equipes/vendeurs/${id}`); }
+  async saveCrmVendeur(id: number | null, body: unknown): Promise<any> {
+    return apiFetch(id ? `/crm/equipes/vendeurs/${id}` : '/crm/equipes/vendeurs', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) });
+  }
+  async archiverCrmVendeur(id: number, archive: boolean): Promise<any> { return apiFetch(`/crm/equipes/vendeurs/${id}/archiver`, { method: 'POST', body: JSON.stringify({ archive }) }); }
+  async apercuCrmDepart(id: number): Promise<any> { return apiFetch(`/crm/equipes/vendeurs/${id}/apercu-depart`, { method: 'POST', body: '{}' }); }
+  async transfererCrmVendeur(id: number, body: { vers: number; zones?: string[]; marque?: string | null; verrou?: boolean }): Promise<{ clients: number }> {
+    return apiFetch(`/crm/equipes/vendeurs/${id}/transferer`, { method: 'POST', body: JSON.stringify(body) });
+  }
+  async saveCrmEncadrement(body: { site: string; role: string; nom: string }): Promise<any> { return apiFetch('/crm/equipes/encadrement', { method: 'PUT', body: JSON.stringify(body) }); }
+  async getCrmNomsDcs(): Promise<any[]> { return apiFetch('/crm/equipes/noms-dcs'); }
+  async saveCrmNomDcs(body: { libelle: string; etat: string; vendeur_id?: number | null }): Promise<any> { return apiFetch('/crm/equipes/noms-dcs', { method: 'PUT', body: JSON.stringify(body) }); }
+  async getCrmRegles(): Promise<any[]> { return apiFetch('/crm/equipes/regles'); }
+  async saveCrmRegle(id: number | null, body: unknown): Promise<any> {
+    return apiFetch(id ? `/crm/equipes/regles/${id}` : '/crm/equipes/regles', { method: id ? 'PUT' : 'POST', body: JSON.stringify(body) });
+  }
+  async deleteCrmRegle(id: number): Promise<any> { return apiFetch(`/crm/equipes/regles/${id}`, { method: 'DELETE' }); }
+  async getCrmRecalculs(): Promise<any[]> { return apiFetch('/crm/equipes/recalculs'); }
+  async recalculerCrm(simuler: boolean): Promise<any> { return apiFetch('/crm/equipes/recalcul', { method: 'POST', body: JSON.stringify({ simuler }) }); }
+  async saveCrmParametres(body: { actif: boolean; anciennete_ans: number | null }): Promise<any> { return apiFetch('/crm/equipes/parametres', { method: 'PUT', body: JSON.stringify(body) }); }
+  async getCrmAAttribuer(site: string | null, page: number): Promise<{ total: number; page: number; rows: any[] }> {
+    return apiFetch(`/crm/equipes/a-attribuer?page=${page}${site ? `&site=${encodeURIComponent(site)}` : ''}`);
+  }
+  async attribuerCrm(body: { clients: number[]; vendeur_id: number; verrou: boolean }): Promise<any> { return apiFetch('/crm/equipes/attribuer', { method: 'POST', body: JSON.stringify(body) }); }
+  async saveCrmPortefeuille(clientId: number, body: { vendeur_id: number | null; verrou: boolean }): Promise<any> {
+    return apiFetch(`/crm/clients/${clientId}/portefeuille`, { method: 'PUT', body: JSON.stringify(body) });
+  }
+  async saveCrmRefus(clientId: number, body: { canaux: string[]; motif: string | null }): Promise<any> {
+    return apiFetch(`/crm/clients/${clientId}/refus`, { method: 'PUT', body: JSON.stringify(body) });
+  }
+  async addCrmEchange(clientId: number, body: unknown): Promise<{ id: number }> { return apiFetch(`/crm/clients/${clientId}/echanges`, { method: 'POST', body: JSON.stringify(body) }); }
+  async deleteCrmEchange(clientId: number, id: number): Promise<any> { return apiFetch(`/crm/clients/${clientId}/echanges/${id}`, { method: 'DELETE' }); }
 
   // --- JEUX (branchés backend le 05/08/2026) ---
   // Avant, défis et parties vivaient dans le localStorage : défier un collègue

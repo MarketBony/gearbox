@@ -41,6 +41,7 @@ import formsRoutes from './routes/forms';
 import bonyFormsRoutes from './routes/bonyForms';
 import assistantRoutes from './routes/assistant';
 import crmRoutes from './routes/crm';
+import crmEquipesRoutes from './routes/crmEquipes';
 import { setupRealtime, withEmitterContext } from './realtime';
 import { startPurgeJob } from './jobs/purge';
 import { chargerReglages } from './settings/appSettings';
@@ -137,6 +138,7 @@ app.use('/api/assistant', assistantRoutes);
 
 // CRM : référentiel client unique, base DÉDIÉE sur le VPS (`rcu/db.ts`). CRM_ROLES sur chaque route.
 app.use('/api/crm', crmRoutes);
+app.use('/api/crm', crmEquipesRoutes);
 
 // Fichiers uploadés servis en statique (URLs relatives renvoyées par la route).
 //

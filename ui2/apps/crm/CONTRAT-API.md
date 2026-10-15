@@ -134,7 +134,9 @@ Une coordonnée SUSPECTE ne compte jamais comme valide.
 
 ### Garde-fous du canal (appliqués PAR LE SERVEUR, quoi qu'envoie le navigateur)
 email → e-mail valide · sms → portable valide · phoning → portable ou fixe · courrier → adresse complète. Les identités
-génériques ne sont jamais des clients.
+génériques ne sont jamais des clients. Lot 4 : un client « ne plus contacter » (`rcu.contact_refus`, « tout » ou le canal ;
+phoning = « tel ») est retiré de tout résultat. Routes du lot 4 (Équipes, portefeuille, refus, échanges) :
+`backend/src/routes/crmEquipes.ts` ; types : `ui2/apps/crm/equipes/modele.tsx` et `Bony` dans `common.tsx`.
 
 ## Routes
 - `GET /requetes/referentiels` → `{ zones: { concession, departements: string[] }[], agents: string[], vendeurs: string[],
