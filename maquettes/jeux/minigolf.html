@@ -1,0 +1,882 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Minigolf Gearbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One+SC&family=Karla:wght@400;600;700&family=Patrick+Hand&display=swap">
+<style>
+/* Prototype du 4e jeu de Gearbox : minigolf 2D vu de dessus. Monde unique et assumé (le jeu impose son décor) :
+   un parcours au premier plan, et une « carte de score » en papier, comme celles qu'on remplit au crayon sur un vrai minigolf. */
+:root {
+  --nuit: #0f1d16;        /* fond de page autour du parcours */
+  --panneau: #16291f;     /* barres et volets */
+  --ligne: #2c4a39;
+  --texte: #eef3ec;
+  --doux: #a9bcae;
+  --papier: #fbfbf6;      /* carte de score */
+  --encre: #1f6b45;       /* encre verte imprimée */
+  --crayon: #34363b;      /* chiffres écrits au crayon */
+  --drapeau: #d9472b;
+  --or: #f2c14e;
+  --f-titre: "Bowlby One SC", "Arial Black", Impact, sans-serif;
+  --f-texte: "Karla", "Segoe UI", system-ui, sans-serif;
+  --f-crayon: "Patrick Hand", "Comic Sans MS", "Segoe Print", cursive;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--nuit); color: var(--texte); font: 15px/1.45 var(--f-texte); overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--or); outline-offset: 2px; }
+.app { height: 100%; display: flex; flex-direction: column; }
+
+/* ---------- Barre de jeu ---------- */
+.hud { display: flex; align-items: center; gap: 12px; padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; background: var(--panneau); border-bottom: 1px solid var(--ligne); flex-wrap: wrap; }
+.hud .trou { display: flex; flex-direction: column; min-width: 0; }
+.hud .trou b { font: 18px/1 var(--f-titre); letter-spacing: .02em; }
+.hud .trou span { color: var(--doux); font-size: 13px; }
+.hud .grow { flex: 1; }
+.joueurs { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { display: flex; align-items: center; gap: 8px; padding: 5px 10px 5px 6px; border-radius: 999px; background: #0c1711; border: 1px solid var(--ligne); font-size: 14px; transition: border-color .2s, background .2s; }
+.chip i { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset -2px -2px 3px rgba(0,0,0,.35); }
+.chip .n { font: 20px/1 var(--f-crayon); min-width: 1.2em; text-align: right; }
+.chip.actif { border-color: var(--or); background: #1e3528; }
+.chip.fini { opacity: .6; }
+.outils { display: flex; gap: 6px; }
+.bt { border: 1px solid var(--ligne); background: #0c1711; border-radius: 10px; padding: 7px 11px; font-size: 14px; }
+.bt:hover { border-color: var(--doux); }
+.bt.plein { background: var(--or); color: #1d1606; border-color: var(--or); font-weight: 700; }
+.scene { position: relative; flex: 1; min-height: 0; }
+canvas#jeu { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+.consigne { position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: rgba(8,16,12,.78); border: 1px solid var(--ligne); padding: 6px 14px; border-radius: 999px; font-size: 13.5px; color: var(--doux); pointer-events: none; white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+.annonce { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(.9); font: clamp(30px, 6vw, 58px)/1 var(--f-titre); color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.35), 0 0 24px rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .25s, transform .35s cubic-bezier(.2,1.4,.4,1); text-align: center; }
+.annonce small { display: block; font: 18px/1.3 var(--f-texte); font-weight: 700; margin-top: 8px; }
+.annonce.vu { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+/* ---------- Écrans (pré-lobby, fin) ---------- */
+.ecran { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; overflow: auto; background: radial-gradient(ellipse at 50% 30%, rgba(15,29,22,.55), rgba(15,29,22,.94)); z-index: 5; }
+.carte { width: min(760px, 100%); background: var(--papier); color: var(--crayon); border-radius: 6px; box-shadow: 0 18px 50px rgba(0,0,0,.45); overflow: hidden; }
+.carte header { background: var(--encre); color: #fff; padding: 18px 22px 14px; display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.carte header h1 { margin: 0; font: clamp(30px, 6vw, 46px)/0.95 var(--f-titre); letter-spacing: .01em; text-wrap: balance; }
+.carte header p { margin: 0; opacity: .85; font-size: 14px; max-width: 34ch; }
+.carte .corps { padding: 18px 22px 22px; display: grid; gap: 18px; }
+.lbl { font: 700 11.5px/1 var(--f-texte); letter-spacing: .14em; text-transform: uppercase; color: var(--encre); margin-bottom: 8px; }
+.choix { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.opt { text-align: left; border: 2px solid #d9ddd3; background: #fff; border-radius: 6px; padding: 10px 12px; color: var(--crayon); display: flex; flex-direction: column; gap: 3px; }
+.opt b { font: 19px/1.05 var(--f-titre); color: #24332b; }
+.opt span { font-size: 13px; color: #5d6460; }
+.opt[aria-pressed="true"] { border-color: var(--encre); background: #eef6f0; box-shadow: inset 0 0 0 1px var(--encre); }
+.ligne2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.seg { display: inline-flex; border: 2px solid #d9ddd3; border-radius: 6px; overflow: hidden; background: #fff; }
+.seg button { border: 0; background: none; padding: 7px 14px; color: #3e4541; font-weight: 700; }
+.seg button[aria-pressed="true"] { background: var(--encre); color: #fff; }
+.noms { display: flex; gap: 8px; flex-wrap: wrap; }
+.noms input { border: 0; border-bottom: 2px solid #c9cec6; background: transparent; padding: 4px 2px; font: 22px/1.1 var(--f-crayon); color: var(--crayon); width: 9ch; min-width: 0; }
+.noms input:focus { outline: none; border-color: var(--encre); }
+.ambiances { display: flex; gap: 10px; flex-wrap: wrap; }
+.amb { border: 2px solid #d9ddd3; border-radius: 6px; padding: 6px; background: #fff; display: flex; align-items: center; gap: 8px; color: #3e4541; font-weight: 700; font-size: 13.5px; }
+.amb canvas { width: 54px; height: 34px; border-radius: 3px; display: block; }
+.amb[aria-pressed="true"] { border-color: var(--encre); background: #eef6f0; }
+.case { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #3e4541; }
+.pied { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; border-top: 1px dashed #cdd2ca; padding-top: 14px; }
+.go { background: var(--drapeau); color: #fff; border: 0; border-radius: 6px; padding: 12px 18px; font: 18px/1 var(--f-titre); letter-spacing: .02em; box-shadow: 0 3px 0 #9e2f1a; }
+.go:active { transform: translateY(2px); box-shadow: 0 1px 0 #9e2f1a; }
+.lien { background: none; border: 0; color: var(--encre); text-decoration: underline; font-weight: 700; padding: 4px 0; }
+.note { font-size: 12.5px; color: #6a716c; }
+
+/* ---------- Carte de score ---------- */
+.score { overflow-x: auto; }
+.score table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.score th, .score td { border: 1px solid #b7d1c1; padding: 6px 8px; text-align: center; }
+.score thead th { background: #e7f2eb; color: var(--encre); font: 700 12px/1 var(--f-texte); letter-spacing: .08em; text-transform: uppercase; }
+.score td { font: 22px/1 var(--f-crayon); color: var(--crayon); }
+.score td.nom { text-align: left; white-space: nowrap; }
+.score tr.par td { font: 700 13px/1 var(--f-texte); color: var(--encre); background: #f3f8f5; }
+.score td.tot { font-weight: 700; background: #f3f8f5; }
+.score td .sous { font-size: 14px; color: #8a918c; }
+.score .cercle { display: inline-block; border: 2px solid var(--drapeau); border-radius: 50%; width: 1.35em; height: 1.35em; line-height: 1.25em; }
+.gagne { font: clamp(26px, 5vw, 38px)/1 var(--f-titre); color: #24332b; text-wrap: balance; }
+
+/* ---------- Atelier et réglages du moteur ---------- */
+.volet { position: absolute; top: 0; right: 0; bottom: 0; width: min(340px, 100%); background: var(--panneau); border-left: 1px solid var(--ligne); z-index: 6; padding: 14px 16px; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.volet h2 { margin: 0; font: 20px/1 var(--f-titre); }
+.volet .r { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 13.5px; }
+.volet .r input { grid-column: 1 / -1; width: 100%; accent-color: var(--or); }
+.volet .r output { font-variant-numeric: tabular-nums; color: var(--or); }
+.volet p { margin: 0; color: var(--doux); font-size: 13px; }
+.liste-trous { display: grid; gap: 6px; }
+.liste-trous button { text-align: left; border: 1px solid var(--ligne); background: #0c1711; border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; gap: 8px; }
+.liste-trous small { color: var(--doux); }
+
+@media (max-width: 640px) {
+  .choix { grid-template-columns: minmax(0, 1fr); }
+  .ligne2 { grid-template-columns: minmax(0, 1fr); }
+  .hud { gap: 8px; }
+  .outils .txt { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .annonce { transition: none; } }
+</style>
+
+<div class="app">
+  <div class="hud" id="hud" hidden>
+    <div class="trou"><b id="hTrou">Trou 1</b><span id="hNom">—</span></div>
+    <div class="joueurs" id="hJoueurs"></div>
+    <div class="grow"></div>
+    <div class="outils">
+      <button class="bt" id="bScore" title="Carte de score">▤ <span class="txt">Score</span></button>
+      <button class="bt" id="bMoteur" title="Réglages du moteur">⚙ <span class="txt">Moteur</span></button>
+      <button class="bt" id="bSon" title="Son">♪ <span class="txt" id="tSon">Son coupé</span></button>
+      <button class="bt" id="bQuitter" title="Retour au choix de partie">✕</button>
+    </div>
+  </div>
+  <div class="scene" id="scene">
+    <canvas id="jeu"></canvas>
+    <div class="consigne" id="consigne" hidden>Glisse depuis n'importe où (comme une fronde), relâche pour frapper. Échap pour annuler.</div>
+    <div class="annonce" id="annonce"></div>
+
+    <!-- Pré-lobby : celui qui lance la partie choisit -->
+    <div class="ecran" id="eLobby">
+      <div class="carte" role="dialog" aria-labelledby="titreLobby">
+        <header><h1 id="titreLobby">Minigolf</h1><p>Prototype du 4ᵉ jeu. Celui qui lance le défi choisit la difficulté ; les trous sont tirés au sort.</p></header>
+        <div class="corps">
+          <div>
+            <div class="lbl">Difficulté</div>
+            <div class="choix" id="cDiff"></div>
+          </div>
+          <div class="ligne2">
+            <div><div class="lbl">Nombre de trous</div><div class="seg" id="cNb"></div></div>
+            <div><div class="lbl">Partie</div><div class="seg" id="cMode"></div></div>
+          </div>
+          <div class="ligne2">
+            <div><div class="lbl">Joueurs</div><div class="noms"><input id="n1" value="Théo" maxlength="12" aria-label="Joueur 1"><input id="n2" value="Collègue" maxlength="12" aria-label="Joueur 2"></div></div>
+            <div><div class="lbl">Règle</div><label class="case"><input type="checkbox" id="cChoc" checked> Les balles peuvent se percuter</label></div>
+          </div>
+          <div>
+            <div class="lbl">Ambiance (pour comparer)</div>
+            <div class="ambiances" id="cAmb"></div>
+          </div>
+          <div class="pied">
+            <button class="lien" id="bAtelier">Atelier : essayer un trou précis</button>
+            <button class="go" id="bGo">Tirer les trous et jouer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fin de partie / carte de score -->
+    <div class="ecran" id="eScore" hidden>
+      <div class="carte">
+        <header><h1 id="tScore">Carte de score</h1><p id="pScore"></p></header>
+        <div class="corps">
+          <div class="gagne" id="gagnant" hidden></div>
+          <div class="score" id="tableScore"></div>
+          <div class="pied"><button class="lien" id="bLobby">Changer les réglages</button><span class="grow"></span><button class="bt plein" id="bFermerScore" hidden>Reprendre</button><button class="go" id="bRejouer" hidden>Rejouer (nouveau tirage)</button></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="volet" id="vMoteur" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>Moteur</h2><button class="bt" id="bFermerMoteur">Fermer</button></div>
+      <p>Réglages de test : bouge-les, rejoue un coup, et dis-moi les valeurs qui te plaisent. Ils ne sont pas enregistrés.</p>
+      <div id="reglages"></div>
+      <label class="case" style="color:var(--texte)"><input type="checkbox" id="cDebug"> Afficher la physique (murs, vitesse)</label>
+      <button class="bt" id="bDefaut">Revenir aux valeurs par défaut</button>
+    </aside>
+
+    <aside class="volet" id="vAtelier" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:center"><h2>Atelier</h2><button class="bt" id="bFermerAtelier">Fermer</button></div>
+      <p>Joue n'importe quel trou en entraînement, sans tirage.</p>
+      <div class="liste-trous" id="listeTrous"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================================
+   MOTEUR — pur et déterministe. Ce bloc deviendra shared/minigolf.ts (même code serveur / navigateur).
+   Le navigateur n'enverra que { angle, puissance, horloge } ; le serveur simulera et renverra la trajectoire.
+   ===================================================================================== */
+const DEF = { frottGazon: 95, amortGazon: 0.55, frottSable: 560, frottGlace: 22, rebond: 0.74, rebondPlot: 1.18,
+  vitesseMax: 1050, captureTrou: 250, choc: 0.92 };
+let P = Object.assign({}, DEF);
+const R = 7, R_TROU = 11.5, DT = 1 / 240, PAS_IMAGE = 4, T_MAX = 15;   // au-delà (balle coincée par un moulin), elle s'arrête où elle est
+
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+const len = (a) => Math.hypot(a[0], a[1]);
+function dansPoly(pt, poly) {
+  let d = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) d = !d;
+  }
+  return d;
+}
+function plusProche(p, a, b) {
+  const ab = sub(b, a), t = Math.max(0, Math.min(1, dot(sub(p, a), ab) / (dot(ab, ab) || 1)));
+  return [a[0] + ab[0] * t, a[1] + ab[1] * t];
+}
+/** Segments fixes d'un trou : bord extérieur, murs fins (capsules), blocs pleins. */
+function segmentsFixes(h) {
+  const S = [];
+  const anneau = (pts, ferme, r) => { for (let i = 0; i < pts.length - (ferme ? 0 : 1); i++) S.push({ a: pts[i], b: pts[(i + 1) % pts.length], r }); };
+  anneau(h.bord, true, 7);                                   // rail extérieur de 14 : la balle s'arrête contre sa face intérieure
+  (h.murs || []).forEach((m) => anneau(m.pts, !!m.bloc, m.bloc ? 3 : 5));
+  return S;
+}
+/** Obstacles mobiles à l'instant t : segments avec leur vitesse (pour le rebond). */
+function segmentsMobiles(h, t) {
+  const S = [];
+  (h.mobiles || []).forEach((m) => {
+    if (m.type === 'moulin') {
+      for (let i = 0; i < m.pales; i++) {
+        const th = m.phase + m.w * t + i * 2 * Math.PI / m.pales;
+        const b = [m.x + Math.cos(th) * m.l, m.y + Math.sin(th) * m.l];
+        S.push({ a: [m.x, m.y], b, r: 5, rot: { c: [m.x, m.y], w: m.w } });
+      }
+    } else if (m.type === 'porte') {
+      const k = 0.5 - 0.5 * Math.cos(2 * Math.PI * t / m.periode + (m.phase || 0));
+      const dk = Math.PI / m.periode * Math.sin(2 * Math.PI * t / m.periode + (m.phase || 0));
+      const cx = m.a[0] + (m.b[0] - m.a[0]) * k, cy = m.a[1] + (m.b[1] - m.a[1]) * k;
+      const vx = (m.b[0] - m.a[0]) * dk, vy = (m.b[1] - m.a[1]) * dk;
+      const [w, hh] = [m.taille[0] / 2, m.taille[1] / 2];
+      const c = [[cx - w, cy - hh], [cx + w, cy - hh], [cx + w, cy + hh], [cx - w, cy + hh]];
+      for (let i = 0; i < 4; i++) S.push({ a: c[i], b: c[(i + 1) % 4], r: 0, v: [vx, vy] });
+    }
+  });
+  return S;
+}
+function zoneDe(h, p) {
+  let z = { sol: 'gazon', ax: 0, ay: 0 };
+  for (const q of h.zones || []) {
+    if (!dansPoly(p, q.pts)) continue;
+    if (q.type === 'pente') { z.ax += q.ax; z.ay += q.ay; }
+    else if (q.type === 'eau' || (q.type === 'sable' && z.sol !== 'eau') || (q.type === 'glace' && z.sol === 'gazon')) z.sol = q.type;
+  }
+  return z;
+}
+/**
+ * Simule un coup. etat = { balles: [{ x, y, dedans }], horloge } ; coup = { balle, angle, puissance (0..1) }.
+ * Rend { images: [[x,y,dedans] par balle], evts, final }. Pur : mêmes entrées → mêmes sorties.
+ */
+function simuler(h, etat, coup, opts = {}) {
+  const fixes = h._fixes || (h._fixes = segmentsFixes(h));
+  const B = etat.balles.map((b) => ({ x: b.x, y: b.y, vx: 0, vy: 0, dedans: !!b.dedans, depart: [b.x, b.y], contact: false, arret: true }));
+  const jb = B[coup.balle];
+  const v = Math.pow(Math.max(0, Math.min(1, coup.puissance)), 1.15) * P.vitesseMax;
+  jb.vx = Math.cos(coup.angle) * v; jb.vy = Math.sin(coup.angle) * v; jb.arret = false;
+  const evts = [], images = [];
+  let t = etat.horloge, n = 0, eau = 0;
+  const choc = opts.choc !== false, seul = opts.seul;
+  const enJeu = () => B.some((b) => !b.arret && !b.dedans);
+  const nMax = (opts.tmax || T_MAX) / DT;
+  while (enJeu() && n < nMax) {
+    if (opts.premierChoc && evts.some((e) => e.type !== 'levre')) break;
+    const mob = segmentsMobiles(h, t);
+    for (let i = 0; i < B.length; i++) {
+      const b = B[i];
+      if (b.dedans || b.arret || (seul && i !== coup.balle)) continue;
+      const z = zoneDe(h, [b.x, b.y]);
+      if (z.sol === 'eau') { evts.push({ n, type: 'eau', balle: i, x: b.x, y: b.y }); b.x = b.depart[0]; b.y = b.depart[1]; b.vx = b.vy = 0; b.arret = true; if (i === coup.balle) eau++; continue; }
+      b.vx += z.ax * DT; b.vy += z.ay * DT;
+      let s = Math.hypot(b.vx, b.vy);
+      const mu = z.sol === 'sable' ? P.frottSable : z.sol === 'glace' ? P.frottGlace : P.frottGazon;
+      const k = z.sol === 'glace' ? 0.12 : P.amortGazon;
+      if (s > 0) { const ns = Math.max(0, s - (mu + k * s) * DT); b.vx *= ns / s; b.vy *= ns / s; s = ns; }
+      b.x += b.vx * DT; b.y += b.vy * DT;
+      // Trou : capturée si assez lente, sinon elle « lèche » le bord, attirée vers le centre.
+      const dc = Math.hypot(b.x - h.trou[0], b.y - h.trou[1]);
+      if (dc < R_TROU) {
+        if (s < P.captureTrou) { b.dedans = true; b.x = h.trou[0]; b.y = h.trou[1]; evts.push({ n, type: 'trou', balle: i }); continue; }
+        b.vx += (h.trou[0] - b.x) / dc * 1400 * DT; b.vy += (h.trou[1] - b.y) / dc * 1400 * DT;
+        if (n % 6 === 0) evts.push({ n, type: 'levre', balle: i });
+      }
+      // Murs, plots, obstacles mobiles
+      b.contact = false;
+      for (const sg of fixes.concat(mob)) {
+        const p = plusProche([b.x, b.y], sg.a, sg.b), d = sub([b.x, b.y], p), dist = len(d), lim = R + sg.r;
+        if (dist >= lim || dist === 0) continue;
+        const nrm = [d[0] / dist, d[1] / dist];
+        b.x = p[0] + nrm[0] * lim; b.y = p[1] + nrm[1] * lim;
+        let vs = sg.v || (sg.rot ? [-sg.rot.w * (p[1] - sg.rot.c[1]), sg.rot.w * (p[0] - sg.rot.c[0])] : [0, 0]);
+        const rel = [b.vx - vs[0], b.vy - vs[1]], vn = dot(rel, nrm);
+        if (vn < 0) {
+          const e = P.rebond;
+          const tg = [rel[0] - vn * nrm[0], rel[1] - vn * nrm[1]];
+          b.vx = vs[0] + tg[0] * 0.97 - e * vn * nrm[0]; b.vy = vs[1] + tg[1] * 0.97 - e * vn * nrm[1];
+          if (-vn > 40) evts.push({ n, type: sg.v || sg.rot ? 'mobile' : 'mur', balle: i, f: Math.min(1, -vn / 700) });
+        }
+        b.contact = true;
+      }
+      for (const pl of h.plots || []) {
+        const d = [b.x - pl.x, b.y - pl.y], dist = len(d), lim = R + pl.r;
+        if (dist >= lim) continue;
+        const nrm = [d[0] / dist, d[1] / dist], vn = b.vx * nrm[0] + b.vy * nrm[1];
+        b.x = pl.x + nrm[0] * lim; b.y = pl.y + nrm[1] * lim;
+        if (vn < 0) {
+          b.vx -= (1 + P.rebondPlot) * vn * nrm[0]; b.vy -= (1 + P.rebondPlot) * vn * nrm[1];
+          const ns = Math.hypot(b.vx, b.vy); if (ns > P.vitesseMax) { b.vx *= P.vitesseMax / ns; b.vy *= P.vitesseMax / ns; }
+          evts.push({ n, type: 'plot', balle: i, f: Math.min(1, -vn / 600) });
+        }
+      }
+      // Arrêt : presque immobile, et pas emportée par une pente plus forte que le frottement (sauf calée contre un mur).
+      const sp = Math.hypot(b.vx, b.vy), pente = Math.hypot(z.ax, z.ay);
+      if (sp < 5 && (pente < mu * 0.9 || b.contact)) { b.vx = b.vy = 0; b.arret = true; }
+    }
+    // Chocs entre balles (masses égales)
+    if (choc) for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
+      const a = B[i], c = B[j];
+      if (a.dedans || c.dedans) continue;
+      const d = [c.x - a.x, c.y - a.y], dist = len(d);
+      if (dist >= 2 * R || dist === 0) continue;
+      const nrm = [d[0] / dist, d[1] / dist], rel = (a.vx - c.vx) * nrm[0] + (a.vy - c.vy) * nrm[1];
+      const pen = 2 * R - dist;
+      a.x -= nrm[0] * pen / 2; a.y -= nrm[1] * pen / 2; c.x += nrm[0] * pen / 2; c.y += nrm[1] * pen / 2;
+      if (rel > 0) {
+        const jx = (1 + P.choc) / 2 * rel;
+        a.vx -= jx * nrm[0]; a.vy -= jx * nrm[1]; c.vx += jx * nrm[0]; c.vy += jx * nrm[1];
+        a.arret = c.arret = false;
+        evts.push({ n, type: 'choc', balle: i, f: Math.min(1, rel / 600) });
+      }
+    }
+    if (n % PAS_IMAGE === 0) images.push(B.map((b) => [b.x, b.y, b.dedans]));
+    t += DT; n++;
+  }
+  images.push(B.map((b) => [b.x, b.y, b.dedans]));
+  return { images, evts, eau, final: { balles: B.map((b) => ({ x: b.x, y: b.y, dedans: b.dedans })), horloge: t } };
+}
+
+/* =====================================================================================
+   PARCOURS — 12 trous, 3 difficultés. Unités du monde : ~ centimètres d'une piste réelle.
+   bord : polygone de la piste (fermé) · murs : { pts, bloc } · zones : sable / eau / glace / pente{ax,ay}
+   plots : bornes rondes qui renvoient · mobiles : moulin { x, y, l, pales, w } ou porte { a, b, taille, periode }
+   ===================================================================================== */
+const rect = (x, y, w, h) => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+const arc = (cx, cy, r, a0, a1, n = 14) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + (a1 - a0) * i / n; return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]; });
+const TROUS = [
+  { id: 'f1', nom: 'La Ligne droite', diff: 'facile', par: 2, w: 720, h: 230, depart: [80, 115], trou: [640, 115],
+    bord: rect(0, 0, 720, 230), plots: [{ x: 360, y: 70, r: 14 }, { x: 360, y: 160, r: 14 }] },
+  { id: 'f2', nom: 'Le Coude', diff: 'facile', par: 3, w: 600, h: 460, depart: [90, 100], trou: [500, 380],
+    bord: [[0, 0], [600, 0], [600, 460], [400, 460], [400, 200], [0, 200]] },
+  { id: 'f3', nom: 'La Bosse', diff: 'facile', par: 2, w: 760, h: 250, depart: [80, 125], trou: [680, 125],
+    bord: rect(0, 0, 760, 250),
+    zones: [{ type: 'pente', pts: rect(250, 0, 130, 250), ax: -150, ay: 0 }, { type: 'pente', pts: rect(380, 0, 130, 250), ax: 150, ay: 0 }] },
+  { id: 'f4', nom: 'Les Portillons', diff: 'facile', par: 3, w: 780, h: 310, depart: [70, 155], trou: [710, 235],
+    bord: rect(0, 0, 780, 310),
+    murs: [{ pts: [[260, 0], [260, 115]] }, { pts: [[260, 195], [260, 310]] }, { pts: [[520, 0], [520, 45]] }, { pts: [[520, 135], [520, 310]] }] },
+
+  { id: 'n1', nom: 'Le Bunker', diff: 'normal', par: 3, w: 780, h: 450, depart: [80, 85], trou: [90, 365],
+    bord: rect(0, 0, 780, 450), murs: [{ bloc: true, pts: rect(0, 175, 540, 95) }],
+    zones: [{ type: 'sable', pts: [[600, 140], [700, 120], [760, 210], [730, 310], [620, 300], [580, 220]] }] },
+  { id: 'n2', nom: 'Le Moulin', diff: 'normal', par: 3, w: 780, h: 250, depart: [80, 125], trou: [700, 125],
+    bord: rect(0, 0, 780, 250), murs: [{ bloc: true, pts: rect(360, 0, 60, 92) }, { bloc: true, pts: rect(360, 158, 60, 92) }],
+    mobiles: [{ type: 'moulin', x: 390, y: 125, l: 112, pales: 4, w: 1.3, phase: 0.3 }] },
+  { id: 'n3', nom: 'Le Lac', diff: 'normal', par: 3, w: 820, h: 400, depart: [80, 200], trou: [740, 200],
+    bord: rect(0, 0, 820, 400),
+    zones: [{ type: 'eau', pts: [[260, 120], [360, 85], [500, 95], [580, 150], [570, 250], [480, 310], [340, 305], [250, 255]] }],
+    plots: [{ x: 410, y: 40, r: 13 }, { x: 410, y: 362, r: 13 }] },
+  { id: 'n4', nom: 'Le Toboggan', diff: 'normal', par: 3, w: 760, h: 420, depart: [80, 340], trou: [660, 90],
+    bord: rect(0, 0, 760, 420),
+    zones: [{ type: 'pente', pts: rect(200, 0, 360, 420), ax: 0, ay: 170 }, { type: 'glace', pts: rect(560, 160, 200, 120) }],
+    murs: [{ pts: [[560, 0], [560, 120]] }] },
+
+  { id: 'd1', nom: 'Le Serpent', diff: 'expert', par: 4, w: 840, h: 430, depart: [90, 80], trou: [750, 360],
+    bord: rect(0, 0, 840, 430),
+    murs: [{ bloc: true, pts: rect(195, 0, 30, 310) }, { bloc: true, pts: rect(415, 120, 30, 310) }, { bloc: true, pts: rect(635, 0, 30, 310) }],
+    zones: [{ type: 'sable', pts: rect(225, 330, 190, 100) }, { type: 'sable', pts: rect(445, 0, 190, 90) }] },
+  { id: 'd2', nom: "L'Île", diff: 'expert', par: 3, w: 800, h: 440, depart: [80, 220], trou: [650, 220],
+    bord: rect(0, 0, 800, 440),
+    zones: [{ type: 'eau', pts: [[180, 0], [800, 0], [800, 440], [180, 440], [180, 252], [500, 252], [500, 330], [760, 330], [760, 110], [500, 110], [500, 188], [180, 188]] }],
+    mobiles: [{ type: 'porte', a: [340, 150], b: [340, 290], taille: [26, 60], periode: 3.2 }] },
+  { id: 'd3', nom: 'Les Deux Moulins', diff: 'expert', par: 3, w: 860, h: 260, depart: [70, 130], trou: [800, 130],
+    bord: rect(0, 0, 860, 260),
+    murs: [{ bloc: true, pts: rect(250, 0, 50, 98) }, { bloc: true, pts: rect(250, 162, 50, 98) }, { bloc: true, pts: rect(540, 0, 50, 98) }, { bloc: true, pts: rect(540, 162, 50, 98) }],
+    mobiles: [{ type: 'moulin', x: 275, y: 130, l: 116, pales: 3, w: 1.7, phase: 0 }, { type: 'moulin', x: 565, y: 130, l: 116, pales: 3, w: -2.1, phase: 1 }],
+    plots: [{ x: 420, y: 60, r: 12 }, { x: 420, y: 200, r: 12 }] },
+  { id: 'd4', nom: 'La Citadelle', diff: 'expert', par: 4, w: 780, h: 470, depart: [80, 235], trou: [560, 235],
+    bord: rect(0, 0, 780, 470),
+    murs: [{ pts: arc(560, 235, 92, 0.75, 2 * Math.PI - 0.75, 18) }],
+    zones: [{ type: 'glace', pts: rect(150, 150, 240, 170) }],
+    plots: [{ x: 720, y: 70, r: 16 }, { x: 720, y: 400, r: 16 }] },
+];
+const DIFFS = {
+  facile: { l: 'Facile', d: 'Parcours ouverts, trajectoire prévue affichée.', tirage: ['facile'] },
+  normal: { l: 'Normal', d: 'Sable, eau, moulins. Direction affichée.', tirage: ['normal', 'facile'] },
+  expert: { l: 'Expert', d: 'Couloirs, îles, rebonds. Seule la force est affichée.', tirage: ['expert', 'normal'] },
+};
+
+/* =====================================================================================
+   AMBIANCES — rendu seulement, la physique est identique.
+   ===================================================================================== */
+const AMB = {
+  ete: { l: 'Plein été', fond: '#b8b0a0', fondGrain: ['#9d9586', '#cfc8b9'], gazon: '#3f9a49', gazon2: '#47a651', rail: '#c48a4c', railOmbre: '#6f4521', railReflet: '#e5b47c',
+    sable: '#e6d199', eau: ['#2f86c4', '#62b6e6'], glace: '#d6eef6', plot: ['#e9e4dc', '#c8382c'], drapeau: '#d9472b', balle: '#ffffff', neon: false },
+  mer: { l: 'Bord de mer', fond: '#d9c49f', fondGrain: ['#c7ae86', '#e8d6b4'], planches: true, gazon: '#2e9f7a', gazon2: '#36ac86', rail: '#f2efe6', railOmbre: '#2c5a85', railReflet: '#ffffff',
+    sable: '#f1e0b3', eau: ['#14a3b6', '#5fd3dc'], glace: '#e2f6f8', plot: ['#ffffff', '#2c5a85'], drapeau: '#f2b632', balle: '#ffffff', neon: false },
+  nuit: { l: 'Nocturne UV', fond: '#0a0718', fondGrain: ['#120d2b', '#05040d'], etoiles: true, gazon: '#1b1747', gazon2: '#201b55', rail: '#ff3cac', railOmbre: '#5b0d3d', railReflet: '#ffc2e6',
+    sable: '#d9f24a', eau: ['#1838c9', '#3ae0ff'], glace: '#7ef9ff', plot: ['#3ae0ff', '#ff3cac'], drapeau: '#b6ff3a', balle: '#f6f7ff', neon: true },
+};
+
+/* =====================================================================================
+   SON — synthétisé (aucun fichier), démarre au premier geste.
+   ===================================================================================== */
+let ctxSon = null, son = true;
+function bruit(dur, filtre, vol, freq) {
+  if (!son) return; try {
+    ctxSon = ctxSon || new (window.AudioContext || window.webkitAudioContext)();
+    const n = ctxSon.sampleRate * dur, buf = ctxSon.createBuffer(1, n, ctxSon.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+    const s = ctxSon.createBufferSource(); s.buffer = buf;
+    const f = ctxSon.createBiquadFilter(); f.type = filtre; f.frequency.value = freq;
+    const g = ctxSon.createGain(); g.gain.value = vol;
+    s.connect(f).connect(g).connect(ctxSon.destination); s.start();
+  } catch (e) { /* son indisponible */ }
+}
+function ton(f0, f1, dur, vol, type = 'sine') {
+  if (!son) return; try {
+    ctxSon = ctxSon || new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctxSon.createOscillator(), g = ctxSon.createGain(), t0 = ctxSon.currentTime;
+    o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(g).connect(ctxSon.destination); o.start(); o.stop(t0 + dur);
+  } catch (e) { /* son indisponible */ }
+}
+const SONS = {
+  frappe: (f) => { bruit(0.05, 'bandpass', 0.5 * f + 0.15, 2600); ton(900, 500, 0.06, 0.08, 'triangle'); },
+  mur: (f) => bruit(0.04, 'bandpass', 0.35 * f, 1500),
+  mobile: (f) => bruit(0.06, 'lowpass', 0.4 * f + 0.1, 900),
+  plot: (f) => ton(520, 300, 0.12, 0.12 * f + 0.05, 'square'),
+  choc: (f) => { bruit(0.03, 'highpass', 0.45 * f + 0.1, 3000); },
+  levre: () => bruit(0.03, 'bandpass', 0.08, 2200),
+  trou: () => { ton(700, 180, 0.22, 0.18, 'sine'); setTimeout(() => bruit(0.08, 'lowpass', 0.2, 700), 120); },
+  eau: () => { bruit(0.45, 'lowpass', 0.5, 1100); ton(300, 90, 0.3, 0.06); },
+};
+
+/* =====================================================================================
+   RENDU
+   ===================================================================================== */
+const cv = document.getElementById('jeu'), g = cv.getContext('2d');
+let vue = { k: 1, ox: 0, oy: 0, dpr: 1 }, couche = null, coucheHaut = null, motifs = {};
+function graine(s) { return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+function motifGazon(a) {
+  const key = a.l; if (motifs[key]) return motifs[key];
+  const c = document.createElement('canvas'); c.width = c.height = 96; const x = c.getContext('2d'), rnd = graine(7);
+  x.fillStyle = a.gazon; x.fillRect(0, 0, 96, 96);
+  for (let i = 0; i < 900; i++) { x.fillStyle = rnd() < 0.5 ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.08)'; x.fillRect(rnd() * 96, rnd() * 96, 1.2, 1.2); }
+  if (a.neon) { x.strokeStyle = 'rgba(120,110,255,.08)'; for (let i = 0; i <= 96; i += 24) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 96); x.moveTo(0, i); x.lineTo(96, i); x.stroke(); } }
+  return (motifs[key] = c);
+}
+function chemin(ctx, pts, ferme = true) { ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); if (ferme) ctx.closePath(); }
+function dessinerFond(ctx, a, W, H) {
+  ctx.fillStyle = a.fond; ctx.fillRect(0, 0, W, H);
+  const rnd = graine(11);
+  if (a.planches) { ctx.strokeStyle = 'rgba(90,60,30,.22)'; ctx.lineWidth = 1.5; for (let y = 0; y < H; y += 26) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); for (let x = (y / 26 % 2) * 90; x < W; x += 180) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 26); ctx.stroke(); } } }
+  const nb = a.etoiles ? 160 : 2600;
+  for (let i = 0; i < nb; i++) {
+    if (a.etoiles) { ctx.fillStyle = `rgba(255,255,255,${0.15 + rnd() * 0.5})`; const s = rnd() * 1.6 + 0.4; ctx.fillRect(rnd() * W, rnd() * H, s, s); }
+    else { ctx.fillStyle = a.fondGrain[rnd() < 0.5 ? 0 : 1]; const s = rnd() * 2.2 + 0.6; ctx.fillRect(rnd() * W, rnd() * H, s, s); }
+  }
+}
+/** Couche fixe (fond, piste, zones, murs) : redessinée au changement de trou, d'ambiance ou de taille. */
+function preparerCouche(h, a) {
+  const W = cv.width, H = cv.height;
+  couche = document.createElement('canvas'); couche.width = W; couche.height = H;
+  const c = couche.getContext('2d');
+  dessinerFond(c, a, W, H);
+  c.save(); c.translate(vue.ox, vue.oy); c.scale(vue.k, vue.k);
+  // Ombre portée de la piste
+  c.save(); c.shadowColor = a.neon ? 'rgba(255,60,172,.35)' : 'rgba(0,0,0,.35)'; c.shadowBlur = 18 * vue.k; c.shadowOffsetY = 6 * vue.k;
+  chemin(c, h.bord); c.fillStyle = a.gazon; c.fill(); c.restore();
+  // Gazon : motif + bandes de tonte
+  c.save(); chemin(c, h.bord); c.clip();
+  c.fillStyle = c.createPattern(motifGazon(a), 'repeat'); c.fillRect(-50, -50, h.w + 100, h.h + 100);
+  c.fillStyle = a.gazon2; c.globalAlpha = 0.55; for (let x = 0; x < h.w; x += 80) c.fillRect(x, -10, 40, h.h + 20); c.globalAlpha = 1;
+  // Zones
+  for (const z of h.zones || []) {
+    if (z.type === 'sable') {
+      chemin(c, z.pts); c.fillStyle = a.sable; c.fill();
+      c.save(); chemin(c, z.pts); c.clip(); const r = graine(3); for (let i = 0; i < 700; i++) { c.fillStyle = r() < 0.5 ? 'rgba(120,90,40,.18)' : 'rgba(255,255,255,.25)'; c.fillRect(r() * h.w, r() * h.h, 1.6, 1.6); } c.restore();
+      c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.12)'; chemin(c, z.pts); c.stroke();
+    } else if (z.type === 'glace') {
+      chemin(c, z.pts); const gr = c.createLinearGradient(z.pts[0][0], z.pts[0][1], z.pts[2][0], z.pts[2][1]); gr.addColorStop(0, a.glace); gr.addColorStop(1, a.neon ? '#1aa6d8' : '#a9d9ea'); c.fillStyle = gr; c.fill();
+      c.save(); chemin(c, z.pts); c.clip(); c.strokeStyle = 'rgba(255,255,255,.6)'; c.lineWidth = 2; for (let i = -400; i < 1200; i += 46) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i + 300, h.h); c.stroke(); } c.restore();
+    } else if (z.type === 'pente') {
+      c.save(); chemin(c, z.pts); c.clip();
+      const xs = z.pts.map((p) => p[0]), ys = z.pts.map((p) => p[1]); const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+      const ang = Math.atan2(z.ay, z.ax), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, L = Math.hypot(x1 - x0, y1 - y0) / 2;
+      const gr = c.createLinearGradient(cx - Math.cos(ang) * L, cy - Math.sin(ang) * L, cx + Math.cos(ang) * L, cy + Math.sin(ang) * L);
+      gr.addColorStop(0, 'rgba(255,255,255,.14)'); gr.addColorStop(1, 'rgba(0,0,0,.18)'); c.fillStyle = gr; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+      c.strokeStyle = 'rgba(255,255,255,.22)'; c.lineWidth = 2.5;
+      for (let x = x0 + 30; x < x1; x += 60) for (let y = y0 + 30; y < y1; y += 60) {
+        c.save(); c.translate(x, y); c.rotate(ang); c.beginPath(); c.moveTo(-6, -7); c.lineTo(2, 0); c.lineTo(-6, 7); c.stroke(); c.restore();
+      }
+      c.restore();
+    }
+  }
+  c.restore();
+  // Départ : tapis
+  c.save(); c.translate(h.depart[0], h.depart[1]); c.fillStyle = a.neon ? 'rgba(182,255,58,.25)' : 'rgba(0,0,0,.18)'; c.fillRect(-16, -16, 32, 32); c.strokeStyle = a.neon ? a.drapeau : 'rgba(255,255,255,.35)'; c.lineWidth = 1.5; c.strokeRect(-16, -16, 32, 32); c.restore();
+  c.restore();
+  // Calque du dessus (rails, blocs, trou) : dessiné APRÈS l'eau animée, qui sinon recouvrirait la moitié intérieure des rails.
+  coucheHaut = document.createElement('canvas'); coucheHaut.width = W; coucheHaut.height = H;
+  { const c = coucheHaut.getContext('2d'); c.translate(vue.ox, vue.oy); c.scale(vue.k, vue.k);
+  // Rails : bord extérieur et murs
+  const rail = (pts, ferme, ep) => {
+    c.save(); c.lineJoin = 'round'; c.lineCap = 'round';
+    if (a.neon) { c.shadowColor = a.rail; c.shadowBlur = 14; }
+    else { c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 6; c.shadowOffsetY = 3; }
+    chemin(c, pts, ferme); c.lineWidth = ep + 3; c.strokeStyle = a.railOmbre; c.stroke(); c.restore();
+    c.save(); c.lineJoin = 'round'; c.lineCap = 'round'; chemin(c, pts, ferme); c.lineWidth = ep; c.strokeStyle = a.rail; c.stroke();
+    c.lineWidth = Math.max(1.5, ep * 0.22); c.strokeStyle = a.railReflet; c.globalAlpha = 0.7; c.translate(-1, -1.5); chemin(c, pts, ferme); c.stroke(); c.restore();
+  };
+  // Le rail extérieur est dessiné à cheval sur le bord : on masque sa moitié intérieure en redessinant le gazon sous les murs intérieurs uniquement.
+  rail(h.bord, true, 14);
+  for (const m of h.murs || []) {
+    if (m.bloc) {
+      c.save(); if (a.neon) { c.shadowColor = '#3ae0ff'; c.shadowBlur = 16; } else { c.shadowColor = 'rgba(0,0,0,.4)'; c.shadowBlur = 8; c.shadowOffsetY = 4; }
+      chemin(c, m.pts); c.fillStyle = a.neon ? '#140f36' : a.railOmbre; c.fill(); c.restore();
+      c.save(); chemin(c, m.pts); c.lineWidth = 6; c.strokeStyle = a.neon ? '#3ae0ff' : a.rail; c.lineJoin = 'round'; c.stroke();
+      if (!a.neon) { c.clip(); c.fillStyle = a.rail; c.globalAlpha = 0.85; c.fill(); c.globalAlpha = 0.25; c.strokeStyle = a.railOmbre; c.lineWidth = 1; const xs = m.pts.map((p) => p[0]); for (let x = Math.min(...xs) + 10; x < Math.max(...xs); x += 12) { c.beginPath(); c.moveTo(x, -10); c.lineTo(x, 2000); c.stroke(); } }
+      c.restore();
+    } else rail(m.pts, false, 10);
+  }
+  // Trou : coupe et ombre
+  c.save(); c.translate(h.trou[0], h.trou[1]);
+  c.fillStyle = a.neon ? 'rgba(182,255,58,.12)' : 'rgba(0,0,0,.12)'; c.beginPath(); c.arc(0, 0, R_TROU + 7, 0, Math.PI * 2); c.fill();
+  const gr = c.createRadialGradient(-2, -3, 1, 0, 0, R_TROU); gr.addColorStop(0, '#000'); gr.addColorStop(1, '#2a2a2a');
+  c.fillStyle = gr; c.beginPath(); c.arc(0, 0, R_TROU, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = a.neon ? a.drapeau : 'rgba(255,255,255,.85)'; c.lineWidth = 1.6; c.stroke(); c.restore();
+  }
+}
+function dessinerPlot(c, a, pl) {
+  c.save(); c.translate(pl.x, pl.y);
+  if (a.neon) { c.shadowColor = a.plot[0]; c.shadowBlur = 16; } else { c.shadowColor = 'rgba(0,0,0,.4)'; c.shadowBlur = 6; c.shadowOffsetY = 3; }
+  c.fillStyle = a.plot[1]; c.beginPath(); c.arc(0, 0, pl.r, 0, Math.PI * 2); c.fill(); c.shadowColor = 'transparent';
+  c.fillStyle = a.plot[0]; c.beginPath(); c.arc(0, 0, pl.r * 0.62, 0, Math.PI * 2); c.fill();
+  c.fillStyle = a.plot[1]; c.beginPath(); c.arc(0, 0, pl.r * 0.28, 0, Math.PI * 2); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.45)'; c.beginPath(); c.arc(-pl.r * 0.35, -pl.r * 0.4, pl.r * 0.22, 0, Math.PI * 2); c.fill();
+  c.restore();
+}
+function dessinerMobiles(c, a, h, t) {
+  for (const m of h.mobiles || []) {
+    if (m.type === 'moulin') {
+      c.save(); c.translate(m.x, m.y);
+      // Socle du moulin (vu de dessus) puis pales
+      c.fillStyle = a.neon ? '#140f36' : 'rgba(0,0,0,.25)'; c.beginPath(); c.arc(4, 5, 22, 0, Math.PI * 2); c.fill();
+      for (let i = 0; i < m.pales; i++) {
+        const th = m.phase + m.w * t + i * 2 * Math.PI / m.pales;
+        c.save(); c.rotate(th);
+        if (a.neon) { c.shadowColor = '#3ae0ff'; c.shadowBlur = 12; } else { c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 6; c.shadowOffsetY = 4; }
+        c.fillStyle = a.neon ? '#3ae0ff' : '#f4efe4'; c.fillRect(4, -6, m.l - 4, 12);
+        c.shadowColor = 'transparent'; c.fillStyle = a.neon ? '#140f36' : '#b8342a';
+        for (let x = 14; x < m.l - 6; x += 18) c.fillRect(x, -6, 9, 12);
+        c.restore();
+      }
+      c.fillStyle = a.neon ? '#ff3cac' : '#6f4521'; c.beginPath(); c.arc(0, 0, 11, 0, Math.PI * 2); c.fill();
+      c.fillStyle = a.neon ? '#ffc2e6' : '#c48a4c'; c.beginPath(); c.arc(-2, -2, 6, 0, Math.PI * 2); c.fill();
+      c.restore();
+    } else if (m.type === 'porte') {
+      const k = 0.5 - 0.5 * Math.cos(2 * Math.PI * t / m.periode + (m.phase || 0));
+      const cx = m.a[0] + (m.b[0] - m.a[0]) * k, cy = m.a[1] + (m.b[1] - m.a[1]) * k;
+      c.save(); c.strokeStyle = a.neon ? 'rgba(58,224,255,.35)' : 'rgba(0,0,0,.18)'; c.lineWidth = 4; c.setLineDash([6, 6]);
+      c.beginPath(); c.moveTo(m.a[0], m.a[1]); c.lineTo(m.b[0], m.b[1]); c.stroke(); c.setLineDash([]);
+      if (a.neon) { c.shadowColor = '#3ae0ff'; c.shadowBlur = 14; } else { c.shadowColor = 'rgba(0,0,0,.4)'; c.shadowBlur = 8; c.shadowOffsetY = 4; }
+      c.fillStyle = a.neon ? '#3ae0ff' : a.rail; c.fillRect(cx - m.taille[0] / 2, cy - m.taille[1] / 2, m.taille[0], m.taille[1]);
+      c.shadowColor = 'transparent'; c.fillStyle = a.neon ? '#140f36' : a.railOmbre; c.globalAlpha = 0.35;
+      c.fillRect(cx - m.taille[0] / 2 + 4, cy - m.taille[1] / 2 + 4, m.taille[0] - 8, m.taille[1] - 8); c.restore();
+    }
+  }
+}
+function dessinerEau(c, a, h, t) {
+  for (const z of h.zones || []) {
+    if (z.type !== 'eau') continue;
+    c.save(); chemin(c, z.pts); c.clip();
+    const gr = c.createLinearGradient(0, 0, h.w, h.h); gr.addColorStop(0, a.eau[0]); gr.addColorStop(1, a.eau[1]); c.fillStyle = gr; c.fillRect(0, 0, h.w, h.h);
+    c.strokeStyle = a.neon ? 'rgba(160,240,255,.35)' : 'rgba(255,255,255,.28)'; c.lineWidth = 1.6;
+    for (let y = 8; y < h.h; y += 22) { c.beginPath(); for (let x = 0; x <= h.w; x += 12) { const yy = y + Math.sin(x / 34 + t * 1.6 + y) * 3; x ? c.lineTo(x, yy) : c.moveTo(x, yy); } c.stroke(); }
+    c.restore();
+    c.save(); chemin(c, z.pts); c.lineWidth = 4; c.strokeStyle = a.neon ? '#3ae0ff' : 'rgba(30,40,30,.35)'; c.stroke(); c.restore();
+  }
+}
+function dessinerDrapeau(c, a, h, t, cache) {
+  if (cache) return;
+  c.save(); c.translate(h.trou[0], h.trou[1]);
+  c.strokeStyle = 'rgba(0,0,0,.28)'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, 0); c.lineTo(26, 18); c.stroke(); // ombre du mât
+  c.strokeStyle = a.neon ? '#f6f7ff' : '#f2f2f2'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -38); c.stroke();
+  const f = Math.sin(t * 5) * 3;
+  c.fillStyle = a.drapeau; if (a.neon) { c.shadowColor = a.drapeau; c.shadowBlur = 12; }
+  c.beginPath(); c.moveTo(0, -38); c.quadraticCurveTo(12, -36 + f, 24, -31 + f * 0.6); c.lineTo(0, -24); c.closePath(); c.fill();
+  c.restore();
+}
+const COUL_J = ['#ffffff', '#ffd23f'];
+function dessinerBalle(c, a, x, y, i, alpha = 1) {
+  c.save(); c.globalAlpha = alpha;
+  c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(x + 2.5, y + 3.5, R, R * 0.8, 0, 0, Math.PI * 2); c.fill();
+  if (a.neon) { c.shadowColor = COUL_J[i]; c.shadowBlur = 14; }
+  const gr = c.createRadialGradient(x - 2.5, y - 2.5, 1, x, y, R); gr.addColorStop(0, '#fff'); gr.addColorStop(1, i ? '#e0a80d' : '#c9ccd2');
+  c.fillStyle = i ? gr : gr; c.beginPath(); c.arc(x, y, R, 0, Math.PI * 2); c.fill();
+  if (i) { c.shadowColor = 'transparent'; c.fillStyle = COUL_J[1]; c.globalAlpha = alpha * 0.55; c.beginPath(); c.arc(x, y, R - 1, 0, Math.PI * 2); c.fill(); }
+  c.restore();
+}
+
+/* =====================================================================================
+   PARTIE (locale, deux joueurs sur ce poste ou entraînement)
+   ===================================================================================== */
+const $ = (id) => document.getElementById(id);
+const CFG = { diff: 'normal', nb: 6, mode: 'duo', amb: 'ete', choc: true };
+try { Object.assign(CFG, JSON.parse(localStorage.getItem('minigolf.cfg') || '{}')); } catch (e) { /* stockage indisponible */ }
+let partie = null, anim = null, visee = null, trace = [];
+
+function melanger(arr, rnd) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function tirerTrous(diff, nb) {
+  const rnd = graine((Date.now() & 0xffffff) ^ 0x5bd1e995);
+  const tiers = DIFFS[diff].tirage;
+  let pool = melanger(TROUS.filter((h) => h.diff === tiers[0]), rnd);
+  if (pool.length < nb && tiers[1]) pool = pool.concat(melanger(TROUS.filter((h) => h.diff === tiers[1]), rnd));
+  if (pool.length < nb) pool = pool.concat(melanger(TROUS.filter((h) => !pool.includes(h)), rnd));
+  return pool.slice(0, nb);
+}
+function nouvellePartie(trous, joueurs, opts) {
+  partie = { trous, joueurs, i: 0, scores: joueurs.map(() => []), opts, aide: opts.aide };
+  demarrerTrou();
+}
+function demarrerTrou() {
+  const h = partie.trous[partie.i];
+  const n = partie.joueurs.length;
+  // L'honneur : celui qui a le mieux joué le trou précédent commence.
+  let ordre = [...Array(n).keys()];
+  if (partie.i > 0 && n > 1) { const prec = partie.scores.map((s) => s[partie.i - 1]); ordre.sort((a, b) => prec[a] - prec[b]); }
+  partie.trou = { h, horloge: 0, balles: partie.joueurs.map(() => ({ x: h.depart[0], y: h.depart[1], dedans: false, pose: false })), coups: partie.joueurs.map(() => 0), ordre, tour: ordre[0], fini: partie.joueurs.map(() => false) };
+  trace = [];
+  ajuster();
+  majHud();
+  annonce(`Trou ${partie.i + 1}`, `${h.nom} · par ${h.par}`);
+}
+const maxCoups = (h) => h.par + 4;
+function joueurSuivant() {
+  const T = partie.trou, n = partie.joueurs.length;
+  if (T.fini.every(Boolean)) return finTrou();
+  // Coup par coup, à tour de rôle ; celui qui a fini laisse la main.
+  let j = T.tour;
+  for (let k = 0; k < n; k++) { j = T.ordre[(T.ordre.indexOf(j) + 1) % n]; if (!T.fini[j]) break; }
+  T.tour = j; majHud();
+}
+function jouerCoup(angle, puissance) {
+  const T = partie.trou, j = T.tour;
+  if (!T.balles[j].pose) T.balles[j].pose = true;
+  const etat = { balles: T.balles.map((b, i) => ({ x: b.x, y: b.y, dedans: b.dedans || T.fini[i] || (!b.pose && i !== j) })), horloge: T.horloge };
+  const res = simuler(T.h, etat, { balle: j, angle, puissance }, { choc: partie.opts.choc });
+  T.coups[j] += 1 + res.eau;
+  SONS.frappe(puissance);
+  anim = { res, k: 0, t0: performance.now(), sonsJoues: 0, j };
+}
+function finCoup() {
+  const T = partie.trou, { res, j } = anim; anim = null;
+  res.final.balles.forEach((b, i) => { if (!T.balles[i].pose && i !== j && !T.balles[i].dedans) return; T.balles[i].x = b.x; T.balles[i].y = b.y; if (b.dedans && !T.balles[i].dedans) { T.balles[i].dedans = true; T.fini[i] = true; } });
+  T.horloge = res.final.horloge;
+  partie.joueurs.forEach((_, i) => { if (!T.fini[i] && T.coups[i] >= maxCoups(T.h)) { T.fini[i] = true; T.coups[i] = maxCoups(T.h); } });
+  if (T.balles[j].dedans) {
+    const c = T.coups[j], d = c - T.h.par;
+    const nomC = c === 1 ? 'Trou en un !' : d <= -2 ? 'Eagle' : d === -1 ? 'Birdie' : d === 0 ? 'Par' : d === 1 ? 'Bogey' : d === 2 ? 'Double bogey' : `+${d}`;
+    annonce(nomC, `${partie.joueurs[j]} · ${c} coup${c > 1 ? 's' : ''}`);
+  } else if (res.eau) annonce('Plouf', `${partie.joueurs[j]} · +1 coup de pénalité`);
+  else if (T.fini[j]) annonce('Balle ramassée', `${partie.joueurs[j]} · ${T.coups[j]} coups (maximum)`);
+  joueurSuivant();
+}
+function finTrou() {
+  const T = partie.trou;
+  partie.scores.forEach((s, i) => (s[partie.i] = T.coups[i]));
+  setTimeout(() => {
+    partie.i++;
+    if (partie.i >= partie.trous.length) return afficherScore(true);
+    demarrerTrou();
+  }, 1600);
+}
+
+/* ---------- Entrées : visée en fronde ---------- */
+function versMonde(ev) { const r = cv.getBoundingClientRect(); return [((ev.clientX - r.left) * vue.dpr - vue.ox) / vue.k, ((ev.clientY - r.top) * vue.dpr - vue.oy) / vue.k]; }
+const DRAG_MAX = 190;
+cv.addEventListener('pointerdown', (ev) => {
+  if (!partie || anim || partie.trou.fini.every(Boolean)) return;
+  cv.setPointerCapture(ev.pointerId); visee = { p0: versMonde(ev), p: versMonde(ev) };
+});
+cv.addEventListener('pointermove', (ev) => { if (visee) visee.p = versMonde(ev); });
+cv.addEventListener('pointerup', (ev) => {
+  if (!visee) return; const v = visee; visee = null;
+  const d = sub(v.p0, v.p), L = len(d); if (L < 8) return;
+  jouerCoup(Math.atan2(d[1], d[0]), Math.min(1, L / DRAG_MAX));
+});
+addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { visee = null; ['vMoteur', 'vAtelier'].forEach((id) => ($(id).hidden = true)); } });
+
+/* ---------- Boucle d'affichage ---------- */
+function ajuster() {
+  const r = cv.getBoundingClientRect(); vue.dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = Math.max(1, Math.round(r.width * vue.dpr)); cv.height = Math.max(1, Math.round(r.height * vue.dpr));
+  const h = partie ? partie.trou.h : TROUS[5];
+  const m = 36 * vue.dpr; vue.k = Math.min((cv.width - 2 * m) / h.w, (cv.height - 2 * m) / h.h);
+  vue.ox = (cv.width - h.w * vue.k) / 2; vue.oy = (cv.height - h.h * vue.k) / 2;
+  preparerCouche(h, AMB[CFG.amb]);
+}
+addEventListener('resize', () => ajuster());
+let tVue = 0, dernier = performance.now();
+function boucle(now) {
+  const dt = Math.min(0.05, (now - dernier) / 1000); dernier = now;
+  const a = AMB[CFG.amb];
+  const h = partie ? partie.trou.h : TROUS[5];
+  if (!couche) ajuster();
+  g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(couche, 0, 0);
+  g.setTransform(vue.k, 0, 0, vue.k, vue.ox, vue.oy);
+  // Horloge visible : celle du trou (les obstacles tournent pendant qu'on vise ; le coup part à l'instant du relâcher).
+  let balles, horlogeAff;
+  if (partie && anim) {
+    const el = (now - anim.t0) / 1000, k = Math.min(anim.res.images.length - 1, Math.floor(el * 240 / PAS_IMAGE));
+    balles = anim.res.images[k]; horlogeAff = partie.trou.horloge + k * PAS_IMAGE * DT;
+    // Sons des évènements atteints
+    while (anim.sonsJoues < anim.res.evts.length && anim.res.evts[anim.sonsJoues].n <= k * PAS_IMAGE) { const e = anim.res.evts[anim.sonsJoues++]; SONS[e.type] && SONS[e.type](e.f || 0.5); }
+    trace.push([balles[anim.j][0], balles[anim.j][1]]); if (trace.length > 22) trace.shift();
+    if (k >= anim.res.images.length - 1) { finCoup(); }
+  } else if (partie) {
+    partie.trou.horloge += dt; horlogeAff = partie.trou.horloge;
+    balles = partie.trou.balles.map((b) => [b.x, b.y, b.dedans]);
+    if (trace.length) trace.shift();
+  } else { tVue += dt; horlogeAff = tVue; balles = []; }
+  dessinerEau(g, a, h, horlogeAff);
+  g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(coucheHaut, 0, 0); g.setTransform(vue.k, 0, 0, vue.k, vue.ox, vue.oy);
+  (h.plots || []).forEach((pl) => dessinerPlot(g, a, pl));
+  dessinerMobiles(g, a, h, horlogeAff);
+  // Traînée
+  trace.forEach((p, i) => { g.fillStyle = `rgba(255,255,255,${(i / trace.length) * 0.35})`; g.beginPath(); g.arc(p[0], p[1], R * (0.4 + 0.6 * i / trace.length), 0, Math.PI * 2); g.fill(); });
+  const cacheDrapeau = partie && partie.trou.balles.some((b, i) => !b.dedans && Math.hypot(b.x - h.trou[0], b.y - h.trou[1]) < 60 && partie.trou.tour === i && !anim);
+  if (partie) {
+    const T = partie.trou;
+    balles.forEach((b, i) => { if (b[2] || T.fini[i] && !anim) return; if (!T.balles[i].pose && i !== T.tour && !(anim && anim.j === i)) return; dessinerBalle(g, a, b[0], b[1], i, i === T.tour || anim ? 1 : 0.75); });
+    if (!anim && !T.fini[T.tour]) {
+      const b = T.balles[T.tour];
+      // Repère du joueur qui a la main
+      g.save(); g.strokeStyle = COUL_J[T.tour]; g.globalAlpha = 0.6 + 0.3 * Math.sin(now / 250); g.lineWidth = 2 / vue.k * vue.dpr; g.beginPath(); g.arc(b.x, b.y, R + 6, 0, Math.PI * 2); g.stroke(); g.restore();
+      if (visee) dessinerVisee(g, a, b, horlogeAff);
+    }
+  }
+  dessinerDrapeau(g, a, h, horlogeAff, cacheDrapeau);
+  if ($('cDebug').checked) dessinerDebug(g, h, horlogeAff);
+  requestAnimationFrame(boucle);
+}
+function dessinerVisee(c, a, b, t) {
+  const d = sub(visee.p0, visee.p), L = len(d); if (L < 8) return;
+  const pw = Math.min(1, L / DRAG_MAX), ang = Math.atan2(d[1], d[0]);
+  const col = pw < 0.5 ? '#9be36d' : pw < 0.8 ? '#ffc93c' : '#ff5a3c';
+  const aide = partie.aide;
+  if (aide === 'trajet') {
+    // Facile : trajectoire jusqu'au premier choc (même moteur, balle seule)
+    const T = partie.trou;
+    const r = simuler(T.h, { balles: [{ x: b.x, y: b.y }], horloge: t }, { balle: 0, angle: ang, puissance: pw }, { seul: true, tmax: 2.5, premierChoc: true });
+    const stop = (r.evts.find((e) => e.type !== 'levre') || { n: 1e9 }).n;
+    c.fillStyle = 'rgba(255,255,255,.75)';
+    r.images.forEach((im, i) => { if (i * PAS_IMAGE > stop || i % 3) return; c.beginPath(); c.arc(im[0][0], im[0][1], 2, 0, Math.PI * 2); c.fill(); });
+  }
+  const lg = aide === 'force' ? 26 : 26 + pw * 120;
+  c.save(); c.translate(b.x, b.y); c.rotate(ang);
+  c.strokeStyle = col; c.lineWidth = 3; c.setLineDash(aide === 'force' ? [] : [7, 6]);
+  c.beginPath(); c.moveTo(R + 4, 0); c.lineTo(R + lg, 0); c.stroke(); c.setLineDash([]);
+  c.fillStyle = col; c.beginPath(); c.moveTo(R + lg + 8, 0); c.lineTo(R + lg - 2, -6); c.lineTo(R + lg - 2, 6); c.closePath(); c.fill();
+  c.restore();
+  // Jauge de force autour de la balle
+  c.save(); c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 5; c.beginPath(); c.arc(b.x, b.y, R + 14, 0, Math.PI * 2); c.stroke();
+  c.strokeStyle = col; c.beginPath(); c.arc(b.x, b.y, R + 14, -Math.PI / 2, -Math.PI / 2 + pw * Math.PI * 2); c.stroke(); c.restore();
+}
+function dessinerDebug(c, h, t) {
+  c.save(); c.lineWidth = 1.5;
+  c.strokeStyle = '#00ffd0'; (h._fixes || segmentsFixes(h)).concat(segmentsMobiles(h, t)).forEach((s) => { c.beginPath(); c.moveTo(s.a[0], s.a[1]); c.lineTo(s.b[0], s.b[1]); c.stroke(); });
+  c.strokeStyle = '#ff00aa'; c.beginPath(); c.arc(h.trou[0], h.trou[1], R_TROU, 0, Math.PI * 2); c.stroke();
+  (h.zones || []).forEach((z) => { c.strokeStyle = { eau: '#39f', sable: '#fc3', glace: '#9ff', pente: '#f6f' }[z.type]; chemin(c, z.pts); c.stroke(); });
+  c.restore();
+}
+
+/* ---------- Interface ---------- */
+function annonce(t, s) { const el = $('annonce'); el.innerHTML = `${t}${s ? `<small>${s}</small>` : ''}`; el.classList.add('vu'); clearTimeout(annonce.t); annonce.t = setTimeout(() => el.classList.remove('vu'), 1500); }
+function majHud() {
+  if (!partie) return; const T = partie.trou, h = T.h;
+  $('hTrou').textContent = `Trou ${partie.i + 1}/${partie.trous.length} · Par ${h.par}`;
+  $('hNom').textContent = `${h.nom} · ${DIFFS[h.diff === 'expert' ? 'expert' : h.diff].l}`;
+  $('hJoueurs').innerHTML = partie.joueurs.map((n, i) => {
+    const tot = partie.scores[i].reduce((a, b) => a + b, 0);
+    return `<span class="chip ${T.tour === i && !T.fini[i] ? 'actif' : ''} ${T.fini[i] ? 'fini' : ''}"><i style="background:${COUL_J[i]}"></i>${esc(n)}<span class="n" title="Coups sur ce trou">${T.coups[i]}</span><span style="color:var(--doux);font-size:12px">total ${tot + T.coups[i]}</span></span>`;
+  }).join('');
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function tableScore() {
+  const tr = partie.trous, J = partie.joueurs;
+  const enCours = partie.trou && !partie.trou.fini.every(Boolean) && partie.i < tr.length;
+  const cell = (s, par) => (s == null ? '' : s < par ? `<span class="cercle">${s}</span>` : s);
+  let html = `<table><thead><tr><th>Trou</th>${tr.map((_, i) => `<th>${i + 1}</th>`).join('')}<th>Total</th></tr></thead><tbody>`;
+  html += `<tr class="par"><td class="nom">Par</td>${tr.map((h) => `<td>${h.par}</td>`).join('')}<td class="tot">${tr.reduce((a, h) => a + h.par, 0)}</td></tr>`;
+  J.forEach((n, j) => {
+    const s = partie.scores[j], tot = s.reduce((a, b) => a + (b || 0), 0), parJ = tr.slice(0, s.length).reduce((a, h) => a + h.par, 0), dif = tot - parJ;
+    html += `<tr><td class="nom">${esc(n)}</td>${tr.map((h, i) => `<td>${i === partie.i && enCours ? `<span class="sous">${partie.trou.coups[j]}…</span>` : cell(s[i], h.par)}</td>`).join('')}<td class="tot">${tot}<br><span class="sous">${s.length ? (dif > 0 ? '+' : '') + dif : ''}</span></td></tr>`;
+  });
+  return html + `</tbody></table><p class="note">Un chiffre entouré : sous le par. Maximum par trou : par + 4 (balle ramassée). Une balle à l'eau revient à sa place, avec 1 coup de pénalité.</p>`;
+}
+function afficherScore(fin) {
+  $('eScore').hidden = false; $('tableScore').innerHTML = tableScore();
+  $('bFermerScore').hidden = !!fin; $('bRejouer').hidden = !fin; $('gagnant').hidden = !fin;
+  $('tScore').textContent = fin ? 'Partie terminée' : 'Carte de score';
+  $('pScore').textContent = partie.trous.map((h) => h.nom).join(' · ');
+  if (fin) {
+    const tot = partie.scores.map((s) => s.reduce((a, b) => a + b, 0)), best = Math.min(...tot);
+    const g2 = partie.joueurs.filter((_, i) => tot[i] === best);
+    $('gagnant').textContent = partie.joueurs.length === 1 ? `${tot[0]} coups au total` : g2.length > 1 ? `Égalité à ${best} coups` : `${g2[0]} gagne avec ${best} coups`;
+    ton(520, 780, 0.25, 0.12, 'triangle'); setTimeout(() => ton(780, 1040, 0.3, 0.12, 'triangle'), 180);
+  }
+}
+function aideDe(diff) { return diff === 'facile' ? 'trajet' : diff === 'normal' ? 'ligne' : 'force'; }
+function lancer(trous, entrainement) {
+  const n1 = $('n1').value.trim() || 'Joueur 1', n2 = $('n2').value.trim() || 'Joueur 2';
+  const joueurs = CFG.mode === 'solo' || entrainement ? [n1] : [n1, n2];
+  $('eLobby').hidden = true; $('eScore').hidden = true; $('vAtelier').hidden = true; $('hud').hidden = false; $('consigne').hidden = false;
+  setTimeout(() => ($('consigne').hidden = true), 6000);
+  nouvellePartie(trous, joueurs, { choc: CFG.choc, aide: aideDe(CFG.diff) });
+}
+function sauver() { try { localStorage.setItem('minigolf.cfg', JSON.stringify(CFG)); } catch (e) { /* stockage indisponible */ } }
+function seg(host, options, key, apres) {
+  host.innerHTML = options.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${String(CFG[key]) === String(v)}">${l}</button>`).join('');
+  host.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { CFG[key] = isNaN(+b.dataset.v) ? b.dataset.v : +b.dataset.v; sauver(); host.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); apres && apres(); }));
+}
+function construireLobby() {
+  const nbTrous = (d) => { const t = DIFFS[d].tirage; return TROUS.filter((h) => t.includes(h.diff)).length; };
+  $('cDiff').innerHTML = Object.entries(DIFFS).map(([k, d]) => `<button type="button" class="opt" data-v="${k}" aria-pressed="${CFG.diff === k}"><b>${d.l}</b><span>${d.d}</span><span>${nbTrous(k)} trous dans le tirage</span></button>`).join('');
+  $('cDiff').querySelectorAll('.opt').forEach((b) => b.addEventListener('click', () => { CFG.diff = b.dataset.v; sauver(); construireLobby(); }));
+  seg($('cNb'), [[3, '3'], [6, '6'], [9, '9']], 'nb');
+  seg($('cMode'), [['duo', 'À deux sur ce poste'], ['solo', 'Entraînement']], 'mode', () => ($('n2').hidden = CFG.mode === 'solo'));
+  $('n2').hidden = CFG.mode === 'solo';
+  $('cChoc').checked = CFG.choc;
+  $('cAmb').innerHTML = Object.entries(AMB).map(([k, a]) => `<button type="button" class="amb" data-v="${k}" aria-pressed="${CFG.amb === k}"><canvas width="108" height="68" data-amb="${k}"></canvas>${a.l}</button>`).join('');
+  $('cAmb').querySelectorAll('canvas').forEach((c) => { const x = c.getContext('2d'), a = AMB[c.dataset.amb]; dessinerFond(x, a, 108, 68); x.fillStyle = a.gazon; x.fillRect(14, 16, 80, 36); x.strokeStyle = a.rail; x.lineWidth = 5; x.strokeRect(14, 16, 80, 36); x.fillStyle = '#000'; x.beginPath(); x.arc(78, 34, 4, 0, 7); x.fill(); x.fillStyle = '#fff'; x.beginPath(); x.arc(30, 34, 3, 0, 7); x.fill(); });
+  $('cAmb').querySelectorAll('.amb').forEach((b) => b.addEventListener('click', () => { CFG.amb = b.dataset.v; sauver(); construireLobby(); couche = null; }));
+  $('listeTrous').innerHTML = TROUS.map((h) => `<button type="button" data-id="${h.id}"><span>${h.nom}</span><small>${DIFFS[h.diff].l} · par ${h.par}</small></button>`).join('');
+  $('listeTrous').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => lancer([TROUS.find((h) => h.id === b.dataset.id)], true)));
+}
+function construireMoteur() {
+  const L = [['frottGazon', 'Frottement du gazon', 20, 250, 1], ['amortGazon', 'Freinage à grande vitesse', 0, 2, 0.05], ['frottSable', 'Frottement du sable', 150, 1200, 10],
+    ['frottGlace', 'Frottement de la glace', 0, 120, 1], ['rebond', 'Rebond sur les rails', 0.3, 1, 0.01], ['rebondPlot', 'Rebond des bornes', 0.5, 1.6, 0.02],
+    ['vitesseMax', 'Vitesse maximale du coup', 400, 1800, 10], ['captureTrou', 'Vitesse max. pour tomber dans le trou', 80, 500, 5], ['choc', 'Rebond entre balles', 0.3, 1, 0.01]];
+  $('reglages').innerHTML = L.map(([k, l, a, b, s]) => `<label class="r">${l}<output id="o_${k}">${P[k]}</output><input type="range" id="r_${k}" min="${a}" max="${b}" step="${s}" value="${P[k]}"></label>`).join('');
+  L.forEach(([k]) => $('r_' + k).addEventListener('input', (e) => { P[k] = +e.target.value; $('o_' + k).textContent = P[k]; }));
+}
+$('bGo').addEventListener('click', () => { lancer(tirerTrous(CFG.diff, CFG.nb), false); });
+$('bAtelier').addEventListener('click', () => { $('vAtelier').hidden = false; });
+$('bFermerAtelier').addEventListener('click', () => ($('vAtelier').hidden = true));
+$('bMoteur').addEventListener('click', () => ($('vMoteur').hidden = !$('vMoteur').hidden));
+$('bFermerMoteur').addEventListener('click', () => ($('vMoteur').hidden = true));
+$('bDefaut').addEventListener('click', () => { P = Object.assign({}, DEF); construireMoteur(); });
+$('bScore').addEventListener('click', () => afficherScore(false));
+$('bFermerScore').addEventListener('click', () => ($('eScore').hidden = true));
+$('bRejouer').addEventListener('click', () => lancer(tirerTrous(CFG.diff, CFG.nb), false));
+$('bLobby').addEventListener('click', () => { $('eScore').hidden = true; $('eLobby').hidden = false; $('hud').hidden = true; partie = null; anim = null; couche = null; });
+$('bQuitter').addEventListener('click', () => { $('eLobby').hidden = false; $('hud').hidden = true; partie = null; anim = null; couche = null; });
+$('bSon').addEventListener('click', () => { son = !son; $('tSon').textContent = son ? 'Son' : 'Son coupé'; if (son) ton(600, 800, 0.08, 0.08); });
+son = false; $('tSon').textContent = 'Son coupé';
+construireLobby(); construireMoteur();
+requestAnimationFrame(boucle);
+</script>
