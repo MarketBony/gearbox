@@ -4,8 +4,9 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 15/10/2026 (lire en premier)
-- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 88**
-  (15/10, `rcu-worker` + `api` + `web` : SPARK lot 4, Équipes et portefeuilles, **calcul des portefeuilles DÉSACTIVÉ en prod**).
+- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 89**
+  (15/10, `web` seul : molette bloquée au survol d'un tableau, v2). Avant lui le **88** (15/10, `rcu-worker` + `api` + `web` :
+  SPARK lot 4, Équipes et portefeuilles, **calcul des portefeuilles DÉSACTIVÉ en prod**).
   Aucune branche ouverte.
 - **🚨 URGENT (Théo, 15/10) — SSH du VPS** : le mot de passe est accepté pour TOUS les comptes (`50-cloud-init.conf`, ubuntu
   compris), 80 800 tentatives en 11 jours, pas de fail2ban. À faire : `PasswordAuthentication no` global (le bloc `Match User dcs`
@@ -99,7 +100,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 88 (15/10)** — SPARK lot 4, Équipes et portefeuilles (`rcu-worker` + `api` + `web`, migration RCU 005).
+- **En production : correctif 89 (15/10)** — v2 : la molette ne se bloque plus au survol d'un tableau (`web` seul).
+  Avant lui le **correctif 88 (15/10)** — SPARK lot 4, Équipes et portefeuilles (`rcu-worker` + `api` + `web`, migration RCU 005).
   Avant lui le **correctif 87 (15/10)** — SPARK, requêtes DCS sur le SFTP + archivage du worker (`rcu-worker` seul).
   Avant lui le **correctif 86 (15/10)** — SPARK, mode avancé du Requêteur (opérateurs, groupes ET / OU, liste collée).
   Avant lui le **correctif 85 (13/10)** — SPARK, export Excel des flottes (taille, parc complet, une ligne par véhicule).
@@ -662,6 +664,14 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 89 — 15/10 : v2, molette bloquée au survol d'un tableau** (branche `fix/scroll-molette`, **`web` seul**). Signalé par
+  Théo : en faisant défiler une rubrique, la molette s'arrêtait dès que la souris passait sur un tableau. Cause : `.scroll`
+  (`ui2/os/maquette.css`, et `.bud-tscroll` / `.fix-scroll`) portait `overscroll-behavior: contain` sur les DEUX axes ; un tableau
+  en boîte `.scroll` (défilement horizontal) devenait un conteneur qui retient la molette verticale même sans rien à faire défiler.
+  Correctif : `overscroll-behavior-x: contain` seulement (l'axe horizontal reste retenu : retour arrière de Chrome, balayage entre
+  fenêtres). ⚠️ Non reproduit en local : la molette simulée de l'outil ne fait pas d'enchaînement réel et la session de Théo avait
+  expiré dans le panneau — **à confirmer par Théo sur la prod**.
+
 - **Correctif 88 — 15/10 : SPARK lot 4 — ÉQUIPES ET PORTEFEUILLES** (branche `feat/spark-lot4-portefeuilles`, **`rcu-worker` +
   `api` + `web`**, migration RCU `005_portefeuilles.sql`, aucune migration Supabase). Maquette validée : `maquettes/crm/v2/equipes.js`.
   Décisions de Théo (15/10) : **SPARK est la source des vendeurs** (GRID, trop limité — pas de secteur —, les lira plus tard) ;
@@ -1142,7 +1152,8 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 88** (15 octobre 2026) — SPARK lot 4, Équipes et portefeuilles,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 89** (15 octobre 2026) — molette bloquée au survol d'un tableau
+  (v2), **`web` seul**, aucune migration. Avant lui le **correctif 88** (15 octobre 2026) — SPARK lot 4, Équipes et portefeuilles,
   **`rcu-worker` (migration RCU `005_portefeuilles.sql`) puis `api` + `web`**, puis chargement du référentiel MAEVA
   (`--vendeurs`) ; calcul des portefeuilles laissé DÉSACTIVÉ. Avant lui le **correctif 87** (15 octobre 2026) — SPARK, requêtes DCS sur le SFTP
   (compte `dcs` ouvert par mot de passe, hors git) et archivage du worker, **`rcu-worker` seul**, aucune migration. Avant lui le
@@ -4783,6 +4794,8 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **`overscroll-behavior: contain` sur une boîte qui défile en largeur bloque la molette VERTICALE de la page** au survol (correctif
+  89). Pour un tableau large dans une page qui défile, ne retenir que l'axe x (`overscroll-behavior-x: contain`).
 - **Artefact GPU = invisible dans les captures du panneau navigateur** (rendu hors écran) : demander une capture d'ÉCRAN à Théo,
   l'agrandir et mesurer (profil de luminance, PIL) avant toute hypothèse. Tester une piste CSS = un `<style>` injecté dans le
   shadow root de la coque (perdu au rechargement). Correctif 81 : 8 variantes à l'aveugle avant de regarder la vraie image.

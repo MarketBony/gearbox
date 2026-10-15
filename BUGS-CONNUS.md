@@ -5,6 +5,8 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [ ] **CRM : Figeac, Millau et Carmaux absents des extractions DCS** (12/10). Ni VN ni VO pour `VNVORFIG`, `VNVORMILLAU`,
   `VNVORCARM` : le compte DCS de Théo n'a pas ces sites (droits à faire ouvrir par l'IT). Leurs codes sont déjà dans
   `rcu.ref_affaire` : rien à coder, ils seront importés dès qu'ils remonteront.
+- [x] **v2 : molette bloquée au survol d'un tableau** (Théo, 15/10) : `overscroll-behavior: contain` sur `.scroll` (deux axes).
+  Corrigé au correctif 89 (axe x seulement). ⚠️ À confirmer par Théo sur la prod (non reproductible avec l'outil).
 - [x] **SPARK : fiche ouverte depuis le Requêteur (ou Équipes › À attribuer) remplacée par le 1er client de la liste** quand le
   client n'était pas dans la page affichée (sélection automatique de `ClientsView.tsx`). Corrigé au correctif 88.
 - [ ] **SPARK, portefeuilles : à faire par Théo avant d'activer le calcul en prod** — ~220 noms DCS à classer ; marques des

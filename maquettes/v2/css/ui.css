@@ -106,7 +106,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 700; letter-spacing: -.015em; }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .row { display: flex; align-items: center; gap: 8px; } .col { display: flex; flex-direction: column; gap: 8px; }
 .grow { flex: 1; min-width: 0; } .wrap { flex-wrap: wrap; }
-.scroll { overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--surface-4) transparent; }
+.scroll { overflow: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: var(--surface-4) transparent; }
 .hide { display: none !important; }
 svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 svg.i.sm { width: 14px; height: 14px; } svg.i.lg { width: 20px; height: 20px; } svg.i.xl { width: 28px; height: 28px; }
