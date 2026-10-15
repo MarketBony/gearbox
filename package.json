@@ -4,13 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/check-plaques-sync.mjs && node scripts/check-bonyform-sync.mjs",
+    "predev": "node scripts/check-plaques-sync.mjs && node scripts/check-bonyform-sync.mjs && node scripts/check-minigolf-sync.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/check-plaques-sync.mjs && node scripts/check-bonyform-sync.mjs",
+    "prebuild": "node scripts/check-plaques-sync.mjs && node scripts/check-bonyform-sync.mjs && node scripts/check-minigolf-sync.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "check:plaques": "node scripts/check-plaques-sync.mjs",
-    "check:bonyform": "node scripts/check-bonyform-sync.mjs"
+    "check:bonyform": "node scripts/check-bonyform-sync.mjs",
+    "check:minigolf": "node scripts/check-minigolf-sync.mjs"
   },
   "dependencies": {
     "date-fns": "^4.1.0",

@@ -14,13 +14,17 @@
 // depuis la liste des utilisateurs.
 // ============================================================================
 
-export type GameType = 'morpion' | 'connect4' | 'battleship';
+export type GameType = 'morpion' | 'connect4' | 'battleship' | 'minigolf';
 
 export const GAME_LABELS: Record<GameType, string> = {
   morpion: 'Morpion',
   connect4: 'Puissance 4',
   battleship: 'Bataille navale',
+  minigolf: 'Minigolf',
 };
+
+/** Réglages d'un défi de minigolf, choisis par celui qui lance (pré-lobby). */
+export interface MinigolfOptions { diff: 'facile' | 'normal' | 'expert'; nb: 3 | 6 | 9; amb: 'ete' | 'mer' | 'nuit' | 'manif'; choc: boolean }
 
 export interface GameChallenge {
   id: string;
@@ -29,6 +33,7 @@ export interface GameChallenge {
   game: GameType;
   status: 'pending' | 'accepted' | 'refused';
   sessionId?: string | null;
+  options?: MinigolfOptions | null;
   createdAt: string;
 }
 

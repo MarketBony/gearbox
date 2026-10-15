@@ -47,6 +47,8 @@ const GAME_META: Record<GameType, { icon: React.ReactNode; pitch: string; accent
   morpion: { icon: <Grid3x3 size={22} />, pitch: 'Trois cases alignées. Deux minutes, pas plus.', accent: 'text-bony-orange' },
   connect4: { icon: <Circle size={22} />, pitch: 'Quatre pions, la gravité en plus.', accent: 'text-bony-violet' },
   battleship: { icon: <Anchor size={22} />, pitch: 'Placez votre flotte, coulez la sienne.', accent: 'text-bony-blue' },
+  // Jouable seulement dans la v2 (pré-lobby et rendu canvas) : présent ici pour afficher une partie en cours.
+  minigolf: { icon: <Circle size={22} />, pitch: 'Se joue dans la nouvelle interface.', accent: 'text-bony-green' },
 };
 
 // ---- Statistiques -----------------------------------------------------------
@@ -379,7 +381,9 @@ const Games: React.FC = () => {
                 {!nul && !gagne && <p className="text-xs text-bony-muted">La revanche est un clic dans le lobby.</p>}
               </div>
             )}
-            <Comp session={active} myId={myId} onMove={jouer} onPlaceFleet={placerFlotte} />
+            {active.game === 'minigolf'
+              ? <div className="gx-card p-6 text-center text-bony-muted">Le minigolf se joue dans la nouvelle interface (Gearbox OS).</div>
+              : <Comp session={active} myId={myId} onMove={jouer} onPlaceFleet={placerFlotte} />}
           </div>
         </div>
       </div>
@@ -484,7 +488,7 @@ const Games: React.FC = () => {
                 <Swords size={12} /> Lancer un défi
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {(Object.keys(GAME_META) as GameType[]).map(g => (
+                {(Object.keys(GAME_META) as GameType[]).filter(g => g !== 'minigolf').map(g => (
                   <button key={g} onClick={() => setJeuChoisi(g)}
                     className={`gx-card p-3.5 text-left transition-colors ${
                       jeuChoisi === g ? 'border-bony-orange' : 'hover:border-bony-border'
