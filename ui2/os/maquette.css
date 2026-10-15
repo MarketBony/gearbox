@@ -120,7 +120,10 @@ h4 { margin: 0; font-weight: 700; letter-spacing: -.015em; }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .row { display: flex; align-items: center; gap: 8px; } .col { display: flex; flex-direction: column; gap: 8px; }
 .grow { flex: 1; min-width: 0; } .wrap { flex-wrap: wrap; }
-.scroll { overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--surface-4) transparent; }
+/* Molette verticale rendue à la page (15/10/2026) : `contain` sur les deux axes bloquait le défilement dès que la souris
+   survolait un tableau en boîte `.scroll`, même sans rien à faire défiler verticalement. Seul l'axe horizontal reste retenu
+   (retour arrière de Chrome, balayage entre fenêtres). */
+.scroll { overflow: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: var(--surface-4) transparent; }
 .hide { display: none !important; }
 svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 svg.i.sm { width: 14px; height: 14px; } svg.i.lg { width: 20px; height: 20px; } svg.i.xl { width: 28px; height: 28px; }
@@ -2490,7 +2493,7 @@ svg.i.sm { width: 14px; height: 14px; } svg.i.lg { width: 20px; height: 20px; } 
   .bud-tcard{padding:22px 0 0;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
   .bud-tcard .hd{padding:0 24px 14px;flex:none}
   .bud-tcard .hd p{margin:6px 0 0;font-size:13px;color:var(--text-2)}
-  .bud-tscroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--surface-4) transparent;margin:0 10px 10px}
+  .bud-tscroll{flex:1;min-height:0;overflow:auto;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:var(--surface-4) transparent;margin:0 10px 10px}
   .bud-tscroll::-webkit-scrollbar{width:12px;height:12px}
   .bud-tscroll::-webkit-scrollbar-thumb{background:var(--surface-4);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
   .bud-tscroll::-webkit-scrollbar-corner{background:transparent}
@@ -2590,7 +2593,7 @@ svg.i.sm { width: 14px; height: 14px; } svg.i.lg { width: 20px; height: 20px; } 
   .fix-cnt{margin-left:auto;font-size:13px;color:var(--text-2);white-space:nowrap}
   .fix-body{display:flex;flex-direction:column;padding:0 22px 22px;overflow:hidden}
   .fix-card{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 0 0;overflow:hidden}
-  .fix-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--surface-4) transparent;padding:0 8px 8px}
+  .fix-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:var(--surface-4) transparent;padding:0 8px 8px}
   .fix-scroll::-webkit-scrollbar{width:12px;height:12px}
   .fix-scroll::-webkit-scrollbar-thumb{background:var(--surface-4);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
   .fix-t{width:100%;min-width:760px;border-collapse:separate;border-spacing:0;font-size:14px}
