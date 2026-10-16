@@ -1,12 +1,14 @@
 import type { Project, Task } from '../../../types';
 import { SERVICES } from '../../../constants';
+import { estAssigne } from '../../../utils/projet';
 import { gx } from '../ui/kit';
 
 // =====================================================================
 // To-do — RÈGLES COMMUNES (sorties de TodoApp.tsx le 09/10/2026) : la rubrique, le widget « To-do » du bureau,
 // « Mes tâches » et « Ma journée » lisent la MÊME liste. Uniquement les tâches ASSIGNÉES à moi : tâches des projets
 // Actifs ou Brouillons dont la fin n'est pas passée (Brouillon inclus : exception voulue, CLAUDE.md) + tâches
-// LIBRES, qui ne disparaissent que terminées ET échues ; « Vierge » masqué. Date de référence = échéance de la
+// LIBRES, qui ne disparaissent que terminées ET échues ; « assignée à moi » = je suis DANS la liste des assignés
+// (tâches multi-assignées, 16/10/2026 : `estAssigne`, utils/projet.ts) ; « Vierge » masqué. Date de référence = échéance de la
 // tâche, sinon fin du projet.
 // =====================================================================
 
@@ -28,11 +30,11 @@ export function buildItems(projects: Project[], standalone: Task[], uid: string)
   const out: Item[] = [], T = todayIso();
   for (const p of projects) {
     if (!(p.status === 'Active' || p.status === 'Draft') || p.endDate < T) continue;
-    for (const t of p.tasks || []) if (t.assignedUserId === uid && t.status !== 'Empty')
+    for (const t of p.tasks || []) if (estAssigne(t, uid) && t.status !== 'Empty')
       out.push({ id: t.id, t, p, sites: sitesOf(p), brands: p.brands || [], services: p.service || [], ref: t.deadline || p.endDate, start: p.startDate, noDate: false });
   }
   for (const t of standalone) {
-    if (t.assignedUserId !== uid) continue;
+    if (!estAssigne(t, uid)) continue;
     if (t.status === 'Done' && t.deadline && t.deadline < T) continue;
     out.push({ id: t.id, t, p: null, sites: t.sites || [], brands: t.brands || [], services: t.service || [], ref: t.deadline || '9999-12-31', start: t.deadline || T, noDate: !t.deadline });
   }

@@ -70,7 +70,12 @@ export interface Task {
   channel: TaskChannel;
   cost: number;
   status: TaskStatus;
+  // PREMIER assigné — tenu par le serveur = `assignedUserIds[0]` (backend/src/utils/taskAssignees.ts). Seul champ
+  // lu et écrit par l'ancienne interface (pages/*). La v2 lit et écrit la LISTE, par `utils/projet.ts`
+  // (`assignesDe`, `estAssigne`, `poserAssignes`) : jamais l'un sans l'autre à la main.
   assignedUserId?: string;
+  // Toutes les personnes assignées (16/10/2026, tâches multi-assignées). Absente d'un objet antérieur au lot.
+  assignedUserIds?: string[];
   // --- Tâches AUTONOMES (créées depuis la To-do, sans projet) ---
   // Une tâche de PROJET hérite ces informations de son projet et laisse ces champs
   // vides ; une tâche autonome n'a aucun projet dont hériter, elle les porte donc

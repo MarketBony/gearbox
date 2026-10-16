@@ -151,6 +151,12 @@ model Task {
   cost           Float
   status         String
   assignedUserId String? // Référence libre vers User (pas de FK, style du schéma)
+  // --- MULTI-ASSIGNÉS (16/10/2026) ---
+  // Toutes les personnes assignées (références libres vers User, comme `assignedUserId`).
+  // ⚠️ `assignedUserId` est CONSERVÉ et tenu = PREMIER de la liste par le serveur
+  // (`src/utils/taskAssignees.ts`, seule porte) : l'ancienne interface ne lit et n'écrit que lui.
+  // Ne jamais écrire l'un sans l'autre en dehors de cette porte.
+  assignedUserIds String[]     @default([])
   volumetry      Float?
   openRate       Float?
   npaiRate       Float?
