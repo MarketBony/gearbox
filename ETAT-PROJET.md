@@ -4,6 +4,15 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 16/10/2026 (lire en premier)
+- **🎳 BOWLING 3D (prototype, 16/10, branche `feat/bowling-prototype`, NON intégré)** — demande de Théo « façon Wii Sports
+  low-poly ». Même chemin que le minigolf : `maquettes/jeux/bowling.html` (three.js 0.160 par CDN, serveur `maquettes`,
+  `/jeux/bowling.html`) + moteur pur et déterministe `maquettes/jeux/bowling-moteur.js` (futur `shared/bowling.ts`, rejoué par
+  le serveur : le navigateur n'enverra que `{ x0, angle, puissance, effet }`). Physique à plat, chute des quilles en capsule
+  qui balaie ; réglée par simulation : poche avec effet ≈ 80 % de strikes, boule droite ≈ 35 %, plein centre = quilles
+  écartées. Score officiel testé (300 / 150 / 0 / 167 / 190). Geste : clic maintenu, tirer vers soi puis pousser (vitesse =
+  puissance, geste en biais = effet) ; thèmes Bony / Grève CGT ; 1-2 joueurs même écran ; 10 ou 5 frames ; sons synthétisés.
+  **Attend le retour de Théo sur la sensation** ; ensuite : `shared/bowling.ts` + `bowlingRules.ts`, `'bowling'` dans
+  `GAME_TYPES`, défi tour par tour dans le lobby (v2), three.js en dépendance npm chargée à la demande.
 - **CORRECTIF 93 EN PRODUCTION (16/10, `api` + `web`)** — branche `feat/lot-93-widgets-assignes-prestataire-1600`, 4 sujets
   codés par 4 agents puis fusionnés, testés sur localhost (Master) et recettés par Théo : (1) **widgets du bureau v2** qui
   bougeaient au redimensionnement (`ui2/os/engine/widgets.ts` : la disposition ENREGISTRÉE est la référence, `computeView()`
