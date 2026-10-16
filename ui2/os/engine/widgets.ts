@@ -383,8 +383,9 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     { type: 'chat-live', size: 'L', x: 4, y: 0 },   // n'affecte que les bureaux sans disposition sauvegardée (ou « Disposition par défaut »)
   ];
   let layout = null, box = null, editing = false;
-  /* Disposition par défaut : un widget qui dépasserait d'un bureau étroit est replacé dans un emplacement libre */
-  const fresh = () => { layout = []; DEFAULT.forEach((d) => { const w = { ...d, id: GX.uid('wg') }; if (w.x + dim(w.size)[0] > cols() || layout.some((o) => overlap(rectOf(w), rectOf(o)))) Object.assign(w, freeSpot(w.size, w)); layout.push(w); }); return layout; };
+  /* Disposition par défaut : copiée TELLE QUELLE (15/10/2026). Sur un bureau étroit, c'est l'affichage (computeView) qui
+     replace un widget qui dépasserait — la disposition enregistrée ne dépend plus de la largeur de la fenêtre. */
+  const fresh = () => (layout = DEFAULT.map((d) => ({ ...d, id: GX.uid('wg') })));
   /* Téléphone : budget et retards en petit, derniers messages du Chat, échéances, absents, météo. Un widget non
      autorisé au rôle reste masqué à l'affichage (allowed), comme au bureau. */
   const DEFAULT_M = [['budget-ring', 'S'], ['late', 'S'], ['chat', 'M'], ['deadlines', 'M'], ['conges-off', 'S'], ['weather', 'S']];
@@ -406,25 +407,73 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
      débordaient sur le Dock (retour de Théo, même jour). SX()/SY() gardés comme points d'appel uniques. */
   const M = () => Math.round(Math.max(10, Math.min(28, innerWidth * 0.016)));
   const cols = () => Math.max(4, Math.floor((innerWidth - 2 * M() + GAP) / STEP));
-  /* Pas HORIZONTAL : le reste de la division en cases est réparti ENTRE les colonnes (les widgets
-     gardent leur taille, seuls les espaces entre eux s'élargissent de quelques px) — grille pleine
-     largeur, marge identique à gauche et à droite (retour de Théo, 30/09/2026). */
-  const SX = () => (innerWidth - 2 * M() + GAP) / cols();
+  /* Pas HORIZONTAL : le reste de la division en cases est réparti entre les colonnes — grille pleine largeur, marge
+     identique à gauche et à droite (retour de Théo, 30/09/2026).
+     [GEARBOX] 15/10/2026 (widgets désalignés au redimensionnement) : le pas est ENTIER et c'est la CASE qui s'élargit
+     (largeur d'un widget = cw × SX − GAP), plus seulement l'espace entre deux widgets. Avant, un widget gardait
+     cw × 96 − 12 px pendant que les positions avançaient de SX (fractionnaire) : un 4 cases ne tombait pas sous deux
+     2 cases côte à côte, et le recalage « bord droit » (ancien XL) décalait tout widget touchant la dernière colonne —
+     les bords dépendaient de la largeur de la fenêtre. Désormais tous les bords tombent sur la grille, au pixel près.
+     Seule la largeur bouge (quelques px par case) ; la hauteur reste fixe (SY = 96 px, Dock préservé). */
+  const SX = () => Math.max(1, Math.floor((innerWidth - 2 * M() + GAP) / cols()));
+  /* Bord gauche de la grille : la marge, plus la moitié du reste (< 1 px par colonne) de la division entière. */
+  const OX = () => M() + Math.floor((innerWidth - 2 * M() + GAP - cols() * SX()) / 2);
+  const PW = (cw) => cw * SX() - GAP;   // largeur en px d'un widget de `cw` colonnes — LA règle unique
   /* Zone du bureau : entre la barre du haut (0 si escamotable) et le haut du Dock. La grille y est
      CENTRÉE : même marge en haut qu'en bas (au-dessus du Dock), même marge à gauche qu'à droite. */
   const cssPx = (n) => parseFloat(getComputedStyle(GX.host).getPropertyValue(n)) || 0;
   const area = () => { const top = cssPx('--mb-space'), bottom = (cssPx('--dock-icon') || 50) + 26 + 8; return { top, h: innerHeight - top - bottom }; };
   const rows = () => Math.max(4, Math.floor((area().h - 2 * M() + GAP) / STEP));
   const SY = () => STEP;
-  /* Abscisse d'un widget : un widget qui touche la dernière colonne est aligné sur le bord DROIT de la
-     grille (sinon l'élargissement des espaces le laisserait quelques px en retrait). */
-  const XL = (x, cw) => (x + cw >= cols() ? cols() * SX() - GAP - (cw * STEP - GAP) : x * SX());
-  function freeSpot(size, ignore, near) {
-    const [cw, ch] = dim(size), C = cols(), R = rows() + 20, cands = [];
-    for (let y = 0; y < R; y++) for (let x = 0; x + cw <= C; x++) { const r = { x, y, w: cw, h: ch }; if (!layout.some((o) => o !== ignore && overlap(r, rectOf(o)))) cands.push(r); }
-    if (!cands.length) return { x: 0, y: 0 };
-    if (near) cands.sort((a, b) => Math.hypot(a.x - near.x, a.y - near.y) - Math.hypot(b.x - near.x, b.y - near.y));
-    return cands[0];
+  /* Abscisse d'un widget : sa colonne × le pas. Le widget de la dernière colonne finit pile sur le bord droit de la
+     grille (C × SX − GAP) sans recalage (l'ancien recalage décalait les bords selon la largeur, 15/10/2026). */
+  const XL = (x) => x * SX();
+  /* Première case libre (balayage ligne par ligne) pour un widget de taille `size`, parmi les rectangles `occ`. */
+  function freeSpot(size, occ) {
+    const [cw, ch] = dim(size), C = cols(), R = rows() + 20;
+    for (let y = 0; y < R; y++) for (let x = 0; x + Math.min(cw, C) <= C; x++) { const r = { x, y, w: cw, h: ch }; if (!occ.some((o) => overlap(r, o))) return { x, y }; }
+    return { x: 0, y: Math.max(0, ...occ.map((o) => o.y + o.h)) };
+  }
+
+  /* ---------------- Disposition ENREGISTRÉE ≠ disposition AFFICHÉE (15/10/2026) ----------------
+     Bug « widgets déplacés au redimensionnement » (BUGS-CONNUS.md) : à chaque rendu, un widget qui dépassait la
+     dernière colonne d'une fenêtre étroite était replacé ET RÉTRÉCI dans `layout`, puis `save()` envoyait ce bureau
+     dégradé au serveur (/api/widgets). Remise en grand, la fenêtre affichait la disposition « étroite » : widgets
+     déplacés, tailles perdues.
+     Désormais `layout` (la RÉFÉRENCE, enregistrée) n'est jamais modifié par l'affichage. `computeView()` en dérive, à
+     chaque rendu, une disposition AFFICHÉE adaptée à la largeur courante (widget trop large ramené à la largeur de la
+     grille, widget qui dépasse replacé dans la case libre la plus proche) — déterministe, jamais enregistrée : revenir
+     à la largeur d'origine restitue exactement la disposition. Seule une action de l'utilisateur (déplacer,
+     redimensionner, ajouter, retirer, configurer, disposition par défaut) appelle `save()`. */
+  let view = {};   // id → { x, y, w, h, size } : ce qui est À L'ÉCRAN (base des gestes)
+  function computeView() {
+    const C = cols(), out = {}, occ = [], late = [];
+    [...layout].sort((a, b) => a.y - b.y || a.x - b.x).forEach((w) => {
+      let [cw, ch] = dim(w.size), size = w.size;
+      if (cw > C) { cw = C; size = sizeOf(C, ch); }        // affichage seulement : la taille enregistrée reste
+      const r = { x: w.x, y: w.y, w: cw, h: ch };
+      if (r.x + cw <= C && !occ.some((o) => overlap(r, o))) { out[w.id] = { ...r, size }; occ.push(r); } else late.push([w, cw, ch, size]);
+    });
+    late.forEach(([w, cw, ch, size]) => { const r = nearestFree(cw, ch, occ, { x: Math.max(0, C - cw), y: w.y }); out[w.id] = { ...r, size }; occ.push(r); });
+    return (view = out);
+  }
+  /* Rectangle AFFICHÉ d'un widget (à défaut, son rectangle enregistré). */
+  const vr = (w) => { const v = view[w.id]; return v ? { x: v.x, y: v.y, w: v.w, h: v.h } : rectOf(w); };
+  /* Après une action : les widgets `fixed` ont une nouvelle position enregistrée. Un widget NON touché garde sa position
+     enregistrée — sauf si elle chevauche désormais celle d'un widget fixé (cas d'un widget qui dépassait, affiché
+     ailleurs sur la fenêtre étroite) : il prend alors sa position AFFICHÉE, celle que l'utilisateur avait sous les yeux.
+     Les rectangles affichés ne se chevauchent jamais entre eux : la boucle converge (chaque widget bascule au plus 1 fois). */
+  function fixRefs(fixed) {
+    const done = new Set(fixed.map((w) => w.id));
+    for (let again = true; again;) {
+      again = false;
+      const fx = layout.filter((w) => done.has(w.id)).map(rectOf);
+      layout.forEach((w) => {
+        if (done.has(w.id) || !fx.some((r) => overlap(rectOf(w), r))) return;
+        const v = view[w.id]; if (v) { w.x = v.x; w.y = v.y; w.size = v.size; }
+        done.add(w.id); again = true;
+      });
+    }
   }
   const allowed = (type) => {
     const a = CAT[type].app; if (a && !GX.shell.canOpen(a)) return false;
@@ -442,7 +491,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
      ping-pong quand on repasse au même endroit). Les autres ne bougent pas. */
   const calm = () => GX.eco() || matchMedia('(prefers-reduced-motion: reduce)').matches;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const snap = () => Object.fromEntries(layout.map((w) => [w.id, rectOf(w)]));
+  const snap = () => Object.fromEntries(layout.map((w) => [w.id, vr(w)]));   // les gestes partent de ce qui est AFFICHÉ
   function nearestFree(cw, ch, occ, near) {
     const C = cols(), R = Math.max(rows(), ...occ.map((o) => o.y + o.h)) + ch + 1;
     let best = null, bd = Infinity;
@@ -461,12 +510,12 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
   }
   /* Aperçu en direct : les voisins glissent (transition ressort sur left/top, cf. CSS) */
   function preview(out, skipId) {
-    box.querySelectorAll('.wdg').forEach((el) => { const r = out[el.dataset.id]; if (!r || el.dataset.id === skipId) return; el.style.left = XL(r.x, r.w) + 'px'; el.style.top = r.y * SY() + 'px'; });
+    box.querySelectorAll('.wdg').forEach((el) => { const r = out[el.dataset.id]; if (!r || el.dataset.id === skipId) return; el.style.left = XL(r.x) + 'px'; el.style.top = r.y * SY() + 'px'; });
     const vis = layout.filter((w) => allowed(w.type)).map((w) => out[w.id]).filter(Boolean);
     box.style.height = Math.max(0, ...vis.map((r) => r.y + r.h)) * SY() + 'px';
   }
   function mkGhost(r, over) { const g = document.createElement('div'); g.className = 'wghost' + (over ? ' over' : ''); placeGhost(g, r); box.append(g); return g; }
-  function placeGhost(g, r) { Object.assign(g.style, { left: XL(r.x, r.w) + 'px', top: r.y * SY() + 'px', width: r.w * STEP - GAP + 'px', height: r.h * STEP - GAP + 'px' }); }
+  function placeGhost(g, r) { Object.assign(g.style, { left: XL(r.x) + 'px', top: r.y * SY() + 'px', width: PW(r.w) + 'px', height: r.h * STEP - GAP + 'px' }); }
   const rects = () => Object.fromEntries([...(box?.querySelectorAll('.wdg') || [])].map((el) => [el.dataset.id, el.getBoundingClientRect()]));
   /* Après un re-rendu : chaque widget part de son ancienne boîte et rejoint la nouvelle en ressort
      (FLIP en translation si la taille n'a pas changé, sinon animation de la boîte elle-même) */
@@ -482,14 +531,26 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     });
   }
   /* Valide une disposition (positions `out`, taille éventuelle) : sauvegarde + re-rendu + atterrissage */
+  /* [GEARBOX] 15/10/2026 : `out` est exprimé dans la disposition AFFICHÉE. Seuls les widgets que le geste a réellement
+     déplacés (ou le widget redimensionné) reçoivent une nouvelle position enregistrée — avec leur taille affichée, ce que
+     l'utilisateur voyait en les lâchant. Les autres gardent leur position de référence (cf. fixRefs). */
   function commit(out, sized, mainId, before = rects()) {
-    layout.forEach((w) => { const r = out && out[w.id]; if (r) { w.x = r.x; w.y = r.y; } });
-    if (sized) sized.w.size = sized.size;
+    const fixed = [];
+    layout.forEach((w) => {
+      const r = out && out[w.id]; if (!r) return;
+      const v = vr(w), isSized = sized && sized.w === w;
+      if (!isSized && r.x === v.x && r.y === v.y) return;   // pas touché par le geste : sa référence ne bouge pas
+      w.x = r.x; w.y = r.y;
+      if (!isSized && view[w.id]) w.size = view[w.id].size;
+      fixed.push(w);
+    });
+    if (sized) { sized.w.size = sized.size; if (!fixed.includes(sized.w)) fixed.push(sized.w); }
+    fixRefs(fixed);
     save(); W.render(); settle(before, mainId);
   }
   function applySize(w, s) {
-    const [cw, ch] = dim(s), x = Math.min(w.x, Math.max(0, cols() - cw));
-    commit(arrange(snap(), w.id, { x, y: w.y, w: cw, h: ch }), { w, size: s }, w.id);
+    const v = vr(w), [cw, ch] = dim(s), x = Math.min(v.x, Math.max(0, cols() - cw));
+    commit(arrange(snap(), w.id, { x, y: v.y, w: cw, h: ch }), { w, size: s }, w.id);
   }
   function removeW(w, el) {
     const done = () => { layout = layout.filter((x) => x !== w); save(); W.render(); };
@@ -510,33 +571,29 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
 
   /* ---------------- Rendu ---------------- */
   let gesture = null, eatClick = 0, lastGesture = 0;
-  let rzT; GX.win(window, 'resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (box && box.isConnected && !editing) W.render(); }, 200); }); // la grille reste centrée
+  /* Redimensionnement de la fenêtre : simple RE-RENDU (la disposition affichée est recalculée, rien n'est enregistré —
+     15/10/2026), mode édition compris : il n'y a plus de raison de l'exclure. */
+  let rzT; GX.win(window, 'resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (box && box.isConnected) W.render(); }, 200); });
   W.render = (container) => {
     box = container || box; if (!box) return;
     if (gesture) return;   // jamais de re-rendu sous le doigt : la fin du geste re-rend de toute façon
     if (!layout) load();
     if (GX.shell.prefs.widgets === false && !editing) { box.innerHTML = ''; return; }
     box.classList.toggle('editing', editing);
-    /* [GEARBOX] Bureau composé sur un écran plus LARGE (09/10/2026) : un widget qui dépasse la dernière colonne était
-       seulement recalé à droite, au risque de chevaucher ses voisins. On le replace dans une case libre proche, et la
-       disposition (adaptée à cet écran) est enregistrée. */
-    if (!isPhone() && !editing) {
-      const C = cols(), over = layout.filter((w) => w.x + dim(w.size)[0] > C);
-      if (over.length) {
-        over.forEach((w) => { const [cw] = dim(w.size); if (cw > C) { const b = bounds(CAT[w.type] || { sizes: [w.size] }); w.size = sizeOf(Math.max(b.min[0], C), dim(w.size)[1]); } const f = freeSpot(w.size, w, { x: Math.max(0, C - dim(w.size)[0]), y: w.y }); w.x = f.x; w.y = f.y; });
-        save();
-      }
-    }
-    const vis = layout.filter((w) => allowed(w.type));
-    const maxY = Math.max(0, ...vis.map((w) => w.y + dim(w.size)[1]));
-    const sx = SX(), sy = SY(); box.style.width = cols() * sx - GAP + 'px'; box.style.left = M() + 'px'; box.style.top = Math.round(area().top + M()) + 'px'; box.style.height = maxY * sy + 'px'; /* [GEARBOX] marge proportionnelle */
+    /* [GEARBOX] Bureau composé sur un écran plus LARGE (09/10/2026) : un widget qui dépasse la dernière colonne est
+       replacé dans une case libre proche — À L'AFFICHAGE SEULEMENT depuis le 15/10/2026 (computeView). Avant, ce
+       replacement était écrit dans `layout` et enregistré : réduire la fenêtre détruisait la disposition. */
+    computeView();
+    const vis = layout.filter((w) => allowed(w.type) && view[w.id]);
+    const maxY = Math.max(0, ...vis.map((w) => view[w.id].y + view[w.id].h));
+    const sy = SY(); box.style.width = PW(cols()) + 'px'; box.style.left = OX() + 'px'; box.style.top = Math.round(area().top + M()) + 'px'; box.style.height = maxY * sy + 'px'; /* [GEARBOX] marge proportionnelle */
     /* Le widget Chat se re-rend à chaque message : on garde le champ de saisie actif (focus + curseur) */
     const ae = GX.root.activeElement, keep = ae && box.contains(ae) && ae.matches('[data-wc-in]') ? { id: ae.closest('.wch')?.dataset.wid, pos: ae.selectionStart } : null;
     const keepAw = ae && box.contains(ae) && ae.matches('[data-aq]') ? ae.selectionStart : null;   /* champ « Pose ta question… » de mIAouss */
     box.innerHTML = vis.map((w, i) => {
-      const c = CAT[w.type], [cw, ch] = dim(w.size);
-      let inner = ''; try { inner = c.render(w.size, w.cfg || {}, w); } catch (e) { inner = indispo(e, c.name); }
-      return `<div class="wdg ${c.accent ? 'accent' : c.sky ? 'sky' : 'glass'}${c.live ? ' live' : ''} sz-${w.size}" data-id="${w.id}" data-app="${c.app || ''}" style="left:${XL(w.x, cw)}px;top:${w.y * sy}px;width:${cw * STEP - GAP}px;height:${ch * STEP - GAP}px;animation-delay:${i * 30}ms">
+      const c = CAT[w.type], v = view[w.id];   // position et taille AFFICHÉES (computeView)
+      let inner = ''; try { inner = c.render(v.size, w.cfg || {}, w); } catch (e) { inner = indispo(e, c.name); }
+      return `<div class="wdg ${c.accent ? 'accent' : c.sky ? 'sky' : 'glass'}${c.live ? ' live' : ''} sz-${v.size}" data-id="${w.id}" data-app="${c.app || ''}" style="left:${XL(v.x)}px;top:${v.y * sy}px;width:${PW(v.w)}px;height:${v.h * STEP - GAP}px;animation-delay:${i * 30}ms">
         ${inner}${editing ? `<button class="wx" data-rm title="Retirer">${GX.icon('minus', 'sm')}</button><button class="wsz" data-size title="Taille suivante">${dimL(w.size).replace(' × ', '×')}</button>` : ''}${resizable(c) ? '<button class="wrz" data-rz tabindex="-1" aria-label="Redimensionner" title="Tirer pour redimensionner"></button>' : ''}</div>`;
     }).join('');
     if (keepAw != null) { const i = box.querySelector('.aw [data-aq]'); if (i) { i.focus({ preventScroll: true }); i.setSelectionRange(keepAw, keepAw); } }
@@ -655,7 +712,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     moveStart(e, el, w);
   }
   function moveStart(e, el, w) {
-    const sx = e.clientX, sy = e.clientY, pid = e.pointerId, thr = editing ? 3 : 6, x0 = w.x * SX(), y0 = w.y * SY(), [cw, ch] = dim(w.size);
+    const sx = e.clientX, sy = e.clientY, pid = e.pointerId, thr = editing ? 3 : 6, v0 = vr(w), x0 = v0.x * SX(), y0 = v0.y * SY(), cw = v0.w, ch = v0.h;   // depuis la position AFFICHÉE
     let lifted = false, ghost = null, base = null, key = '', out = null, lx = sx, ly = sy, raf = 0;
     const timer = setTimeout(() => lift(), 350);
     function lift() {
@@ -671,7 +728,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     function track() {
       const dx = lx - sx, dy = ly - sy;
       el.style.translate = `${dx}px ${dy}px`;
-      const nx = clamp(Math.round((x0 + dx) / SX()), 0, Math.max(0, cols() - cw)), ny = clamp(Math.round((y0 + dy) / SY()), 0, Math.max(0, rows() - ch, w.y));
+      const nx = clamp(Math.round((x0 + dx) / SX()), 0, Math.max(0, cols() - cw)), ny = clamp(Math.round((y0 + dy) / SY()), 0, Math.max(0, rows() - ch, v0.y));
       const k = nx + ',' + ny; if (k === key) return; key = k;
       out = arrange(base, w.id, { x: nx, y: ny, w: cw, h: ch });
       placeGhost(ghost, out[w.id]); preview(out, w.id);
@@ -705,10 +762,10 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     el.insertAdjacentHTML('beforeend', '<span class="wtip"></span>');
     const tip = el.querySelector('.wtip'), ghost = mkGhost(base[w.id], true);
     function track() {
-      const C = cols(), maxW = C * SX() - GAP, bd = bounds(c);   // au-delà du bord droit, l'aimantation décale le widget vers la gauche
+      const C = cols(), maxW = PW(C), bd = bounds(c);   // au-delà du bord droit, l'aimantation décale le widget vers la gauche
       const fw = clamp(W0 + lx - sx, CELL * 1.2, Math.max(maxW, W0)), fh = clamp(H0 + ly - sy, CELL * 1.2, bd.max[1] * SY());
       el.style.width = fw + 'px'; el.style.height = fh + 'px';
-      const tw = (fw + GAP) / STEP, th = (fh + GAP) / SY();
+      const tw = (fw + GAP) / SX(), th = (fh + GAP) / SY();   // largeur d'un widget = cw × SX − GAP (PW)
       /* [GEARBOX] formats libres : la case la plus proche, dans les bornes du widget (09/10/2026) */
       const best = sizeOf(clamp(Math.round(tw), bd.min[0], Math.max(bd.min[0], Math.min(bd.max[0], C))), clamp(Math.round(th), bd.min[1], bd.max[1]));
       if (best === cur) return; cur = best;
@@ -756,7 +813,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     };
     show('all');
     gal.querySelector('[data-gtabs]').addEventListener('change', (e) => show(e.detail));
-    list.addEventListener('click', (e) => { const b = e.target.closest('[data-add]'); if (!b) return; const t = b.dataset.add, size = CAT[t].sizes[0]; const w = { id: GX.uid('wg'), type: t, size, ...freeSpot(size) }; layout.push(w); save(); W.render(); const el = box.querySelector(`[data-id="${w.id}"]`); if (el && !calm()) GX.animate(el, [{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { spring: 'bouncy' }); });
+    list.addEventListener('click', (e) => { const b = e.target.closest('[data-add]'); if (!b) return; const t = b.dataset.add, size = CAT[t].sizes[0]; const w = { id: GX.uid('wg'), type: t, size, ...freeSpot(size, Object.values(snap())) }; layout.push(w); fixRefs([w]); save(); W.render();   /* case libre de ce qui est AFFICHÉ */ const el = box.querySelector(`[data-id="${w.id}"]`); if (el && !calm()) GX.animate(el, [{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { spring: 'bouncy' }); });
     gal.querySelector('[data-done]').onclick = () => W.edit(false);
     gal.querySelector('[data-reset]').onclick = () => { const before = rects(); fresh(); save(); W.render(); settle(before); };
     GX.animate(gal, [{ transform: 'translate(-50%, 110%)' }, { transform: 'translate(-50%, 0)' }], { spring: 'snappy' });
@@ -779,7 +836,8 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       const w = layout.find((x) => x.id === el.dataset.wid); if (!w || !CAT[w.type]?.live) return;
       const ae = GX.root.activeElement, had = ae && el.contains(ae) && ae.matches('[data-wc-in]'), pos = had ? ae.selectionStart : null;
       const sc = el.querySelector('.wch-list')?.scrollTop || 0;
-      const tmp = document.createElement('div'); try { tmp.innerHTML = CAT[w.type].render(w.size, w.cfg || {}, w); } catch (e) { return; }
+      const sz = box && box.contains(el) && view[w.id] ? view[w.id].size : w.size;   /* bureau : taille AFFICHÉE (computeView) */
+      const tmp = document.createElement('div'); try { tmp.innerHTML = CAT[w.type].render(sz, w.cfg || {}, w); } catch (e) { return; }
       const nu = tmp.firstElementChild; if (!nu) return; el.replaceWith(nu);
       const l = nu.querySelector('.wch-list'); if (l) l.scrollTop = sc;
       if (had || focusId === w.id) { const i = nu.querySelector('[data-wc-in]'); if (i) { i.focus({ preventScroll: true }); const p = pos ?? i.value.length; i.setSelectionRange(p, p); } }
