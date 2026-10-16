@@ -4,7 +4,7 @@ import type { BrandType, FixedExpense, ServiceType } from '../../../types';
 import { PLAQUES_STRUCTURE, SERVICES, BRANDS, ALPINE_SITES, NISSAN_SITES, DISTRIBUTION_GROUPE_BONY, DISTRIBUTION_GROUPE_BONY_RN, HOLDING_BRAND, RDM_BRANDS, FIXED_EXPENSE_EDIT_ROLES, isSiteManager, shareForSite, SITES_HORS_PLAQUE } from '../../../constants';
 import { useAuth } from '../../../contexts/AuthContext';
 import { fixedExpenses as fixedRes, createFixedExpense, updateFixedExpense, deleteFixedExpense } from '../../store/collections';
-import { logActivity as logFeed } from '../../store/workspace';
+import { logActivity as logFeed, useWorkspace } from '../../store/workspace';
 import { gx, hud, Icon, Seg, PickerBtn, useSheets, useEngineEvent } from '../ui/kit';
 
 // =====================================================================
@@ -19,7 +19,7 @@ import { gx, hud, Icon, Seg, PickerBtn, useSheets, useEngineEvent } from '../ui/
 //  - chef de site : rubrique refusée (SITE_MANAGER_SECTIONS) — aucun appel réseau ici.
 // =====================================================================
 
-type Sort = { k: 'date' | 'site' | 'service' | 'comment' | 'amount'; dir: 'asc' | 'desc' };
+type Sort = { k: 'date' | 'site' | 'service' | 'provider' | 'comment' | 'amount'; dir: 'asc' | 'desc' };
 interface Filters { q: string; site: string; service: string; from: string; to: string }
 const F0: Filters = { q: '', site: 'All', service: 'All', from: '', to: '' };
 
@@ -53,11 +53,11 @@ export const partOf = (e: FixedExpense, site: string) => (site === 'All' ? 1 : s
 function listOf(all: FixedExpense[], f: Filters, sort: Sort) {
   const q = f.q.toLowerCase();
   return all.filter((e) => inPer(e)
-    && ((e.comment || '').toLowerCase().includes(q) || (e.site || '').toLowerCase().includes(q) || (e.service || '').toLowerCase().includes(q))
+    && ((e.comment || '').toLowerCase().includes(q) || (e.provider || '').toLowerCase().includes(q) || (e.site || '').toLowerCase().includes(q) || (e.service || '').toLowerCase().includes(q))
     && partOf(e, f.site) > 0 && (f.service === 'All' || e.service === f.service)
     && (!f.from || new Date(e.date) >= new Date(f.from)) && (!f.to || new Date(e.date) <= new Date(f.to)))
     .sort((a, b) => {
-      let x: any = (a as any)[sort.k], y: any = (b as any)[sort.k];
+      let x: any = (a as any)[sort.k] ?? '', y: any = (b as any)[sort.k] ?? '';
       if (typeof x === 'string' && typeof y === 'string') { x = x.toLowerCase(); y = y.toLowerCase(); }
       if (x < y) return sort.dir === 'asc' ? -1 : 1;
       if (x > y) return sort.dir === 'asc' ? 1 : -1;
@@ -81,6 +81,7 @@ const Row = React.memo(function Row({ e, flash, cur, canEdit }: { e: FixedExpens
       <td><span className="fix-dt">{dateFr(e.date)}</span>{e.isAnnual ? <span className="fix-b an" style={{ marginLeft: 8 }}>Annuelle</span> : null}</td>
       <td><span className="fix-b site" data-tip={e.site}>{e.site}</span></td>
       <td>{svcBadge(e.service)}</td>
+      <td>{e.provider || ''}</td>
       <td>{e.proPlus ? <span className="fix-b pro">PRO+</span> : null}{e.comment || ''}</td>
       <td className="r"><span className="fix-amt">{amountFr(e.amount)}</span></td>
       <td className="r">{canEdit ? <Acts /> : null}</td>
@@ -90,7 +91,7 @@ const Row = React.memo(function Row({ e, flash, cur, canEdit }: { e: FixedExpens
 const MCard = React.memo(function MCard({ e, flash, canEdit }: { e: FixedExpense; flash: boolean; canEdit: boolean }) {
   return (
     <article className={`card fix-mc ${flash ? 'fix-flash' : ''}`} data-id={e.id}><div className="top"><span className="fix-dt">{dateFr(e.date)}</span>{e.isAnnual ? <span className="fix-b an">Annuelle</span> : null}<span className="grow" /><span className="fix-amt">{amountFr(e.amount)}</span></div>
-      <div className="meta"><span>{e.site}</span><span>·</span><span>{e.service}</span>{e.proPlus ? <><span className="grow" /><span className="fix-b pro" style={{ margin: 0 }}>PRO+</span></> : null}</div>
+      <div className="meta"><span>{e.site}</span><span>·</span><span>{e.service}</span>{e.provider ? <><span>·</span><span>{e.provider}</span></> : null}{e.proPlus ? <><span className="grow" /><span className="fix-b pro" style={{ margin: 0 }}>PRO+</span></> : null}</div>
       {e.comment ? <div className="cm">{e.comment}</div> : null}{canEdit ? <div className="acts"><Acts style={{ opacity: 1 }} /></div> : null}</article>
   );
 });
@@ -169,7 +170,7 @@ export default function FixedApp({ win, inst }: AppProps) {
   };
   inst.menus = () => ({
     'Fichier': [{ label: 'Nouvelle dépense…', icon: 'plus', disabled: !canEdit, action: () => openForm() }, { label: 'Exporter vers Excel…', icon: 'export', disabled: !gx().shell?.canOpen?.('export'), action: () => gx().wm.open('export') }],
-    'Présentation': [{ header: 'Trier par' }, ...([['date', 'Date'], ['site', 'Site / plaque'], ['service', 'Service'], ['comment', 'Commentaire'], ['amount', 'Montant']] as [Sort['k'], string][]).map(([k, l]) => ({ label: l, checked: sort.k === k, action: () => setSort(k) })), '-',
+    'Présentation': [{ header: 'Trier par' }, ...([['date', 'Date'], ['site', 'Site / plaque'], ['service', 'Service'], ['provider', 'Prestataire'], ['comment', 'Commentaire'], ['amount', 'Montant']] as [Sort['k'], string][]).map(([k, l]) => ({ label: l, checked: sort.k === k, action: () => setSort(k) })), '-',
       { label: 'Réinitialiser les filtres', icon: 'refresh', disabled: !nFilters, action: () => setF(F0) }],
   });
 
@@ -195,12 +196,12 @@ export default function FixedApp({ win, inst }: AppProps) {
       </div>
       <div className="app-body fix-body" ref={bodyRef}>
         <div className="card fix-card" onClick={onListClick} onDoubleClick={onListDbl} onContextMenu={onListMenu}>
-          <div className="fix-scroll" tabIndex={0} aria-label="Dépenses"><table className="fix-t"><thead><tr>{th('date', 'Date')}{th('site', 'Site / plaque')}{th('service', 'Service')}{th('comment', 'Commentaire')}{th('amount', 'Montant (€)', 'r')}<th className="r" style={{ width: 90 }}>Actions</th></tr></thead>
-            <tbody>{L.length ? L.map((e) => <Row key={e.id} e={e} flash={flashId === e.id} cur={!!form && !form.closing && form.src?.id === e.id} canEdit={canEdit} />) : <tr><td colSpan={6}>{empty}</td></tr>}</tbody></table></div>
+          <div className="fix-scroll" tabIndex={0} aria-label="Dépenses"><table className="fix-t"><thead><tr>{th('date', 'Date')}{th('site', 'Site / plaque')}{th('service', 'Service')}{th('provider', 'Prestataire')}{th('comment', 'Commentaire')}{th('amount', 'Montant (€)', 'r')}<th className="r" style={{ width: 90 }}>Actions</th></tr></thead>
+            <tbody>{L.length ? L.map((e) => <Row key={e.id} e={e} flash={flashId === e.id} cur={!!form && !form.closing && form.src?.id === e.id} canEdit={canEdit} />) : <tr><td colSpan={7}>{empty}</td></tr>}</tbody></table></div>
           <div className="fix-cards">{L.length ? L.map((e) => <MCard key={e.id} e={e} flash={flashId === e.id} canEdit={canEdit} />) : empty}</div>
         </div>
       </div></div>
-      <div style={{ display: 'contents' }}>{form ? <ExpenseForm key={form.seq} src={form.src} closing={!!form.closing} onClose={closeForm} onSaved={onSaved} user={user} /> : null}</div>
+      <div style={{ display: 'contents' }}>{form ? <ExpenseForm key={form.seq} src={form.src} all={expenses || []} closing={!!form.closing} onClose={closeForm} onSaved={onSaved} user={user} /> : null}</div>
     </div>{portals}</div>
   );
 }
@@ -214,8 +215,11 @@ function Num({ value, onValue, ...rest }: { value: number; onValue: (n: number) 
   return <input {...rest} type="number" value={raw ?? String(value)} onFocus={() => setRaw(String(value))} onBlur={() => setRaw(null)} onChange={(e) => { setRaw(e.target.value); onValue(+e.target.value || 0); }} />;
 }
 
-const ExpenseForm: React.FC<{ src: FixedExpense | null; closing: boolean; onClose: () => void; onSaved: (id: string, edit: boolean) => void; user: any }> = ({ src, closing, onClose, onSaved, user }) => {
+const ExpenseForm: React.FC<{ src: FixedExpense | null; all: FixedExpense[]; closing: boolean; onClose: () => void; onSaved: (id: string, edit: boolean) => void; user: any }> = ({ src, all, closing, onClose, onSaved, user }) => {
   const edit = !!src;
+  // Auto-complétion du Prestataire : valeurs déjà saisies sur les dépenses et sur les tâches de projet (même source que To-do).
+  const projects = useWorkspace((s) => s.projects);
+  const provList = useMemo(() => [...new Set([...all.map((x) => (x.provider || '').trim()), ...projects.flatMap((p) => (p.tasks || []).map((x) => (x.provider || '').trim()))].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr')), [all, projects]);
   // Valeurs initiales : celles de la page (openModal, l.117-140). En édition, copie telle quelle.
   const [v, setV] = useState<Draft>(() => src
     ? { ...src, brands: [...brandsOf(src)] as BrandType[], amountRaw: String(src.amount ?? '') }
@@ -268,7 +272,7 @@ const ExpenseForm: React.FC<{ src: FixedExpense | null; closing: boolean; onClos
     if (!ok) { if (errRef.current) gx().animate(errRef.current, [{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], { spring: 'snappy' }); return; }
     const { amountRaw: _r, ...rest } = v;
     const saveBrands = v.brands || [];
-    const data = { ...rest, amount: amountNum, brands: saveBrands, brand: saveBrands[0] } as FixedExpense;   // même charge que handleSave
+    const data = { ...rest, provider: (v.provider || '').trim(), amount: amountNum, brands: saveBrands, brand: saveBrands[0] } as FixedExpense;   // même charge que handleSave
     setBusy(true); setFailed('');
     try {
       const r = edit && src?.id ? await updateFixedExpense(data) : await createFixedExpense(data);
@@ -310,6 +314,7 @@ const ExpenseForm: React.FC<{ src: FixedExpense | null; closing: boolean; onClos
                   <span className="u">{euro ? '€' : '%'}</span><span className="alt">{euro ? `${Number(pct.toFixed(1))} %` : amountFr(amt)}</span></div>); })}
               {euro && !(base > 0) ? <span className="fix-note" style={{ color: 'var(--warn)' }}>Montant = 0 € : saisie en € indisponible (utilisez le mode %).</span> : null}
               <div className="fix-dtot" style={{ color: Math.abs(distTotal - 100) < 0.01 ? 'var(--ok)' : 'var(--danger)' }}>Total : {Math.round(distTotal)} %</div></div>) : null}</div>
+          <div className="fix-fld"><span className="label">Prestataire</span><input className="input" value={v.provider || ''} list="fixProv" placeholder="Nom du prestataire…" maxLength={200} aria-label="Prestataire" onChange={(e) => set({ provider: e.target.value })} /><datalist id="fixProv">{provList.map((p) => <option key={p} value={p} />)}</datalist></div>
           <div className="fix-fld"><span className="label">Commentaire</span><textarea className="textarea" placeholder="Description de la dépense..." value={v.comment || ''} onChange={(e) => set({ comment: e.target.value })} /></div>
           <label className="fix-pro"><input type="checkbox" checked={!!v.proPlus} onChange={(e) => set({ proPlus: e.target.checked })} />Type client : PRO+ (B2B)</label>
         </div>

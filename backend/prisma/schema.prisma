@@ -365,6 +365,7 @@ model FixedExpense {
   sites              String[] @default([])
   budgetDistribution Json? // Record<string, number> — % par site
   comment            String
+  provider           String? // Prestataire (texte libre, auto-complété côté client) — null = non renseigné
   amount             Float
   brand              String? // legacy — premier élément de brands
   brands             String[] @default([])
