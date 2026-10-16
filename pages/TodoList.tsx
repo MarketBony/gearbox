@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import DatePicker from '../components/DatePicker';
 import Select from '../components/Select';
 import { db } from '../services/dataService';
-import { recalculerProjet } from '../utils/projet';
+import { recalculerProjet, estAssigne } from '../utils/projet';
 import { useRealtimeSync, RT_EVENTS } from '../services/realtime';
 import { Project, Task, TaskStatus, TaskChannel, BrandType, ServiceType, PlaqueName } from '../types';
 import { BRAND_COLORS, SERVICE_COLORS, PLAQUES_STRUCTURE, BRANDS, SERVICES, TASK_CHANNELS } from '../constants';
@@ -506,7 +506,8 @@ const TodoList: React.FC = () => {
     const tasks: TodoTask[] = [];
     for (const p of active) {
       for (const t of p.tasks) {
-        if (t.assignedUserId === user.id && t.status !== 'Empty') {
+        // Multi-assignées (16/10/2026) : à moi si je suis DANS la liste (`estAssigne`), plus seulement le 1er assigné.
+        if (estAssigne(t, user.id) && t.status !== 'Empty') {
           tasks.push({
             ...t,
             projectId: p.id,
@@ -539,7 +540,7 @@ const TodoList: React.FC = () => {
     // non. Deux comportements distincts dans la même colonne, assumés.
     const libres = await db.getStandaloneTasks();
     for (const t of libres) {
-      if (t.assignedUserId !== user.id || t.status === 'Empty') continue;
+      if (!estAssigne(t, user.id) || t.status === 'Empty') continue;
       const echue = !!t.deadline && t.deadline < todayStr;
       if (echue && t.status === 'Done') continue;
       const sites = t.sites ?? [];

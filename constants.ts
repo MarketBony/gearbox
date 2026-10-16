@@ -784,6 +784,14 @@ export const SITE_MANAGER_SECTIONS: string[] = [
 export const hasSocialFeatures = (role?: string | null) => !isSiteManager(role);
 
 /**
+ * Rubrique To-do (16/10/2026, tâches multi-assignées) : tout le monde SAUF l'External et le chef de site. Sert à la
+ * navigation (services/navigation.ts), au chargement des tâches libres (ui2/store/workspace.ts) et à la liste des
+ * personnes à qui l'on peut ATTRIBUER une tâche (décision de Théo : « seulement parmi les rôles qui ont accès à la
+ * To-do »). Miroir de `TODO_ROLES` de backend/src/auth/roles.ts, qui est le VRAI refus (utils/taskAssignees.ts).
+ */
+export const canHaveTodo = (role?: string | null): boolean => !!role && role !== 'External' && !isSiteManager(role);
+
+/**
  * Périmètre imposé à l'utilisateur, ou `null` s'il voit tout.
  *
  * ⚠️ Renvoie un tableau VIDE pour un chef de site sans site rattaché — « ne voit

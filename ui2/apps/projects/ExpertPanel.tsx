@@ -4,6 +4,7 @@ import { db } from '../../../services/dataService';
 import { getSocket } from '../../../services/socket';
 import { formatPoids, estImage } from '../../../utils/fichiers';
 import { useWorkspace } from '../../store/workspace';
+import { assignesDe } from '../../../utils/projet';
 import { gx, hud, Icon, Avatar } from '../ui/kit';
 import { D, today, engaged, finished, isLate } from './common';
 
@@ -55,12 +56,15 @@ function Pilotage({ p, open, setOpen, onOpenTask }: { p: Project; open: string |
   if (!eng.length) return <div className="empty" style={{ padding: 24 }}>Aucune tâche engagée : les indicateurs apparaîtront dès la première tâche non « Vierge ».</div>;
   const cats: [string, Task[], string, string][] = [
     ['late', rest.filter((t) => isLate(t, T)), 'en retard', 'var(--danger)'],
-    ['noOne', rest.filter((t) => !t.assignedUserId), 'sans personne assignée', 'var(--warn)'],
+    ['noOne', rest.filter((t) => !assignesDe(t).length), 'sans personne assignée', 'var(--warn)'],
     ['noDate', rest.filter((t) => !t.deadline), 'à faire sans date', 'var(--warn)'],
   ];
   const clean = cats.every(([, l]) => !l.length);
   const who = new Map<string, { n: number; d: number; late: number; amt: number }>();
-  eng.forEach((t) => { const k = t.assignedUserId || ''; const w = who.get(k) || { n: 0, d: 0, late: 0, amt: 0 }; w.n++; if (finished(t)) w.d++; if (isLate(t, T)) w.late++; w.amt += t.cost || 0; who.set(k, w); });
+  // Multi-assignées (16/10/2026, décision de Théo) : une tâche compte EN ENTIER pour CHACUN de ses assignés — une tâche
+  // de 5 000 € à deux personnes porte 5 000 € sur chacune, pas 2 500. La somme de la colonne peut donc dépasser le
+  // coût du projet : c'est une mesure de charge par personne, pas une ventilation (« Où part l'argent » reste par tâche).
+  eng.forEach((t) => { const ks = assignesDe(t); for (const k of ks.length ? ks : ['']) { const w = who.get(k) || { n: 0, d: 0, late: 0, amt: 0 }; w.n++; if (finished(t)) w.d++; if (isLate(t, T)) w.late++; w.amt += t.cost || 0; who.set(k, w); } });
   const whoList = [...who.entries()].sort((a, b) => (a[0] === '' ? 1 : b[0] === '' ? -1 : b[1].n - a[1].n || b[1].amt - a[1].amt));
   const total = eng.reduce((s, t) => s + (t.cost || 0), 0), top3 = [...eng].sort((a, b) => (b.cost || 0) - (a.cost || 0)).slice(0, 3).reduce((s, t) => s + (t.cost || 0), 0);
   const prov = new Map<string, number>(); eng.forEach((t) => prov.set(t.provider || '— non renseigné —', (prov.get(t.provider || '— non renseigné —') || 0) + (t.cost || 0)));
@@ -84,7 +88,7 @@ function Pilotage({ p, open, setOpen, onOpenTask }: { p: Project; open: string |
             <span className="grow ellipsis" style={u ? undefined : { color: 'var(--warn)' }}>{u ? users.find((x) => x.id === u)?.name || '—' : 'Non assignées'}</span>
             <span className="faint num">{w.d}/{w.n}</span>{w.late ? <span className="badge solid" style={{ '--c': 'var(--danger)' } as React.CSSProperties}>{w.late}</span> : null}
             <b className="num" style={{ minWidth: 58, textAlign: 'right' }}>{w.amt > 0 ? gx().fmt.eurK(w.amt) : ''}</b></div>))}
-        <div className="faint" style={{ fontSize: 12, marginTop: 8 }}>Toutes les tâches de chacun, terminées comprises.</div></div>
+        <div className="faint" style={{ fontSize: 12, marginTop: 8 }}>Toutes les tâches de chacun, terminées comprises. Une tâche partagée compte en entier pour chaque personne.</div></div>
       <div className="prj-xbloc"><div className="prj-lbl"><Icon name="euro" size="sm" /> Où part l’argent</div>
         <div className="num" style={{ fontSize: 24, fontWeight: 700, margin: '8px 0 2px' }}>{gx().fmt.eur(total)}</div>
         <div className="faint" style={{ fontSize: 12.5, marginBottom: 10 }}>Les 3 plus grosses lignes : <span style={pct3 >= 70 ? { color: 'var(--bony-orange)', fontWeight: 700 } : undefined}>{pct3} %</span></div>
@@ -105,7 +109,8 @@ function Gantt({ p, onOpenTask }: { p: Project; onOpenTask: (t: Task) => void })
   const t0 = Math.min(...dates.map(ms), +gx().today()) - 864e5 * 2, t1 = Math.max(...dates.map(ms), +gx().today()) + 864e5 * 2;
   const x = (d: string | Date) => ((+new Date(d) - t0) / (t1 - t0)) * 100;
   const grads: Date[] = []; for (let d = new Date(new Date(t0).getFullYear(), new Date(t0).getMonth() + 1, 1); +d < t1; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) grads.push(d);
-  const byU = new Map<string, Task[]>(); placed.forEach((t) => { const k = t.assignedUserId || ''; byU.set(k, [...(byU.get(k) || []), t]); });
+  // Multi-assignées : une tâche partagée apparaît sur la ligne de CHACUN de ses assignés.
+  const byU = new Map<string, Task[]>(); placed.forEach((t) => { const ks = assignesDe(t); for (const k of ks.length ? ks : ['']) byU.set(k, [...(byU.get(k) || []), t]); });
   const nameOf = (u: string) => users.find((x) => x.id === u)?.name || '—';
   const rows = [...byU.entries()].sort((a, b) => (a[0] === '' ? 1 : b[0] === '' ? -1 : nameOf(a[0]).localeCompare(nameOf(b[0]), 'fr')));
   const color = (t: Task) => (isLate(t, T) ? 'var(--danger)' : t.status === 'Done' ? 'var(--ok)' : undefined);

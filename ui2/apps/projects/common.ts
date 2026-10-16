@@ -1,6 +1,6 @@
 import type { Project, Task, User } from '../../../types';
 import { isMarketingRole } from '../../../constants';
-import { groupeDuProjet, sitesDuProjet } from '../../../utils/projet';
+import { groupeDuProjet, sitesDuProjet, assignesDe } from '../../../utils/projet';
 import { gx } from '../ui/kit';
 
 // Données dérivées de la rubrique Projets (maquettes/v2/js/apps/projects.js, en-tête), sur le vrai
@@ -65,7 +65,8 @@ export function sortTasks(tasks: Task[], k: string, dir: 'asc' | 'desc', users: 
       case 'deadline': return !a.deadline && !b.deadline ? 0 : !a.deadline ? 1 : !b.deadline ? -1 : a.deadline.localeCompare(b.deadline) * s;
       case 'cost': return ((a.cost || 0) - (b.cost || 0)) * s;
       case 'status': return (TASK_ORDER[a.status] - TASK_ORDER[b.status]) * s;
-      case 'assignee': { const na = userName(users, a.assignedUserId), nb = userName(users, b.assignedUserId); return !na && !nb ? 0 : !na ? 1 : !nb ? -1 : na.localeCompare(nb, 'fr') * s; }
+      // Multi-assignées : tri sur les noms de TOUS les assignés, dans leur ordre (le premier d'abord).
+      case 'assignee': { const nm = (t: Task) => assignesDe(t).map((u) => userName(users, u)).join(', '); const na = nm(a), nb = nm(b); return !na && !nb ? 0 : !na ? 1 : !nb ? -1 : na.localeCompare(nb, 'fr') * s; }
       default: return txt((a as any)[k]).localeCompare(txt((b as any)[k]), 'fr') * s;
     }
   });

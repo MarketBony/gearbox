@@ -5,7 +5,7 @@ import { db, ApiError, normalizeProject } from '../../services/dataService';
 import { getSocket, connectSocket } from '../../services/socket';
 import { fileSauvegardeProjet } from '../../services/fileSauvegardeProjet';
 import { recalculerProjet } from '../../utils/projet';
-import { canEditProjects, canReadProjects } from '../../constants';
+import { canEditProjects, canReadProjects, canHaveTodo } from '../../constants';
 
 // =====================================================================
 // Espace de travail de l'interface v2 : SOURCE UNIQUE des projets (tâches comprises), des
@@ -82,7 +82,9 @@ export async function reloadProjects() {
   setProjects(list.map((p) => (fileSauvegardeProjet.aDesEcrituresEnCours(p.id) && s.byId[p.id] ? s.byId[p.id] : p)));
 }
 async function reloadStandalone() {
-  if (!canEditProjects(me?.role)) { workspace.setState({ standalone: [] }); return; }
+  // Lecture des tâches libres : rôles de la To-do (Guest compris, 16/10/2026 — une tâche libre peut lui être attribuée).
+  // Miroir de `GET /api/tasks` (TODO_ROLES) ; l'écriture reste à `canEditProjects`.
+  if (!canHaveTodo(me?.role)) { workspace.setState({ standalone: [] }); return; }
   workspace.setState({ standalone: await db.getStandaloneTasks() });
 }
 async function reloadUsers() { workspace.setState({ users: await db.getUsers() }); }
@@ -118,13 +120,13 @@ function bindSocket() {
     if (typeof id === 'string') dropProject(id); else later('projects', reloadProjects);
   });
   s.on('tasks:updated', (t: any) => {
-    if (echoing || !canEditProjects(me?.role)) return;
+    if (echoing || !canHaveTodo(me?.role)) return;
     if (!t) return later('tasks', reloadStandalone);
     const L = workspace.getState().standalone;
     workspace.setState({ standalone: L.some((x) => x.id === t.id) ? L.map((x) => (x.id === t.id ? t : x)) : [t, ...L] });
   });
   s.on('tasks:deleted', (id: any) => {
-    if (echoing || !canEditProjects(me?.role)) return;
+    if (echoing || !canHaveTodo(me?.role)) return;
     if (typeof id === 'string') workspace.setState({ standalone: workspace.getState().standalone.filter((x) => x.id !== id) });
     else later('tasks', reloadStandalone);
   });

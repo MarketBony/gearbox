@@ -110,5 +110,28 @@ export const nouveauProjet = (name: string, userId?: string): Project => ({
   tasks: [], assignedUsers: userId ? [userId] : [],
 });
 
+// ---------------------------------------------------------------- assignés d'une tâche (16/10/2026)
+// Tâches MULTI-ASSIGNÉES : SEULE PORTE front pour lire et écrire les assignés (v2, To-do, Ma journée, widgets,
+// Dashboard, mode Expert). Jumelle de backend/src/utils/taskAssignees.ts, qui tient `assignedUserId` = premier de
+// `assignedUserIds` à chaque écriture.
+
+/** Toutes les personnes assignées (un objet antérieur au lot n'a que `assignedUserId`). */
+export const assignesDe = (t: Pick<Task, 'assignedUserId' | 'assignedUserIds'>): string[] =>
+  t.assignedUserIds && t.assignedUserIds.length ? t.assignedUserIds : t.assignedUserId ? [t.assignedUserId] : [];
+
+/** « Une tâche est à moi si je suis dans la liste » — règle de la To-do, de Ma journée et des widgets. */
+export const estAssigne = (t: Pick<Task, 'assignedUserId' | 'assignedUserIds'>, uid: string | null | undefined): boolean =>
+  !!uid && assignesDe(t).includes(uid);
+
+/**
+ * Correctif d'écriture des assignés : la liste ET son premier élément, TOUJOURS ensemble. Envoyer la liste seule
+ * laisserait un `assignedUserId` périmé dans l'objet (le serveur s'en sort, l'affichage local de l'ancienne
+ * interface non).
+ */
+export const poserAssignes = (ids: string[]): Pick<Task, 'assignedUserId' | 'assignedUserIds'> => {
+  const L = [...new Set(ids.filter(Boolean))];
+  return { assignedUserIds: L, assignedUserId: (L[0] ?? null) as any };
+};
+
 /** Tâche neuve (même forme que « + AJOUTER UNE TÂCHE »). */
 export const nouvelleTache = (): Task => ({ id: idClient(), name: '', channel: '' as any, cost: 0, status: 'Todo' });

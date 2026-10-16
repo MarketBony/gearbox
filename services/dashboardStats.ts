@@ -6,6 +6,7 @@
 import { Project, BudgetLine, BrandType, ServiceType, SocialPost, FixedExpense } from '../types';
 import { isHoldingBrand, isDestinationInScope, resolveSiteAlias, splitShareToBuckets, siteSharesOf } from '../constants';
 import { parseLocalDate } from '../components/DateRangePicker';
+import { assignesDe } from '../utils/projet';
 
 export interface DashboardStatsInput {
   projects: Project[];
@@ -198,9 +199,10 @@ export function computeDashboardStats(input: DashboardStatsInput) {
           projetsEnRetard.push({ id: p.id, nom: p.name, site: p.site as string, fin: p.endDate, avancement: p.progress || 0 });
       }
       // Charge d'équipe : tâches encore ouvertes, par personne assignée.
+      // Multi-assignées (16/10/2026) : une tâche compte UNE fois pour CHACUN de ses assignés.
       (p.tasks || []).forEach(t => {
-          if ((t.status === 'Todo' || t.status === 'InProgress') && t.assignedUserId) {
-              chargeParUtilisateur[t.assignedUserId] = (chargeParUtilisateur[t.assignedUserId] || 0) + 1;
+          if (t.status === 'Todo' || t.status === 'InProgress') {
+              for (const u of assignesDe(t)) chargeParUtilisateur[u] = (chargeParUtilisateur[u] || 0) + 1;
           }
       });
 
