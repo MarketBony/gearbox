@@ -514,8 +514,8 @@ const Material: React.FC = () => {
             {/* Booking Modal */}
             {isBookingModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                    <div className="glass-strong glass-sheen relative rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="p-6 border-b border-bony-border flex items-center justify-between bg-slate-50 dark:bg-white/5">
+                    <div className="glass-strong glass-sheen relative rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-bony-border flex items-center justify-between bg-slate-50 dark:bg-white/5 shrink-0">
                             <h3 className="text-xl font-title text-bony-text flex items-center gap-2">
                                 {isEditing ? 'Modifier la réservation' : 'Nouvelle réservation'}
                             </h3>
@@ -523,7 +523,7 @@ const Material: React.FC = () => {
                                 <X size={24} />
                             </button>
                         </div>
-                        <div className="p-6 space-y-4">
+                        <div className="p-6 space-y-4 overflow-y-auto min-h-0">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Matériel</label>
                                 <Select
@@ -615,7 +615,7 @@ const Material: React.FC = () => {
                                 />
                             </div>
                         </div>
-                        <div className="p-6 border-t border-bony-border bg-slate-50 dark:bg-white/5 flex justify-end gap-3">
+                        <div className="p-6 border-t border-bony-border bg-slate-50 dark:bg-white/5 flex justify-end gap-3 shrink-0">
                             {isEditing && (
                                 !showDeleteConfirm ? (
                                     <button 
@@ -670,8 +670,8 @@ const Material: React.FC = () => {
             {/* Inventory Modal */}
             {isInventoryModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                    <div className="glass-strong glass-sheen relative rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="p-6 border-b border-bony-border flex items-center justify-between bg-slate-50 dark:bg-white/5">
+                    <div className="glass-strong glass-sheen relative rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-bony-border flex items-center justify-between bg-slate-50 dark:bg-white/5 shrink-0">
                             <h3 className="text-xl font-title text-bony-text flex items-center gap-2">
                                 {isEditing ? 'Modifier le matériel' : 'Nouveau matériel'}
                             </h3>
@@ -679,7 +679,7 @@ const Material: React.FC = () => {
                                 <X size={24} />
                             </button>
                         </div>
-                        <div className="p-6 space-y-4">
+                        <div className="p-6 space-y-4 overflow-y-auto min-h-0">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nom du matériel</label>
                                 <input 
@@ -711,7 +711,7 @@ const Material: React.FC = () => {
                                 />
                             </div>
                         </div>
-                        <div className="p-6 border-t border-bony-border bg-slate-50 dark:bg-white/5 flex justify-end gap-3">
+                        <div className="p-6 border-t border-bony-border bg-slate-50 dark:bg-white/5 flex justify-end gap-3 shrink-0">
                             <button 
                                 onClick={() => setIsInventoryModalOpen(false)}
                                 className="px-4 py-2 rounded-lg font-bold text-sm text-slate-500 hover:text-bony-text hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"

@@ -69,3 +69,39 @@ input[type="checkbox"].switch:disabled { opacity: .5; cursor: default; }
 .cht-pstate { align-self: flex-end; font-size: 11px; color: var(--text-3); margin-top: 3px; text-align: right; }
 .cht-pending.failed .cht-pstate { color: var(--danger); }
 .cht-pstate button { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+
+/* =====================================================================
+   Écrans 1600x900 et portables mis à l'échelle (16/10/2026, demande des collègues).
+   Zone utile du navigateur ≈ 1600x780 (1600x900 à 100 %) ou 1536x730 (1920x1080 à 125 %), contre ≈ 1920x945
+   pour le 1920x1080 de référence. Les rubriques s'adaptent déjà en LARGEUR (requêtes de conteneur `app`) ;
+   ce qui manquait est la HAUTEUR. Tout est CONDITIONNÉ : la règle des menus n'agit que sur un menu plus haut
+   que l'écran, le reste seulement sous 850 px de hauteur utile — rien ne change en 1920x1080 à 100 %.
+   Pas de zoom global (`zoom` / `transform: scale`) : il fausserait les gestes et le glisser-déposer.
+   ===================================================================== */
+
+/* Menus du moteur : un menu plus haut que l'écran défile au lieu de sortir par le bas. */
+.menu { max-height: calc(100vh - 12px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+
+@media (max-height: 850px) {
+  /* Densité de l'en-tête des rubriques, fenêtres du bureau seulement (`.win` n'existe pas sur téléphone) :
+     ≈ 33 px rendus au contenu de chaque fenêtre (marges de l'en-tête, titre 24 → 21 px, carte de filtres). */
+  .win .app-head { padding-top: 14px; padding-bottom: 12px; }
+  .win .app-head .ah-eye { margin-bottom: 4px; }
+  .win .app-head .ah-t .sub { margin-top: 4px; }
+  :host([data-da]) .win .app-head .ah-t h1 { font-size: 21px !important; }
+  .win .app-head2 { margin-bottom: 10px; padding-top: 10px; padding-bottom: 10px; }
+  /* En-têtes qui ont DÉJÀ leurs propres marges (alignées sur un voisin) : valeurs d'origine conservées. */
+  .win .dig .app-head { padding-top: 6px; padding-bottom: 6px; }
+  .win .set-panel > .app-head { padding-top: 22px; padding-bottom: 8px; }
+  .win .cht-side > .app-head { padding-top: 18px; padding-bottom: 10px; }
+  @container app (max-width: 720px) {
+    :host([data-da]) .win .app-head .ah-t h1 { font-size: 19px !important; }
+    .win .set-panel > .app-head { padding-top: 16px; padding-bottom: 6px; }
+  }
+
+  /* Budget, Suivi réalisé : mise en page « pleine hauteur » SANS défilement (`.bud-body` en overflow hidden).
+     Sous ≈ 500 px de corps, le graphique mensuel (200 px minimum) était coupé en bas, sans moyen de le voir.
+     Même mise en page, avec une hauteur plancher : au-delà, le corps défile. */
+  .win .bud-body { overflow: auto; }
+  .win .bud-real { min-height: 500px; }
+}

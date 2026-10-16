@@ -29,6 +29,16 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const g = G(), dockH = GX.shell?.dockReserve?.() ?? 0;
     return { x: g, y: MB() + g, w: innerWidth - 2 * g, h: innerHeight - MB() - 2 * g - dockH };
   };
+  /* [GEARBOX] Écrans 1600x900 et portables mis à l'échelle (16/10/2026) : un rectangle d'OUVERTURE est ramené
+     entier dans la zone de travail. Deux cas débordaient : la cascade (+26 px par fenêtre) d'une fenêtre presque
+     aussi large que l'écran, et la session enregistrée sur un écran plus grand (portable rebranché sur un 1920,
+     puis débranché). Un rectangle qui tient déjà est rendu TEL QUEL : rien ne bouge en 1920x1080. */
+  const fitRect = (r) => {
+    const a = WM.workArea();
+    if (r.x >= a.x && r.y >= a.y && r.x + r.w <= a.x + a.w && r.y + r.h <= a.y + a.h) return r;
+    const w = Math.min(r.w, a.w), h = Math.min(r.h, a.h);
+    return { x: Math.round(Math.max(a.x, Math.min(r.x, a.x + a.w - w))), y: Math.round(Math.max(a.y, Math.min(r.y, a.y + a.h - h))), w, h };
+  };
   function zoneRect(zone, sp = spaces[cur]) {
     const a = WM.workArea(), g = G(), r = sp?.ratio ?? .5, h2 = (a.h - g) / 2, w3 = (a.w - 2 * g) / 3;
     const L = a.w * r - g / 2, R = a.w * (1 - r) - g / 2, xr = a.x + a.w * r + g / 2;
@@ -59,7 +69,9 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     for (let i = 0; i < n; i++) addSpaceEl(saved?.spaces?.[i]);
     cur = Math.min(saved?.cur || 0, n - 1); layoutSpaces(false);
     desk.insertAdjacentHTML('beforeend', '<div class="snap-preview" id="snapPreview"></div>');
-    GX.win(window, 'resize', () => { for (const w of wins.values()) refit(w); drawDividers(); });
+    /* [GEARBOX] `lastA` : zone de travail AVANT le redimensionnement (refit). */
+    let lastA = WM.workArea();
+    GX.win(window, 'resize', () => { const prev = lastA; lastA = WM.workArea(); for (const w of wins.values()) refit(w, prev); drawDividers(); });
     initSwipe(); initKeys(); initHotCorners();
   };
   function addSpaceEl(def) {
@@ -88,7 +100,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     const space = opts.space ?? cur;
     let [w, h] = app.size; w = Math.min(w, a.w); h = Math.min(h, a.h);
     const off = (cascade++ % 6) * 26;
-    const rect = opts.rect || { x: Math.round(a.x + Math.max(0, (a.w - w) / 2 - 60 + off)), y: Math.round(a.y + Math.max(0, Math.min(40 + off, a.h - h))), w, h };
+    const rect = fitRect(opts.rect || { x: Math.round(a.x + Math.max(0, (a.w - w) / 2 - 60 + off)), y: Math.round(a.y + Math.max(0, Math.min(40 + off, a.h - h))), w, h });
     const el = document.createElement('section'); el.className = 'win'; el.dataset.wid = wid; el.dataset.app = app.parent || app.id; el.style.pointerEvents = 'auto';
     el.innerHTML = `
       <div class="titlebar"><div class="lights"><button class="l-close" data-tip="Fermer">${svg('<path d="M6 6l12 12M18 6 6 18"/>')}</button><button class="l-min" data-tip="Réduire">${svg('<path d="M5 12h14"/>')}</button><button class="l-max" data-tip="Agrandir · survol : dispositions">${svg('<path d="M7 17 17 7M9 7h8v8"/>')}</button></div>
@@ -147,10 +159,14 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     win.rect = { ...r };
     if (animate) GX.flip(win.el, first, { spring: 'window' });
   }
-  function refit(win) {
+  function refit(win, prev) {
     if (win.state === 'full') return applyRect(win, { x: 0, y: 0, w: innerWidth, h: innerHeight }, false);
     if (win.state !== 'normal') return applyRect(win, zoneRect(win.zone, spaces[win.space]), false);
     const a = WM.workArea(), r = win.rect;
+    /* [GEARBOX] Navigateur rétréci (fenêtre du navigateur passée sur l'écran du portable, zoom…) : une fenêtre qui
+       tenait ENTIÈRE dans l'ancienne zone y est ramenée entière, au lieu de déborder à droite ou en bas. Une fenêtre
+       que l'utilisateur avait déjà poussée en partie hors de l'écran garde la règle d'origine (120 px visibles). */
+    if (prev && r.x >= prev.x && r.y >= prev.y && r.x + r.w <= prev.x + prev.w && r.y + r.h <= prev.y + prev.h) return applyRect(win, fitRect(r), false);
     applyRect(win, { x: Math.max(a.x - r.w + 120, Math.min(r.x, a.x + a.w - 120)), y: Math.max(MB(), Math.min(r.y, a.y + a.h - 40)), w: Math.min(r.w, a.w), h: Math.min(r.h, a.h) }, false);
   }
 
@@ -653,7 +669,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       if (!GX.app(w.appId) || w.space >= spaces.length) continue;
       await new Promise((r) => setTimeout(r, i ? 70 : 0));
       const win = WM.open(w.appId, w.params, { rect: w.rect, space: w.space, state: w.state, zone: w.zone, min: w.min, pinned: w.pinned, silent: w.space !== cur });
-      if (win && w.state !== 'normal') win.normal = w.rect;
+      if (win && w.state !== 'normal') win.normal = w.rect ? fitRect(w.rect) : w.rect; /* [GEARBOX] taille « normale » d'un écran plus grand */
     }
     restoring = false; drawDividers(); WM.save(); return true;
   };
