@@ -33,7 +33,8 @@ export interface GameChallenge {
   game: GameType;
   status: 'pending' | 'accepted' | 'refused';
   sessionId?: string | null;
-  options?: MinigolfOptions | null;
+  /** Réglages du pré-lobby : ceux du minigolf, ou le thème des autres jeux. */
+  options?: MinigolfOptions | { theme: 'bony' | 'cgt' } | null;
   createdAt: string;
 }
 

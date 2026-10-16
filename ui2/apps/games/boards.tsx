@@ -2,6 +2,10 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import type { GameSession, MorpionBoard, Connect4Board, BattleshipBoard, ShipView, MoveFeedback } from '../../../components/games/gameTypes';
 import { gx, Icon } from '../ui/kit';
 import { FLEET, GRID, key, cellsFor, canPlace, occupiedFrom, randomFleet, type Dir, type Draft } from './logic';
+import { LOGO_CGT_SRC } from './cgt';
+
+/** Thème de la partie (« bony » par défaut) : posé par le serveur dans le plateau, styles dans themes.tsx. */
+const cgt = (s: GameSession) => (s.board as any)?.theme === 'cgt';
 
 // =====================================================================
 // Plateaux de la rubrique Jeux — balisage et classes de la maquette (`gme-*`), données et coups
@@ -17,8 +21,8 @@ type Place = (ships: { name: string; cells: [number, number][] }[]) => Promise<{
 interface BoardProps { s: GameSession; myId: string; onMove: Move; onPlaceFleet: Place; end: React.ReactNode }
 
 const Turn: React.FC<{ s: GameSession; myId: string; mine?: React.ReactNode }> = ({ s, myId, mine = 'À vous de jouer' }) => {
-  const over = s.status === 'finished', me = !over && s.currentTurn === myId;
-  return <div className={`gme-turn ${me ? 'on' : ''}`}>{over ? 'Partie terminée' : me ? mine : <><span className="gme-dots"><i /><i /><i /></span>Au tour de votre adversaire…</>}</div>;
+  const over = s.status === 'finished', me = !over && s.currentTurn === myId, c = cgt(s);
+  return <div className={`gme-turn ${me ? 'on' : ''}`}>{over ? (c ? 'Fin de la manif' : 'Partie terminée') : me ? (c ? 'À l’action, camarade !' : mine) : <><span className="gme-dots"><i /><i /><i /></span>{c ? 'Le camarade d’en face réfléchit…' : 'Au tour de votre adversaire…'}</>}</div>;
 };
 
 const X_SVG = () => <svg className="x" viewBox="0 0 40 40"><path className="dr" pathLength={1} d="M11 11 29 29" /><path className="dr" pathLength={1} d="M29 11 11 29" /></svg>;
@@ -39,7 +43,7 @@ export const Morpion: React.FC<BoardProps & { playRef: React.MutableRefObject<((
     <div className="gme-game">{end}<Turn s={s} myId={myId} /><div className="gme-msg">{msg}</div>
       <div className="gme-ttt">{cells.map((v, i) => (
         <button key={i} className={`gme-cell ${!v && can ? 'can' : ''} ${i === last ? 'new' : ''} ${line.includes(i) ? 'win' : ''}`} aria-label={`Case ${i + 1}`} onClick={() => play(i)}>
-          {v ? (v === s.myRole ? <X_SVG /> : <O_SVG />) : null}
+          {v ? (cgt(s) ? (v === s.myRole ? <img className="cgt-logo" src={LOGO_CGT_SRC} alt="CGT" /> : <span className="cgt-coin">€</span>) : v === s.myRole ? <X_SVG /> : <O_SVG />) : null}
         </button>
       ))}</div></div>
   );
@@ -69,7 +73,7 @@ export const Connect4: React.FC<BoardProps & { playRef: React.MutableRefObject<(
         <div ref={boardRef} className={`gme-p4 ${over ? 'over' : ''}`} onPointerLeave={() => setHov(-1)}>{Array.from({ length: C }, (_, c) => (
           <div key={c} className={`gme-col ${can(c) ? 'can' : ''} ${can(c) && hov === c ? 'hov' : ''}`} onPointerOver={() => setHov(c)} onClick={() => play(c)}>
             {Array.from({ length: R }, (_, r) => { const v = g[r][c], isLast = !!lm && lm[0] === r && lm[1] === c; return (
-              <div key={r} className="gme-hole">{v ? <i className={`gme-disc ${win.has(`${r}:${c}`) ? 'win' : ''} ${isLast ? 'last' : ''}`} style={{ '--c': v === s.myRole ? ME_C : OP_C } as React.CSSProperties} {...(isLast ? { 'data-new': '' } : {})} /> : null}</div>
+              <div key={r} className="gme-hole">{v ? <i className={`gme-disc ${v === s.myRole ? 'mine' : 'foe'} ${win.has(`${r}:${c}`) ? 'win' : ''} ${isLast ? 'last' : ''}`} style={{ '--c': v === s.myRole ? ME_C : OP_C } as React.CSSProperties} {...(isLast ? { 'data-new': '' } : {})}>{cgt(s) ? (v === s.myRole ? <img src={LOGO_CGT_SRC} alt="" /> : '€') : null}</i> : null}</div>
             ); })}
           </div>
         ))}</div></div></div>
@@ -140,9 +144,9 @@ export const Battleship: React.FC<BoardProps> = ({ s, myId, onMove, onPlaceFleet
   return (
     <div className="gme-game">{end}<Turn s={s} myId={myId} mine={<><Icon name="target" size="sm" />À vous de tirer</>} /><div className="gme-msg">{msg}</div>
       <div className="gme-grids">
-        <div><div className="gme-gt"><Icon name="target" size="sm" />Grille adverse</div>
+        <div><div className="gme-gt"><Icon name="target" size="sm" />{cgt(s) ? 'Cortège adverse' : 'Grille adverse'}</div>
           <Sea side="foe" can={mine} onSq={shoot} sq={(r, c) => { const k = key(r, c); if (foeSunk.has(k)) return { cls: 'sunk', mark: '✕' }; const v = foeShots[k]; return v ? { cls: v, mark: v === 'miss' ? '•' : '✕' } : { cls: 'free' }; }} /></div>
-        <div><div className="gme-gt"><Icon name="flag" size="sm" />Ma flotte</div>
+        <div><div className="gme-gt"><Icon name="flag" size="sm" />{cgt(s) ? 'Mon cortège' : 'Ma flotte'}</div>
           <Sea side="me" size="sm" can={false} sq={(r, c) => { const k = key(r, c), v = myShots[k], ship = myShip.get(k), cls: string[] = [];
             if (ship !== undefined) cls.push(ship ? 'sunk' : 'ship'); if (v && !ship) cls.push(v);
             return { cls: cls.join(' '), mark: v ? (v === 'miss' ? '•' : '✕') : '' }; }} /></div>

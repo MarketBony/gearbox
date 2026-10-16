@@ -57,7 +57,7 @@ const redactBattleship = (board: BattleshipBoard, jeSuisP1: boolean) => {
   // Volontairement nommé « me / opponent » et non « p1 / p2 » : le frontend n'a
   // pas à savoir quel numéro il porte pour dessiner ses grilles, et ça rend une
   // fuite plus visible à la lecture.
-  return { me: ownFleet(mien), opponent: redactEnemyFleet(sien) };
+  return { me: ownFleet(mien), opponent: redactEnemyFleet(sien), theme: (board as any).theme };
 };
 
 export const projectSessionFor = (userId: string, session: SessionRow) => {

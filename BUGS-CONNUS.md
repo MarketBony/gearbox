@@ -5,6 +5,10 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [ ] **CRM : Figeac, Millau et Carmaux absents des extractions DCS** (12/10). Ni VN ni VO pour `VNVORFIG`, `VNVORMILLAU`,
   `VNVORCARM` : le compte DCS de Théo n'a pas ces sites (droits à faire ouvrir par l'IT). Leurs codes sont déjà dans
   `rcu.ref_affaire` : rien à coder, ils seront importés dès qu'ils remonteront.
+- [x] **Jeux v2 : impossible de lancer un 2e jeu avec un collègue** (Théo, 15/10) : « Défi envoyé » dès qu'un défi, de N'IMPORTE
+  quel jeu, était en attente avec lui (`GamesApp.tsx`, filtre sans le jeu ; le serveur raisonnait déjà par jeu). Corrigé au 92.
+- [x] **Jeux v2 : rendu en partie « immonde »** (Théo, 15/10 ; Puissance 4 plus grand que la fenêtre, sous le Dock) : rendu de
+  la v1 repris comme thème Bony (correctif 92).
 - [x] **Minigolf : tour par tour injouable** (Théo, 15/10, juste après le correctif 90 : « soit ça joue pas, soit ça joue en
   double ») : tir bloqué dès le trou 2, verrou jamais levé quand le serveur répond après la fin de l'animation, tir permis
   pendant la pause de fin de trou. Corrigé au correctif 91 (`rendu.ts`). Partie entre deux vrais comptes à confirmer en prod.

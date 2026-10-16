@@ -14,6 +14,7 @@ import { computeStats, computeRivalries, computeStreak } from './logic';
 import { Morpion, Connect4, Battleship } from './boards';
 import { Minigolf } from './minigolf/Minigolf';
 import { apercuAmbiance, AMBIANCES } from './minigolf/rendu';
+import { THEMES, ThemeApercu, ThemeCadre, ThemeStyle, themeLabel, type Theme } from './themes';
 
 // =====================================================================
 // Rubrique « Jeux » — transposition de maquettes/v2/js/apps/games.js (même balisage, mêmes
@@ -36,6 +37,8 @@ const GAMES: { id: GameType; pitch: string; c: string; icon: string }[] = [
 ];
 const MG_DIFF: [string, string][] = [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']];
 const mgResume = (o: any) => (o ? `${MG_DIFF.find((d) => d[0] === o.diff)?.[1] ?? ''} · ${o.nb} trous · ${AMBIANCES[o.amb] ?? ''}` : '');
+/** Réglages d'un défi en clair : ceux du minigolf, ou le thème (seulement s'il n'est pas celui par défaut). */
+const resume = (game: GameType, o: any) => (game === 'minigolf' ? mgResume(o) : o?.theme && o.theme !== 'bony' ? themeLabel(o.theme) : '');
 /** Vignette d'ambiance du pré-lobby (même dessin que le jeu). */
 const Vignette: React.FC<{ amb: string }> = ({ amb }) => { const r = useRef<HTMLCanvasElement>(null); useEffect(() => { if (r.current) apercuAmbiance(r.current, amb); }, [amb]); return <canvas ref={r} width={256} height={160} style={{ width: '100%', aspectRatio: '16 / 10', borderRadius: 6, display: 'block' }} />; };
 const gOf = (id: GameType) => GAMES.find((g) => g.id === id) || GAMES[0];
@@ -69,6 +72,9 @@ export default function GamesApp({ win, inst }: AppProps) {
   // Pré-lobby du minigolf : réglages choisis par celui qui lance, mémorisés pour le prochain défi.
   const [mg, setMgState] = useState<any>(() => ({ diff: 'normal', nb: 6, amb: 'ete', choc: true, ...(gx().store.get('games.minigolf', {}) || {}) }));
   const setMg = (p: any) => { const n = { ...mg, ...p }; setMgState(n); gx().store.set('games.minigolf', n); };
+  // Thème des trois autres jeux (pré-lobby), mémorisé lui aussi.
+  const [theme, setThemeState] = useState<Theme>(() => (gx().store.get('games.theme', 'bony') === 'cgt' ? 'cgt' : 'bony'));
+  const setTheme = (t: Theme) => { setThemeState(t); gx().store.set('games.theme', t); };
   const [target, setTarget] = useState<string | null>(null);
   const [leaving, setLeaving] = useState<string | null>(null);   // défi refusé en train de sortir
   const paneRef = useRef<HTMLDivElement>(null);
@@ -115,8 +121,9 @@ export default function GamesApp({ win, inst }: AppProps) {
   // ---------------------------------------------------------------- actions
   const dare = async (to: string) => {
     try {
-      await db.sendGameChallenge(to, pick, pick === 'minigolf' ? mg : undefined);
-      setTarget(null); hud(`Défi envoyé à ${first(to)} · ${GAME_LABELS[pick]}${pick === 'minigolf' ? ` (${mgResume(mg)})` : ''}`);
+      const options = pick === 'minigolf' ? mg : { theme }, r = resume(pick, options);
+      await db.sendGameChallenge(to, pick, options);
+      setTarget(null); hud(`Défi envoyé à ${first(to)} · ${GAME_LABELS[pick]}${r ? ` (${r})` : ''}`);
       await loadLobby();
     } catch (e) { setError(errMsg(e, "Échec de l'envoi du défi.")); }
   };
@@ -227,7 +234,7 @@ export default function GamesApp({ win, inst }: AppProps) {
           <div className="ah-f">{!over ? <button className="btn ghost" style={{ color: 'var(--danger)' }} onClick={abandon}><Icon name="flag" size="sm" />Abandonner</button> : null}</div></div>
         <div className={plein ? 'gme-pane' : 'gme-pane scroll'} ref={paneRef} style={plein ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : undefined}>
           {plein ? <Minigolf key={active.id} s={active} myId={myId} onMove={move} end={end} nomDe={uName} />
-            : active.game === 'morpion' ? <Morpion key={active.id} {...props} playRef={playKey} /> : active.game === 'connect4' ? <Connect4 key={active.id} {...props} playRef={playKey} /> : <Battleship key={active.id} {...props} />}
+            : <><ThemeStyle /><ThemeCadre s={active}>{active.game === 'morpion' ? <Morpion key={active.id} {...props} playRef={playKey} /> : active.game === 'connect4' ? <Connect4 key={active.id} {...props} playRef={playKey} /> : <Battleship key={active.id} {...props} />}</ThemeCadre></>}
         </div>
       </div>
     );
@@ -247,7 +254,7 @@ export default function GamesApp({ win, inst }: AppProps) {
     const dareBox = received.length ? (
       <section className={`gme-card gme-dare gme-sec enter ${running.length ? '' : 'solo'}`}><h2 className="gme-h2"><Icon name="flag" size="sm" />On vous défie <span className="faint">({received.length})</span></h2><div className="gme-list">
         {received.map((c) => (
-          <div key={c.id} className="gme-lrow" data-ch={c.id}>{av(c.fromUserId)}<div className="t"><b>{uName(c.fromUserId)}</b><small>{GAME_LABELS[c.game]}{c.game === 'minigolf' && c.options ? ` (${mgResume(c.options)})` : ''} · {gx().fmt.ago(new Date(c.createdAt).getTime())}</small></div>
+          <div key={c.id} className="gme-lrow" data-ch={c.id}>{av(c.fromUserId)}<div className="t"><b>{uName(c.fromUserId)}</b><small>{GAME_LABELS[c.game]}{resume(c.game, c.options) ? ` (${resume(c.game, c.options)})` : ''} · {gx().fmt.ago(new Date(c.createdAt).getTime())}</small></div>
             <button className="icon-btn" aria-label="Refuser" data-tip="Refuser" style={{ color: 'var(--danger)' }} disabled={leaving === c.id} onClick={(e) => refuse(c, e.currentTarget.closest('.gme-lrow'))}><Icon name="close" size="sm" /></button>
             <button className="btn primary" aria-label="Accepter" disabled={leaving === c.id} onClick={() => accept(c)}><Icon name="check" size="sm" />Jouer</button></div>
         ))}</div></section>) : null;
@@ -275,10 +282,17 @@ export default function GamesApp({ win, inst }: AppProps) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>{Object.entries(AMBIANCES).map(([k, l]) => (
                   <button key={k} className="gme-gcard" aria-pressed={mg.amb === k} style={{ padding: 6, gap: 6, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }} onClick={() => setMg({ amb: k })}><Vignette amb={k} /><span className="nm" style={{ fontSize: 13 }}>{l as string}</span></button>))}</div></div>
             </div>) : null}
+          {pick !== 'minigolf' ? (
+            <div className="gme-card" style={{ display: 'grid', gap: 8, padding: 14, marginTop: 12 }}><span className="label">Thème — le même pour les deux joueurs</span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>{THEMES.map(([k, l]) => (
+                <button key={k} className="gme-gcard" aria-pressed={theme === k} style={{ padding: 6, gap: 6, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }} onClick={() => setTheme(k)}><ThemeApercu game={pick} theme={k} /><span className="nm" style={{ fontSize: 13 }}>{l}</span></button>))}</div>
+            </div>) : null}
           <div className="gme-opps">{opponents.length ? opponents.map((u: User) => {
-            const already = sent.some((c) => c.toUserId === u.id), online = gx().data.USERS?.find((x: any) => x.id === u.id)?.online;
+            // Un défi en attente bloque CE jeu avec ce collègue, pas les autres (le serveur raisonne déjà par jeu).
+            const already = sent.some((c) => c.toUserId === u.id && c.game === pick), online = gx().data.USERS?.find((x: any) => x.id === u.id)?.online;
+            const avec = [...running.filter((s) => s.opponentId === u.id).map((s) => `${GAME_LABELS[s.game]} en cours`), ...sent.filter((c) => c.toUserId === u.id && c.game !== pick).map((c) => `${GAME_LABELS[c.game]} envoyé`)];
             return (
-              <div key={u.id} className="gme-lrow">{av(u.id)}<div className="t"><b>{u.name}</b><small>{gx().data.ROLES?.[u.role]?.l || u.role}{online ? ' · en ligne' : ''}</small></div>
+              <div key={u.id} className="gme-lrow">{av(u.id)}<div className="t"><b>{u.name}</b><small>{gx().data.ROLES?.[u.role]?.l || u.role}{online ? ' · en ligne' : ''}</small>{avec.length ? <small style={{ color: 'var(--bony-orange)' }}>{avec.join(' · ')}</small> : null}</div>
                 {already ? <span className="faint" style={{ fontSize: 12.5, padding: '0 6px' }}>Défi envoyé</span>
                   : target === u.id ? <button className="btn primary" onClick={() => dare(u.id)}>{GAME_LABELS[pick]} !</button>
                   : <button className="btn" onClick={() => setTarget(u.id)}>Défier</button>}</div>
@@ -305,5 +319,5 @@ export default function GamesApp({ win, inst }: AppProps) {
       </div><div className="gme-foot"><Icon name="barchart" size="sm" />Classement calculé sur les parties enregistrées côté serveur — identique pour tout le monde.</div></div>
     );
   }
-  return <div className="app">{head}<div className="gme-pane scroll" ref={paneRef}>{body}</div></div>;
+  return <div className="app"><ThemeStyle />{head}<div className="gme-pane scroll" ref={paneRef}>{body}</div></div>;
 }
