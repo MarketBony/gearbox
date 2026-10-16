@@ -32,7 +32,7 @@ export interface MoveResult {
 export class IllegalMoveError extends Error {}
 // Importé APRÈS la classe : minigolfRules s'en sert (import circulaire volontaire, résolu à l'appel).
 // eslint-disable-next-line import/first
-import { appliquerCoupMinigolf, plateauInitial } from '../games/minigolfRules';
+import { appliquerCoupMinigolf, lireOptions, plateauInitial } from '../games/minigolfRules';
 
 const autre = (session: { player1Id: string; player2Id: string }, userId: string) =>
   userId === session.player1Id ? session.player2Id : session.player1Id;
@@ -243,7 +243,7 @@ interface SessionLike {
   winnerId: string | null;
 }
 
-export const applyMove = (session: SessionLike, userId: string, move: any): MoveResult => {
+const appliquerCoup = (session: SessionLike, userId: string, move: any): MoveResult => {
   if (session.status === 'finished') throw new IllegalMoveError('Cette partie est terminée.');
   if (userId !== session.player1Id && userId !== session.player2Id) {
     throw new IllegalMoveError("Vous ne participez pas à cette partie.");
@@ -357,7 +357,26 @@ export const applyMove = (session: SessionLike, userId: string, move: any): Move
 
 // Plateau initial selon le jeu. La bataille navale commence en 'placing'.
 // `options` : réglages du défi (minigolf : difficulté, nombre de trous, ambiance, chocs).
-export const initBoard = (game: GameType, options?: unknown) =>
-  game === 'morpion' ? emptyMorpion() : game === 'connect4' ? emptyConnect4() : game === 'minigolf' ? plateauInitial(options) : emptyBattleship();
+// ---- Thème d'affichage (morpion, puissance 4, bataille navale) --------------------
+// Choisi par celui qui lance le défi (pré-lobby), le même pour les deux joueurs. Purement visuel :
+// il est rangé DANS le plateau (`board.theme`, aucune colonne en plus) et recopié à chaque coup par
+// `applyMove` — les règles reconstruisent leur plateau et l'oublieraient. Le minigolf a ses propres
+// réglages (`lireOptions`, ambiance comprise).
+export const THEMES = ['bony', 'cgt'] as const;
+export type Theme = (typeof THEMES)[number];
+export const lireOptionsJeu = (game: GameType, o: any) =>
+  game === 'minigolf' ? lireOptions(o) : { theme: (THEMES as readonly string[]).includes(o?.theme) ? (o.theme as Theme) : 'bony' };
+
+export const applyMove = (session: SessionLike, userId: string, move: any): MoveResult => {
+  const r = appliquerCoup(session, userId, move);
+  const theme = (session.board as any)?.theme;
+  return theme && r.board && !(r.board as any).theme ? { ...r, board: { ...(r.board as any), theme } } : r;
+};
+
+export const initBoard = (game: GameType, options?: any) => {
+  if (game === 'minigolf') return plateauInitial(options);
+  const b: any = game === 'morpion' ? emptyMorpion() : game === 'connect4' ? emptyConnect4() : emptyBattleship();
+  return { ...b, theme: (lireOptionsJeu(game, options) as { theme: Theme }).theme };
+};
 export const initStatus = (game: GameType): 'placing' | 'playing' =>
   game === 'battleship' ? 'placing' : 'playing';

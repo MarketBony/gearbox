@@ -3,15 +3,15 @@
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
-## ▶ POINT DE REPRISE — 15/10/2026 (lire en premier)
-- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 91**
+## ▶ POINT DE REPRISE — 16/10/2026 (lire en premier)
+- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 92**
+  (16/10, `api` + `web` : Jeux, thèmes Bony / Grève CGT des 3 jeux + lobby multi-jeux). Avant lui le **91**
   (15/10, `web` seul : minigolf, tour par tour réparé — tir bloqué dès le trou 2, coups en double). Avant lui le **90**
   (15/10, `api` + `web` + migration Supabase `game_challenge_options` : **4e jeu, le MINIGOLF**, v2 seulement). Avant lui le
   **89** (15/10, `web` seul : molette bloquée au survol d'un tableau, v2). Avant lui le **88** (15/10, `rcu-worker` + `api` + `web` :
   SPARK lot 4, Équipes et portefeuilles, **calcul des portefeuilles DÉSACTIVÉ en prod**).
   Aucune branche ouverte.
-- **PROCHAINS LOTS (Théo, 15/10)** : JEUX — rendre aux 3 autres jeux leur rendu « en partie » de la v1 dans la v2 (lobby v2
-  gardé) ; puis le **SSH** ci-dessous, **juste avant le déploiement officiel de la v2** : fail2ban + clé seule pour `ubuntu`,
+- **PROCHAINS LOTS (Théo, 15/10)** : le rendu v1 des 3 jeux est revenu dans la v2 (thème Bony, correctif 92) ; reste le **SSH** ci-dessous, **juste avant le déploiement officiel de la v2** : fail2ban + clé seule pour `ubuntu`,
   exception `Match User dcs` conservée. Confirmer sur la prod la partie de minigolf entre deux vrais comptes (non jouée en local).
 - **🚨 URGENT (Théo, 15/10) — SSH du VPS** : le mot de passe est accepté pour TOUS les comptes (`50-cloud-init.conf`, ubuntu
   compris), 80 800 tentatives en 11 jours, pas de fail2ban. À faire : `PasswordAuthentication no` global (le bloc `Match User dcs`
@@ -106,7 +106,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 91 (15/10)** — minigolf : tour par tour réparé (`web` seul).
+- **En production : correctif 92 (16/10)** — Jeux : thèmes Bony / Grève CGT + lobby multi-jeux (`api` + `web`).
+  Avant lui le **correctif 91 (15/10)** — minigolf : tour par tour réparé (`web` seul).
   Avant lui le **correctif 90 (15/10)** — Jeux : 4e jeu, le minigolf (`api` + `web`, migration `game_challenge_options`).
   Avant lui le **correctif 89 (15/10)** — v2 : la molette ne se bloque plus au survol d'un tableau (`web` seul).
   Avant lui le **correctif 88 (15/10)** — SPARK lot 4, Équipes et portefeuilles (`rcu-worker` + `api` + `web`, migration RCU 005).
@@ -672,6 +673,29 @@
   témoin posé, cron → file vidée puis témoin effacé, limite 8 / min tenue (429 au 9e), aucune clé de compteur en KV.
   ⚠️ À retenir : **sur l'offre gratuite, ne jamais écrire / lister le KV à chaque requête ou chaque minute.**
 
+- **Correctif 92 — 16/10 : JEUX, thèmes Bony / Grève CGT + lobby multi-jeux** (branche `feat/jeux-themes-lobby`, **`api` +
+  `web`**, aucune migration). Demandes de Théo (15/10) : un pré-lobby à thèmes pour le Morpion, le Puissance 4 et la Bataille
+  navale (« Bony et CGT pour le moment, reprends des assets du minigolf ») ; le lobby empêchait d'avoir plusieurs parties de
+  jeux DIFFÉRENTS avec la même personne. Plan validé « en one shot ».
+  - **Lobby** : la cause était dans la v2 seule — « Défi envoyé » s'affichait dès qu'UN défi était en attente avec le collègue,
+    quel que soit le jeu (le serveur raisonnait déjà par jeu). Désormais par jeu sélectionné, et chaque collègue affiche les
+    parties ouvertes avec lui (« Puissance 4 en cours », « Morpion envoyé »).
+  - **Thème** : choisi par celui qui lance, le même pour les deux joueurs. Serveur : `lireOptionsJeu()` (`utils/gameRules.ts`)
+    valide `options.theme` (`bony` | `cgt`, inconnu → `bony`), `initBoard()` le range DANS le plateau (`board.theme`, aucune
+    colonne), `applyMove()` le recopie après chaque coup (les règles reconstruisent leur plateau), `gameView` le garde dans la
+    vue redactée de la bataille navale. Les parties antérieures restent en Bony.
+  - **Bony** = le rendu en partie de la v1 repris dans la v2 (bandeau en dégradé, cases en verre, pions plats, plateaux compacts :
+    le Puissance 4 tient enfin dans la fenêtre) — c'est la demande « in game c'est immonde, beaucoup mieux sur la V1 » du 15/10.
+  - **Grève CGT** : bitume, banderoles à slogans haut et bas, pancarte de tour (« À l'action, camarade ! »), pancartes sur les
+    côtés (écran large) ; Morpion en pancartes de carton (logo CGT contre pièces €), Puissance 4 en barrière Vauban (autocollants
+    CGT contre pièces du patronat), Bataille navale « Mon cortège / Cortège adverse » (banderoles rouges, impacts en fumigène).
+  - Fichiers : `ui2/apps/games/themes.tsx` (styles, décor, vignettes = les VRAIS plateaux en miniature avec une partie fictive),
+    `ui2/apps/games/cgt.ts` (logo officiel, slogans, pancartes — SORTIS de `minigolf/rendu.ts`, qui les importe : une seule copie).
+  - Tests : script serveur (thème validé, conservé après un coup au morpion et au puissance 4, présent dans la vue redactée) ;
+    navigateur avec le compte de Théo : pré-lobby des 4 jeux, défi par jeu, parties réelles affichées en CGT en forçant le thème
+    dans la RÉPONSE du lobby côté navigateur (aucune écriture, aucun coup joué), minigolf revérifié. `tsc` 9 / 0, `vite build` OK.
+    Partie CGT réelle entre deux comptes : à confirmer en prod. v1 non thémée (choix « v2 seulement »).
+
 - **Correctif 91 — 15/10 : minigolf, tour par tour injouable** (branche `fix/minigolf-tour-par-tour`, **`web` seul**, aucune
   migration). Premiers retours de Théo après le 90 : « soit ça joue pas, soit ça joue en double, soit ça marche pas ». Trois causes,
   toutes dans l'orchestration de `ui2/apps/games/minigolf/rendu.ts` (règles serveur hors de cause) :
@@ -1209,7 +1233,8 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 91** (15 octobre 2026) — minigolf, tour par tour réparé,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 92** (16 octobre 2026) — Jeux, thèmes Bony / Grève CGT + lobby multi-jeux,
+  **`api` + `web`**, aucune migration. Avant lui le **correctif 91** (15 octobre 2026) — minigolf, tour par tour réparé,
   **`web` seul**, aucune migration. Avant lui le **correctif 90** (15 octobre 2026) — Jeux, 4e jeu : le minigolf,
   **`api` + `web`**, migration Supabase `20261015180000_game_challenge_options` (colonne `GameChallenge.options`, additive),
   appliquée par `db execute` + `migrate resolve --applied` avant le déploiement. Avant lui le **correctif 89** (15 octobre 2026) —

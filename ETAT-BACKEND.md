@@ -352,6 +352,13 @@ ne ferme pas une route. C'est la leçon qui a coûté deux passes au lot du chef
 Temps réel : `tasks:updated` / `tasks:deleted`, entrée `RT_EVENTS.tasks` distincte de
 `projects` — une mutation de l'un ne concerne pas l'autre.
 
+### 🎨 Jeux — thème des plateaux (16/10/2026, correctif 92)
+
+`GameChallenge.options` sert désormais à TOUS les jeux : `lireOptionsJeu(game, o)` (`utils/gameRules.ts`) rend les réglages du
+minigolf (`lireOptions`) ou `{ theme: 'bony' | 'cgt' }` (inconnu → `bony`). Le thème vit DANS le plateau (`board.theme`) :
+`initBoard()` le pose, `applyMove()` (enveloppe d'`appliquerCoup`) le recopie après chaque coup, `redactBattleship()` le garde
+dans la vue. ⚠️ Une nouvelle règle qui reconstruit son plateau n'a rien à faire : c'est l'enveloppe qui recopie. Purement visuel.
+
 ### ⛳ Jeux — le minigolf, simulé par le serveur (15/10/2026, correctif 90)
 
 Migration `20261015180000_game_challenge_options` : `GameChallenge.options` (JSONB, nullable) — les réglages choisis par celui
