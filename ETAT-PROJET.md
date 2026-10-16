@@ -4,8 +4,20 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 16/10/2026 (lire en premier)
-- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 92**
-  (16/10, `api` + `web` : Jeux, thèmes Bony / Grève CGT des 3 jeux + lobby multi-jeux). Avant lui le **91**
+- **CORRECTIF 93 EN PRODUCTION (16/10, `api` + `web`)** — branche `feat/lot-93-widgets-assignes-prestataire-1600`, 4 sujets
+  codés par 4 agents puis fusionnés, testés sur localhost (Master) et recettés par Théo : (1) **widgets du bureau v2** qui
+  bougeaient au redimensionnement (`ui2/os/engine/widgets.ts` : la disposition ENREGISTRÉE est la référence, `computeView()`
+  en dérive l'affichage à la largeur courante sans jamais l'enregistrer ; grille au pas entier, plus de recalage « bord
+  droit ») ; (2) **tâches multi-assignées** (`Task.assignedUserIds`, `assignedUserId` = 1er de la liste pour la v1, porte
+  `backend/src/utils/taskAssignees.ts`, `TODO_ROLES`, KPI Expert à coût plein par assigné) ; (3) **prestataire sur les
+  dépenses fixes** (`FixedExpense.provider`, auto-complétion) ; (4) **affichage 1600x900** (`wm.ts` : fenêtres recadrées dans
+  l'écran ; `overrides.css` : en-têtes compacts sous 850 px de haut, Budget › Suivi réalisé qui défile ; modales Matériel v1).
+  Migrations additives `20261016120000_task_assignees` et `20261016121000_expense_provider` appliquées et inscrites AVANT le
+  push. `GET /api/tasks` : un rôle de la To-do qui n'édite pas (Guest) ne reçoit que SES tâches libres (filtre serveur).
+  **Non vérifié** : Guest et chef de site avec de vrais comptes ; 1536x730 ; ancienne interface. **Le bureau de Théo est déjà
+  abîmé par l'ancien bug** (widgets sous le bas de l'écran) : à refaire une fois.
+- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 93**
+  (16/10, ci-dessus). Avant lui le **92** (16/10, `api` + `web` : Jeux, thèmes Bony / Grève CGT des 3 jeux + lobby multi-jeux). Avant lui le **91**
   (15/10, `web` seul : minigolf, tour par tour réparé — tir bloqué dès le trou 2, coups en double). Avant lui le **90**
   (15/10, `api` + `web` + migration Supabase `game_challenge_options` : **4e jeu, le MINIGOLF**, v2 seulement). Avant lui le
   **89** (15/10, `web` seul : molette bloquée au survol d'un tableau, v2). Avant lui le **88** (15/10, `rcu-worker` + `api` + `web` :
@@ -13,7 +25,8 @@
   Aucune branche ouverte.
 - **PROCHAIN LOT (décision de Théo, 15/10) : le SSH** ci-dessous, **juste avant le déploiement officiel de la v2** : fail2ban
   (plafond de tentatives par IP) + connexion par CLÉ SEULE pour `ubuntu`, exception `Match User dcs` (mot de passe) conservée.
-  Hotspot obligatoire, accès à la console de secours OVH vérifié AVANT. Le rendu v1 des 3 jeux est revenu (thème Bony, 92).
+  Hotspot obligatoire, accès à la console de secours OVH vérifié AVANT. **Audit fait le 16/10, lot REPORTÉ au lundi 19/10**
+  (Théo : après le 1er import DCS) — plan et constats dans la fiche SSH de `BUGS-CONNUS.md`. Le rendu v1 des 3 jeux est revenu (thème Bony, 92).
 - **À confirmer par Théo en prod (non jouable en local, faute de second compte)** : une partie de minigolf (correctif 91) et une
   partie en thème Grève CGT (correctif 92) entre deux vrais comptes, du défi à la fin.
 - **Backlog récent (Théo, 15/10)** : widgets du bureau v2 déplacés au redimensionnement (« désastreux », `BUGS-CONNUS.md`) ;
@@ -111,7 +124,9 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 92 (16/10)** — Jeux : thèmes Bony / Grève CGT + lobby multi-jeux (`api` + `web`).
+- **En production : correctif 93 (16/10)** — widgets du bureau stables, tâches multi-assignées, prestataire sur les dépenses,
+  affichage 1600x900 (`api` + `web`, 2 migrations additives).
+  Avant lui le **correctif 92 (16/10)** — Jeux : thèmes Bony / Grève CGT + lobby multi-jeux (`api` + `web`).
   Avant lui le **correctif 91 (15/10)** — minigolf : tour par tour réparé (`web` seul).
   Avant lui le **correctif 90 (15/10)** — Jeux : 4e jeu, le minigolf (`api` + `web`, migration `game_challenge_options`).
   Avant lui le **correctif 89 (15/10)** — v2 : la molette ne se bloque plus au survol d'un tableau (`web` seul).
@@ -1238,7 +1253,10 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 92** (16 octobre 2026) — Jeux, thèmes Bony / Grève CGT + lobby multi-jeux,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 93** (16 octobre 2026) — widgets du bureau v2 stables, tâches multi-assignées, prestataire
+  sur les dépenses, affichage 1600x900, **`api` + `web`**, migrations Supabase `20261016120000_task_assignees` et
+  `20261016121000_expense_provider` (additives), appliquées par `db execute` + `migrate resolve --applied` avant le push.
+  Avant lui le **correctif 92** (16 octobre 2026) — Jeux, thèmes Bony / Grève CGT + lobby multi-jeux,
   **`api` + `web`**, aucune migration. Avant lui le **correctif 91** (15 octobre 2026) — minigolf, tour par tour réparé,
   **`web` seul**, aucune migration. Avant lui le **correctif 90** (15 octobre 2026) — Jeux, 4e jeu : le minigolf,
   **`api` + `web`**, migration Supabase `20261015180000_game_challenge_options` (colonne `GameChallenge.options`, additive),

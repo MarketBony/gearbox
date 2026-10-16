@@ -6,6 +6,7 @@ import { emitEvent } from '../realtime';
 import { withDates } from '../utils/dates';
 import { scopeOf, arrayScopeWhere, redactSiteFields } from '../auth/siteScope';
 import { prisma } from '../db';
+import { normaliserAssignes, nouveauxAssignes, verifierNouveauxAssignes, assignesEligibles, AssigneInvalideError } from '../utils/taskAssignees';
 
 const router = Router();
 
@@ -36,11 +37,26 @@ router.get('/', authenticateToken, requireRole(INTERNAL_ROLES), async (req: Auth
 
 router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) => {
   const { tasks, ...projectData } = req.body;
+  // ⚠️ Tâches passées par la MÊME liste blanche que le diff du PUT (16/10/2026, multi-assignés) : elles partaient
+  // brutes à Prisma, donc une copie de projet (seul appelant qui envoie des tâches : « Dupliquer ») n'aurait pas
+  // tenu `assignedUserId` = premier de `assignedUserIds`. L'id client est conservé, comme dans le PUT.
+  // Une COPIE reprend les assignés de l'original : ceux qui n'ont plus accès à la To-do sont RETIRÉS de la copie
+  // (au lieu de refuser la duplication pour un ancien membre) — ce n'est pas une nouvelle attribution choisie.
+  const aCreer: any[] = (Array.isArray(tasks) ? tasks : []).map((t: any) => ({
+    ...normaliserAssignes(pickTaskData(t)),
+    ...(typeof t?.id === 'string' && t.id.length > 0 ? { id: t.id } : {}),
+  }));
+  const eligibles = await assignesEligibles(prisma, aCreer.flatMap(t => t.assignedUserIds || []));
+  for (const t of aCreer) {
+    if (!Array.isArray(t.assignedUserIds)) continue;
+    t.assignedUserIds = t.assignedUserIds.filter((u: string) => eligibles.has(u));
+    t.assignedUserId = t.assignedUserIds[0] ?? null;   // premier de la liste, comme le tient normaliserAssignes
+  }
   const project = await prisma.project.create({
     data: {
       ...withDates(projectData, ['startDate', 'endDate']),
       tasks: {
-        create: tasks
+        create: aCreer
       }
     },
     include: { tasks: true }
@@ -61,11 +77,20 @@ router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) =>
 // ⚠️ `startDate` et `notes` ajoutés le 27/08/2026 (mode Expert) — MÊME PIÈGE que
 // `deadline` la veille : les oublier ici aurait fait accepter la saisie, répondre 200,
 // et perdre la valeur au rechargement suivant, sans erreur nulle part.
+// ⚠️ `assignedUserIds` ajouté le 16/10/2026 (tâches multi-assignées) — dans le MÊME lot que la colonne, sinon la
+// liste partait, répondait 200 et disparaissait. Les deux champs d'assignés sont ensuite rendus cohérents par
+// `normaliserAssignes` (utils/taskAssignees.ts), seule porte : ne pas les traiter ici.
 const TASK_FIELDS = [
-  'name', 'provider', 'channel', 'cost', 'status', 'assignedUserId', 'deadline',
+  'name', 'provider', 'channel', 'cost', 'status', 'assignedUserId', 'assignedUserIds', 'deadline',
   'startDate', 'notes',
   'volumetry', 'openRate', 'npaiRate', 'stopRate', 'clickRate', 'codTxt', 'billedAmount'
 ] as const;
+
+/** Egalite de deux valeurs de colonne pour le diff du PUT : scalaires par `===`, tableaux element par element. */
+const memeValeur = (a: unknown, b: unknown) =>
+  Array.isArray(a) || Array.isArray(b)
+    ? Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i])
+    : a === b;
 
 const pickTaskData = (t: any) => {
   const data: any = {};
@@ -118,6 +143,8 @@ export const statutPrisma = (e: any): { statut: number; message: string } => {
   const code: string | undefined = e?.code;
   const msg: string = typeof e?.message === 'string' ? e.message : '';
 
+  // Attribution refusée (utils/taskAssignees.ts) : message fixe, écrit pour l'utilisateur.
+  if (e instanceof AssigneInvalideError) return { statut: 400, message: e.message };
   if (code === 'P2025') return { statut: 404, message: 'Projet introuvable.' };
   if (code === 'P2002') return { statut: 409, message: 'Conflit : une valeur unique existe déjà.' };
   if (code === 'P2003') return { statut: 409, message: 'Référence invalide (élément lié inexistant).' };
@@ -192,12 +219,16 @@ router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) 
       const incoming: any[] = Array.isArray(tasks) ? tasks : [];
       const keptIds = new Set<string>();
       const aCreer: any[] = [];
+      const aMettreAJour: { id: string; data: any }[] = [];
+      const ajouts: string[] = [];   // assignés AJOUTÉS, vérifiés en une requête avant toute écriture
 
       for (const t of incoming) {
         const ancienne = typeof t?.id === 'string' ? parId.get(t.id) : undefined;
         if (!ancienne) {
+          const neuve = normaliserAssignes(pickTaskData(t));
+          ajouts.push(...nouveauxAssignes(neuve));
           aCreer.push({
-            ...pickTaskData(t),
+            ...neuve,
             projectId: id,
             // id client conserve si fourni (le frontend genere ses propres ids) —
             // sinon uuid genere par la base.
@@ -207,7 +238,8 @@ router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) 
         }
         keptIds.add(ancienne.id);
 
-        const donnees = pickTaskData(t);
+        const donnees = normaliserAssignes(pickTaskData(t), ancienne);
+        ajouts.push(...nouveauxAssignes(donnees, ancienne));
         // ⚠️ COMPARAISON APRES `pickTaskData`, jamais avant : c'est elle qui normalise
         // '' -> null pour deadline/startDate/notes/assignedUserId. Comparer avant ferait
         // paraitre une chaine vide DIFFERENTE d'un null en base, et la ligne serait
@@ -215,15 +247,18 @@ router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) 
         // ⚠️ Un champ ABSENT du corps est absent de `donnees` : il n'entre pas dans la
         // comparaison et ne compte jamais comme une difference. Meme semantique
         // qu'`undefined` = << non modifie >> dans pickTaskData.
-        // ⚠️ Tous les TASK_FIELDS sont SCALAIRES (aucun tableau, aucun Json), donc `!==`
-        // suffit. Le jour ou on en ajoute un qui ne l'est pas, cette comparaison devient
-        // FAUSSE en silence et la valeur cessera d'etre enregistree — meme classe de
-        // piege que la liste blanche elle-meme.
-        const aChange = Object.keys(donnees).some(k => (donnees as any)[k] !== (ancienne as any)[k]);
-        if (aChange) {
-          await tx.task.update({ where: { id: ancienne.id }, data: donnees });
-        }
+        // ⚠️ `!==` ne vaut que pour les SCALAIRES. Depuis le 16/10/2026 la liste blanche porte un
+        // TABLEAU (`assignedUserIds`) : deux tableaux egaux ne sont jamais `===`, la ligne aurait ete
+        // reecrite a chaque PUT (le gain du correctif 48 perdu en silence). D'ou `memeValeur`, qui
+        // compare les tableaux element par element. Tout futur champ non scalaire (Json…) doit y passer.
+        const aChange = Object.keys(donnees).some(k => !memeValeur((donnees as any)[k], (ancienne as any)[k]));
+        if (aChange) aMettreAJour.push({ id: ancienne.id, data: donnees });
       }
+
+      // Attributions ajoutees : comptes existants ayant la To-do, sinon 400 et RIEN n'est ecrit. Une requete,
+      // et seulement quand une attribution est ajoutee.
+      await verifierNouveauxAssignes(tx, ajouts);
+      for (const u of aMettreAJour) await tx.task.update({ where: { id: u.id }, data: u.data });
 
       // `createMany` : un seul aller-retour au lieu d'un par tache creee.
       if (aCreer.length > 0) await tx.task.createMany({ data: aCreer });

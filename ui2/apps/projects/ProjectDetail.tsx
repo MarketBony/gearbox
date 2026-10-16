@@ -1,13 +1,14 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Project, Task, TaskStatus, ServiceType, BrandType } from '../../../types';
 import { PROJECT_TYPES, TASK_CHANNELS, SERVICES, RDM_BRANDS } from '../../../constants';
-import { groupeDuProjet, sitesDuProjet, marqueAutorisee, poserSites, basculerService, basculerMarque, nouvelleTache } from '../../../utils/projet';
+import { groupeDuProjet, sitesDuProjet, marqueAutorisee, poserSites, basculerService, basculerMarque, nouvelleTache, assignesDe, poserAssignes } from '../../../utils/projet';
 import { mutateProject, useWorkspace, currentRole } from '../../store/workspace';
 import { canSeeForms } from '../../../constants';
 import { LinkedForms } from '../forms/bony/F4';
 import { gx, hud, Icon, Seg, PickerBtn, Avatar, DraftInput } from '../ui/kit';
 import { D, today, marketing, userName, sortTasks, GROUP_LABEL, LABEL_GROUP, type Mode } from './common';
 import { ExpertPanel, TaskFilesBlock } from './ExpertPanel';
+import { AvatarStack, assigneesLabel, pickAssignees } from '../ui/assignees';
 import type { EngineWin } from '../types';
 
 // =====================================================================
@@ -19,6 +20,11 @@ import type { EngineWin } from '../types';
 
 const fg = (b: string) => (b === 'Renault' ? '#1b1604' : '#fff');
 const TH: [string, string, string?][] = [['name', 'Nom de la tâche'], ['provider', 'Prestataire'], ['channel', 'Canal'], ['status', 'Statut'], ['assignee', 'Assigné'], ['cost', 'Coût (€)', 'r'], ['deadline', 'Échéance']];
+
+// Bouton du sélecteur d'assignés (multi, 16/10/2026) : même allure que les `select.cell` du tableau (maquette.css ne
+// stylise que `input.cell` / `select.cell` ; les règles `.cell:hover/:focus/:disabled` s'appliquent déjà au bouton).
+const ASG_BTN: React.CSSProperties = { height: 34, width: '100%', borderRadius: 8, padding: '0 10px', font: '600 13.5px var(--font-ui)', color: 'var(--text)', minWidth: 0, textAlign: 'left', cursor: 'pointer', backgroundColor: 'color-mix(in srgb,var(--surface-0) 55%,transparent)', boxShadow: 'inset 0 0 0 1px var(--line)' };
+const ASG_BTN_RO: React.CSSProperties = { ...ASG_BTN, backgroundColor: 'transparent', boxShadow: 'none', cursor: 'default' };
 
 export interface DetailApi {
   label: string; mode: Mode; ro: boolean; win: EngineWin;
@@ -88,7 +94,9 @@ export const ProjectDetail: React.FC<{ p: Project; api: DetailApi }> = ({ p, api
     api.openSheet((close) => <><h3>Retirer le dernier membre ?</h3><div className="muted">{userName(users, u)} est le seul membre du projet. Le retirer quand même ?</div><div className="foot"><button className="btn" onClick={() => close()}>Annuler</button><button className="btn primary" onClick={() => { close(); go(); }}>Retirer</button></div></>);
   };
 
-  const asgOpts = (t: Task) => { const L = marketing(users).map((u) => u.id); if (t.assignedUserId && !L.includes(t.assignedUserId)) L.unshift(t.assignedUserId); return L; };
+  // Assignés (multi, 16/10/2026) : sélecteur multiple du moteur, parmi les comptes qui ont la To-do (ui/assignees.tsx).
+  // `poserAssignes` écrit la liste ET son premier élément (lu par l'ancienne interface).
+  const pickAsg = (t: Task, el: HTMLElement) => { if (!dis) pickAssignees(el, users, assignesDe(t), (ids) => setTask(t.id, poserAssignes(ids))); };
   const openTask = (t: Task) => api.openSheet((close) => <TaskDetailSheet projectId={p.id} taskId={t.id} ro={ro} close={close} />, { width: 520 });
 
   return (
@@ -191,8 +199,8 @@ export const ProjectDetail: React.FC<{ p: Project; api: DetailApi }> = ({ p, api
                   <td><DraftInput className="cell" value={t.provider || ''} placeholder="Prestataire…" disabled={dis} onCommit={(v: string) => setTask(t.id, { provider: v })} /></td>
                   <td><select className="cell" value={t.channel || ''} disabled={dis} onChange={(e) => setTask(t.id, { channel: e.target.value as any })}><option value="">-- Aucun --</option>{TASK_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
                   <td><select className="cell st" value={t.status} disabled={dis} style={{ '--c': D().TASK_STATUS[t.status]?.c } as React.CSSProperties} onChange={(e) => setTask(t.id, { status: e.target.value as TaskStatus })}>{Object.entries(D().TASK_STATUS).map(([k, v]: any) => <option key={k} value={k}>{v.l}</option>)}</select></td>
-                  <td><div className="asg">{t.assignedUserId ? <Avatar uid={t.assignedUserId} cls="sm" /> : <span className="av sm" style={{ '--c': 'var(--surface-4)' } as React.CSSProperties}>?</span>}
-                    <select className="cell" value={t.assignedUserId || ''} disabled={dis} onChange={(e) => setTask(t.id, { assignedUserId: (e.target.value || null) as any })}><option value="">— Non assigné —</option>{asgOpts(t).map((u) => <option key={u} value={u}>{userName(users, u)}</option>)}</select></div></td>
+                  <td><div className="asg"><AvatarStack ids={assignesDe(t)} max={2} />
+                    <button type="button" className="cell ellipsis" style={dis ? ASG_BTN_RO : ASG_BTN} disabled={dis} data-tip={assignesDe(t).length > 1 ? assignesDe(t).map((u) => userName(users, u)).join(', ') : undefined} onClick={(e) => pickAsg(t, e.currentTarget)}>{assigneesLabel(users, assignesDe(t), '— Non assigné —')}</button></div></td>
                   <td><DraftInput className="cell num" type="number" style={{ textAlign: 'right' }} disabled={dis} value={t.cost || 0} onCommit={(v: number) => setTask(t.id, { cost: v })} /></td>
                   <td><input className="cell num" type="date" value={t.deadline || ''} disabled={dis} style={late ? { color: 'var(--danger)', fontWeight: 700 } : undefined} data-tip={late ? `Dépassée · ${lateD} j` : undefined} onChange={(e) => setTask(t.id, { deadline: (e.target.value || null) as any })} /></td>
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -223,7 +231,7 @@ export function TaskDetailSheet({ projectId, taskId, ro, close }: { projectId: s
     <>
       <div className="label" style={{ color: 'var(--bony-violet)' }}>Détail de la tâche</div><h3 style={{ margin: '2px 0 6px' }}>{t.name || 'Sans nom'}</h3>
       <div className="row wrap" style={{ gap: 6 }}><span className="badge" style={{ '--c': D().TASK_STATUS[t.status]?.c } as React.CSSProperties}>{D().TASK_STATUS[t.status]?.l}</span>
-        {t.assignedUserId ? <><Avatar uid={t.assignedUserId} cls="sm" /><span>{D().user(t.assignedUserId).name}</span></> : <span className="faint">Non assignée</span>}
+        {assignesDe(t).length ? assignesDe(t).map((u) => <React.Fragment key={u}><Avatar uid={u} cls="sm" /><span>{D().user(u).name}</span></React.Fragment>) : <span className="faint">Non assignée</span>}
         {t.channel ? <span className="badge">{t.channel}</span> : null}{t.cost ? <b className="num">{gx().fmt.eur(t.cost)}</b> : null}</div>
       <div className="label" style={{ marginTop: 14 }}><Icon name="agenda" size="sm" /> Fenêtre de réalisation</div>
       <div className="row" style={{ gap: 8, marginTop: 6 }}>

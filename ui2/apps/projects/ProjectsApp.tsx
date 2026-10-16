@@ -123,7 +123,7 @@ export default function ProjectsApp({ win, inst, mode }: AppProps & { mode: Mode
     const base = nouveauProjet(`${pr.name} (copie)`, user?.id);
     // Copie PROPRE : seuls les champs de tâche d'entrée (liste `TASK_FIELDS` de backend/src/routes/projects.ts)
     // — `projectId`, `createdAt`… feraient échouer la création imbriquée de Prisma.
-    const TASK_KEYS = ['name', 'provider', 'channel', 'cost', 'status', 'assignedUserId', 'deadline', 'startDate', 'notes', 'volumetry', 'openRate', 'npaiRate', 'stopRate', 'clickRate', 'codTxt', 'billedAmount'] as const;
+    const TASK_KEYS = ['name', 'provider', 'channel', 'cost', 'status', 'assignedUserId', 'assignedUserIds', 'deadline', 'startDate', 'notes', 'volumetry', 'openRate', 'npaiRate', 'stopRate', 'clickRate', 'codTxt', 'billedAmount'] as const;
     const tasks = pr.tasks.map((t) => ({ id: Math.random().toString(36).slice(2, 11), ...Object.fromEntries(TASK_KEYS.filter((k) => (t as any)[k] !== undefined).map((k) => [k, (t as any)[k]])) }) as any);
     const { createdAt: _c, updatedAt: _u, ...rest } = pr as any;
     const c: Project = { ...rest, id: base.id, name: base.name, status: 'Draft', tasks };

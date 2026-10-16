@@ -137,5 +137,14 @@ export const ASSISTANT_CAP_ROLES = ['Master'];
 export const INTERNAL_ROLES = (VALID_ROLES as readonly string[]).filter(r => r !== 'External');
 /** Données SANS cloisonnement par site (campagnes, contacts, dépenses ponctuelles) : ni External, ni chef de site. */
 export const UNSCOPED_READ_ROLES = INTERNAL_ROLES.filter(r => r !== SITE_MANAGER_ROLE);
+/**
+ * Rôles qui ont la rubrique To-do (16/10/2026, tâches multi-assignées) : tout le monde SAUF l'External et le chef de
+ * site — miroir de `canHaveTodo` (constants.ts), qui pilote la navigation (services/navigation.ts).
+ * Sert à DEUX règles : qui peut ÊTRE ASSIGNÉ à une tâche (décision de Théo : « seulement parmi les rôles qui ont
+ * accès à la To-do », contrôlé par utils/taskAssignees.ts) et qui LIT les tâches libres (`GET /api/tasks`), sans quoi
+ * un Guest assigné à une tâche libre ne la verrait jamais. Même valeur qu'UNSCOPED_READ_ROLES ce jour, règle
+ * DIFFÉRENTE : ne pas les aliaser.
+ */
+export const TODO_ROLES = INTERNAL_ROLES.filter(r => r !== SITE_MANAGER_ROLE);
 /** Rôles qui ont le Chat (et donc ses fichiers) : ceux de `hasSocialFeatures`. */
 export const CHAT_ROLES = (VALID_ROLES as readonly string[]).filter(r => !NO_SOCIAL_ROLES.includes(r));

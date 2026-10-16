@@ -36,9 +36,9 @@ export const PROJ_HEADERS = [
   'Date début', 'Date fin', 'Budget prévisionnel', 'Budget réalisé',
   'Avancement (%)', 'Description',
 ];
-export const EXP_HEADERS = ['Date', 'Site(s)', 'Marque(s)', 'Service', 'Commentaire', 'Montant', 'PRO+'];
+export const EXP_HEADERS = ['Date', 'Site(s)', 'Marque(s)', 'Service', 'Commentaire', 'Montant', 'PRO+', 'Prestataire'];
 const PROJ_COLS = [34, 22, 18, 16, 16, 12, 8, 12, 12, 18, 16, 14, 50], PROJ_NUM = [9, 10];
-const EXP_COLS = [12, 22, 18, 14, 50, 16, 8], EXP_NUM = [5];
+const EXP_COLS = [12, 22, 18, 14, 50, 16, 8, 24], EXP_NUM = [5];
 
 export type Cell = string | number;
 export interface ExportData { projects: Cell[][]; expenses: Cell[][] }
@@ -92,6 +92,7 @@ export function buildExport(projects: Project[], fixedExpenses: FixedExpense[], 
     e.comment || '',
     Number(e.amount || 0),
     e.proPlus ? 'Oui' : 'Non',
+    e.provider || '',
   ]);
   return { projects: projData, expenses: expData };
 }

@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
 import { prisma } from '../db';
+import { TODO_ROLES } from '../auth/roles';
+import { normaliserAssignes, nouveauxAssignes, verifierNouveauxAssignes, AssigneInvalideError } from '../utils/taskAssignees';
 
 const router = Router();
 
@@ -30,8 +32,10 @@ const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digit
 // Champs acceptés en écriture — liste blanche, comme `TASK_FIELDS` de projects.ts :
 // le frontend renvoie des objets issus d'un GET, `id`/`createdAt`/`projectId` ne sont
 // pas des données d'entrée.
+// ⚠️ `assignedUserIds` ajouté le 16/10/2026 (multi-assignés), dans le même lot que la colonne. La cohérence
+// avec `assignedUserId` (= premier de la liste) est tenue par `normaliserAssignes` (utils/taskAssignees.ts).
 const FIELDS = [
-  'name', 'provider', 'channel', 'status', 'assignedUserId',
+  'name', 'provider', 'channel', 'status', 'assignedUserId', 'assignedUserIds',
   'deadline', 'sites', 'brands', 'service',
 ] as const;
 
@@ -46,16 +50,29 @@ const pick = (t: any) => {
 };
 
 // GET /api/tasks — les tâches autonomes uniquement.
-router.get('/', authenticateToken, requireRole(EDIT_ROLES), async (_req: AuthRequest, res) => {
-  const tasks = await prisma.task.findMany({ where: { projectId: null } });
+// ⚠️ LECTURE ouverte aux rôles qui ont la To-do (`TODO_ROLES`, donc le Guest) depuis le 16/10/2026 : une tâche libre
+// peut désormais être attribuée à n'importe quel rôle de la To-do, et un Guest assigné ne l'aurait jamais vue.
+// L'ÉCRITURE reste à EDIT_ROLES. Ni External ni chef de site (pas de To-do).
+// Un rôle de la To-do qui n'ÉDITE pas (Guest…) ne reçoit que les tâches libres qui lui sont attribuées (Théo, 16/10/2026) :
+// filtré ICI, côté serveur — un filtre front laisserait les autres lisibles dans l'onglet Réseau.
+router.get('/', authenticateToken, requireRole(TODO_ROLES), async (req: AuthRequest, res) => {
+  const mine = EDIT_ROLES.includes(req.user!.role) ? {} : { assignedUserIds: { has: req.user!.id } };
+  const tasks = await prisma.task.findMany({ where: { projectId: null, ...mine } });
   res.json(tasks);
 });
 
+/** Attribution refusée → 400 avec son message fixe ; toute autre erreur suit son cours. */
+const refusAssigne = (res: any, e: unknown) => {
+  if (e instanceof AssigneInvalideError) { res.status(400).json({ error: e.message }); return true; }
+  return false;
+};
+
 router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) => {
-  const data = pick(req.body);
+  const data = normaliserAssignes(pick(req.body));
   if (typeof data.name !== 'string' || !data.name.trim()) {
     return res.status(400).json({ error: 'Le nom de la tâche est obligatoire.' });
   }
+  try { await verifierNouveauxAssignes(prisma, nouveauxAssignes(data)); } catch (e) { if (refusAssigne(res, e)) return; throw e; }
   const task = await prisma.task.create({
     data: { ...data, projectId: null, channel: data.channel ?? '', status: data.status ?? 'Todo' },
   });
@@ -65,13 +82,19 @@ router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) =>
 
 router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) => {
   const { id } = req.params;
+  // La ligne en base est lue AVANT l'écriture : c'est l'état de référence de `normaliserAssignes` (qui, de la liste
+  // ou du premier assigné, a changé ?) et de la vérification des seuls assignés AJOUTÉS.
+  const ancienne = await prisma.task.findFirst({ where: { id, projectId: null }, select: { assignedUserId: true, assignedUserIds: true } });
+  if (!ancienne) return res.status(404).json({ error: 'Tâche autonome introuvable.' });
+  const data = normaliserAssignes(pick(req.body), ancienne);
+  try { await verifierNouveauxAssignes(prisma, nouveauxAssignes(data, ancienne)); } catch (e) { if (refusAssigne(res, e)) return; throw e; }
   try {
     // `updateMany` avec `projectId: null` plutôt qu'`update` par id : c'est ce qui
     // garantit qu'un id de tâche DE PROJET envoyé ici ne peut rien modifier (il ne
     // matche pas le where et l'update porte sur 0 ligne).
     const { count } = await prisma.task.updateMany({
       where: { id, projectId: null },
-      data: pick(req.body),
+      data,
     });
     if (count === 0) return res.status(404).json({ error: 'Tâche autonome introuvable.' });
   } catch (e) {

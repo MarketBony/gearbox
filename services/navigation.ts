@@ -3,7 +3,7 @@ import {
   Globe, Euro, Sparkles, Gamepad2, CheckSquare, MessageSquare, FileSpreadsheet, Palmtree, ClipboardList, Handshake,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { canSeeGames, SITE_MANAGER_SECTIONS, isSiteManager } from '../constants';
+import { canSeeGames, SITE_MANAGER_SECTIONS, isSiteManager, canHaveTodo } from '../constants';
 import { EXPORT_ALLOWED_ROLES, canSeeForms, canSeeCrm } from '../constants';
 
 // ============================================================================
@@ -43,7 +43,8 @@ export function computeNav({ role, gamesEnabled, voitConges, ui2 = false }: NavC
     ...(canAccessGames ? [I('games', Gamepad2, 'Jeux')] : []),
     I('dashboard', LayoutDashboard, 'Dashboard'),
     I('projects', FolderKanban, 'Projets'),
-    ...(!isExternal ? [I('todo', CheckSquare, 'To-do')] : []),
+    // `canHaveTodo` (constants.ts) : même règle que la liste des personnes à qui l'on peut attribuer une tâche.
+    ...(canHaveTodo(role) ? [I('todo', CheckSquare, 'To-do')] : []),
     I('digital', Globe, 'Digital'),
     I('chat', MessageSquare, 'Chat'),
     // Campagnes : retirée de la v2 le 09/10/2026 (Théo : « elle sert à rien »). Reste dans l'ancienne interface jusqu'à la bascule.

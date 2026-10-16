@@ -6,6 +6,8 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useWorkspace, mutateTask, updateStandalone, createStandalone, deleteStandalone } from '../../store/workspace';
 import { gx, hud, Icon, Chips, Seg, PickerBtn, ServiceBadge, BrandChips, useSheets, useEngineStore, useEngineEvent } from '../ui/kit';
 import PostItBoard from './PostItBoard';
+import { assignesDe, estAssigne, poserAssignes } from '../../../utils/projet';
+import { AvatarStack, assigneesLabel, pickAssignees } from '../ui/assignees';
 import { type ColKey, COLS, FILTER_SERVICES, FORM_SERVICES, brandLabel, type Item, type Filters, F0, sitesOf, buildItems, inGlobal, urgency, matches, sortIt, siteLbl } from './board';
 
 // =====================================================================
@@ -33,7 +35,9 @@ const Card = React.memo(function Card({ it, ro }: { it: Item; ro: boolean }) {
           : <button className="tdo-pj" data-act="edit" data-tip={ro ? 'Tâche libre' : 'Modifier cette tâche'}><span className="tdo-libre">Libre</span>{where ? <span className="st">{where}</span> : null}{ro ? null : <Icon name="edit" size="sm" />}</button>}
         <span className={`tdo-dl ${u.cls}`}>{u.cls === 'none' ? null : <Icon name={u.cls === 'late' ? 'alert' : 'clock'} />}{u.txt}</span>
       </div>
-      <div className="tdo-tags">{it.services.map((s) => <ServiceBadge key={s} s={s} />)}<BrandChips brands={it.brands} />{t.channel ? <span className="badge ch">{t.channel}</span> : null}{t.cost ? <span className="cost num">{gx().fmt.eur(t.cost)}</span> : null}</div>
+      <div className="tdo-tags">{it.services.map((s) => <ServiceBadge key={s} s={s} />)}<BrandChips brands={it.brands} />{t.channel ? <span className="badge ch">{t.channel}</span> : null}{t.cost ? <span className="cost num">{gx().fmt.eur(t.cost)}</span> : null}
+        {/* Tâche PARTAGÉE (multi-assignés, 16/10/2026) : on montre avec qui. Seul, inutile — elle est à moi. */}
+        {assignesDe(t).length > 1 ? <span style={{ marginLeft: 'auto' }}><AvatarStack ids={assignesDe(t)} max={3} /></span> : null}</div>
       <div className="tdo-mv">
         <button data-mv="-1" disabled={si <= 0 || ro} aria-label="Colonne précédente" data-tip={si > 0 ? `Vers « ${COLS[si - 1][1]} »` : ''}><Icon name="back" size="sm" /></button>
         <button data-mv="1" disabled={si >= COLS.length - 1 || ro} aria-label="Colonne suivante" data-tip={si < COLS.length - 1 ? `Vers « ${COLS[si + 1][1]} »` : ''}><Icon name="chevron" size="sm" /></button>
@@ -207,7 +211,12 @@ export function TasksView({ win, inst, switcher, variant = 'app' }: AppProps & {
   const taskSheet = (t: Task | null) => {
     if (t ? ro : !canCreate) { if (t) hud('Lecture seule'); return; }
     openSheet((close) => <TaskForm t={t} uid={uid} close={close} onDelete={() => { close(); delFree(t!); }}
-      onSaved={(id, visible) => { capture({ moved: id }); if (!visible) hud(t ? 'Tâche enregistrée — masquée par les filtres actifs' : 'Tâche créée — masquée par les filtres actifs'); }}
+      onSaved={(id, visible, mine) => {
+        capture({ moved: id });
+        // Attribuée à d'AUTRES sans moi : elle quitte (ou n'entre pas dans) MA To-do — on le dit, sinon elle semble perdue.
+        if (!mine) hud(t ? 'Tâche enregistrée — vous n’en faites plus partie, elle quitte votre To-do' : 'Tâche créée — elle apparaît dans la To-do des personnes choisies');
+        else if (!visible) hud(t ? 'Tâche enregistrée — masquée par les filtres actifs' : 'Tâche créée — masquée par les filtres actifs');
+      }}
       isVisible={(task) => buildItems([], [task], uid).some((it) => matches(it, f))} />, { width: 600 });
   };
 
@@ -283,36 +292,44 @@ export function TasksView({ win, inst, switcher, variant = 'app' }: AppProps & {
 // ---------------------------------------------------------------- formulaire de tâche libre
 function TaskForm({ t, uid, close, onDelete, onSaved, isVisible }: {
   t: Task | null; uid: string; close: (v?: unknown) => void; onDelete: () => void;
-  onSaved: (id: string, visible: boolean) => void; isVisible: (t: Task) => boolean;
+  onSaved: (id: string, visible: boolean, mine: boolean) => void; isVisible: (t: Task) => boolean;
 }) {
   const providers = useWorkspace((s) => s.projects);
+  const users = useWorkspace((s) => s.users);
   const provList = useMemo(() => [...new Set(providers.flatMap((p) => (p.tasks || []).map((x) => x.provider || '').filter(Boolean)))], [providers]);
-  const [v, setV] = useState(() => ({ name: t?.name || '', provider: t?.provider || '', deadline: t?.deadline || '', channel: (t?.channel as string) || '', status: (t?.status as ColKey) || 'Todo', sites: [...(t?.sites || [])], brands: [...(t?.brands || [])] as string[], services: [...(t?.service || [])] as string[] }));
+  const [v, setV] = useState(() => ({ name: t?.name || '', provider: t?.provider || '', deadline: t?.deadline || '', channel: (t?.channel as string) || '', status: (t?.status as ColKey) || 'Todo', sites: [...(t?.sites || [])], brands: [...(t?.brands || [])] as string[], services: [...(t?.service || [])] as string[],
+    // Multi-assignés (16/10/2026) : moi par défaut à la création, la liste de la tâche sinon.
+    assignees: t ? assignesDe(t) : uid ? [uid] : [] }));
   const [confirmDel, setConfirmDel] = useState(false), [busy, setBusy] = useState(false), [err, setErr] = useState('');
   const set = (p: Partial<typeof v>) => setV((x) => ({ ...x, ...p }));
   const toggleBrand = (b: string) => set({ brands: b === 'Holding' ? (v.brands.includes('Holding') ? [] : ['Holding']) : (v.brands.includes(b) ? v.brands.filter((y) => y !== b) : [...v.brands.filter((y) => y !== 'Holding'), b]) });
   const toggleSvc = (s: string) => set({ services: v.services.includes(s) ? v.services.filter((y) => y !== s) : [...v.services, s] });
   const save = async () => {
     const name = v.name.trim(); if (!name) { setErr('Le nom de la tâche est obligatoire.'); return; }
-    // Même charge que StandaloneTaskForm (pages/TodoList.tsx) : l'assigné reste celui de la tâche.
-    const data: Partial<Task> = { name, provider: v.provider.trim(), channel: v.channel as any, status: v.status as TaskStatus, assignedUserId: t?.assignedUserId || uid, deadline: v.deadline || (null as any), sites: v.sites, brands: v.brands as any, service: v.services as any };
+    // Une tâche libre sans personne ne serait visible dans AUCUNE To-do : au moins un assigné.
+    if (!v.assignees.length) { setErr('Choisissez au moins une personne.'); return; }
+    // Assignés : la liste ET son premier élément (`poserAssignes`), comme partout. Le serveur refuse (400) un compte
+    // sans To-do : son message s'affiche tel quel ci-dessous.
+    const data: Partial<Task> = { name, provider: v.provider.trim(), channel: v.channel as any, status: v.status as TaskStatus, ...poserAssignes(v.assignees), deadline: v.deadline || (null as any), sites: v.sites, brands: v.brands as any, service: v.services as any };
     setBusy(true); setErr('');
     try {
       let id = t?.id || '';
       if (t) await updateStandalone(t.id, data); else id = (await createStandalone(data))?.id || '';
-      close(); onSaved(id, isVisible({ ...(t || {} as Task), ...data, id } as Task));
+      close(); onSaved(id, isVisible({ ...(t || {} as Task), ...data, id } as Task), estAssigne(data, uid));
     } catch (e: any) { setErr(e?.message && !/^Erreur \d+$/.test(e.message) ? e.message : 'Échec de l\'enregistrement.'); setBusy(false); }
   };
   const chip = (on: boolean, label: string, onClick: () => void, color?: string) => <button type="button" className="chip" aria-pressed={on} onClick={onClick}>{color ? <i className="brand-dot" style={{ '--c': color } as React.CSSProperties} /> : null}{label}</button>;
   const colors: Record<string, string> = Object.fromEntries(gx().data.BRANDS.map((b: any) => [b.id, b.hex]));
   return (
-    <div className="tdo-sheet"><h3>{t ? 'Modifier la tâche' : 'Nouvelle tâche'}</h3><div className="muted">Tâche libre, toujours assignée à vous. Les tâches d’un projet se créent depuis le projet.</div>
+    <div className="tdo-sheet"><h3>{t ? 'Modifier la tâche' : 'Nouvelle tâche'}</h3><div className="muted">Tâche libre, assignée à vous par défaut — vous pouvez l’attribuer à d’autres personnes. Les tâches d’un projet se créent depuis le projet.</div>
       <div className="form-grid">
         <label className="field full"><span className="label">Nom *</span><input className="input" autoFocus value={v.name} placeholder="Ex. Relancer l’imprimeur" onChange={(e) => set({ name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter' && v.name.trim()) save(); }} /></label>
         <label className="field"><span className="label">Prestataire</span><input className="input" value={v.provider} list="tdoProv" onChange={(e) => set({ provider: e.target.value })} /><datalist id="tdoProv">{provList.map((p) => <option key={p} value={p} />)}</datalist></label>
         <label className="field"><span className="label">Deadline</span><input type="date" className="input" value={v.deadline} onChange={(e) => set({ deadline: e.target.value })} /></label>
         <label className="field"><span className="label">Canal</span><select className="select" value={v.channel} onChange={(e) => set({ channel: e.target.value })}><option value="">—</option>{TASK_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
         <label className="field"><span className="label">Statut</span><select className="select" value={v.status} onChange={(e) => set({ status: e.target.value as ColKey })}>{COLS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+        <div className="field full"><span className="label">Assignés *</span><div className="row" style={{ gap: 8 }}><AvatarStack ids={v.assignees} max={4} />
+          <PickerBtn icon="users" label={assigneesLabel(users, v.assignees, 'Choisir des personnes')} active={!!v.assignees.length} onClick={(el) => pickAssignees(el, users, v.assignees, (ids) => set({ assignees: ids }))} /></div></div>
         <div className="field full"><span className="label">Sites</span><div><PickerBtn icon="pin" label={gx().ui.summary(v.sites, { all: 'Choisir des sites', max: 3 })} active={!!v.sites.length} onClick={(el) => gx().ui.sitePicker(el, v.sites, (vals: string[]) => set({ sites: vals }), { variant: 'filter', multi: true, title: 'Sites', entities: false })} /></div></div>
         <div className="field full"><span className="label">Marques</span><div className="chips">{(BRANDS as string[]).map((b) => <React.Fragment key={b}>{chip(v.brands.includes(b), brandLabel(b), () => toggleBrand(b), colors[b])}</React.Fragment>)}</div><span className="faint" style={{ fontSize: 12 }}>GROUPE BONY (Holding) est exclusif : suivi, jamais imputé à un budget.</span></div>
         <div className="field full"><span className="label">Services</span><div className="chips">{FORM_SERVICES.map((s) => <React.Fragment key={s}>{chip(v.services.includes(s), s, () => toggleSvc(s))}</React.Fragment>)}</div></div>
