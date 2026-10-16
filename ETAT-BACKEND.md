@@ -1667,3 +1667,14 @@ est le bon comportement (`restart: always` côté Docker).
   un message non texte ; `chat:conversation:delete` (groupe, administrateurs) : cascade des messages, `unlink` des fichiers
   `/uploads/chat/<uuid>`, `chat:conversation:removed` aux membres.
 
+## Correctif 93 (16/10/2026) — tâches multi-assignées, prestataire des dépenses
+- **`Task.assignedUserIds String[]`** (migration `20261016120000_task_assignees`, reprise depuis `assignedUserId`). Porte unique
+  `utils/taskAssignees.ts` : `normaliserAssignes` compare à l'état EN BASE (liste changée → elle s'impose ; seul le 1er
+  assigné changé, ancienne interface → il remplace le 1er de la liste) et tient `assignedUserId` = 1er de la liste ;
+  `verifierNouveauxAssignes` refuse (400) un assigné AJOUTÉ hors `TODO_ROLES`. Ajouté à `TASK_FIELDS` (projects.ts, diff
+  élément par élément) et à `FIELDS` (tasks.ts) ; le POST de projet passe aussi par la liste blanche.
+- **`TODO_ROLES`** (`auth/roles.ts`) : tout sauf External et chef de site. Même valeur qu'`UNSCOPED_READ_ROLES`, règle
+  différente : ne pas les aliaser. `GET /api/tasks` ouvert à `TODO_ROLES` ; un rôle hors `EDIT_ROLES` (Guest) ne reçoit que
+  les tâches libres où il figure dans `assignedUserIds` (filtre serveur). Écriture inchangée (`EDIT_ROLES`).
+- **`FixedExpense.provider String?`** (migration `20261016121000_expense_provider`) : accepté en POST/PUT (`fixedExpenses.ts`,
+  liste explicite du PUT), rogné à 200 caractères, vide → `null`.

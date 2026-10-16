@@ -53,8 +53,11 @@ const pick = (t: any) => {
 // ⚠️ LECTURE ouverte aux rôles qui ont la To-do (`TODO_ROLES`, donc le Guest) depuis le 16/10/2026 : une tâche libre
 // peut désormais être attribuée à n'importe quel rôle de la To-do, et un Guest assigné ne l'aurait jamais vue.
 // L'ÉCRITURE reste à EDIT_ROLES. Ni External ni chef de site (pas de To-do).
-router.get('/', authenticateToken, requireRole(TODO_ROLES), async (_req: AuthRequest, res) => {
-  const tasks = await prisma.task.findMany({ where: { projectId: null } });
+// Un rôle de la To-do qui n'ÉDITE pas (Guest…) ne reçoit que les tâches libres qui lui sont attribuées (Théo, 16/10/2026) :
+// filtré ICI, côté serveur — un filtre front laisserait les autres lisibles dans l'onglet Réseau.
+router.get('/', authenticateToken, requireRole(TODO_ROLES), async (req: AuthRequest, res) => {
+  const mine = EDIT_ROLES.includes(req.user!.role) ? {} : { assignedUserIds: { has: req.user!.id } };
+  const tasks = await prisma.task.findMany({ where: { projectId: null, ...mine } });
   res.json(tasks);
 });
 

@@ -12,10 +12,18 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [x] **Minigolf : tour par tour injouable** (Théo, 15/10, juste après le correctif 90 : « soit ça joue pas, soit ça joue en
   double ») : tir bloqué dès le trou 2, verrou jamais levé quand le serveur répond après la fin de l'animation, tir permis
   pendant la pause de fin de trou. Corrigé au correctif 91 (`rendu.ts`). Partie entre deux vrais comptes à confirmer en prod.
-- [ ] **v2 : widgets du bureau déplacés au redimensionnement** (Théo, 15/10, « franchement désastreux ») : réduire la fenêtre du
+- [x] **v2 : widgets du bureau déplacés au redimensionnement** (Théo, 15/10, « franchement désastreux ») : réduire la fenêtre du
   navigateur puis la remettre en grand déplace les widgets ; des widgets censés occuper le même nombre de cases ne s'alignent
   plus. Non reproduit à ce jour. Piste : la grille recalcule les positions à la largeur RÉDUITE et les enregistre sur le serveur
   (`/api/widgets`, correctif 78) au lieu de garder la disposition de référence.
+  **Corrigé au correctif 93 (16/10)** — cause confirmée : `W.render()` rétrécissait / déplaçait les widgets qui dépassaient ET
+  appelait `save()` (à chaque redimensionnement, 200 ms) ; largeur fixe sur un pas fractionnaire (+ recalage « bord droit »).
+  Mesuré : 1920→1280→1000→1920, 0 PUT, disposition identique au pixel. Les bureaux DÉJÀ abîmés ne sont pas restaurables.
+- [ ] **v2 : « Réinitialiser les widgets » (Réglages, `ui2/apps/settings/ShellPanels.tsx`) n'efface que la copie du navigateur**
+  (trouvé au correctif 93, non corrigé) : le bureau du serveur revient probablement au rechargement suivant.
+- [ ] **v2 : barre du haut « escamotable » jamais active** (trouvé au correctif 93, non corrigé) : `ui2/os/engine/shell.ts`
+  l. 70, l'instruction est derrière un `//` sur la même ligne (hérité de `maquettes/v2/js/shell.js` l. 28) — la barre prend
+  30 px en permanence. La corriger change l'apparence en 1920 : décision de Théo.
 - [x] **v2 : molette bloquée au survol d'un tableau** (Théo, 15/10) : `overscroll-behavior: contain` sur `.scroll` (deux axes).
   Corrigé au correctif 89 (axe x seulement). ⚠️ À confirmer par Théo sur la prod (non reproductible avec l'outil).
 - [x] **SPARK : fiche ouverte depuis le Requêteur (ou Équipes › À attribuer) remplacée par le 1er client de la liste** quand le
