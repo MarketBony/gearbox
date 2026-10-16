@@ -31,6 +31,13 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [ ] **VPS : connexion SSH par mot de passe ouverte à TOUS les comptes** (constaté le 15/10) : `50-cloud-init.conf` (19/06) met
   `PasswordAuthentication yes` (ubuntu compris ; root `prohibit-password`), pas de fail2ban. Seul `dcs` en a besoin (bloc `Match`
   du `70-dcs-sftp.conf`). À arbitrer par Théo : passer le global à `no` (clé seule pour ubuntu), après `sshd -t`, session ouverte.
+  **Audit du 16/10 (lecture seule), lot reporté au lundi 19/10 par Théo** (après le 1er import DCS) : le `yes` de
+  `50-cloud-init.conf` gagne sur le `no` de `60-cloudimg-settings.conf` (sshd garde la PREMIÈRE valeur lue) → plan : un fichier
+  `05-gearbox-securite.conf` (`PasswordAuthentication no`, `PermitRootLogin no`, `MaxAuthTries 3`, `LoginGraceTime 30`,
+  `X11Forwarding no`), contrôle par `sshd -T -C user=ubuntu|dcs`. UNE SEULE clé autorisée pour `ubuntu` (celle de ce poste) :
+  proposer une clé de secours. Garder le mot de passe d'`ubuntu` (console KVM OVH). fail2ban : `backend = systemd`, 5 échecs /
+  10 min, 1 h croissante, `ignoreip` = `195.25.28.4` (connexion `dcs` vue le 15/10, à confirmer : DCS ?). 17 355 échecs en 24 h,
+  aucune connexion `ubuntu` par mot de passe en 14 jours.
 - [ ] **VPS : pare-feu `ufw` inactif** (constaté le 12/10 en préparant le CRM). Rien n'est exposé à tort aujourd'hui (Caddy 80/443
   et SSH seulement ; `rcu-db` n'a AUCUN port publié), mais aucun filet si un conteneur publiait un port par erreur.
 - [x] **SPARK, trouvés avant la prod (correctif 84)** : 4 341 ventes « à une société » chez des clients classés particuliers

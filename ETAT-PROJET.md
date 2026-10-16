@@ -4,6 +4,17 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 16/10/2026 (lire en premier)
+- **🚧 LOT 93 EN COURS (16/10 après-midi), branche `feat/lot-93-widgets-assignes-prestataire-1600`, NON poussée, NON recettée.**
+  4 sujets codés par 4 agents puis fusionnés : (1) widgets du bureau v2 qui bougent au redimensionnement (`engine/widgets.ts` :
+  disposition enregistrée = référence jamais réécrite par l'affichage, grille au pas entier) ; (2) **tâches multi-assignées**
+  (`Task.assignedUserIds`, `utils/taskAssignees.ts`, `TODO_ROLES`, KPI Expert à coût plein) ; (3) **prestataire sur les dépenses
+  fixes** (`FixedExpense.provider`) ; (4) **affichage 1600x900** (`wm.ts` fenêtres recadrées, `overrides.css` en-têtes compacts
+  sous 850 px de haut, Budget Suivi réalisé, modales Matériel v1). **Migrations `20261016120000_task_assignees` et
+  `20261016121000_expense_provider` APPLIQUÉES et INSCRITES sur Supabase** (additives) ; `prisma generate` fait ; tsc 9 / 0.
+  À faire : test localhost + recette Théo, puis docs (fiches), push, déploiement `api` + `web`. Points à trancher : `GET
+  /api/tasks` ouvert au Guest renvoie TOUTES les tâches libres (proposé : filtrer aux siennes) ; surplus de largeur absorbé par
+  les widgets ; barre du haut « escamotable » cassée depuis la maquette (`engine/shell.ts` l. 70, non corrigé) ; « Réinitialiser
+  les widgets » des Réglages n'efface pas la copie serveur (bug distinct, à ficher).
 - **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 92**
   (16/10, `api` + `web` : Jeux, thèmes Bony / Grève CGT des 3 jeux + lobby multi-jeux). Avant lui le **91**
   (15/10, `web` seul : minigolf, tour par tour réparé — tir bloqué dès le trou 2, coups en double). Avant lui le **90**
@@ -13,7 +24,8 @@
   Aucune branche ouverte.
 - **PROCHAIN LOT (décision de Théo, 15/10) : le SSH** ci-dessous, **juste avant le déploiement officiel de la v2** : fail2ban
   (plafond de tentatives par IP) + connexion par CLÉ SEULE pour `ubuntu`, exception `Match User dcs` (mot de passe) conservée.
-  Hotspot obligatoire, accès à la console de secours OVH vérifié AVANT. Le rendu v1 des 3 jeux est revenu (thème Bony, 92).
+  Hotspot obligatoire, accès à la console de secours OVH vérifié AVANT. **Audit fait le 16/10, lot REPORTÉ au lundi 19/10**
+  (Théo : après le 1er import DCS) — plan et constats dans la fiche SSH de `BUGS-CONNUS.md`. Le rendu v1 des 3 jeux est revenu (thème Bony, 92).
 - **À confirmer par Théo en prod (non jouable en local, faute de second compte)** : une partie de minigolf (correctif 91) et une
   partie en thème Grève CGT (correctif 92) entre deux vrais comptes, du défi à la fin.
 - **Backlog récent (Théo, 15/10)** : widgets du bureau v2 déplacés au redimensionnement (« désastreux », `BUGS-CONNUS.md`) ;
