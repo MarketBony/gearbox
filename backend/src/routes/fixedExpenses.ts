@@ -12,7 +12,7 @@ const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digit
 
 // Contrat aligné sur le frontend (types.ts FixedExpense + pages/FixedExpenses.tsx) :
 // { date, service, site, sites?, budgetDistribution?, comment, amount,
-//   brand?, brands?, alpineShare?, nissanShare?, proPlus?, isAnnual? }
+//   provider?, brand?, brands?, alpineShare?, nissanShare?, proPlus?, isAnnual? }
 // Colonnes stockées BRUTES : aucun calcul métier côté serveur (pas de
 // fractionnement /12 pour isAnnual, pas de routage Alpine/Nissan) —
 // toute l'agrégation reste côté frontend (pages/Budget.tsx).
@@ -34,6 +34,9 @@ const budgetDistributionError = (v: unknown): string | null => {
   }
   return null;
 };
+
+// Prestataire : texte libre rogné ; vide ou absent = null (colonne nullable).
+const cleanProvider = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 200) : null);
 
 // Valide les champs optionnels communs à POST et PUT. Retourne un message d'erreur ou null.
 const optionalFieldsError = (body: any): string | null => {
@@ -64,6 +67,9 @@ const optionalFieldsError = (body: any): string | null => {
   }
   if (body.comment !== undefined && typeof body.comment !== 'string') {
     return 'Champ "comment" invalide : chaîne attendue.';
+  }
+  if (body.provider !== undefined && body.provider !== null && typeof body.provider !== 'string') {
+    return 'Champ "provider" invalide : chaîne attendue.';
   }
   return null;
 };
@@ -111,6 +117,7 @@ router.post('/', authenticateToken, requireRole(EDIT_ROLES), async (req, res) =>
       sites: sites ?? [],
       budgetDistribution: budgetDistribution ?? undefined,
       comment: comment ?? '',
+      provider: cleanProvider(req.body.provider),
       amount,
       brand: brand ?? undefined,
       brands: brands ?? [],
@@ -158,6 +165,7 @@ router.put('/:id', authenticateToken, requireRole(EDIT_ROLES), async (req, res) 
         ...(b.sites !== undefined ? { sites: b.sites } : {}),
         ...(b.budgetDistribution !== undefined ? { budgetDistribution: b.budgetDistribution } : {}),
         ...(b.comment !== undefined ? { comment: b.comment } : {}),
+        ...(b.provider !== undefined ? { provider: cleanProvider(b.provider) } : {}),
         ...(b.brand !== undefined ? { brand: b.brand } : {}),
         ...(b.brands !== undefined ? { brands: b.brands } : {}),
         ...(b.alpineShare !== undefined ? { alpineShare: b.alpineShare } : {}),

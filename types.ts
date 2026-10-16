@@ -292,6 +292,7 @@ export interface FixedExpense {
   sites?: string[]; // List of all selected sites
   budgetDistribution?: Record<string, number>; // Site -> Percentage (0-100)
   comment: string;
+  provider?: string | null; // Prestataire (texte libre, optionnel — dépenses existantes sans ce champ = undefined/null)
   amount: number;
   brand?: BrandType; // Pour le routage budgétaire Alpine/Nissan (legacy — premier élément de brands)
   brands?: BrandType[]; // Multi-sélection marques pour le routage budgétaire
