@@ -11,8 +11,13 @@
   **89** (15/10, `web` seul : molette bloquée au survol d'un tableau, v2). Avant lui le **88** (15/10, `rcu-worker` + `api` + `web` :
   SPARK lot 4, Équipes et portefeuilles, **calcul des portefeuilles DÉSACTIVÉ en prod**).
   Aucune branche ouverte.
-- **PROCHAINS LOTS (Théo, 15/10)** : le rendu v1 des 3 jeux est revenu dans la v2 (thème Bony, correctif 92) ; reste le **SSH** ci-dessous, **juste avant le déploiement officiel de la v2** : fail2ban + clé seule pour `ubuntu`,
-  exception `Match User dcs` conservée. Confirmer sur la prod la partie de minigolf entre deux vrais comptes (non jouée en local).
+- **PROCHAIN LOT (décision de Théo, 15/10) : le SSH** ci-dessous, **juste avant le déploiement officiel de la v2** : fail2ban
+  (plafond de tentatives par IP) + connexion par CLÉ SEULE pour `ubuntu`, exception `Match User dcs` (mot de passe) conservée.
+  Hotspot obligatoire, accès à la console de secours OVH vérifié AVANT. Le rendu v1 des 3 jeux est revenu (thème Bony, 92).
+- **À confirmer par Théo en prod (non jouable en local, faute de second compte)** : une partie de minigolf (correctif 91) et une
+  partie en thème Grève CGT (correctif 92) entre deux vrais comptes, du défi à la fin.
+- **Backlog récent (Théo, 15/10)** : widgets du bureau v2 déplacés au redimensionnement (« désastreux », `BUGS-CONNUS.md`) ;
+  SPARK lot 5 (relances) et lot 6 (GRID) ; mIAouss « qui agit » ; Jeux : idée d'un bowling low-poly, d'autres thèmes plus tard.
 - **🚨 URGENT (Théo, 15/10) — SSH du VPS** : le mot de passe est accepté pour TOUS les comptes (`50-cloud-init.conf`, ubuntu
   compris), 80 800 tentatives en 11 jours, pas de fail2ban. À faire : `PasswordAuthentication no` global (le bloc `Match User dcs`
   garde l'exception), `sudo sshd -t`, session ouverte, test de la clé dans une 2e session. Vérifier d'abord l'accès à la console
@@ -21,7 +26,7 @@
   `maquettes/crm/rcu-cartographie.html` ; maquettes : `maquettes/crm/v2/` (rubrique + Requêteur) et le canevas
   https://claude.ai/artifact/YQAT1pvBU1w6aMj2GB8Kv4 (planches A–D du Requêteur). **En production** :
   - 82 (12/10) lot 1 : base `rcu-db` sur le VPS (jamais exposée, jamais hors VPS), worker d'import (`rcu-worker`), compte SFTP
-    `dcs` (chroot `/srv/dcs`, dépôt `/srv/dcs/depot`) — **SANS mot de passe ni clé à ce jour**, écran Imports ;
+    `dcs` (chroot `/srv/dcs`, dépôt `/srv/dcs/depot`) — ouvert par mot de passe au correctif 87, écran Imports ;
   - 83 (12/10) lot 2 : client unique (rapprochement, arbitrage, fiche) — 180 427 clients ;
   - 84 (13/10) lot 3 : **Requêteur** (4 cartes Qui / Quel véhicule / À quel moment / Comment les joindre, résumé en phrase,
     « Voir les clients » en tableau trié, exports Excel / Sarbacane / allmysms / phoning / courrier journalisés) ;
