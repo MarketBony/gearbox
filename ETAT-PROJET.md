@@ -4,15 +4,20 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 16/10/2026 (lire en premier)
-- **🎳 BOWLING 3D (prototype, 16/10, branche `feat/bowling-prototype`, NON intégré)** — demande de Théo « façon Wii Sports
-  low-poly ». Même chemin que le minigolf : `maquettes/jeux/bowling.html` (three.js 0.160 par CDN, serveur `maquettes`,
-  `/jeux/bowling.html`) + moteur pur et déterministe `maquettes/jeux/bowling-moteur.js` (futur `shared/bowling.ts`, rejoué par
-  le serveur : le navigateur n'enverra que `{ x0, angle, puissance, effet }`). Physique à plat, chute des quilles en capsule
-  qui balaie ; réglée par simulation : poche avec effet ≈ 80 % de strikes, boule droite ≈ 35 %, plein centre = quilles
-  écartées. Score officiel testé (300 / 150 / 0 / 167 / 190). Geste : clic maintenu, tirer vers soi puis pousser (vitesse =
-  puissance, geste en biais = effet) ; thèmes Bony / Grève CGT ; 1-2 joueurs même écran ; 10 ou 5 frames ; sons synthétisés.
-  **Attend le retour de Théo sur la sensation** ; ensuite : `shared/bowling.ts` + `bowlingRules.ts`, `'bowling'` dans
-  `GAME_TYPES`, défi tour par tour dans le lobby (v2), three.js en dépendance npm chargée à la demande.
+- **🎳 BOWLING 3D — prototype v2 (16–17/10, branche `feat/bowling-prototype`, NON intégré à Gearbox)** — refonte après le
+  1er jet jugé « éteint / ignoble » : `maquettes/jeux/bowling/` (serveur `maquettes`, `/jeux/bowling/index.html`), modules
+  ES + CDN, contrat entre modules dans `CONTRAT.md`. **Physique VALIDÉE par Théo (17/10, « excellente, rien à changer »)** :
+  Rapier DÉTERMINISTE `@dimforge/rapier3d-deterministic-compat@0.21.0` (même résultat au bit près Node / navigateur →
+  rejouable par le serveur), huile (glisse → crochet → roule), Magnus léger, quilles 3D composées ; mesures dans
+  `test-physique-balayage.mjs`. Rendu three.js 0.160 (`rendu.js`) : salle à la CHARTE du groupe (dégradé #f75632→#8f12ab,
+  bleu nuit #293f74, logos, « génération auto-mobile », jamais « Bony » seul), Mii animé, reflets ; thème CGT + clichés de
+  manif (`decor-manif.js` : chipos, brasero, camion sono, arche gonflable, dormeur, chien, papy à béret) ; textes CGT PROPRES
+  au bowling dans `cgt.js` (annonces : titre bowling + blague en sous-titre). Sons 100 % synthétisés SANS AUCUNE VOIX
+  (`son.js` ; les voix par formants « film d'horreur » ont été supprimées). Geste (`jeu.js`) : direction de la poussée,
+  coup de poignet = effet, timing du lâcher, compromis vitesse / précision — durci le 17/10 (« c'est le placement qui
+  faisait tout »). Restes : Brooklyn trop généreux (47 %), boule lente pas pénalisée ; calibrage du geste sur vraie souris.
+  **Ensuite (quand Théo le dira)** : intégration v2 (`shared/bowling` + règles serveur, `'bowling'` dans `GAME_TYPES`,
+  défi à deux dans le lobby, three.js et Rapier en dépendances npm chargées à la demande).
 - **CORRECTIF 93 EN PRODUCTION (16/10, `api` + `web`)** — branche `feat/lot-93-widgets-assignes-prestataire-1600`, 4 sujets
   codés par 4 agents puis fusionnés, testés sur localhost (Master) et recettés par Théo : (1) **widgets du bureau v2** qui
   bougeaient au redimensionnement (`ui2/os/engine/widgets.ts` : la disposition ENREGISTRÉE est la référence, `computeView()`

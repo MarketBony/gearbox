@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bowling — Bony auto-mobile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;600;800&family=Bowlby+One+SC&family=Syncopate:wght@700&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<style>
+  /* ---------------------------------------------------------------- charte : Bony auto-mobile (défaut) */
+  :root {
+    --orange: #f75632; --violet: #8f12ab; --nuit: #293f74; --nuit-fonce: #1a2a52; --noir: #000;
+    --deg: linear-gradient(90deg, #f75632 0%, #8f12ab 100%);
+    --panneau: rgba(20, 31, 64, .86); --panneau-bord: rgba(255, 255, 255, .14);
+    --carte: #ffffff; --carte-texte: #293f74; --carte-trait: #dfe4ef; --carte-pale: #f3f5fa;
+    --accent: #f75632; --accent2: #8f12ab;
+    --titre: 'Syncopate', 'Arial Black', Arial, sans-serif; --texte: 'Albert Sans', Arial, sans-serif;
+    --case: clamp(30px, 3.3vw, 52px);
+  }
+  /* ---------------------------------------------------------------- thème Grève CGT */
+  body[data-theme="cgt"] {
+    --deg: linear-gradient(90deg, #e3001b 0%, #b30015 100%);
+    --panneau: rgba(40, 8, 12, .88); --panneau-bord: rgba(255, 255, 255, .2);
+    --carte-texte: #2b2d31; --carte-trait: #f0d6d9; --carte-pale: #fbf1f2;
+    --accent: #e3001b; --accent2: #e3001b; --nuit: #b30015; --nuit-fonce: #8f0010;
+    --titre: 'Bowlby One SC', Impact, 'Arial Black', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1328; color: #fff; font-family: var(--texte); -webkit-user-select: none; user-select: none; }
+  #scene { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; cursor: grab; }
+  body.geste #scene { cursor: grabbing; }
+  .hud { position: fixed; pointer-events: none; z-index: 2; }
+  .hud .clic { pointer-events: auto; }
+  button { font: 600 13px var(--texte); color: inherit; cursor: pointer; }
+
+  /* ---------------------------------------------------------------- bandeau du haut : marque + réglages */
+  #haut { left: 12px; right: 12px; top: 10px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  #marque { display: flex; align-items: center; gap: 12px; background: var(--panneau); border: 1px solid var(--panneau-bord); border-radius: 14px; padding: 8px 14px; }
+  #marque img { height: 26px; width: auto; display: block; }
+  body[data-theme="cgt"] #marque img { height: 34px; }
+  #marque .titre { font: 700 13px var(--titre); letter-spacing: .5px; text-transform: lowercase; background: var(--deg); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  body[data-theme="cgt"] #marque .titre { text-transform: uppercase; color: #fff; background: none; font-size: 15px; letter-spacing: .3px; }
+  #reglages { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 70vw; }
+  .groupe { display: flex; background: var(--panneau); border: 1px solid var(--panneau-bord); border-radius: 999px; padding: 3px; }
+  .groupe button { border: 0; background: transparent; border-radius: 999px; padding: 6px 12px; white-space: nowrap; color: rgba(255,255,255,.82); }
+  .groupe button:hover { color: #fff; background: rgba(255,255,255,.08); }
+  .groupe button.actif { background: var(--deg); color: #fff; }
+  .groupe button.seul { display: flex; align-items: center; gap: 6px; }
+  .groupe svg { width: 16px; height: 16px; display: block; }
+
+  /* ---------------------------------------------------------------- feuille de score */
+  #feuille { left: 50%; top: 64px; transform: translateX(-50%); display: grid; gap: 4px; }
+  .ligne { display: flex; align-items: stretch; background: var(--carte); color: var(--carte-texte); border-radius: 10px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,.28); opacity: .8; transition: opacity .25s, transform .25s; }
+  .ligne.actif { opacity: 1; transform: scale(1.0); box-shadow: 0 0 0 2px var(--accent), 0 8px 22px rgba(0,0,0,.35); }
+  .ligne .nom { width: calc(var(--case) * 2.3); display: flex; align-items: center; gap: 6px; padding: 0 10px; font-weight: 800; font-size: clamp(11px, 1vw, 15px); background: var(--nuit); color: #fff; white-space: nowrap; }
+  .ligne.actif .nom { background: var(--deg); }
+  .ligne .nom i { width: 8px; height: 8px; border-radius: 50%; background: #fff; opacity: 0; flex: none; }
+  .ligne.actif .nom i { opacity: 1; animation: pouls 1.2s ease-in-out infinite; }
+  @keyframes pouls { 50% { transform: scale(.55); } }
+  .fr { width: var(--case); border-left: 1px solid var(--carte-trait); display: flex; flex-direction: column; }
+  .fr.der { width: calc(var(--case) * 1.5); }
+  .fr .num { font-size: 10px; font-weight: 600; text-align: center; color: #fff; background: var(--nuit-fonce); line-height: 15px; opacity: .85; }
+  .fr .ls { display: flex; justify-content: flex-end; height: calc(var(--case) * .44); }
+  .fr .ls span { width: calc(var(--case) * .46); border-left: 1px solid var(--carte-trait); border-bottom: 1px solid var(--carte-trait); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: clamp(11px, 1vw, 15px); }
+  .fr.der .ls span { width: calc(var(--case) * .5); }
+  .fr .ls span.x { color: var(--accent); }
+  .fr .ls span.sp { color: var(--accent2); }
+  .fr .cu { flex: 1; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: clamp(13px, 1.25vw, 19px); min-height: calc(var(--case) * .48); }
+  .fr.cour { background: var(--carte-pale); box-shadow: inset 0 -3px 0 var(--accent); }
+  .ligne .tot { width: calc(var(--case) * 1.35); display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--nuit); color: #fff; font-weight: 800; font-size: clamp(16px, 1.6vw, 24px); border-left: 1px solid var(--carte-trait); }
+  .ligne .tot small { font-size: 9px; font-weight: 600; opacity: .7; text-transform: uppercase; letter-spacing: .6px; }
+
+  /* ---------------------------------------------------------------- bas gauche : quilles restantes, frame, joueur */
+  #etat { left: 12px; bottom: 12px; display: flex; gap: 12px; align-items: center; background: var(--panneau); border: 1px solid var(--panneau-bord); border-radius: 16px; padding: 10px 14px; }
+  #schema { width: 86px; height: 78px; display: block; }
+  #schema circle { transition: fill .25s, stroke .25s, opacity .25s; }
+  #schema .debout { fill: #fff; stroke: var(--accent); stroke-width: 2.5; }
+  #schema .tombee { fill: transparent; stroke: rgba(255,255,255,.28); stroke-width: 1.5; }
+  #schema .vient { fill: var(--accent); stroke: #fff; stroke-width: 1.5; opacity: .9; }
+  #etat .infos { display: grid; gap: 2px; min-width: 120px; }
+  #etat .qui { font-weight: 800; font-size: 17px; }
+  #etat .ou { font-size: 13px; opacity: .8; }
+  #etat .ou b { font-weight: 800; opacity: 1; }
+  #etat .reste { font-size: 12px; opacity: .65; }
+
+  /* ---------------------------------------------------------------- bas centre : visée et aide */
+  #bas { left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: calc(100vw - 24px); }
+  #pave { display: flex; gap: 6px; align-items: center; background: var(--panneau); border: 1px solid var(--panneau-bord); border-radius: 999px; padding: 4px; transition: opacity .25s; }
+  #pave button { width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255,255,255,.1); display: grid; place-items: center; }
+  #pave button:hover { background: rgba(255,255,255,.2); }
+  #pave button svg { width: 18px; height: 18px; }
+  #pave .lecture { font-size: 12px; min-width: 150px; text-align: center; line-height: 1.25; opacity: .9; }
+  #pave .lecture b { font-weight: 800; }
+  #pave .sep { width: 1px; height: 22px; background: rgba(255,255,255,.2); }
+  #aide { font-size: 13px; background: rgba(0,0,0,.42); border-radius: 999px; padding: 6px 14px; text-align: center; transition: opacity .3s; }
+  #aide b { font-weight: 800; }
+  body:not(.visee) #pave { opacity: 0; pointer-events: none; }
+
+  /* ---------------------------------------------------------------- bas droite : jauge du geste */
+  #jauge { right: 16px; bottom: 16px; width: 14px; height: 150px; border-radius: 999px; background: rgba(0,0,0,.4); border: 1px solid var(--panneau-bord); overflow: hidden; opacity: 0; transition: opacity .2s; }
+  #jauge div { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(0deg, var(--accent), var(--accent2)); }
+  body.geste #jauge { opacity: 1; }
+
+  /* ---------------------------------------------------------------- retour après le lâcher */
+  #retour { left: 50%; top: 58%; transform: translate(-50%, 0) scale(.9); opacity: 0; transition: opacity .25s, transform .35s cubic-bezier(.2,1.5,.4,1); background: var(--panneau); border: 1px solid var(--panneau-bord); border-radius: 16px; padding: 10px 18px; display: flex; gap: 16px; align-items: center; white-space: nowrap; }
+  #retour.vu { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  #retour .kmh { font: 800 30px var(--texte); line-height: 1; }
+  #retour .kmh small { font-size: 13px; font-weight: 600; opacity: .7; margin-left: 3px; }
+  #retour .det { display: grid; gap: 2px; font-size: 13px; }
+  #retour .det b { font-weight: 800; }
+  #retour .barre { width: 120px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.18); position: relative; margin-top: 3px; }
+  #retour .barre i { position: absolute; top: -3px; width: 11px; height: 11px; border-radius: 50%; background: #fff; margin-left: -5.5px; box-shadow: 0 0 0 2px var(--accent); }
+  #retour .barre::after { content: ''; position: absolute; left: 50%; top: -2px; width: 1px; height: 9px; background: rgba(255,255,255,.5); }
+
+  /* ---------------------------------------------------------------- annonce */
+  #annonce { left: 50%; top: 38%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
+  #annonce .gros { font: 700 clamp(40px, 7.5vw, 104px) var(--titre); letter-spacing: 1px; text-transform: lowercase; background: var(--deg); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 4px 0 rgba(255,255,255,.9)) drop-shadow(0 10px 24px rgba(0,0,0,.45)); opacity: 0; transform: scale(.3); line-height: 1.05; white-space: nowrap; }
+  body[data-theme="cgt"] #annonce .gros { text-transform: uppercase; background: none; color: #fff; -webkit-text-stroke: 3px #e3001b; paint-order: stroke fill; filter: drop-shadow(0 6px 0 #8f0010) drop-shadow(0 12px 26px rgba(0,0,0,.5)); }
+  #annonce .petit { margin-top: 8px; font: 800 clamp(16px, 2vw, 24px) var(--texte); text-shadow: 0 2px 10px rgba(0,0,0,.6); opacity: 0; }
+  body[data-theme="cgt"] #annonce .petit { display: inline-block; margin-top: 12px; padding: 6px 16px; background: #e3001b; color: #fff; border-radius: 6px; font: 400 clamp(15px, 1.8vw, 24px) 'Bowlby One SC', Impact, sans-serif; letter-spacing: .3px; text-shadow: none; box-shadow: 0 6px 18px rgba(0,0,0,.35); max-width: 80vw; white-space: normal; }
+  body[data-theme="cgt"] #annonce .petit:empty { display: none; }
+  #annonce.vu .gros { animation: pop .55s cubic-bezier(.2,1.6,.4,1) forwards; }
+  #annonce.vu .petit { animation: fondu .4s .2s forwards; }
+  #annonce.part .gros, #annonce.part .petit { animation: sortie .35s forwards; }
+  @keyframes pop { from { opacity: 0; transform: scale(.3) rotate(-4deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+  @keyframes fondu { to { opacity: 1; } }
+  @keyframes sortie { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(1.15); } }
+
+  /* ---------------------------------------------------------------- écran de fin */
+  #fin { inset: 0; display: grid; place-items: center; background: rgba(8, 12, 28, .55); opacity: 0; pointer-events: none; transition: opacity .4s; z-index: 5; }
+  #fin.vu { opacity: 1; pointer-events: auto; }
+  #fin .boite { background: #fff; color: var(--carte-texte); border-radius: 22px; padding: 26px 34px 24px; min-width: min(420px, 90vw); text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.45); position: relative; overflow: hidden; }
+  #fin .boite::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px; background: var(--deg); }
+  #fin img { height: 30px; margin-bottom: 10px; }
+  body[data-theme="cgt"] #fin img { height: 46px; }
+  #fin h2 { margin: 0 0 4px; font: 700 22px var(--titre); text-transform: lowercase; background: var(--deg); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  body[data-theme="cgt"] #fin h2 { text-transform: uppercase; color: #e3001b; background: none; font-size: 26px; }
+  #fin .vainqueur { font-size: 20px; font-weight: 800; margin: 6px 0 14px; }
+  #fin .scores { display: grid; gap: 6px; margin-bottom: 18px; }
+  #fin .scores div { display: flex; justify-content: space-between; gap: 30px; padding: 8px 14px; border-radius: 10px; background: var(--carte-pale); font-weight: 600; }
+  #fin .scores div.gagne { background: var(--deg); color: #fff; font-weight: 800; }
+  #fin .scores b { font-weight: 800; }
+  #fin button { border: 0; border-radius: 999px; padding: 11px 28px; background: var(--deg); color: #fff; font-weight: 800; font-size: 15px; }
+  #fin .signature { margin-top: 14px; font-size: 11px; opacity: .6; letter-spacing: .4px; }
+
+  /* ---------------------------------------------------------------- chargement */
+  #chargement { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #22346a, #0d1328 70%); transition: opacity .5s; }
+  #chargement.fini { opacity: 0; pointer-events: none; }
+  #chargement .boite { display: grid; justify-items: center; gap: 16px; text-align: center; }
+  #chargement img { width: 220px; height: auto; }
+  #chargement .titre { font: 700 18px 'Syncopate', Arial, sans-serif; letter-spacing: 1px; background: linear-gradient(90deg, #f75632, #8f12ab); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #chargement .barre { width: 240px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+  #chargement .barre div { height: 100%; width: 0; background: linear-gradient(90deg, #f75632, #8f12ab); transition: width .4s; }
+  #chargement .etape { font-size: 13px; opacity: .75; min-height: 18px; }
+  #chargement .erreur { color: #ffb4a6; font-size: 13px; max-width: 360px; }
+
+  /* ---------------------------------------------------------------- petits écrans */
+  @media (max-width: 1250px) { #feuille { top: 108px; } }
+  @media (max-height: 520px) {
+    #feuille { --case: 30px; }
+    #etat { padding: 6px 10px; } #schema { width: 56px; height: 51px; } #etat .reste { display: none; }
+    #aide { display: none; }
+  }
+  @media (max-width: 900px) and (orientation: portrait) {
+    #feuille { top: auto; bottom: 150px; }
+  }
+  @media (max-width: 900px) {
+    #reglages .groupe button { padding: 6px 9px; font-size: 12px; }
+    #marque .titre { display: none; }
+  }
+  @media (max-width: 640px) {
+    #etat { padding: 8px 10px; gap: 8px; bottom: 96px; }
+    #schema { width: 62px; height: 56px; }
+    #etat .infos { min-width: 0; }
+    #etat .qui { font-size: 14px; }
+    #aide { font-size: 11px; }
+    #feuille { bottom: 190px; }
+  }
+</style>
+</head>
+<body data-theme="bony" class="">
+<canvas id="scene" aria-label="Piste de bowling"></canvas>
+
+<div class="hud" id="haut">
+  <div id="marque"><img id="logo" src="assets/logo-bony-white.svg" alt="Bony auto-mobile"><span class="titre">bowling</span></div>
+  <div id="reglages" class="clic">
+    <div class="groupe" role="group" aria-label="Thème">
+      <button data-theme="bony" class="actif">Bony auto-mobile</button><button data-theme="cgt">Grève CGT</button>
+    </div>
+    <div class="groupe" role="group" aria-label="Joueurs">
+      <button data-joueurs="1" class="actif">1 joueur</button><button data-joueurs="2">2 joueurs</button>
+    </div>
+    <div class="groupe" role="group" aria-label="Frames">
+      <button data-frames="10" class="actif">10 frames</button><button data-frames="5">5 frames</button>
+    </div>
+    <div class="groupe"><button id="bSon" class="seul" aria-pressed="false"></button></div>
+    <div class="groupe"><button id="bNouvelle">Nouvelle partie</button></div>
+  </div>
+</div>
+
+<div class="hud" id="feuille"></div>
+
+<div class="hud" id="etat">
+  <svg id="schema" viewBox="0 0 86 78" aria-label="Quilles debout"></svg>
+  <div class="infos"><div class="qui" id="qui">Joueur 1</div><div class="ou" id="ou">Frame <b>1</b> / 10 · 1<sup>er</sup> lancer</div><div class="reste" id="reste">10 quilles debout</div></div>
+</div>
+
+<div class="hud" id="bas">
+  <div id="pave" class="clic">
+    <button data-pas="-1" title="Se décaler à gauche (←)" aria-label="Se décaler à gauche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button data-pas="1" title="Se décaler à droite (→)" aria-label="Se décaler à droite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+    <div class="lecture" id="lectureVisee"></div>
+    <button data-vise="-1" title="Viser plus à gauche (Maj + ← ou molette)" aria-label="Viser plus à gauche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7H5V3"/><path d="M5.6 7A8 8 0 1 1 4 12"/></svg></button>
+    <button data-vise="1" title="Viser plus à droite (Maj + → ou molette)" aria-label="Viser plus à droite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h4V3"/><path d="M18.4 7A8 8 0 1 0 20 12"/></svg></button>
+  </div>
+  <div id="aide"></div>
+</div>
+
+<div class="hud" id="jauge"><div></div></div>
+<div class="hud" id="retour"></div>
+<div class="hud" id="annonce"><div class="gros"></div><div class="petit"></div></div>
+
+<div class="hud" id="fin"><div class="boite clic">
+  <img id="finLogo" src="assets/logo-bony-color.svg" alt="">
+  <h2 id="finTitre">partie terminée</h2>
+  <div class="vainqueur" id="finVainqueur"></div>
+  <div class="scores" id="finScores"></div>
+  <button id="bRejouer">Rejouer</button>
+  <div class="signature" id="finSignature">Génération auto-mobile</div>
+</div></div>
+
+<div id="chargement">
+  <div class="boite">
+    <img src="assets/logo-bony-white.svg" alt="Bony auto-mobile">
+    <div class="titre">bowling</div>
+    <div class="barre"><div id="chBarre"></div></div>
+    <div class="etape" id="chEtape">Préparation de la salle…</div>
+    <div class="erreur" id="chErreur"></div>
+  </div>
+</div>
+
+<script type="module">
+  // Import daté : le serveur de maquettes ne coupe pas le cache, on veut toujours la dernière version des modules
+  // (jeu.js propage ce suffixe à rendu.js, son.js, regles.js, physique.js et au Worker).
+  import('./jeu.js?v=' + Date.now()).catch((e) => {
+    document.getElementById('chErreur').textContent = 'Le jeu n’a pas pu démarrer : ' + (e && e.message || e);
+    console.error(e);
+  });
+</script>
+</body>
+</html>
