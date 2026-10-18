@@ -36,6 +36,11 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [x] **SPARK : le worker n'archivait aucun fichier du dépôt SFTP** (trouvé au test de dépôt du 15/10, avant le premier envoi
   DCS). `rename` de `/depot` vers `/archive` → `EXDEV` (deux montages) : fichier laissé dans le dépôt, tour interrompu, **le
   fichier suivant jamais importé** (le VO derrière le VN). Correctif 87 : copie + suppression, erreur isolée par fichier.
+- [x] **Jeux : notification push d'un défi de minigolf sans nom de jeu** — corrigé au correctif 94 (`realtime/index.ts`).
+- [x] **Jeux : deux coups envoyés coup sur coup pouvaient lire le même plateau** — verrou par partie, correctif 94.
+- [ ] **Bowling : Brooklyn encore généreux (30 % de strikes, cible 25 %)** et boule lente encore moins déviée qu'une rapide —
+  limites du moteur (mélange des quilles), noté au correctif 94.
+- [ ] **Bowling : duel à deux comptes jamais joué avant la prod** (correctif 94) — recette de Théo en prod.
 - [ ] **VPS : connexion SSH par mot de passe ouverte à TOUS les comptes** (constaté le 15/10) : `50-cloud-init.conf` (19/06) met
   `PasswordAuthentication yes` (ubuntu compris ; root `prohibit-password`), pas de fail2ban. Seul `dcs` en a besoin (bloc `Match`
   du `70-dcs-sftp.conf`). À arbitrer par Théo : passer le global à `no` (clé seule pour ubuntu), après `sshd -t`, session ouverte.

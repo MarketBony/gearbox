@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bowling — démo du rendu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;600;800&family=Bowlby+One+SC&family=Syncopate:wght@700&display=swap" rel="stylesheet">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<style>
+  :root { --nuit: #293f74; }
+  html, body { margin: 0; height: 100%; background: #0d1328; overflow: hidden; font-family: "Albert Sans", Arial, sans-serif; color: #fff; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #panneau { position: fixed; top: 10px; left: 10px; width: 270px; max-height: calc(100vh - 20px); overflow: auto; background: rgba(13, 19, 40, .82); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; padding: 10px 12px; font-size: 13px; backdrop-filter: blur(6px); }
+  #panneau h1 { font: 700 13px Syncopate, Arial; margin: 0 0 8px; letter-spacing: .5px; background: linear-gradient(90deg, #f75632, #8f12ab); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .rangee { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; }
+  .titre { font-weight: 800; opacity: .75; font-size: 11px; text-transform: uppercase; letter-spacing: .6px; }
+  button { font: 600 12px "Albert Sans", Arial; background: #23346a; color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 7px; padding: 4px 8px; cursor: pointer; }
+  button:hover { background: #31488f; } button.actif { background: linear-gradient(90deg, #f75632, #8f12ab); border-color: transparent; }
+  button.gros { width: 100%; padding: 7px; font-size: 13px; background: linear-gradient(90deg, #f75632, #8f12ab); }
+  label { display: flex; align-items: center; gap: 6px; margin: 3px 0; } input[type=range] { flex: 1; }
+  #stats { position: fixed; right: 10px; top: 10px; font: 600 12px "Albert Sans", Arial; background: rgba(0,0,0,.45); padding: 4px 8px; border-radius: 6px; }
+  #chargement { position: fixed; inset: 0; display: grid; place-items: center; font: 700 16px Syncopate, Arial; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="chargement">chargement…</div>
+<div id="stats">—</div>
+<div id="panneau" hidden>
+  <h1>démo rendu bowling</h1>
+  <button class="gros" id="lancer">Lancer (démo complète)</button>
+  <div class="rangee" style="margin-top:6px">
+    <label style="margin:0"><input type="radio" name="sc" value="strike" checked> strike</label>
+    <label style="margin:0"><input type="radio" name="sc" value="split"> 7-10</label>
+    <label style="margin:0"><input type="radio" name="sc" value="gouttiere"> gouttière</label>
+  </div>
+  <label><input type="checkbox" id="boucle"> enchaîner les lancers</label>
+  <div class="titre">Thème</div>
+  <div class="rangee"><button data-theme="bony">Bony auto-mobile</button><button data-theme="cgt">Grève CGT</button></div>
+  <div class="titre">Caméra</div>
+  <div class="rangee"><button data-cam="visee">visée</button><button data-cam="suivi">suivi</button><button data-cam="quilles">quilles</button><button data-cam="celebration">célébration</button></div>
+  <div class="titre">Visée (joueur.placer)</div>
+  <label>position <input type="range" id="pos" min="-0.45" max="0.45" step="0.01" value="0.25"></label>
+  <label>angle <input type="range" id="ang" min="-0.08" max="0.08" step="0.002" value="-0.012"></label>
+  <div class="titre">Geste (joueur.elan)</div>
+  <label><select id="phase"><option>attente</option><option>approche</option><option>arriere</option><option>avant</option><option>suivi</option></select>
+    <input type="range" id="tphase" min="0" max="1" step="0.01" value="0"></label>
+  <div class="titre">Réactions</div>
+  <div class="rangee"><button data-rea="strike">strike</button><button data-rea="spare">spare</button><button data-rea="bon">bon</button><button data-rea="rate">raté</button><button data-rea="gouttiere">gouttière</button></div>
+  <div class="titre">Effets</div>
+  <div class="rangee"><button data-eff="secousse">secousse</button><button data-eff="eclats">éclats</button><button data-eff="strike">strike</button><button data-eff="spare">spare</button><button data-eff="confettis">confettis</button></div>
+</div>
+<script type="module">
+// import daté : le serveur de maquettes ne coupe pas le cache, on veut toujours la dernière version de rendu.js
+const { creerRendu } = await import('./rendu.js?v=' + Date.now());
+
+// ---- simulation FACTICE (la vraie est physique.js) : même format d'images que le contrat ----
+function graine(s) { s = s >>> 0 || 1; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+const EMPL = [[1, 0, 0], [2, 1, 1], [3, -1, 1], [4, 2, 2], [5, 0, 2], [6, -2, 2], [7, 3, 3], [8, 1, 3], [9, -1, 3], [10, -3, 3]].map(([n, c, r]) => ({ n, x: c * 0.1524, z: 18.29 + r * 0.264, rot: 0 }));
+function quatAxe(ax, ay, az, a) { const s = Math.sin(a / 2); return [ax * s, ay * s, az * s, Math.cos(a / 2)]; }
+function mulQ(a, b) { return [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1], a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0], a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3], a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]]; }
+function simulerFactice(scenario, xJoueur) {
+  const R = 0.1085, v = scenario === 'gouttiere' ? 6.5 : 8.2, r = graine(scenario.length * 97 + 3), images = [], x0 = -xJoueur;
+  const xImpact = scenario === 'split' ? 0.0 : -0.065;
+  let q = [0, 0, 0, 1], impactT = null, t = 0; const dt = 1 / 60, debout = EMPL.map((e) => ({ ...e }));
+  const etats = debout.map((e) => ({ ...e, td: null, dir: 0, vit: 0 }));
+  let bx = x0, by = R, bz = 0;
+  while (t < 4.2) {
+    t += dt; const zPrec = bz;
+    if (bz < 20.4) bz += v * dt * (bz > 18 ? 0.75 : 1);
+    if (scenario === 'gouttiere') { bx = x0 - Math.min(1, bz / 7) ** 1.6 * (0.64 + x0); by = bz > 6 ? R - 0.11 * Math.min(1, (bz - 6) / 1.5) : R; }
+    else { const u = Math.min(1, bz / 18.29); bx = x0 + (xImpact - x0) * u ** 2.6; by = R; }
+    if (bz > 19.4) by = Math.max(-0.2, by - (bz - 19.4) * 0.3);
+    const d = bz - zPrec; q = mulQ(quatAxe(1, 0, 0, d / R), q); // roulement vers +z
+    if (scenario !== 'gouttiere') {
+      etats.forEach((e) => {
+        const dx = e.x - bx, dz = e.z - bz;
+        if (e.td === null && Math.hypot(dx, dz) < 0.17 && !(scenario === 'split' && (e.n === 7 || e.n === 10))) { e.td = t; e.dir = Math.atan2(dz + 0.12, dx * 1.6); e.vit = 1.4 + r() * 1.5; impactT ??= t; }
+      });
+      // réaction en chaîne : les quilles touchées renversent leurs voisines
+      etats.forEach((e) => { if (e.td === null && !(scenario === 'split' && (e.n === 7 || e.n === 10))) etats.forEach((o) => { if (o.td !== null && t - o.td > 0.05 && Math.hypot(o.x + Math.cos(o.dir) * o.vit * (t - o.td) * 0.5 - e.x, o.z + Math.sin(o.dir) * o.vit * (t - o.td) * 0.5 - e.z) < 0.14) { e.td = t; e.dir = o.dir + (r() - 0.5) * 1.4; e.vit = o.vit * 0.8; } }); });
+    }
+    const quilles = etats.map((e) => {
+      if (e.td === null) return [e.x, 0, e.z, 0, 0, 0, 1];
+      const s = t - e.td, a = Math.min(Math.PI / 2, s * 7), dist = e.vit * (1 - Math.exp(-s * 2)) * 0.6;
+      const px = e.x + Math.cos(e.dir) * dist, pz = e.z + Math.sin(e.dir) * dist;
+      const axe = [Math.sin(e.dir), 0, -Math.cos(e.dir)], qq = quatAxe(axe[0], 0, axe[2], a);
+      const fosse = pz > 19.32 ? Math.min(0.28, (pz - 19.32) * 1.5) : 0;
+      return [px, Math.sin(a) * 0.055 - fosse, pz, ...qq];
+    });
+    images.push({ t, boule: [bx, by, bz, ...q], quilles });
+  }
+  const restent = etats.filter((e) => e.td === null).map(({ n, x, z }) => ({ n, x, z, rot: 0 }));
+  return { images, impactT, restent, tombees: 10 - restent.length, gouttiere: scenario === 'gouttiere' };
+}
+
+// ---- démo ----
+const canvas = document.getElementById('c');
+const R = await creerRendu(canvas, { theme: 'bony' });
+window.R = R;
+document.getElementById('chargement').remove(); document.getElementById('panneau').hidden = false;
+const ajuster = () => R.redimensionner(innerWidth, innerHeight); addEventListener('resize', ajuster); ajuster();
+const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+const majBoutons = () => { $$('[data-theme]').forEach((b) => b.classList.toggle('actif', b.dataset.theme === R.theme)); };
+$$('[data-theme]').forEach((b) => b.onclick = () => { R.setTheme(b.dataset.theme); majBoutons(); }); majBoutons();
+$$('[data-cam]').forEach((b) => b.onclick = () => R.camera(b.dataset.cam));
+$$('[data-rea]').forEach((b) => b.onclick = () => { demo = null; R.camera('celebration'); R.joueur.reaction(b.dataset.rea); });
+$$('[data-eff]').forEach((b) => b.onclick = () => R.effet(b.dataset.eff, b.dataset.eff === 'secousse' ? { force: 1.5 } : b.dataset.eff === 'eclats' ? { x: 0, y: 0.2, z: 18.3, force: 900 } : {}));
+const placer = () => { R.joueur.placer(+$('#pos').value, +$('#ang').value); R.boule.enMain(true); };
+$('#pos').oninput = $('#ang').oninput = () => { demo = null; placer(); R.camera('visee'); };
+$('#phase').onchange = $('#tphase').oninput = () => { demo = null; R.boule.enMain(true); R.joueur.elan($('#phase').value, +$('#tphase').value); };
+placer();
+
+let demo = null;
+function lancerDemo() {
+  const sc = $('input[name=sc]:checked').value;
+  R.poserQuilles(EMPL); placer(); R.camera('visee'); R.joueur.elan('attente', 0);
+  demo = { sc, t: 0, etape: 'attente', sim: simulerFactice(sc, +$('#pos').value), lu: 0, fait: {} };
+}
+$('#lancer').onclick = lancerDemo;
+
+function avancerDemo(dt) {
+  const d = demo; d.t += dt;
+  const DUR = { attente: 0.7, approche: 0.95, arriere: 0.45, avant: 0.42 };
+  if (d.etape in DUR) {
+    const t = Math.min(1, d.t / DUR[d.etape]); R.joueur.elan(d.etape, t);
+    if (t >= 1) {
+      const suite = { attente: 'approche', approche: 'arriere', arriere: 'avant', avant: 'roule' }[d.etape]; d.etape = suite; d.t = 0;
+      if (suite === 'roule') { R.boule.enMain(false); R.lecture(d.sim.images, d.sim.impactT); R.camera('suivi'); d.temps = 0; }
+    }
+    return;
+  }
+  if (d.etape === 'roule') {
+    R.joueur.elan('suivi', Math.min(1, d.t / 0.7));
+    const im = d.sim.images, ti = d.sim.impactT ?? 99;
+    const ralenti = d.temps > ti - 0.12 && d.temps < ti + 0.6 ? 0.3 : 1;
+    if (d.temps > ti - 0.35 && !d.fait.cam) { d.fait.cam = true; R.camera('quilles'); }
+    d.temps += dt * ralenti;
+    if (d.temps >= ti && !d.fait.impact) { d.fait.impact = true; R.effet('eclats', { x: 0, y: 0.2, z: 18.3, force: 1200 }); R.effet('secousse', { force: 1.2 }); }
+    const i = Math.min(im.length - 1, Math.floor(d.temps * 60));
+    R.image(im[i], dt * ralenti);
+    if (i >= im.length - 1) {
+      const sc = d.sim, res = sc.gouttiere ? 'gouttiere' : sc.tombees === 10 ? 'strike' : sc.tombees >= 7 ? 'bon' : 'rate';
+      if (res === 'strike') R.effet('strike'); else if (res === 'bon') R.effet('confettis', { n: 60 });
+      R.camera('celebration'); R.joueur.reaction(res); d.etape = 'fete'; d.t = 0; d.res = sc.restent;
+    }
+    return;
+  }
+  if (d.etape === 'fete' && d.t > 3.6) {
+    if ($('#boucle').checked) { const s = ['strike', 'split', 'gouttiere']; $$('input[name=sc]').find((x) => x.value === s[(s.indexOf(d.sc) + 1) % 3]).checked = true; lancerDemo(); }
+    else { demo = null; R.poserQuilles(EMPL); placer(); R.camera('visee'); }
+  }
+}
+
+let avant = performance.now(), nImg = 0, cumul = 0;
+function boucle(maintenant) {
+  const dt = Math.min(0.1, (maintenant - avant) / 1000); avant = maintenant;
+  if (demo) avancerDemo(dt);
+  R.rendre(dt);
+  nImg++; cumul += dt; if (cumul > 0.5) { $('#stats').textContent = `${Math.round(nImg / cumul)} i/s · qualité ${R.debug.qualite.niveau} · ${R.debug.renderer.info.render.calls} appels`; nImg = 0; cumul = 0; }
+  requestAnimationFrame(boucle);
+}
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>

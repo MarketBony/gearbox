@@ -1678,3 +1678,12 @@ est le bon comportement (`restart: always` côté Docker).
   les tâches libres où il figure dans `assignedUserIds` (filtre serveur). Écriture inchangée (`EDIT_ROLES`).
 - **`FixedExpense.provider String?`** (migration `20261016121000_expense_provider`) : accepté en POST/PUT (`fixedExpenses.ts`,
   liste explicite du PUT), rogné à 200 caractères, vide → `null`.
+
+## Correctif 94 (18/10/2026) — bowling (5e jeu)
+- `'bowling'` dans `GAME_TYPES` (`utils/gameRules.ts`) ; règles `games/bowlingRules.ts` : coup = `{ position, angle, vitesse,
+  effet, lacher }` (bornes du contrat, nombres finis, sinon refus) ; simulation par le moteur partagé `games/bowling/`
+  (COPIE de `shared/bowling/`, contrôlée par `scripts/check-bowling-sync.mjs`) ; Rapier (`@dimforge/rapier3d-deterministic-compat`
+  0.21.0, WASM embarqué) chargé à la PREMIÈRE partie de bowling, pas au démarrage. Options du défi (`theme`, `frames` 5|10) dans
+  `GameChallenge.options`. Plateau : lancers par joueur, quilles debout (positions arrondies), compteur, dernier lancer.
+- `realtime/games.ts` : verrou « un coup à la fois par partie » (tous les jeux) — deux coups simultanés lisaient le même plateau.
+- `realtime/index.ts` : nom du jeu ajouté pour minigolf et bowling dans la notification push de défi (manquait pour le minigolf).

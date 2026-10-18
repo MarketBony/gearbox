@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bowling Gearbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<!-- Prototype (16/10/2026) : bowling 3D low-poly façon Wii Sports. Moteur pur et déterministe dans bowling-moteur.js
+     (deviendra shared/bowling.ts, partagé avec le serveur comme le minigolf). Ici : rendu three.js, contrôles, score. -->
+<style>
+  :root { --bleu: #2a8cf0; --bleu2: #1366c4; --or: #ffc21a; --txt: #1d2b3a; --blanc: #fff; --acc: #f75632; --acc2: #a52fce; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd4ff; font-family: 'Baloo 2', system-ui, sans-serif; color: var(--txt); }
+  canvas { display: block; touch-action: none; }
+  .hud { position: fixed; pointer-events: none; }
+  #score { top: 12px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; }
+  .ligne { display: flex; align-items: stretch; background: rgba(255,255,255,.92); border-radius: 14px; box-shadow: 0 6px 18px rgba(20,60,120,.25); overflow: hidden; border: 3px solid rgba(255,255,255,.9); }
+  .ligne.on { border-color: var(--or); box-shadow: 0 0 0 3px rgba(255,194,26,.35), 0 6px 18px rgba(20,60,120,.25); }
+  .nom { background: linear-gradient(180deg, var(--bleu), var(--bleu2)); color: #fff; font-weight: 800; padding: 0 12px; display: flex; align-items: center; min-width: 78px; font-size: 15px; }
+  .fr { width: 50px; border-left: 2px solid #dbe6f2; display: flex; flex-direction: column; }
+  .fr.der { width: 70px; }
+  .fr.cur { background: #fff6d6; }
+  .lc { display: flex; justify-content: flex-end; height: 20px; }
+  .lc span { width: 22px; text-align: center; font-weight: 800; font-size: 14px; border-left: 2px solid #e7eef6; border-bottom: 2px solid #e7eef6; line-height: 20px; }
+  .lc span.x { color: #e0392b; } .lc span.s { color: var(--bleu2); }
+  .tt { text-align: center; font-weight: 800; font-size: 16px; height: 22px; line-height: 22px; }
+  .tot { min-width: 58px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; background: #eef5fc; border-left: 2px solid #dbe6f2; }
+  #msg { inset: 0; display: flex; align-items: center; justify-content: center; }
+  #msg div { font-size: 92px; font-weight: 800; color: #fff; -webkit-text-stroke: 4px var(--bleu2); paint-order: stroke fill; text-shadow: 0 8px 0 rgba(10,40,90,.25); transform: scale(0); transition: transform .35s cubic-bezier(.2,1.6,.4,1); text-align: center; line-height: 1; }
+  #msg div.on { transform: scale(1); }
+  #msg div.strike { color: var(--or); -webkit-text-stroke-color: #c0392b; }
+  #msg div small { display: block; font-size: 34px; -webkit-text-stroke-width: 2px; margin-top: 8px; }
+  #aide { left: 50%; bottom: 18px; transform: translateX(-50%); background: rgba(255,255,255,.9); border-radius: 999px; padding: 8px 20px; font-weight: 700; font-size: 16px; box-shadow: 0 6px 18px rgba(20,60,120,.2); white-space: nowrap; }
+  #aide b { color: var(--bleu2); }
+  #info { left: 18px; bottom: 70px; background: rgba(255,255,255,.88); border-radius: 14px; padding: 8px 14px; font-weight: 700; font-size: 15px; opacity: 0; transition: opacity .3s; }
+  #info.on { opacity: 1; }
+  #mini { right: 18px; top: 14px; width: 92px; height: 84px; background: rgba(255,255,255,.88); border-radius: 14px; box-shadow: 0 6px 18px rgba(20,60,120,.2); }
+  #mini i { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid #7a8da3; transform: translate(-50%, -50%); }
+  #mini i.down { background: #d7e0ea; border-color: #d7e0ea; }
+  #mini i.up { background: #fff; border-color: var(--bleu2); box-shadow: 0 0 0 2px rgba(42,140,240,.25); }
+  #barre { left: 18px; top: 14px; display: flex; gap: 8px; pointer-events: auto; flex-wrap: wrap; max-width: 280px; }
+  #barre button { font: inherit; font-weight: 800; font-size: 14px; border: 0; border-radius: 999px; padding: 6px 14px; background: rgba(255,255,255,.92); color: var(--txt); cursor: pointer; box-shadow: 0 4px 12px rgba(20,60,120,.2); }
+  #barre button.on { background: var(--bleu); color: #fff; }
+  #fin { inset: 0; display: none; align-items: center; justify-content: center; background: rgba(15,40,80,.35); pointer-events: auto; }
+  #fin.on { display: flex; }
+  #fin .carte { background: #fff; border-radius: 26px; padding: 26px 40px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+  #fin h2 { margin: 0; font-size: 40px; color: var(--bleu2); }
+  #fin p { font-size: 22px; margin: 8px 0 18px; font-weight: 700; }
+  #fin button { font: inherit; font-weight: 800; font-size: 20px; border: 0; border-radius: 999px; padding: 10px 28px; background: linear-gradient(180deg, var(--bleu), var(--bleu2)); color: #fff; cursor: pointer; }
+  #pos { left: 50%; bottom: 64px; transform: translateX(-50%); display: flex; gap: 10px; pointer-events: auto; }
+  #pos button { font: inherit; font-size: 22px; font-weight: 800; width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgba(255,255,255,.92); color: var(--bleu2); cursor: pointer; box-shadow: 0 4px 12px rgba(20,60,120,.25); }
+  body.cgt { --bleu: #e3001b; --bleu2: #9c0012; --or: #ffd400; }
+  body.cgt #msg div { -webkit-text-stroke-color: #9c0012; }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+</head>
+<body>
+<div id="score" class="hud"></div>
+<div id="mini" class="hud"></div>
+<div id="barre" class="hud">
+  <button id="bTheme">Thème : Bony</button>
+  <button id="bJoueurs">1 joueur</button>
+  <button id="bFrames">10 frames</button>
+  <button id="bSon">♪ coupé</button>
+  <button id="bNouv">Nouvelle partie</button>
+</div>
+<div id="msg" class="hud"><div></div></div>
+<div id="info" class="hud"></div>
+<div id="pos" class="hud"><button id="bG" title="Se décaler à gauche (←)">◀</button><button id="bD" title="Se décaler à droite (→)">▶</button></div>
+<div id="aide" class="hud"></div>
+<div id="fin" class="hud"><div class="carte"><h2>Partie terminée</h2><p id="finTxt"></p><button id="bRejouer">Rejouer</button></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { PISTE, R_BOULE, H_QUILLE, P, emplacements, simuler, tableau, position } from './bowling-moteur.js';
+
+/* =====================================================================================
+   THÈMES — rendu seulement (la physique est la même). Bony : couleurs de la marque, ambiance Wii lumineuse.
+   Grève CGT : béton, banderoles et drapeaux rouges, annonces détournées (comme le minigolf).
+   ===================================================================================== */
+const THEMES = {
+  bony: { nom: 'Bony', ciel: 0x9fd4ff, murs: [0xf75632, 0xa52fce, 0xffb347], sol: 0x3a4a6b, boule: 0xf75632, boule2: 0xa52fce,
+    bande: 0xf75632, tenue: 0xf75632, tenue2: 0x2a3550, enseigne: ['BONY', 'auto-mobile'], enseigneFond: ['#f75632', '#a52fce'],
+    annonces: { strike: 'STRIKE !', spare: 'SPARE !', gout: 'Gouttière…', zero: 'Raté !', double: 'DOUBLE !', turkey: 'TURKEY !' } },
+  cgt: { nom: 'Grève CGT', ciel: 0xc9d2dc, murs: [0xe3001b, 0x5c636d, 0xeeeeee], sol: 0x4a4c51, boule: 0xe3001b, boule2: 0x222222,
+    bande: 0xe3001b, tenue: 0xe3001b, tenue2: 0x2b2d31, enseigne: ['GRÈVE', 'GÉNÉRALE'], enseigneFond: ['#e3001b', '#9c0012'],
+    slogans: ['BONY : TES PROFITS, NOS SALAIRES !', 'ON LÂCHE RIEN', 'SALAIRES +10 %'],
+    annonces: { strike: 'GRÈVE GÉNÉRALE !', spare: 'ACQUIS SOCIAL !', gout: 'Dans le caniveau', zero: 'Piquet de grève', double: 'CONVERGENCE !', turkey: 'BLOCAGE TOTAL !' } },
+};
+let theme = 'bony';
+
+/* =====================================================================================
+   SCÈNE — repère du moteur (x à droite vu du joueur, z le long de la piste) → three : X = -x (la caméra regarde +z).
+   ===================================================================================== */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 80);
+const X = (x) => -x;
+
+const hemi = new THREE.HemisphereLight(0xdff1ff, 0x8a6a4a, 1.15); scene.add(hemi);
+const soleil = new THREE.DirectionalLight(0xffffff, 1.6);
+soleil.position.set(-2, 9, 6); soleil.target.position.set(0, 0, 11); scene.add(soleil, soleil.target);
+soleil.castShadow = true; soleil.shadow.mapSize.set(2048, 2048);
+Object.assign(soleil.shadow.camera, { left: -3, right: 3, top: 12, bottom: -12, near: 1, far: 30 });
+soleil.shadow.bias = -0.0004; soleil.shadow.normalBias = 0.02;
+const spotQuilles = new THREE.PointLight(0xfff3dd, 6, 6, 1.6); spotQuilles.position.set(0, 1.4, 18.4); scene.add(spotQuilles);
+
+const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, metalness: 0, flatShading: true, ...o });
+
+/** Texture de piste : 39 lattes, flèches à 4,6 m, points à 2,1 m, ligne de faute. */
+function textureBois(clair) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 4096; const g = c.getContext('2d');
+  for (let i = 0; i < 39; i++) {
+    const t = (i * 37) % 7;
+    g.fillStyle = clair ? `hsl(${34 + t}, ${55 + t}%, ${72 - t * 1.6}%)` : `hsl(${30 + t}, ${58 + t}%, ${64 - t * 1.8}%)`;
+    g.fillRect(i * 512 / 39, 0, 512 / 39 + 1, 4096);
+    g.fillStyle = 'rgba(80,40,10,.12)'; g.fillRect(i * 512 / 39, 0, 1, 4096);
+  }
+  // reflets doux
+  const gr = g.createLinearGradient(0, 0, 512, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(.5, 'rgba(255,255,255,.12)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 512, 4096);
+  if (!clair) {
+    const zpx = (m) => 4096 - (m / 19.45) * 4096;
+    g.fillStyle = '#7a2a12';
+    for (const b of [5, 10, 15, 20, 25, 30, 35]) { // flèches
+      const x = (b - 0.5) * 512 / 39, y = zpx(4.6 + Math.abs(b - 20) * 0.03);
+      g.beginPath(); g.moveTo(x, y - 46); g.lineTo(x - 7, y + 10); g.lineTo(x + 7, y + 10); g.fill();
+    }
+    for (const b of [3, 5, 8, 11, 14, 26, 29, 32, 35, 37]) { g.beginPath(); g.arc((b - 0.5) * 512 / 39, zpx(2.1), 4, 0, 7); g.fill(); }
+    g.fillStyle = '#18202a'; g.fillRect(0, 4096 - 10, 512, 10); // ligne de faute
+  }
+  const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 8; return tx;
+}
+const texPiste = textureBois(false), texElan = textureBois(true);
+
+/** Une piste complète (élan, piste, gouttières, aire des quilles, fosse), centrée sur cx (repère three). */
+function construirePiste(cx) {
+  const g = new THREE.Group(); g.position.x = cx;
+  const L = PISTE.fosse;
+  const piste = new THREE.Mesh(new THREE.PlaneGeometry(PISTE.demi * 2, L), mat(0xffffff, { map: texPiste, roughness: 0.32, flatShading: false }));
+  piste.rotation.x = -Math.PI / 2; piste.position.set(0, 0, L / 2); piste.receiveShadow = true; g.add(piste);
+  const elan = new THREE.Mesh(new THREE.PlaneGeometry(PISTE.demi * 2 + PISTE.gouttiere * 2 + 0.3, 4.6), mat(0xffffff, { map: texElan, roughness: 0.4, flatShading: false }));
+  elan.rotation.x = -Math.PI / 2; elan.position.set(0, -0.001, -2.3); elan.receiveShadow = true; g.add(elan);
+  // gouttières : profil en U extrudé
+  const sh = new THREE.Shape(); const w = PISTE.gouttiere / 2;
+  sh.moveTo(-w, 0); sh.lineTo(-w * 0.8, -0.05); sh.lineTo(-w * 0.4, -0.085); sh.lineTo(w * 0.4, -0.085); sh.lineTo(w * 0.8, -0.05); sh.lineTo(w, 0); sh.lineTo(w, -0.14); sh.lineTo(-w, -0.14);
+  const geoG = new THREE.ExtrudeGeometry(sh, { depth: PISTE.plateau, bevelEnabled: false });
+  for (const s of [-1, 1]) {
+    const m = new THREE.Mesh(geoG, mat(0x3b4656, { roughness: 0.35, metalness: 0.3 }));
+    m.position.set(s * (PISTE.demi + w), 0, 0); m.receiveShadow = true; g.add(m);
+    const sep = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, L + 0.2), mat(0x2b3442));
+    sep.position.set(s * (PISTE.demi + PISTE.gouttiere + 0.03), 0.02, L / 2); g.add(sep);
+    const kick = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.55, PISTE.fosse - PISTE.plateau + 0.8), mat(0x24272e));
+    kick.position.set(s * (PISTE.murX + 0.025), 0.27, (PISTE.plateau + PISTE.fosse + 0.8) / 2); kick.castShadow = true; g.add(kick);
+  }
+  const fosse = new THREE.Mesh(new THREE.BoxGeometry(PISTE.murX * 2, 0.05, 1.2), mat(0x15171c));
+  fosse.position.set(0, -0.3, PISTE.fosse + 0.6); g.add(fosse);
+  const rideau = new THREE.Mesh(new THREE.PlaneGeometry(PISTE.murX * 2, 1.2), mat(0x101218));
+  rideau.position.set(0, 0.3, PISTE.fosse + 1.2); rideau.rotation.y = Math.PI; g.add(rideau);
+  return g;
+}
+const allee = new THREE.Group(); scene.add(allee);
+for (const cx of [-2.05, 0, 2.05]) allee.add(construirePiste(cx));
+
+/* ---------- Quilles (low-poly, tour) ---------- */
+const profil = [[0, 0], [0.028, 0], [0.042, 0.03], [0.058, 0.09], [0.06, 0.13], [0.054, 0.19], [0.036, 0.245], [0.024, 0.275], [0.023, 0.29], [0.03, 0.325], [0.031, 0.35], [0.024, 0.372], [0.011, 0.381], [0, H_QUILLE]];
+const geoQuille = new THREE.LatheGeometry(profil.map(([r, y]) => new THREE.Vector2(r, y)), 12);
+const geoBande = new THREE.CylinderGeometry(0.0255, 0.0245, 0.011, 12, 1, true);
+const matQuille = mat(0xfbfaf6, { roughness: 0.28 });
+const matBande = mat(0xf75632, { roughness: 0.35, side: THREE.DoubleSide });
+function quille() {
+  const g = new THREE.Group(), m = new THREE.Mesh(geoQuille, matQuille);
+  m.castShadow = true; g.add(m);
+  for (const y of [0.258, 0.274]) { const b = new THREE.Mesh(geoBande, matBande); b.position.y = y; b.scale.setScalar(1.06); g.add(b); }
+  return g;
+}
+const QUILLES = emplacements().map((e) => { const q = quille(); q.position.set(X(e.x), 0, e.z); scene.add(q); return { e, g: q }; });
+// quilles décoratives des pistes voisines
+for (const cx of [-2.05, 2.05]) for (const e of emplacements()) { const q = quille(); q.position.set(cx + X(e.x), 0, e.z); scene.add(q); }
+
+/* ---------- Boule ---------- */
+const matBoule = mat(0xf75632, { roughness: 0.18, metalness: 0.08 });
+const boule = new THREE.Mesh(new THREE.IcosahedronGeometry(R_BOULE, 1), matBoule);
+boule.castShadow = true;
+const matTrou = mat(0x111111);
+for (const [a, b] of [[0.35, 0.12], [0.35, -0.12], [-0.1, 0]]) {
+  const t = new THREE.Mesh(new THREE.CircleGeometry(0.013, 8), matTrou);
+  const v = new THREE.Vector3(Math.sin(b) * Math.cos(a), Math.sin(a), Math.cos(b) * Math.cos(a)).normalize();
+  t.position.copy(v.clone().multiplyScalar(R_BOULE * 1.002)); t.lookAt(v.clone().multiplyScalar(2)); boule.add(t);
+}
+scene.add(boule);
+
+/* ---------- Le joueur (façon Mii) ---------- */
+const matPeau = mat(0xf3c9a1), matTenue = mat(0xf75632), matPant = mat(0x2a3550), matCheveux = mat(0x4a2f1f), matNoir = mat(0x111111);
+const mii = new THREE.Group(); scene.add(mii);
+{
+  for (const s of [-1, 1]) { const j = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.62, 7), matPant); j.position.set(s * 0.09, 0.31, 0); j.castShadow = true; mii.add(j); }
+  const corps = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.5, 8), matTenue); corps.position.y = 0.86; corps.castShadow = true; mii.add(corps);
+  const tete = new THREE.Mesh(new THREE.IcosahedronGeometry(0.17, 1), matPeau); tete.position.y = 1.32; tete.castShadow = true; mii.add(tete);
+  const cheveux = new THREE.Mesh(new THREE.SphereGeometry(0.178, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.55), matCheveux); cheveux.position.y = 1.34; cheveux.rotation.x = -0.25; mii.add(cheveux);
+  for (const s of [-1, 1]) { const o = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 4), matNoir); o.position.set(s * 0.06, 1.33, 0.155); o.scale.y = 1.6; mii.add(o); }
+  const bG = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.5, 6), matTenue); bG.position.set(0.24, 0.85, 0); bG.rotation.z = -0.2; mii.add(bG);
+}
+const epaule = new THREE.Group(); epaule.position.set(-0.23, 1.06, 0); mii.add(epaule);
+{ const bras = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.55, 6), matTenue); bras.position.y = -0.27; bras.castShadow = true; epaule.add(bras);
+  const main = new THREE.Mesh(new THREE.IcosahedronGeometry(0.05, 0), matPeau); main.position.y = -0.56; epaule.add(main); }
+
+/* ---------- Décor : murs, enseigne, banderoles ---------- */
+const decor = new THREE.Group(); scene.add(decor);
+function texteTexture(l1, l2, fond, w = 1024, h = 256) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, fond[0]); gr.addColorStop(1, fond[1]); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `800 ${l2 ? h * 0.42 : h * 0.5}px "Baloo 2", sans-serif`; g.fillText(l1, w / 2, l2 ? h * 0.38 : h / 2);
+  if (l2) { g.font = `700 ${h * 0.22}px "Baloo 2", sans-serif`; g.fillText(l2, w / 2, h * 0.75); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function construireDecor() {
+  decor.clear();
+  const T = THEMES[theme];
+  scene.background = new THREE.Color(T.ciel); scene.fog = new THREE.Fog(T.ciel, 24, 46);
+  // sol de la salle, murs latéraux en bandes de couleur, plafond lumineux
+  const sol = new THREE.Mesh(new THREE.PlaneGeometry(14, 40), mat(T.sol)); sol.rotation.x = -Math.PI / 2; sol.position.set(0, -0.02, 8); sol.receiveShadow = true; decor.add(sol);
+  for (const s of [-1, 1]) for (let i = 0; i < 3; i++) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.1, 26), mat(T.murs[i]));
+    m.position.set(s * 3.6, 0.55 + i * 1.1, 8); decor.add(m);
+  }
+  for (let z = -2; z < 22; z += 3) { const l = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.06, 0.5), new THREE.MeshBasicMaterial({ color: 0xfffbe8 })); l.position.set(0, 3.4, z); decor.add(l); }
+  // bloc de masquage au-dessus des quilles, avec l'enseigne
+  const tx = texteTexture(T.enseigne[0], T.enseigne[1], T.enseigneFond);
+  for (const cx of [-2.05, 0, 2.05]) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.8, 0.3), [mat(0x222), mat(0x222), mat(0x222), mat(0x222), new THREE.MeshBasicMaterial({ map: tx }), mat(0x222)]);
+    m.rotation.y = Math.PI; m.position.set(cx, 1.25, 18.95); decor.add(m);
+  }
+  // Grève CGT : banderoles et drapeaux
+  if (theme === 'cgt') {
+    T.slogans.forEach((s, i) => {
+      const b = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.55), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      b.material.map = (() => { const c = document.createElement('canvas'); c.width = 1600; c.height = 260; const g = c.getContext('2d'); g.fillStyle = '#fbf8f2'; g.fillRect(0, 0, 1600, 260); g.fillStyle = '#e3001b'; g.font = '800 120px "Baloo 2", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(s, 800, 135); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+      const sd = i % 2 ? 1 : -1; b.position.set(sd * 3.45, 2.6, 3 + i * 6); b.rotation.y = -sd * Math.PI / 2; decor.add(b);
+    });
+    for (let i = 0; i < 6; i++) {
+      const sd = i % 2 ? 1 : -1, z = 1 + i * 3.2;
+      const hampe = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.6, 5), mat(0x8a8f96)); hampe.position.set(sd * 3.1, 0.8, z); decor.add(hampe);
+      const dr = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.4, 6, 1), mat(0xe3001b, { side: THREE.DoubleSide })); dr.position.set(sd * 3.1 - sd * 0.3, 1.4, z); dr.userData.drapeau = true; decor.add(dr);
+    }
+  }
+  matBoule.color.set(T.boule); matBande.color.set(T.bande); matTenue.color.set(T.tenue); matPant.color.set(T.tenue2);
+  document.body.classList.toggle('cgt', theme === 'cgt');
+  $('bTheme').textContent = 'Thème : ' + T.nom;
+}
+
+/* =====================================================================================
+   SON — synthétisé (aucun fichier), coupé par défaut.
+   ===================================================================================== */
+let ctxSon = null, son = false, roulement = null;
+const audio = () => (ctxSon = ctxSon || new (window.AudioContext || window.webkitAudioContext)());
+function bruit(dur, type, freq, vol, q = 1) {
+  if (!son) return; const c = audio(), n = Math.floor(c.sampleRate * dur), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+  const s = c.createBufferSource(); s.buffer = buf; const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  const g = c.createGain(); g.gain.value = vol; s.connect(f).connect(g).connect(c.destination); s.start();
+}
+function clac(n) { if (!son) return; const c = audio(); for (let i = 0; i < Math.min(n, 5); i++) setTimeout(() => { bruit(0.09, 'bandpass', 1800 + Math.random() * 1600, 0.5, 3); const o = c.createOscillator(), g = c.createGain(); o.frequency.value = 700 + Math.random() * 500; g.gain.setValueAtTime(0.12, c.currentTime); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.08); o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime + 0.09); }, i * 28 + Math.random() * 20); }
+function roule(v) {
+  if (!son) return; const c = audio();
+  if (!roulement) { const n = c.sampleRate * 2, buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const s = c.createBufferSource(); s.buffer = buf; s.loop = true; const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 260; const g = c.createGain(); g.gain.value = 0; s.connect(f).connect(g).connect(c.destination); s.start(); roulement = g; }
+  roulement.gain.setTargetAtTime(v, c.currentTime, 0.05);
+}
+function ovation() { bruit(1.6, 'bandpass', 1400, 0.35, 0.6); }
+
+/* =====================================================================================
+   PARTIE — joueurs, frames, quilles debout. Tout le comptage passe par le moteur (tableau / position).
+   ===================================================================================== */
+const $ = (id) => document.getElementById(id);
+let nbJoueurs = 1, nbFrames = 10;
+let joueurs, cur, debout, enchaine;
+function nouvellePartie() {
+  joueurs = Array.from({ length: nbJoueurs }, (_, i) => ({ nom: `Joueur ${i + 1}`, lancers: [], x: 0.18, angle: 0 }));
+  cur = 0; debout = emplacements(); enchaine = [];
+  $('fin').classList.remove('on');
+  placerQuilles(); dessinerScore(); preparerLancer();
+}
+function marques(fr) {
+  const out = [];
+  fr.l.forEach((v, i) => {
+    const prev = out[i - 1];
+    if (fr.derniere) {
+      if (v === 10 && (i === 0 || prev === 'X' || prev === '/')) out.push('X');
+      else if (i > 0 && prev !== 'X' && prev !== '/' && fr.l[i - 1] + v === 10) out.push('/');
+      else out.push(v === 0 ? '-' : String(v));
+    } else if (i === 0 && v === 10) out.push('X');
+    else if (i === 1 && fr.l[0] + v === 10) out.push('/');
+    else out.push(v === 0 ? '-' : String(v));
+  });
+  return out;
+}
+function dessinerScore() {
+  $('score').innerHTML = joueurs.map((j, ji) => {
+    const t = tableau(j.lancers, nbFrames), pos = position(j.lancers, nbFrames);
+    const cells = t.frames.map((fr, fi) => {
+      const m = marques(fr), n = fr.derniere ? 3 : 2;
+      if (!fr.derniere && m[0] === 'X') { m.length = 0; m.push('', 'X'); }
+      const spans = Array.from({ length: n }, (_, k) => { const v = m[k] ?? ''; return `<span class="${v === 'X' ? 'x' : v === '/' ? 's' : ''}">${v}</span>`; }).join('');
+      return `<div class="fr ${fr.derniere ? 'der' : ''} ${ji === cur && fi === pos.frame ? 'cur' : ''}"><div class="lc">${spans}</div><div class="tt">${fr.total ?? ''}</div></div>`;
+    }).join('');
+    return `<div class="ligne ${ji === cur && nbJoueurs > 1 ? 'on' : ''}"><div class="nom">${j.nom}</div>${cells}<div class="tot">${t.total}</div></div>`;
+  }).join('');
+}
+function dessinerMini(restants) {
+  const ids = new Set(restants.map((q) => q.n));
+  $('mini').innerHTML = emplacements().map((e) => `<i class="${ids.has(e.n) ? 'up' : 'down'}" style="left:${46 + e.x * 100}px;top:${70 - (e.z - PISTE.quille1) * 75}px"></i>`).join('');
+}
+function placerQuilles() {
+  const ids = new Map(debout.map((q) => [q.n, q]));
+  for (const Q of QUILLES) {
+    const q = ids.get(Q.e.n); Q.g.visible = !!q; Q.g.quaternion.identity();
+    if (q) Q.g.position.set(X(q.x), 0, q.z);
+  }
+  dessinerMini(debout);
+}
+
+/* =====================================================================================
+   CONTRÔLES (façon Wii) — souris à gauche / à droite : la visée ; ◀ ▶ ou flèches : se décaler.
+   Lancer : maintenir le clic, TIRER la souris vers soi (élan arrière), puis la POUSSER vers l'avant et relâcher.
+   La vitesse du geste fait la puissance ; un geste en biais au lâcher donne de l'effet (la boule crochète).
+   ===================================================================================== */
+let phase = 'vise', elan = null, rejeu = null, tPhase = 0;
+const ligneVisee = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, 1)]), new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.25, gapSize: 0.18, transparent: true, opacity: 0.85 }));
+scene.add(ligneVisee);
+const fleche = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 6), new THREE.MeshBasicMaterial({ color: 0xffffff })); scene.add(fleche);
+
+const J = () => joueurs[cur];
+function preparerLancer() {
+  phase = 'vise'; tPhase = 0; rejeu = null;
+  const pos = position(J().lancers, nbFrames);
+  const nomTour = nbJoueurs > 1 ? `<b>${J().nom}</b> · ` : '';
+  $('aide').innerHTML = `${nomTour}Frame ${pos.frame + 1}${pos.lancer ? ` · lancer ${pos.lancer + 1}` : ''} — <b>Souris</b> : viser · <b>◀ ▶</b> : se décaler · <b>Clic maintenu</b> : tirer vers soi, puis pousser et lâcher`;
+  $('pos').style.display = 'flex';
+  boule.visible = true; ligneVisee.visible = fleche.visible = true;
+  dessinerScore();
+}
+function majVisee() {
+  const j = J(), L = 7.5, x1 = j.x + Math.sin(j.angle) * L, z1 = Math.cos(j.angle) * L;
+  ligneVisee.geometry.setFromPoints([new THREE.Vector3(X(j.x), 0.012, 0.4), new THREE.Vector3(X(x1), 0.012, z1)]);
+  ligneVisee.computeLineDistances();
+  fleche.position.set(X(x1), 0.03, z1); fleche.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(X(Math.sin(j.angle)), 0, Math.cos(j.angle)).normalize());
+}
+const cv = renderer.domElement;
+cv.addEventListener('pointermove', (ev) => {
+  if (phase === 'vise' && !elan) { J().angle = Math.max(-1, Math.min(1, (ev.clientX / innerWidth - 0.5) * 2.4)) * P.angleMax * 0.85; }
+  if (elan) { elan.s.push([performance.now(), ev.clientX, ev.clientY]); elan.bas = Math.max(elan.bas, ev.clientY - elan.y0); }
+});
+cv.addEventListener('pointerdown', (ev) => {
+  if (phase !== 'vise') return;
+  cv.setPointerCapture(ev.pointerId); audio && son && audio().resume();
+  elan = { y0: ev.clientY, s: [[performance.now(), ev.clientX, ev.clientY]], bas: 0 };
+  $('pos').style.display = 'none'; $('aide').innerHTML = '<b>Tirez</b> la souris vers vous… puis <b>poussez</b> vers l\'avant et <b>lâchez</b> !';
+});
+cv.addEventListener('pointerup', () => {
+  if (!elan) return;
+  const e = elan; elan = null;
+  const now = performance.now(), recents = e.s.filter((s) => now - s[0] < 110);
+  const a = recents[0] || e.s[e.s.length - 1], b = e.s[e.s.length - 1], dt = Math.max(0.016, (b[0] - a[0]) / 1000);
+  const vUp = -(b[2] - a[2]) / dt, vx = (b[1] - a[1]) / dt;
+  if (e.bas < 25 || vUp < 160) { preparerLancer(); info('Tirez d\'abord la souris vers vous, puis poussez-la vers l\'avant en relâchant.'); return; }
+  const puissance = Math.max(0, Math.min(1, (vUp - 250) / 2600));
+  const effet = Math.abs(vx) < 120 ? 0 : Math.max(-1, Math.min(1, -vx / 1400));
+  lancer({ x0: J().x, angle: J().angle, puissance, effet });
+});
+function deplacer(d) { if (phase === 'vise' && !elan) J().x = Math.max(-PISTE.demi + 0.12, Math.min(PISTE.demi - 0.12, J().x + d)); }
+addEventListener('keydown', (ev) => { if (ev.key === 'ArrowLeft') deplacer(-0.03); if (ev.key === 'ArrowRight') deplacer(0.03); });
+$('bG').onclick = () => deplacer(-0.05); $('bD').onclick = () => deplacer(0.05);
+function info(t) { $('info').innerHTML = t; $('info').classList.add('on'); clearTimeout(info.t); info.t = setTimeout(() => $('info').classList.remove('on'), 3200); }
+
+function lancer(l) {
+  const res = simuler(debout, l);
+  rejeu = { res, l, t: 0, vus: new Set(), ids: debout.map((q) => q.n), ancien: null };
+  phase = 'lache'; tPhase = 0; ligneVisee.visible = fleche.visible = false;
+  const v = (P.vMin + (P.vMax - P.vMin) * l.puissance) * 3.6;
+  info(`${v.toFixed(0)} km/h${l.effet ? ` · effet ${l.effet > 0 ? '↰' : '↱'} ${Math.round(Math.abs(l.effet) * 100)} %` : ''}`);
+  $('aide').innerHTML = '…';
+}
+
+function annonce(txt, sous, cls) {
+  const d = $('msg').firstElementChild; d.className = cls || ''; d.innerHTML = txt + (sous ? `<small>${sous}</small>` : '');
+  requestAnimationFrame(() => d.classList.add('on'));
+  setTimeout(() => d.classList.remove('on'), 1500);
+}
+function finDuLancer() {
+  const { res } = rejeu, j = J(), T = THEMES[theme].annonces;
+  const nAvant = debout.length;
+  j.lancers.push(res.tombees);
+  debout = res.restent;
+  const n = res.tombees, tous = debout.length === 0;
+  if (tous && nAvant === 10) {
+    enchaine[cur] = (enchaine[cur] || 0) + 1;
+    const k = enchaine[cur]; annonce(k >= 3 ? T.turkey : k === 2 ? T.double : T.strike, '', 'strike'); ovation();
+  } else if (tous) { enchaine[cur] = 0; annonce(T.spare, '', ''); ovation(); }
+  else { enchaine[cur] = 0; if (res.gouttiere) annonce(T.gout); else if (!n) annonce(T.zero); else annonce(String(n), n > 1 ? 'quilles' : 'quille'); }
+  dessinerMini(debout); dessinerScore();
+  phase = 'resultat'; tPhase = 0;
+  setTimeout(suite, 1700);
+}
+function suite() {
+  const j = J(), pos = position(j.lancers, nbFrames);
+  const changeFrame = pos.fini || pos.lancer === 0;
+  if (changeFrame && nbJoueurs > 1) cur = (cur + 1) % nbJoueurs;
+  if (joueurs.every((x) => position(x.lancers, nbFrames).fini)) return finPartie();
+  while (position(J().lancers, nbFrames).fini) cur = (cur + 1) % nbJoueurs;
+  const p2 = position(J().lancers, nbFrames);
+  if (p2.rack) debout = emplacements();
+  placerQuilles(); preparerLancer();
+}
+function finPartie() {
+  const sc = joueurs.map((j) => tableau(j.lancers, nbFrames).total);
+  const max = Math.max(...sc);
+  $('finTxt').innerHTML = nbJoueurs > 1 ? joueurs.map((j, i) => `${j.nom} : ${sc[i]}`).join(' · ') + `<br>${sc.filter((s) => s === max).length > 1 ? 'Égalité !' : joueurs[sc.indexOf(max)].nom + ' gagne !'}` : `Score final : ${sc[0]}`;
+  $('fin').classList.add('on'); dessinerScore();
+}
+
+/* =====================================================================================
+   BOUCLE — caméra, joueur, rejeu des images du moteur (1 image = 4 pas de 1/240 s = 1/60 s).
+   ===================================================================================== */
+const clock = new THREE.Clock();
+const camPos = new THREE.Vector3(0, 1.5, -2.8), camVise = new THREE.Vector3(0, 0.2, 12);
+function boucle() {
+  const dt = Math.min(0.05, clock.getDelta()); tPhase += dt; const tt = clock.elapsedTime;
+  const j = J(), xj = X(j.x);
+  let cibleCam = new THREE.Vector3(xj * 0.5 - 0.35, 1.85, -3.9), cibleVise = new THREE.Vector3(X(j.x + Math.sin(j.angle) * 18) * 0.5, 0.1, 14);
+  // le joueur : position, bras
+  const posMiiZ = phase === 'vise' ? -0.75 : -0.75 + Math.min(1, tPhase / 0.45) * 0.4;
+  mii.position.set(xj + 0.23, 0, phase === 'vise' || phase === 'lache' ? posMiiZ : -0.35);
+  mii.rotation.y = -j.angle * 3;
+  let brasA = -0.55 + Math.sin(tt * 2.2) * 0.04; // boule tenue devant soi
+  if (elan) { const last = elan.s[elan.s.length - 1]; brasA = Math.max(-0.9, Math.min(1.9, (last[2] - elan.y0) / 110 - 0.55)); }
+  if (phase === 'lache') brasA = 1.6 - Math.min(1, tPhase / 0.33) * 3.0;
+  if (phase === 'roule' || phase === 'resultat') brasA = -1.4 + Math.min(1, tPhase / 0.8) * 0.9;
+  epaule.rotation.x = brasA;
+  // boule tenue en main pendant la visée et l'élan
+  if (phase === 'vise' || phase === 'lache') {
+    const m = new THREE.Vector3(0, -0.6, 0); epaule.localToWorld(m); boule.position.copy(m);
+    if (phase === 'lache' && tPhase > 0.33) { phase = 'roule'; tPhase = 0; }
+  }
+  if (phase === 'vise') majVisee();
+  if (phase === 'roule' && rejeu) {
+    rejeu.t += dt; const k = Math.min(rejeu.res.images.length - 1, Math.floor(rejeu.t * 60)), im = rejeu.res.images[k];
+    const [bx, bz, gout, fosse] = im.b;
+    const np = new THREE.Vector3(X(bx), gout ? 0.024 : R_BOULE, bz);
+    if (fosse && bz > PISTE.fosse + 0.15) { np.y = -0.2; boule.visible = bz < PISTE.fosse + 1; }
+    if (rejeu.ancien) { const d = np.clone().sub(rejeu.ancien); d.y = 0; const L = d.length(); if (L > 1e-5) { const ax = new THREE.Vector3(d.z, 0, -d.x).normalize(); boule.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(ax, L / R_BOULE)); } }
+    rejeu.ancien = np.clone(); boule.position.copy(np);
+    roule(bz < PISTE.fosse ? 0.25 : 0);
+    // quilles
+    let nouvelles = 0;
+    im.q.forEach((s, i) => {
+      const Q = QUILLES.find((q) => q.e.n === rejeu.ids[i]);
+      const [qx, qz, prog, ang, wob, sortie] = s;
+      Q.g.position.set(X(qx), 0, qz);
+      if (prog > 0) {
+        if (!rejeu.vus.has(i)) { rejeu.vus.add(i); nouvelles++; }
+        const ax = new THREE.Vector3(Math.cos(ang), 0, Math.sin(ang));
+        const a = prog * Math.PI / 2 * 0.96; Q.g.quaternion.setFromAxisAngle(ax, a); Q.g.position.y = Math.sin(a) * 0.055;
+        if (sortie && qz > PISTE.fosse) Q.g.position.y = -0.3;
+      } else Q.g.quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), wob * Math.sin(tt * 26));
+    });
+    if (nouvelles) clac(nouvelles);
+    // caméra : suit la boule, puis se pose devant les quilles
+    if (bz < 13.5) { cibleCam.set(X(bx) * 0.7, 0.75, bz - 2.4); cibleVise.set(X(bx) * 0.3, 0.2, bz + 7); }
+    else { cibleCam.set(0, 0.95, 14.6); cibleVise.set(0, 0.25, 18.9); }
+    if (k >= rejeu.res.images.length - 1) { roule(0); finDuLancer(); }
+  }
+  if (phase === 'resultat') { cibleCam.set(0, 0.95, 14.6); cibleVise.set(0, 0.25, 18.9); }
+  const lissage = phase === 'roule' ? 1 - Math.pow(0.002, dt) : 1 - Math.pow(0.02, dt);
+  camPos.lerp(cibleCam, lissage); camVise.lerp(cibleVise, lissage);
+  camera.position.copy(camPos); camera.lookAt(camVise);
+  decor.children.forEach((o) => { if (o.userData.drapeau) { const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i); p.setZ(i, Math.sin(tt * 4 + x * 9) * 0.05 * (x + 0.3)); } p.needsUpdate = true; } });
+  renderer.render(scene, camera);
+  requestAnimationFrame(boucle);
+}
+function taille() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', taille); taille();
+
+$('bTheme').onclick = () => { theme = theme === 'bony' ? 'cgt' : 'bony'; construireDecor(); };
+$('bJoueurs').onclick = () => { nbJoueurs = nbJoueurs === 1 ? 2 : 1; $('bJoueurs').textContent = nbJoueurs + (nbJoueurs > 1 ? ' joueurs' : ' joueur'); nouvellePartie(); };
+$('bFrames').onclick = () => { nbFrames = nbFrames === 10 ? 5 : 10; $('bFrames').textContent = nbFrames + ' frames'; nouvellePartie(); };
+$('bSon').onclick = () => { son = !son; $('bSon').textContent = son ? '♪ activé' : '♪ coupé'; $('bSon').classList.toggle('on', son); if (son) audio().resume(); else roule(0); };
+$('bNouv').onclick = nouvellePartie; $('bRejouer').onclick = nouvellePartie;
+document.fonts.ready.then(construireDecor); construireDecor();
+nouvellePartie(); boucle();
+</script>
+</body>
+</html>

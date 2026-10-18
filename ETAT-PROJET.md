@@ -4,6 +4,21 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 16/10/2026 (lire en premier)
+- **CORRECTIF 94 EN PRODUCTION (18/10, `api` + `web`) — 🎳 BOWLING 3D, 5e jeu de la v2** (branche `feat/bowling-v2`, qui
+  contient aussi le prototype `maquettes/jeux/bowling/`). Physique Rapier DÉTERMINISTE (`@dimforge/rapier3d-deterministic-compat`
+  0.21.0, versions EXACTES racine + backend, contrôlées par `scripts/check-bowling-sync.mjs` dans `predev`/`prebuild`) :
+  moteur canonique `shared/bowling/{physique,regles}.ts`, copie octet pour octet dans `backend/src/games/bowling/` (on modifie
+  `shared/`, jamais la copie). Le client n'envoie QUE le geste `{ position, angle, vitesse, effet, lacher }` ; le serveur
+  (`games/bowlingRules.ts`) rejoue le lancer (mode léger ~110 ms) et fait foi ; le client simule en parallèle dans un Worker
+  pour animer et compare. Plateau : lancers par joueur, quilles debout, dernier lancer (pour le rejouer chez l'adversaire) ;
+  aucune image en base, AUCUNE migration (thème + frames dans `GameChallenge.options`). Verrou « un coup à la fois par
+  partie » ajouté pour TOUS les jeux (`realtime/games.ts`). v2 : `ui2/apps/games/bowling/` chargé à la demande (chunk
+  `Bowling` 869 kB / 243 kB gz + worker Rapier 4,4 Mo, mis en cache), carte du lobby, duel tour par tour, thèmes Bony (charte
+  du groupe) / Grève CGT (décor manif, textes propres au bowling), 5 ou 10 frames, mode ENTRAÎNEMENT solo sans serveur.
+  Empreintes de référence `3c4f3b5f 7998a4bc 0f25f108 95a16e4b 82f907f9 1fe8df12 089d6d7c 5b63b45d` identiques Node 20 /
+  Node 24 / navigateur / build de prod. Physique validée par Théo (17/10) ; Brooklyn ramené à 30 % (cible 25), boule lente
+  pénalisée. **À FAIRE PAR THÉO : recette du DUEL en prod entre deux vrais comptes** (5 et 10 frames, deux thèmes, lancer
+  rejoué chez l'adversaire, spare + changement de joueur, bonus du 10e, coup hors tour refusé, abandon, geste au doigt).
 - **CORRECTIF 93 EN PRODUCTION (16/10, `api` + `web`)** — branche `feat/lot-93-widgets-assignes-prestataire-1600`, 4 sujets
   codés par 4 agents puis fusionnés, testés sur localhost (Master) et recettés par Théo : (1) **widgets du bureau v2** qui
   bougeaient au redimensionnement (`ui2/os/engine/widgets.ts` : la disposition ENREGISTRÉE est la référence, `computeView()`
@@ -16,8 +31,8 @@
   push. `GET /api/tasks` : un rôle de la To-do qui n'édite pas (Guest) ne reçoit que SES tâches libres (filtre serveur).
   **Non vérifié** : Guest et chef de site avec de vrais comptes ; 1536x730 ; ancienne interface. **Le bureau de Théo est déjà
   abîmé par l'ancien bug** (widgets sous le bas de l'écran) : à refaire une fois.
-- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 93**
-  (16/10, ci-dessus). Avant lui le **92** (16/10, `api` + `web` : Jeux, thèmes Bony / Grève CGT des 3 jeux + lobby multi-jeux). Avant lui le **91**
+- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 94**
+  (18/10, bowling, ci-dessus). Avant lui le **93** (16/10). Avant lui le **92** (16/10, `api` + `web` : Jeux, thèmes Bony / Grève CGT des 3 jeux + lobby multi-jeux). Avant lui le **91**
   (15/10, `web` seul : minigolf, tour par tour réparé — tir bloqué dès le trou 2, coups en double). Avant lui le **90**
   (15/10, `api` + `web` + migration Supabase `game_challenge_options` : **4e jeu, le MINIGOLF**, v2 seulement). Avant lui le
   **89** (15/10, `web` seul : molette bloquée au survol d'un tableau, v2). Avant lui le **88** (15/10, `rcu-worker` + `api` + `web` :
@@ -124,7 +139,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 93 (16/10)** — widgets du bureau stables, tâches multi-assignées, prestataire sur les dépenses,
+- **En production : correctif 94 (18/10)** — Jeux : bowling 3D, 5e jeu de la v2 (`api` + `web`, aucune migration).
+  Avant lui le **correctif 93 (16/10)** — widgets du bureau stables, tâches multi-assignées, prestataire sur les dépenses,
   affichage 1600x900 (`api` + `web`, 2 migrations additives).
   Avant lui le **correctif 92 (16/10)** — Jeux : thèmes Bony / Grève CGT + lobby multi-jeux (`api` + `web`).
   Avant lui le **correctif 91 (15/10)** — minigolf : tour par tour réparé (`web` seul).
@@ -1253,7 +1269,9 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 93** (16 octobre 2026) — widgets du bureau v2 stables, tâches multi-assignées, prestataire
+- master = prod, synchronisés. Dernier lot déployé : **correctif 94** (18 octobre 2026) — Jeux : bowling 3D dans la v2, **`api` + `web`**,
+  aucune migration, nouvelles dépendances `three` 0.160.0 (web) et `@dimforge/rapier3d-deterministic-compat` 0.21.0 (web + api).
+  Avant lui le **correctif 93** (16 octobre 2026) — widgets du bureau v2 stables, tâches multi-assignées, prestataire
   sur les dépenses, affichage 1600x900, **`api` + `web`**, migrations Supabase `20261016120000_task_assignees` et
   `20261016121000_expense_provider` (additives), appliquées par `db execute` + `migrate resolve --applied` avant le push.
   Avant lui le **correctif 92** (16 octobre 2026) — Jeux, thèmes Bony / Grève CGT + lobby multi-jeux,
