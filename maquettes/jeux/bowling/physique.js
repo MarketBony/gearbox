@@ -147,10 +147,14 @@ export const REGLAGES = Object.freeze({
   magnus: 0.003,          // coefficient de l'effet Magnus (N·s²/rad/m) — léger, comme demandé
   hLacher: 0.12,          // hauteur de chute supplémentaire pour un lâcher raté (lacher = 0)
   perteLacher: 0.05,      // perte de vitesse au lâcher pour lacher = 0
-  amortiQuille: 0.4,      // amortissement angulaire des quilles (air + roulis sur l'aire)
+  amortiQuille: 2,        // amortissement angulaire des quilles (air + roulis) : 2 ramène Brooklyn de 47 à 30 %
   iterations: 4,
+  // boule lente : à l'entrée de l'aire, rebonds (B = boule/quille, Q = quilles) et frottement boule/quille (F)
+  // multipliés par kMou… à vMou m/s et moins, 1 à vDur et plus (linéaire entre les deux) ; vitesse À L'ENTRÉE DE
+  // L'AIRE (≈ 85 % de la vitesse au lâcher). Mesuré : à 4 m/s, 0 % de strikes dans la poche au lieu de 75 %.
+  vMou: 3.5, vDur: 5.5, kMouB: 1, kMouQ: 0.3, kMouF: 2, kMouA: 1,
   // frottements PAR PAIRE : B = boule, Q = quille, A = aire des quilles, M = mur, G = gouttière, F = fosse/rideau
-  fBQ: 0.2, fQQ: 0.16, fQA: 0.4, fBA: 0.3, fQM: 0.2, fBG: 0.15, fQF: 0.6,
+  fBQ: 0.2, fQQ: 0.16, fQA: 0.6, fBA: 0.3, fQM: 0.2, fBG: 0.15, fQF: 0.6,
   // rebonds PAR PAIRE (P = piste, R = rideau)
   eBQ: 0.8, eQQ: 0.4, eQA: 0.35, eBP: 0.3, eQM: 0.2, eBG: 0.25, eQF: 0.18, eQR: 0.08,
 });
@@ -374,6 +378,7 @@ export function simuler(debout, lancer, opts = {}) {
       .setAdditionalMassProperties(D.mQuille, { x: 0, y: D.cgQuille, z: 0 }, { x: I.trav, y: I.axe, z: I.trav }, { x: 0, y: 0, z: 0, w: 1 })
       .setAngularDamping(P.amortiQuille).setLinearDamping(0.05));
     // (pas de setSleeping(true) : une quille créée endormie traverse l'aire au premier réveil — mesuré)
+    const cols = [];
     for (let k = -1; k < PRE.enveloppes.length; k++) {
       const forme = k < 0 ? R.ColliderDesc.cylinder(PIED.h / 2, PIED.r).setTranslation(0, PIED.h / 2, 0)
         : R.ColliderDesc.convexHull(PRE.enveloppes[k]);
@@ -382,8 +387,9 @@ export function simuler(debout, lancer, opts = {}) {
         .setCollisionGroups(GR_QUILLE)
         .setActiveEvents(EVTS).setContactForceEventThreshold(1), corps);
       tags.set(col.handle, { genre: 'quille', n: d.n, corps: i + 1 });
+      cols.push(col);
     }
-    return { n: d.n, corps, sortie: false, tFosse: -1, fosse: false };
+    return { n: d.n, corps, cols, sortie: false, tFosse: -1, fosse: false };
   });
 
   // ---- boucle
@@ -435,7 +441,20 @@ export function simuler(debout, lancer, opts = {}) {
     // huile : frottement de la piste selon la position de la boule
     const pb = corpsBoule.translation();
     if (pb.z < D.aire) piste.setFriction(muPiste(P, pb.x, pb.z) / FROT.boule);
-    else if (!surAire) { surAire = true; piste.setFriction(P.fBA / FROT.boule); }
+    else if (!surAire) {
+      surAire = true;
+      piste.setFriction(P.fBA / FROT.boule);
+      // Boule LENTE : chocs plus « mous ». Les rebonds boule/quille et quille/quille baissent avec la vitesse de la
+      // boule à l'entrée de l'aire (une seule fois, d'après l'état : déterministe). Sans cela un moteur rigide est
+      // invariant d'échelle et une boule à 4 m/s renversait autant qu'à 8 m/s (mesuré).
+      const v = corpsBoule.linvel(), vit = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+      const k = borne((vit - P.vMou) / (P.vDur - P.vMou), 0, 1);
+      colBoule.setRestitution(REBOND.boule * (P.kMouB + (1 - P.kMouB) * k));
+      colBoule.setFriction(FROT.boule * (P.kMouF + (1 - P.kMouF) * k));
+      piste.setFriction(P.fBA * (P.kMouA + (1 - P.kMouA) * k) / (FROT.boule * (P.kMouF + (1 - P.kMouF) * k)));
+      const eQ = REBOND.quille * (P.kMouQ + (1 - P.kMouQ) * k);
+      for (const q of quilles) for (const c of q.cols) c.setRestitution(eQ);
+    }
     // Magnus léger, tant que la boule est sur la piste ou l'aire
     corpsBoule.resetForces(false);
     if (!bouleFinie && !gouttiere && pb.z < D.fosse) {

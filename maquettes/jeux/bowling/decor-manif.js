@@ -8,9 +8,9 @@
 
    Repère de rendu.js : y haut, z le long de la piste (0 = ligne de faute), x positif = GAUCHE du joueur. Salle :
    x ∈ [-8,75 ; 8,75], mur du fond (derrière le joueur) à z = -11,5, plafond 4,4 m. Les pistes occupent tout l'avant :
-   le décor vit donc DERRIÈRE la zone d'élan (z < -5), hors de la zone interdite (piste principale, joueur, caméras),
-   et se voit surtout depuis la caméra de célébration (devant les quilles, tournée vers le joueur).
-   Le stand merguez de rendu.js est déjà à (-6,7 ; -9,7) : on s'installe autour, sans le toucher.
+   Théo (17/10) : « mets-les sur les côtés de la piste, c'est là qu'on voit vraiment les choses ». Les pistes voisines
+   ±3 et ±4 (x = ±5,17 et ±6,9, entraxe 1,724 m) sont « occupées » : le décor s'y installe, de z ≈ 5 à 14, là où la
+   caméra de visée et la caméra de suivi les voient. Les pistes ±2 (joueurs voisins) restent libres.
    ===================================================================================== */
 import { SLOGANS } from './cgt.js';
 
@@ -131,7 +131,7 @@ export function creerDecorManif(THREE, { logoTexture, zoneInterdite } = {}) {
      1. LE BARBECUE DE CHIPOS — bidon coupé en deux, grille, chipolatas qui dorent, deux gars en chasuble :
         l'un retourne les chipos à la pince, l'autre surveille, canette à la main.
      ===================================================================================== */
-  const BBQ = { x: -3.7, z: -9.9 };
+  const BBQ = { x: 5.17, z: 6.2 };
   const chipos = [];
   let pince = null, cuisinier = null, buveur = null;
   {
@@ -163,7 +163,7 @@ export function creerDecorManif(THREE, { logoTexture, zoneInterdite } = {}) {
   /* =====================================================================================
      2. LE BRASERO — bidon percé, palettes qui dépassent, flammes, lueur orange qui vacille ; deux gars s'y réchauffent.
      ===================================================================================== */
-  const BRA = { x: 3.4, z: -9.6 };
+  const BRA = { x: 5.17, z: 10.6 };
   const rechauffe = [];
   {
     const b = new THREE.Group(); poser(b, BRA.x, BRA.z);
@@ -183,11 +183,11 @@ export function creerDecorManif(THREE, { logoTexture, zoneInterdite } = {}) {
      3. LE CAMION SONO — fourgonnette blanche, banderole sur le flanc, haut-parleurs sur le toit, grappe de ballons ;
         un gars au mégaphone qui harangue à côté.
      ===================================================================================== */
-  const CAM = { x: 6.3, z: -9.2 };
+  const CAM = { x: -5.17, z: 9.2 };
   const ballons = [];
   let harangueur = null;
   {
-    const c = new THREE.Group(); poser(c, CAM.x, CAM.z, Math.PI / 2 + 0.25);
+    const c = new THREE.Group(); poser(c, CAM.x, CAM.z, Math.PI / 2); // cabine tournée vers le joueur, flanc vers la piste
     const caisse = new THREE.Mesh(garder(new THREE.BoxGeometry(2.1, 1.35, 1.3)), mat('#f4f4f4', { roughness: 0.4 })); caisse.position.set(-0.3, 1.0, 0); c.add(caisse);
     const cabine = new THREE.Mesh(garder(new THREE.BoxGeometry(0.9, 1.0, 1.26)), mat('#f4f4f4', { roughness: 0.4 })); cabine.position.set(1.15, 0.82, 0); c.add(cabine);
     const vitre = new THREE.Mesh(garder(new THREE.BoxGeometry(0.02, 0.4, 1.1)), mat('#2a3a4a', { roughness: 0.1, metalness: 0.4 })); vitre.position.set(1.61, 1.05, 0); vitre.rotation.z = 0.25; c.add(vitre);
@@ -209,7 +209,7 @@ export function creerDecorManif(THREE, { logoTexture, zoneInterdite } = {}) {
     const gf = garder(new THREE.BufferGeometry()); gf.setAttribute('position', new THREE.BufferAttribute(new Float32Array(fils), 3));
     const lf = new THREE.LineSegments(gf, garder(new THREE.LineBasicMaterial({ color: '#dddddd' }))); c.add(lf); ballons.fils = gf;
     // le gars au mégaphone, tourné vers la salle
-    harangueur = bonhomme(4, { haut: '#3a3a3a' }); poser(harangueur.g, CAM.x - 1.4, CAM.z + 1.2, versPoint(CAM.x - 1.4, CAM.z + 1.2, 0, 0));
+    harangueur = bonhomme(4, { haut: '#3a3a3a' }); poser(harangueur.g, CAM.x + 0.2, CAM.z - 2.4, versPoint(CAM.x + 0.2, CAM.z - 2.4, 0, -4));
     const mega = new THREE.Group(); mega.position.y = -0.48; harangueur.brasD.add(mega);
     const cn = new THREE.Mesh(garder(new THREE.CylinderGeometry(0.11, 0.04, 0.28, 12, 1, true)), mat('#f2f2f2', { side: THREE.DoubleSide })); cn.rotation.x = Math.PI / 2; cn.position.z = 0.16; mega.add(cn);
     const bague = new THREE.Mesh(garder(new THREE.TorusGeometry(0.11, 0.015, 6, 16)), M.chasuble); bague.position.z = 0.3; mega.add(bague);
@@ -220,7 +220,7 @@ export function creerDecorManif(THREE, { logoTexture, zoneInterdite } = {}) {
      ===================================================================================== */
   let arche = null;
   {
-    arche = new THREE.Group(); poser(arche, 0, -10.95);
+    arche = new THREE.Group(); poser(arche, -6.0, 14.2); arche.scale.setScalar(0.82); // à cheval sur les pistes -3 et -4, face au joueur
     const tore = new THREE.Mesh(garder(new THREE.TorusGeometry(2.3, 0.42, 14, 40, Math.PI)), mat(ROUGE, { roughness: 0.35 })); tore.position.y = 0.2; arche.add(tore);
     for (const s of [-1, 1]) { const pied = new THREE.Mesh(garder(new THREE.CylinderGeometry(0.5, 0.55, 0.4, 16)), mat('#b80016', { roughness: 0.4 })); pied.position.set(s * 2.3, 0.2, 0); arche.add(pied); }
     const panneau = new THREE.Mesh(garder(new THREE.PlaneGeometry(2.6, 0.65)), garder(new THREE.MeshStandardMaterial({ map: texte('TOUS ENSEMBLE !', { avecLogo: true, fond: '#ffffff', coul: ROUGE }), roughness: 0.5 })));
@@ -234,8 +234,8 @@ export function creerDecorManif(THREE, { logoTexture, zoneInterdite } = {}) {
      ===================================================================================== */
   let dormeur = null, queue = null; const zzz = [];
   {
-    const S = { x: -4.9, z: -7.0 };
-    const chaise = new THREE.Group(); poser(chaise, S.x, S.z, versPoint(S.x, S.z, 0, 4));
+    const S = { x: 6.9, z: 12.4 };
+    const chaise = new THREE.Group(); poser(chaise, S.x, S.z, versPoint(S.x, S.z, 0, -4));
     const assise = new THREE.Mesh(garder(new THREE.BoxGeometry(0.5, 0.04, 0.45)), mat('#2e5aa8')); assise.position.y = 0.42; chaise.add(assise);
     const dos = new THREE.Mesh(garder(new THREE.BoxGeometry(0.5, 0.5, 0.04)), mat('#2e5aa8')); dos.position.set(0, 0.7, -0.24); dos.rotation.x = -0.25; chaise.add(dos);
     for (const s of [-1, 1]) { const p = new THREE.Mesh(garder(new THREE.BoxGeometry(0.03, 0.6, 0.03)), M.metal); p.position.set(s * 0.24, 0.3, 0); p.rotation.x = 0.6; chaise.add(p); const q = p.clone(); q.rotation.x = -0.6; chaise.add(q); }
@@ -267,14 +267,14 @@ export function creerDecorManif(THREE, { logoTexture, zoneInterdite } = {}) {
     queue = new THREE.Group(); queue.position.set(0, 0.38, -0.27); ch.add(queue);
     const qm = new THREE.Mesh(garder(new THREE.CapsuleGeometry(0.025, 0.18, 3, 6)), poil); qm.position.y = 0.1; queue.add(qm); queue.rotation.x = -0.7;
     // le papy à béret et moustache
-    const papy = bonhomme(3, { chasuble: true, haut: '#5b5b5b' }); poser(papy.g, -2.9, -7.6, versPoint(-2.9, -7.6, 0, 3));
+    const papy = bonhomme(3, { chasuble: true, haut: '#5b5b5b' }); poser(papy.g, 6.9, 7.4, versPoint(6.9, 7.4, 0, -4));
     const beret = new THREE.Mesh(garder(new THREE.CylinderGeometry(0.2, 0.21, 0.06, 16)), mat('#1d2340')); beret.position.set(0.03, 0.17, 0); beret.rotation.z = 0.15; papy.tete.add(beret);
     const mous = new THREE.Mesh(garder(new THREE.CapsuleGeometry(0.02, 0.1, 3, 6)), mat('#e6e6e6')); mous.rotation.z = Math.PI / 2; mous.position.set(0, -0.06, 0.18); papy.tete.add(mous);
     papy.tete.children[1].material = mat('#d8d8d8');
     // pneus et palettes empilés au fond
     const gP = garder(new THREE.TorusGeometry(0.3, 0.12, 8, 16)); gP.rotateX(Math.PI / 2);
-    for (let i = 0; i < 4; i++) { const p = new THREE.Mesh(gP, M.pneu); p.position.set(1.6 + (i === 3 ? 0.15 : 0), 0.12 + i * 0.22, -10.9); groupe.add(p); }
-    for (let i = 0; i < 4; i++) { const pal = new THREE.Mesh(garder(new THREE.BoxGeometry(1.2, 0.14, 0.8)), M.bois); pal.position.set(-1.7, 0.07 + i * 0.15, -10.85); pal.rotation.y = i * 0.12; groupe.add(pal); }
+    for (let i = 0; i < 4; i++) { const p = new THREE.Mesh(gP, M.pneu); p.position.set(-6.9 + (i === 3 ? 0.15 : 0), 0.12 + i * 0.22, 6.0); groupe.add(p); }
+    for (let i = 0; i < 4; i++) { const pal = new THREE.Mesh(garder(new THREE.BoxGeometry(1.2, 0.14, 0.8)), M.bois); pal.position.set(-6.9, 0.07 + i * 0.15, 4.6); pal.rotation.y = i * 0.12; groupe.add(pal); }
   }
 
   /* ---------- contrôle : rien dans la zone interdite (au chargement, une fois) ---------- */
@@ -314,7 +314,7 @@ export function creerDecorManif(THREE, { logoTexture, zoneInterdite } = {}) {
     // le harangueur : bras du mégaphone levé, l'autre poing qui monte sur le rythme
     if (harangueur) { harangueur.brasD.rotation.x = -1.55; harangueur.brasD.rotation.y = 0.2; harangueur.brasG.rotation.x = -2.6 * Math.max(0, Math.sin(t * 3.2)) ** 2; harangueur.corps.rotation.x = -0.05 + Math.sin(t * 3.2) * 0.04; }
     // l'arche respire
-    if (arche) arche.scale.set(1 + Math.sin(t * 0.8) * 0.008, 1 + Math.sin(t * 0.8 + 1) * 0.012, 1);
+    if (arche) arche.scale.set(0.82 * (1 + Math.sin(t * 0.8) * 0.008), 0.82 * (1 + Math.sin(t * 0.8 + 1) * 0.012), 0.82);
     // le dormeur respire, les « Z » montent
     if (dormeur) dormeur.corps.scale.set(1 + Math.sin(t * 1.1) * 0.03, 1, 1 + Math.sin(t * 1.1) * 0.03);
     for (const z of zzz) { const p = (t * 0.35 + z.ph) % 1; z.s.position.set(z.x + 0.1 + p * 0.25, 1.15 + p * 0.8, z.z + 0.1); z.s.material.opacity = Math.sin(p * Math.PI); z.s.scale.setScalar(0.12 + p * 0.15); }

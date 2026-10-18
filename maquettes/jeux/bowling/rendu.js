@@ -1094,7 +1094,7 @@ export async function creerRendu(canvas, { theme = 'bony' } = {}) {
   /* ---------- foule (instanciée) : spectateurs (Bony) / manifestants (CGT) ---------- */
   const FOULE = (() => {
     const g = geoMii(), CAP = 96;
-    const inst = (geo, mat, n) => { const im = new THREE.InstancedMesh(geo, mat, n); im.frustumCulled = false; im.count = 0; im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3); scene.add(decor(im)); return im; };
+    const inst = (geo, mat, n) => { const im = new THREE.InstancedMesh(geo, mat, n); im.frustumCulled = false; im.count = 0; im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3).fill(1), 3); /* blanc par défaut : une instance posée sans couleur (drapeaux) sortait NOIRE */ scene.add(decor(im)); return im; };
     const blanc = (r) => std('#ffffff', r);
     const I = {
       torse: inst(g.corps, blanc(0.65), CAP), chasuble: inst(g.chasuble, matChasuble(IMG), CAP), tete: inst(g.tete, blanc(0.55), CAP), cheveux: inst(g.cheveux, blanc(0.5), CAP),

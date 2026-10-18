@@ -62,7 +62,7 @@ if (!isMainThread) {
   });
 } else {
   const reglages = process.argv[3] ? JSON.parse(process.argv[3]) : undefined;
-  const CACHE = path.join(ici, 'test-physique-visees.json');
+  const CACHE = process.env.CACHE_VISEES || path.join(ici, 'test-physique-visees.json');
   const cache = fs.existsSync(CACHE) ? JSON.parse(fs.readFileSync(CACHE, 'utf8')) : {};
   const POCHE = [-0.105, -0.095, -0.085, -0.075, -0.065, -0.055, -0.045]; // entre la 1 (x = 0) et la 3 (x = -0,152)
   const groupes = {
