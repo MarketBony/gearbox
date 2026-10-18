@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppProps } from '../types';
 import type { User } from '../../../types';
 import { GAMES_ALLOWED_ROLES, canSeeGames } from '../../../constants';
@@ -15,6 +15,9 @@ import { Morpion, Connect4, Battleship } from './boards';
 import { Minigolf } from './minigolf/Minigolf';
 import { apercuAmbiance, AMBIANCES } from './minigolf/rendu';
 import { THEMES, ThemeApercu, ThemeCadre, ThemeStyle, themeLabel, type Theme } from './themes';
+import { LOGO_CGT_SRC } from './cgt';
+// Bowling 3D : chargé À LA DEMANDE (three.js, rendu, son, Worker de physique Rapier) — chunk séparé, rien dans le bundle principal.
+const Bowling = lazy(() => import('./bowling/Bowling'));
 
 // =====================================================================
 // Rubrique « Jeux » — transposition de maquettes/v2/js/apps/games.js (même balisage, mêmes
@@ -28,17 +31,28 @@ import { THEMES, ThemeApercu, ThemeCadre, ThemeStyle, themeLabel, type Theme } f
 // =====================================================================
 
 type Tab = 'lobby' | GameType | 'global';
-const TABS: [Tab, string][] = [['lobby', 'Lobby'], ['morpion', 'Morpion'], ['connect4', 'Puissance 4'], ['battleship', 'Bataille navale'], ['minigolf', 'Minigolf'], ['global', 'Classement']];
+const TABS: [Tab, string][] = [['lobby', 'Lobby'], ['morpion', 'Morpion'], ['connect4', 'Puissance 4'], ['battleship', 'Bataille navale'], ['minigolf', 'Minigolf'], ['bowling', 'Bowling'], ['global', 'Classement']];
 const GAMES: { id: GameType; pitch: string; c: string; icon: string }[] = [
   { id: 'morpion', pitch: 'Trois cases alignées. Deux minutes, pas plus.', c: 'var(--bony-orange)', icon: 'grid' },
   { id: 'connect4', pitch: 'Quatre pions, la gravité en plus.', c: 'var(--bony-violet)', icon: 'target' },
   { id: 'battleship', pitch: 'Placez votre flotte, coulez la sienne.', c: 'var(--bony-blue)', icon: 'flag' },
   { id: 'minigolf', pitch: 'Moulins, îles, tapis roulants : le moins de coups gagne.', c: 'var(--ok)', icon: 'pin' },
+  { id: 'bowling', pitch: 'Tirez, poussez, lâchez : dix quilles en 3D, le plus gros score gagne.', c: 'var(--warn)', icon: 'play' },
 ];
 const MG_DIFF: [string, string][] = [['facile', 'Facile'], ['normal', 'Normal'], ['expert', 'Expert']];
 const mgResume = (o: any) => (o ? `${MG_DIFF.find((d) => d[0] === o.diff)?.[1] ?? ''} · ${o.nb} trous · ${AMBIANCES[o.amb] ?? ''}` : '');
-/** Réglages d'un défi en clair : ceux du minigolf, ou le thème (seulement s'il n'est pas celui par défaut). */
-const resume = (game: GameType, o: any) => (game === 'minigolf' ? mgResume(o) : o?.theme && o.theme !== 'bony' ? themeLabel(o.theme) : '');
+/** Réglages d'un défi en clair : ceux du minigolf, du bowling, ou le thème (seulement s'il n'est pas celui par défaut). */
+const resume = (game: GameType, o: any) => (game === 'minigolf' ? mgResume(o)
+  : game === 'bowling' ? (o ? `${o.frames ?? 10} frames${o.theme === 'cgt' ? ` · ${themeLabel('cgt')}` : ''}` : '')
+  : o?.theme && o.theme !== 'bony' ? themeLabel(o.theme) : '');
+/** Vignette de thème du bowling (pré-lobby) : la salle à la charte, ou le piquet de grève. */
+const ApercuBowling: React.FC<{ theme: Theme }> = ({ theme }) => (
+  <div aria-hidden style={{ height: 96, borderRadius: 6, display: 'grid', placeItems: 'center', gap: 4, alignContent: 'center',
+    background: theme === 'cgt' ? 'linear-gradient(90deg,#e3001b,#b30015)' : 'linear-gradient(90deg,#f75632,#8f12ab)' }}>
+    <img src={theme === 'cgt' ? LOGO_CGT_SRC : '/logo-bony-white.svg'} alt="" style={{ height: theme === 'cgt' ? 40 : 22, width: 'auto' }} />
+    <span style={{ color: '#fff', font: theme === 'cgt' ? '15px "Bowlby One SC",Impact,sans-serif' : '700 12px Syncopate,Arial,sans-serif', textTransform: theme === 'cgt' ? 'uppercase' : 'lowercase' }}>{theme === 'cgt' ? 'Piquet de grève' : 'bowling'}</span>
+  </div>
+);
 /** Vignette d'ambiance du pré-lobby (même dessin que le jeu). */
 const Vignette: React.FC<{ amb: string }> = ({ amb }) => { const r = useRef<HTMLCanvasElement>(null); useEffect(() => { if (r.current) apercuAmbiance(r.current, amb); }, [amb]); return <canvas ref={r} width={256} height={160} style={{ width: '100%', aspectRatio: '16 / 10', borderRadius: 6, display: 'block' }} />; };
 const gOf = (id: GameType) => GAMES.find((g) => g.id === id) || GAMES[0];
@@ -75,6 +89,11 @@ export default function GamesApp({ win, inst }: AppProps) {
   // Thème des trois autres jeux (pré-lobby), mémorisé lui aussi.
   const [theme, setThemeState] = useState<Theme>(() => (gx().store.get('games.theme', 'bony') === 'cgt' ? 'cgt' : 'bony'));
   const setTheme = (t: Theme) => { setThemeState(t); gx().store.set('games.theme', t); };
+  // Pré-lobby du bowling : nombre de frames (le thème est celui des autres jeux), mémorisé lui aussi.
+  const [bwFrames, setBwFramesState] = useState<5 | 10>(() => (Number(gx().store.get('games.bowling.frames', 10)) === 5 ? 5 : 10));
+  const setBwFrames = (f: 5 | 10) => { setBwFramesState(f); gx().store.set('games.bowling.frames', f); };
+  // Entraînement au bowling : en local, sans adversaire, sans serveur ni écriture.
+  const [solo, setSolo] = useState(false);
   const [target, setTarget] = useState<string | null>(null);
   const [leaving, setLeaving] = useState<string | null>(null);   // défi refusé en train de sortir
   const paneRef = useRef<HTMLDivElement>(null);
@@ -121,7 +140,7 @@ export default function GamesApp({ win, inst }: AppProps) {
   // ---------------------------------------------------------------- actions
   const dare = async (to: string) => {
     try {
-      const options = pick === 'minigolf' ? mg : { theme }, r = resume(pick, options);
+      const options = pick === 'minigolf' ? mg : pick === 'bowling' ? { theme, frames: bwFrames } : { theme }, r = resume(pick, options);
       await db.sendGameChallenge(to, pick, options);
       setTarget(null); hud(`Défi envoyé à ${first(to)} · ${GAME_LABELS[pick]}${r ? ` (${r})` : ''}`);
       await loadLobby();
@@ -169,8 +188,8 @@ export default function GamesApp({ win, inst }: AppProps) {
 
   // ---------------------------------------------------------------- navigation + animations
   const anim = useRef(false);
-  const openGame = (id: string | null) => { anim.current = true; setActiveId(id); };
-  const goTab = (t: Tab) => { anim.current = true; setActiveId(null); setTab(t); };
+  const openGame = (id: string | null) => { anim.current = true; setSolo(false); setActiveId(id); };
+  const goTab = (t: Tab) => { anim.current = true; setActiveId(null); setSolo(false); setTab(t); };
   useLayoutEffect(() => {
     if (!anim.current) return; anim.current = false;
     const pane = paneRef.current, el = pane?.firstElementChild as HTMLElement | null; if (!el) return;
@@ -226,19 +245,31 @@ export default function GamesApp({ win, inst }: AppProps) {
       {!won && !draw ? <span className="muted" style={{ fontSize: 13 }}>La revanche est un clic dans le lobby.</span> : null}
       <button className="btn" style={{ marginTop: 6 }} onClick={() => openGame(null)}><Icon name="back" size="sm" />Retour au lobby</button></div> : null;
     const props = { s: active, myId, onMove: move, onPlaceFleet: placeFleet, end };
-    const plein = active.game === 'minigolf';
+    const plein = active.game === 'minigolf' || active.game === 'bowling';
     return (
       <div className="app" onKeyDown={onKey} tabIndex={-1}>
         <div className="app-head gme-head"><button className="gme-back" data-tip="Retour au lobby" aria-label="Retour au lobby" onClick={() => openGame(null)}><Icon name="back" /></button>
           <div className="ah-t"><span className="ah-eye">Détente</span><h1>{GAME_LABELS[active.game]}</h1><span className="sub gme-vs">{player(myId, true)}<span className="faint">vs</span>{player(active.opponentId, true)}</span></div>
           <div className="ah-f">{!over ? <button className="btn ghost" style={{ color: 'var(--danger)' }} onClick={abandon}><Icon name="flag" size="sm" />Abandonner</button> : null}</div></div>
         <div className={plein ? 'gme-pane' : 'gme-pane scroll'} ref={paneRef} style={plein ? { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } : undefined}>
-          {plein ? <Minigolf key={active.id} s={active} myId={myId} onMove={move} end={end} nomDe={uName} />
+          {active.game === 'bowling' ? <Suspense fallback={<div className="gme-empty" style={{ margin: 'auto' }}>Chargement du bowling…</div>}><Bowling key={active.id} s={active} onMove={move} nomDe={uName} onQuit={() => openGame(null)} /></Suspense>
+            : plein ? <Minigolf key={active.id} s={active} myId={myId} onMove={move} end={end} nomDe={uName} />
             : <><ThemeStyle /><ThemeCadre s={active}>{active.game === 'morpion' ? <Morpion key={active.id} {...props} playRef={playKey} /> : active.game === 'connect4' ? <Connect4 key={active.id} {...props} playRef={playKey} /> : <Battleship key={active.id} {...props} />}</ThemeCadre></>}
         </div>
       </div>
     );
   }
+
+  // ---------------------------------------------------------------- entraînement au bowling (local, aucune écriture)
+  if (solo) return (
+    <div className="app">
+      <div className="app-head gme-head"><button className="gme-back" data-tip="Retour au lobby" aria-label="Retour au lobby" onClick={() => { anim.current = true; setSolo(false); }}><Icon name="back" /></button>
+        <div className="ah-t"><span className="ah-eye">Détente</span><h1>Bowling</h1><span className="sub">Entraînement — seul ou à deux sur ce poste, rien n’est enregistré.</span></div></div>
+      <div className="gme-pane" ref={paneRef} style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <Suspense fallback={<div className="gme-empty" style={{ margin: 'auto' }}>Chargement du bowling…</div>}><Bowling theme={theme} onQuit={() => setSolo(false)} /></Suspense>
+      </div>
+    </div>
+  );
 
   // ---------------------------------------------------------------- lobby et classements
   const cnt = received.length;
@@ -282,7 +313,18 @@ export default function GamesApp({ win, inst }: AppProps) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>{Object.entries(AMBIANCES).map(([k, l]) => (
                   <button key={k} className="gme-gcard" aria-pressed={mg.amb === k} style={{ padding: 6, gap: 6, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }} onClick={() => setMg({ amb: k })}><Vignette amb={k} /><span className="nm" style={{ fontSize: 13 }}>{l as string}</span></button>))}</div></div>
             </div>) : null}
-          {pick !== 'minigolf' ? (
+          {pick === 'bowling' ? (
+            <div className="gme-card" style={{ display: 'grid', gap: 12, padding: 14, marginTop: 12 }}>
+              <div className="row wrap" style={{ gap: 14, alignItems: 'end' }}>
+                <div style={{ display: 'grid', gap: 6 }}><span className="label">Frames</span><Seg value={String(bwFrames)} onChange={(v: string) => setBwFrames(v === '5' ? 5 : 10)} options={[['5', '5 frames'], ['10', '10 frames']]} /></div>
+                <span className="grow" />
+                <button className="btn" onClick={() => { anim.current = true; setSolo(true); }}><Icon name="play" size="sm" />S’entraîner seul</button>
+              </div>
+              <div style={{ display: 'grid', gap: 6 }}><span className="label">Thème — le même pour les deux joueurs</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>{THEMES.map(([k, l]) => (
+                  <button key={k} className="gme-gcard" aria-pressed={theme === k} style={{ padding: 6, gap: 6, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }} onClick={() => setTheme(k)}><ApercuBowling theme={k} /><span className="nm" style={{ fontSize: 13 }}>{l}</span></button>))}</div></div>
+            </div>) : null}
+          {pick !== 'minigolf' && pick !== 'bowling' ? (
             <div className="gme-card" style={{ display: 'grid', gap: 8, padding: 14, marginTop: 12 }}><span className="label">Thème — le même pour les deux joueurs</span>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>{THEMES.map(([k, l]) => (
                 <button key={k} className="gme-gcard" aria-pressed={theme === k} style={{ padding: 6, gap: 6, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }} onClick={() => setTheme(k)}><ThemeApercu game={pick} theme={k} /><span className="nm" style={{ fontSize: 13 }}>{l}</span></button>))}</div>

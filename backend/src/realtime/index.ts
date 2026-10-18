@@ -180,6 +180,8 @@ const NOMS_JEUX: Record<string, string> = {
   morpion: 'Morpion',
   connect4: 'Puissance 4',
   battleship: 'Bataille navale',
+  minigolf: 'Minigolf',
+  bowling: 'Bowling',
 };
 
 /**

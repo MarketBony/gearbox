@@ -14,14 +14,18 @@
 // depuis la liste des utilisateurs.
 // ============================================================================
 
-export type GameType = 'morpion' | 'connect4' | 'battleship' | 'minigolf';
+export type GameType = 'morpion' | 'connect4' | 'battleship' | 'minigolf' | 'bowling';
 
 export const GAME_LABELS: Record<GameType, string> = {
   morpion: 'Morpion',
   connect4: 'Puissance 4',
   battleship: 'Bataille navale',
   minigolf: 'Minigolf',
+  bowling: 'Bowling',
 };
+
+/** Réglages d'un défi de bowling (pré-lobby) : thème et nombre de frames, les mêmes pour les deux joueurs. */
+export interface BowlingOptions { theme: 'bony' | 'cgt'; frames: 5 | 10 }
 
 /** Réglages d'un défi de minigolf, choisis par celui qui lance (pré-lobby). */
 export interface MinigolfOptions { diff: 'facile' | 'normal' | 'expert'; nb: 3 | 6 | 9; amb: 'ete' | 'mer' | 'nuit' | 'manif'; choc: boolean }
@@ -34,7 +38,7 @@ export interface GameChallenge {
   status: 'pending' | 'accepted' | 'refused';
   sessionId?: string | null;
   /** Réglages du pré-lobby : ceux du minigolf, ou le thème des autres jeux. */
-  options?: MinigolfOptions | { theme: 'bony' | 'cgt' } | null;
+  options?: MinigolfOptions | BowlingOptions | { theme: 'bony' | 'cgt' } | null;
   createdAt: string;
 }
 

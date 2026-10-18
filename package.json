@@ -4,16 +4,18 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/check-plaques-sync.mjs && node scripts/check-bonyform-sync.mjs && node scripts/check-minigolf-sync.mjs",
+    "predev": "node scripts/check-plaques-sync.mjs && node scripts/check-bonyform-sync.mjs && node scripts/check-minigolf-sync.mjs && node scripts/check-bowling-sync.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/check-plaques-sync.mjs && node scripts/check-bonyform-sync.mjs && node scripts/check-minigolf-sync.mjs",
+    "prebuild": "node scripts/check-plaques-sync.mjs && node scripts/check-bonyform-sync.mjs && node scripts/check-minigolf-sync.mjs && node scripts/check-bowling-sync.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "check:plaques": "node scripts/check-plaques-sync.mjs",
     "check:bonyform": "node scripts/check-bonyform-sync.mjs",
-    "check:minigolf": "node scripts/check-minigolf-sync.mjs"
+    "check:minigolf": "node scripts/check-minigolf-sync.mjs",
+    "check:bowling": "node scripts/check-bowling-sync.mjs"
   },
   "dependencies": {
+    "@dimforge/rapier3d-deterministic-compat": "0.21.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.42.1",
     "lucide-react": "^0.574.0",
@@ -23,6 +25,7 @@
     "react-easy-crop": "^5.5.7",
     "recharts": "^3.7.0",
     "socket.io-client": "^4.8.3",
+    "three": "0.160.0",
     "xlsx-js-style": "^1.2.0",
     "zustand": "^5.0.15"
   },

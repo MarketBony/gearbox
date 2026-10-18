@@ -3,6 +3,7 @@ import { GAMES_ROLES } from '../auth/roles';
 import { jeuxActives } from '../settings/appSettings';
 import { applyMove, validateFleet, IllegalMoveError, BattleshipBoard } from '../utils/gameRules';
 import { projectSessionFor, SessionRow } from '../utils/gameView';
+import { assurerPhysiqueBowling } from '../games/bowlingRules';
 import { prisma } from '../db';
 
 
@@ -39,6 +40,12 @@ const chargerPartie = async (sessionId: unknown, userId: string) => {
   }
   return session;
 };
+
+// UN COUP À LA FOIS PAR PARTIE. Sans ce verrou, deux `game:move` envoyés coup sur coup (double clic, onglet en
+// double) liraient le MÊME plateau avant que l'un ou l'autre ne l'écrive : le contrôle du tour passerait deux
+// fois et le second écraserait le premier. Ça vaut pour tous les jeux, et surtout pour le bowling dont le
+// lancer est simulé par le serveur (~110 ms de calcul). Verrou en mémoire : un seul processus `api`.
+const enCours = new Set<string>();
 
 export const registerGameHandlers = (io: Server, socket: Socket) => {
   const userId: string = socket.data.user.id;
@@ -82,8 +89,13 @@ export const registerGameHandlers = (io: Server, socket: Socket) => {
 
   // ---- Coup joué ----
   socket.on('game:move', async (payload: any, ack: Ack) => {
+    const verrou = typeof payload?.sessionId === 'string' ? payload.sessionId : '';
+    if (verrou && enCours.has(verrou)) return reply(ack, { error: 'Coup précédent en cours de traitement.' });
+    if (verrou) enCours.add(verrou);
     try {
       const session = await chargerPartie(payload?.sessionId, userId);
+      // Bowling : Rapier (WASM) est chargé à la première partie, pas au démarrage du serveur.
+      if (session.game === 'bowling') await assurerPhysiqueBowling();
 
       // TOUTE la validation est ici, côté serveur : tour, case libre, coup légal,
       // et c'est le serveur qui désigne le vainqueur. Le client ne propose qu'une
@@ -112,6 +124,8 @@ export const registerGameHandlers = (io: Server, socket: Socket) => {
     } catch (e) {
       reply(ack, { error: e instanceof IllegalMoveError ? e.message : 'Coup refusé.' });
       if (!(e instanceof IllegalMoveError)) console.error('[games] move', e);
+    } finally {
+      if (verrou) enCours.delete(verrou);
     }
   });
 

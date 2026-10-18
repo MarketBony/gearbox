@@ -12,8 +12,8 @@
 // une case ; il ne décide de rien.
 // ============================================================================
 
-export type GameType = 'morpion' | 'connect4' | 'battleship' | 'minigolf';
-export const GAME_TYPES: GameType[] = ['morpion', 'connect4', 'battleship', 'minigolf'];
+export type GameType = 'morpion' | 'connect4' | 'battleship' | 'minigolf' | 'bowling';
+export const GAME_TYPES: GameType[] = ['morpion', 'connect4', 'battleship', 'minigolf', 'bowling'];
 export const isGameType = (v: unknown): v is GameType =>
   typeof v === 'string' && (GAME_TYPES as string[]).includes(v);
 
@@ -33,6 +33,8 @@ export class IllegalMoveError extends Error {}
 // Importé APRÈS la classe : minigolfRules s'en sert (import circulaire volontaire, résolu à l'appel).
 // eslint-disable-next-line import/first
 import { appliquerCoupMinigolf, lireOptions, plateauInitial } from '../games/minigolfRules';
+// eslint-disable-next-line import/first
+import { appliquerLancerBowling, lireOptionsBowling, plateauInitialBowling } from '../games/bowlingRules';
 
 const autre = (session: { player1Id: string; player2Id: string }, userId: string) =>
   userId === session.player1Id ? session.player2Id : session.player1Id;
@@ -351,6 +353,9 @@ const appliquerCoup = (session: SessionLike, userId: string, move: any): MoveRes
 
   // Minigolf : le serveur simule le coup avec le moteur partagé (games/minigolfRules.ts).
   if (session.game === 'minigolf') return appliquerCoupMinigolf(session, marque, move);
+  // Bowling : le serveur rejoue le lancer avec le moteur partagé (games/bowlingRules.ts). ⚠️ Rapier doit être
+  // chargé avant (assurerPhysiqueBowling, attendu par realtime/games.ts) : la simulation est synchrone.
+  if (session.game === 'bowling') return appliquerLancerBowling(session, marque, move);
 
   throw new IllegalMoveError('Jeu inconnu.');
 };
@@ -365,7 +370,7 @@ const appliquerCoup = (session: SessionLike, userId: string, move: any): MoveRes
 export const THEMES = ['bony', 'cgt'] as const;
 export type Theme = (typeof THEMES)[number];
 export const lireOptionsJeu = (game: GameType, o: any) =>
-  game === 'minigolf' ? lireOptions(o) : { theme: (THEMES as readonly string[]).includes(o?.theme) ? (o.theme as Theme) : 'bony' };
+  game === 'minigolf' ? lireOptions(o) : game === 'bowling' ? lireOptionsBowling(o) : { theme: (THEMES as readonly string[]).includes(o?.theme) ? (o.theme as Theme) : 'bony' };
 
 export const applyMove = (session: SessionLike, userId: string, move: any): MoveResult => {
   const r = appliquerCoup(session, userId, move);
@@ -375,6 +380,7 @@ export const applyMove = (session: SessionLike, userId: string, move: any): Move
 
 export const initBoard = (game: GameType, options?: any) => {
   if (game === 'minigolf') return plateauInitial(options);
+  if (game === 'bowling') return plateauInitialBowling(options);
   const b: any = game === 'morpion' ? emptyMorpion() : game === 'connect4' ? emptyConnect4() : emptyBattleship();
   return { ...b, theme: (lireOptionsJeu(game, options) as { theme: Theme }).theme };
 };
