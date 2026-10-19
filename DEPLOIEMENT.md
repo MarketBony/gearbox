@@ -224,7 +224,9 @@ Mise en place (une fois) :
     fichier. Refusé si des vendeurs existent déjà. Le calcul des portefeuilles reste DÉSACTIVÉ jusqu'au clic de Théo
     (SPARK › Équipes › Règles). À la main : `… worker.js --portefeuilles [--simuler]`.
 
-Au quotidien (depuis le 16/10 : chaque vendredi soir, VN 23 h 30, VO 23 h 45) : DCS dépose ses TXT dans `depot/` ; le worker les importe et les range dans l'archive. Le journal est dans
+Au quotidien (depuis le 16/10 : chaque vendredi soir, VN 23 h 30, VO 23 h 45 ; depuis le 19/10, ces requêtes ne portent que sur les
+**30 derniers jours** (date de livraison) et sont importées en MISE À JOUR — un export de la base entière se dépose avec « complet »
+dans son titre) : DCS dépose ses TXT dans `depot/` ; le worker les importe et les range dans l'archive. Le journal est dans
 Gearbox (CRM › Imports, Master). Un import refusé pour baisse de volume s'applique depuis Gearbox (« Appliquer quand même… »).
 
 ## Worker Cloudflare des Forms Bony (`forms-worker/`, 01/10/2026)

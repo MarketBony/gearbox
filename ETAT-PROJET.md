@@ -31,8 +31,8 @@
   push. `GET /api/tasks` : un rôle de la To-do qui n'édite pas (Guest) ne reçoit que SES tâches libres (filtre serveur).
   **Non vérifié** : Guest et chef de site avec de vrais comptes ; 1536x730 ; ancienne interface. **Le bureau de Théo est déjà
   abîmé par l'ancien bug** (widgets sous le bas de l'écran) : à refaire une fois.
-- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 94**
-  (18/10, bowling, ci-dessus). Avant lui le **93** (16/10). Avant lui le **92** (16/10, `api` + `web` : Jeux, thèmes Bony / Grève CGT des 3 jeux + lobby multi-jeux). Avant lui le **91**
+- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 95**
+  (19/10, SPARK imports 30 jours, ci-dessus). Avant lui le **94** (18/10, bowling). Avant lui le **93** (16/10). Avant lui le **92** (16/10, `api` + `web` : Jeux, thèmes Bony / Grève CGT des 3 jeux + lobby multi-jeux). Avant lui le **91**
   (15/10, `web` seul : minigolf, tour par tour réparé — tir bloqué dès le trou 2, coups en double). Avant lui le **90**
   (15/10, `api` + `web` + migration Supabase `game_challenge_options` : **4e jeu, le MINIGOLF**, v2 seulement). Avant lui le
   **89** (15/10, `web` seul : molette bloquée au survol d'un tableau, v2). Avant lui le **88** (15/10, `rcu-worker` + `api` + `web` :
@@ -71,7 +71,20 @@
   vendeurs du Sud-Ouest (MAEVA dit « Renault » partout : les clients Dacia d'Albi tombent « à attribuer ») ; codes postaux des
   8 vendeurs Secteur qui n'en ont pas ; départs / arrivées notés dans les feuilles par plaque (« départ fin octobre »…, non repris).
   Puis Règles › Simuler › « Activer et lancer le premier calcul ».
-- **PROCHAINE ÉTAPE : contrôler le PREMIER envoi DCS (samedi 17/10 ou lundi)** — SPARK › Imports doit montrer deux imports
+- **CORRECTIF 95 EN PRODUCTION (19/10, `rcu-worker` + `api` + `web`) — SPARK : imports DCS en MISE À JOUR 30 JOURS.**
+  Décision de Théo : les requêtes du vendredi soir (VN 23 h 30, VO 23 h 45) ne renvoient plus la base entière (15 min de
+  calcul côté DCS) mais les **30 derniers jours sur la DATE DE LIVRAISON**, même cadence. Plus AUCUN export complet
+  automatique. Worker (`rcu/parse.ts` `modeDuTitre`, `rcu/importer.ts`) : un VN / VO est une **mise à jour** par défaut
+  (ajoute / met à jour, ne marque rien « disparu », pas de garde-fou de volume) ; un titre contenant « complet » garde
+  l'ancien comportement (rechargement manuel). Écran Imports : « 30 j » / « mise à jour (30 derniers jours) ». Aucune
+  migration (`stats.mode`). Testé sur la base RCU locale (VN réel réduit à 30 j : 1 145 lignes, appliqué en 1,5 s, 0
+  disparue ; même fichier titré « complet » refusé pour chute). **Limite assumée** : une fiche livrée il y a plus de 30 jours
+  n'est plus mise à jour (coordonnées, annulations) sauf export « complet » manuel. **À FAIRE PAR THÉO dans DCSNETneo** :
+  passer les 2 requêtes « SPGR » en 30 derniers jours (titre inchangé), puis contrôler l'envoi suivant dans SPARK › Imports.
+- **❌ PREMIER ENVOI DCS NON REÇU (contrôlé le 19/10)** : AUCUNE connexion SFTP du compte `dcs` depuis le test du 15/10 08:33
+  (`195.25.28.4`), ni réussie ni échouée ; `/srv/dcs/depot` vide ; journal du worker sans import. Le problème est en amont, côté
+  DCSNETneo (planification « SPGR » non lancée / poste éteint / tâche en erreur avant connexion) — à voir par Théo avec l'IT.
+  Ancien texte : - **PROCHAINE ÉTAPE : contrôler le PREMIER envoi DCS (samedi 17/10 ou lundi)** — SPARK › Imports doit montrer deux imports
   VN et VO du vendredi 16/10 au soir (`sudo docker compose logs --since 72h rcu-worker`). Risques non vérifiés : ligne de TOTAL
   absente (refus « Ligne de total absente » → voir si DCSNETneo a une option), titre non reconnu (« clients VN » attendu), noms
   de fichier. Si refus : le fichier est dans `/srv/rcu/archive/refuses/`, le lire avant de toucher au code. Garde-fou de volume :
@@ -139,7 +152,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 94 (18/10)** — Jeux : bowling 3D, 5e jeu de la v2 (`api` + `web`, aucune migration).
+- **En production : correctif 95 (19/10)** — SPARK : imports DCS en mise à jour 30 jours (`rcu-worker` + `api` + `web`).
+  Avant lui le **correctif 94 (18/10)** — Jeux : bowling 3D, 5e jeu de la v2 (`api` + `web`, aucune migration).
   Avant lui le **correctif 93 (16/10)** — widgets du bureau stables, tâches multi-assignées, prestataire sur les dépenses,
   affichage 1600x900 (`api` + `web`, 2 migrations additives).
   Avant lui le **correctif 92 (16/10)** — Jeux : thèmes Bony / Grève CGT + lobby multi-jeux (`api` + `web`).
@@ -1269,7 +1283,9 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 94** (18 octobre 2026) — Jeux : bowling 3D dans la v2, **`api` + `web`**,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 95** (19 octobre 2026) — SPARK, imports DCS en mise à jour 30 jours,
+  **`rcu-worker` + `api` + `web`**, aucune migration.
+  Avant lui le **correctif 94** (18 octobre 2026) — Jeux : bowling 3D dans la v2, **`api` + `web`**,
   aucune migration, nouvelles dépendances `three` 0.160.0 (web) et `@dimforge/rapier3d-deterministic-compat` 0.21.0 (web + api).
   Avant lui le **correctif 93** (16 octobre 2026) — widgets du bureau v2 stables, tâches multi-assignées, prestataire
   sur les dépenses, affichage 1600x900, **`api` + `web`**, migrations Supabase `20261016120000_task_assignees` et
