@@ -1687,3 +1687,8 @@ est le bon comportement (`restart: always` côté Docker).
   `GameChallenge.options`. Plateau : lancers par joueur, quilles debout (positions arrondies), compteur, dernier lancer.
 - `realtime/games.ts` : verrou « un coup à la fois par partie » (tous les jeux) — deux coups simultanés lisaient le même plateau.
 - `realtime/index.ts` : nom du jeu ajouté pour minigolf et bowling dans la notification push de défi (manquait pour le minigolf).
+
+## Correctif 95 (19/10/2026) — SPARK : imports DCS en mise à jour 30 jours
+- `rcu/parse.ts` : `ModeImport` = `maj` | `complet`, `modeDuTitre()` (VN / VO = `maj` sauf titre contenant « complet » ; BSO =
+  `complet`). `rcu/importer.ts` : en `maj`, aucune vente marquée disparue et pas de garde-fou de volume ; en `complet`, le
+  garde-fou compare au dernier import COMPLET appliqué (`coalesce(stats->>'mode','complet')`). `stats.mode` enregistré.

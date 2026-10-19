@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { PoolClient } from 'pg';
 import { rcu } from './db';
-import { COLONNES_TAMPON, decouper, lire, Ligne, Source } from './parse';
+import { COLONNES_TAMPON, decouper, lire, Ligne, ModeImport, Source } from './parse';
 
 /**
  * Import d'UN fichier DCS dans la base du RCU — une seule transaction, garde-fous compris.
@@ -11,9 +11,13 @@ import { COLONNES_TAMPON, decouper, lire, Ligne, Source } from './parse';
  * Étapes (RCU-CADRAGE.md § 6) :
  *   1. lecture et contrôles du fichier (titre, colonnes obligatoires, total annoncé) ;
  *   2. lignes normalisées → `rcu.tampon`, par lots ;
- *   3. garde-fou de volume : une chute de plus de 10 % par rapport au dernier import APPLIQUÉ de la même
- *      source refuse l'import (données de la veille conservées), sauf `force` ;
- *   4. mise à jour véhicules → identités → ventes, et marquage des ventes disparues (VN / VO, exports complets) ;
+ *   3. garde-fou de volume (exports COMPLETS seulement) : une chute de plus de 10 % par rapport au dernier import
+ *      complet APPLIQUÉ de la même source refuse l'import (données de la veille conservées), sauf `force` ;
+ *   4. mise à jour véhicules → identités → ventes, et marquage des ventes disparues (exports COMPLETS seulement) ;
+ *
+ * ⚠️ Depuis le 19/10/2026, les envois DCS automatiques sont des MISES À JOUR (30 derniers jours), pas des exports
+ *    complets : voir `ModeImport` dans parse.ts. Une mise à jour ne marque rien « disparu » et n'a pas de garde-fou de
+ *    volume — sinon chaque envoi serait refusé (chute) ou, forcé, déclarerait disparue toute la base hors fenêtre.
  *   5. journal `rcu.import_run` avec les compteurs du rapport.
  *
  * ⚠️ L'import n'écrit QUE dans la couche DCS (identite_source, vehicule, vente). Jamais dans ce que Bony saisit.
@@ -48,7 +52,7 @@ async function remplirTampon(client: PoolClient, runId: number, lignes: Ligne[])
 }
 
 /** Met à jour la couche DCS à partir du tampon du run. Rend les compteurs du rapport. */
-async function appliquer(client: PoolClient, runId: number, source: Source): Promise<Record<string, unknown>> {
+async function appliquer(client: PoolClient, runId: number, source: Source, mode: ModeImport): Promise<Record<string, unknown>> {
   const n = async (sql: string, params: unknown[] = [runId]) => (await client.query(sql, params)).rowCount ?? 0;
 
   // Résolution : société, site, retenue / motif d'exclusion, financement. Une ligne par clé de vente :
@@ -185,8 +189,8 @@ async function appliquer(client: PoolClient, runId: number, source: Source): Pro
   stats.ventesEcrites = ventes.rowCount;
 
   // Ventes disparues d'un export COMPLET (VN / VO) : jamais supprimées, marquées. L'ancienne base, importée
-  // une fois, ne marque rien.
-  stats.ventesDisparues = source === 'BSO' ? 0 : await n(
+  // une fois, ne marque rien ; une MISE À JOUR (30 jours) non plus : une vente hors de sa fenêtre n'a pas disparu.
+  stats.ventesDisparues = source === 'BSO' || mode === 'maj' ? 0 : await n(
     `update rcu.vente set absente_depuis = now() where source = $2::text and dernier_run <> $1 and absente_depuis is null`,
     [runId, source]);
   return stats;
@@ -230,7 +234,7 @@ export async function importerFichier(chemin: string, opts: { force?: boolean; r
       return { runId, source, statut: 'refuse', message, stats };
     };
 
-    const stats: Record<string, unknown> = { lignesLues: fichier.lignes.length, totalAnnonce: fichier.totalAnnonce };
+    const stats: Record<string, unknown> = { mode: fichier.mode, lignesLues: fichier.lignes.length, totalAnnonce: fichier.totalAnnonce };
     if (!fichier.complet) return await refuser('Ligne de total absente : fichier incomplet (dépôt en cours ou export interrompu).', stats);
     if (fichier.totalAnnonce != null && fichier.totalAnnonce !== fichier.lignes.length) {
       return await refuser(`Le total annoncé (${fichier.totalAnnonce}) ne correspond pas aux lignes lues (${fichier.lignes.length}).`, stats);
@@ -242,11 +246,13 @@ export async function importerFichier(chemin: string, opts: { force?: boolean; r
     stats.sansClient = lecture.sansClient;
     stats.lignesClient = lecture.lignes.length;
 
-    // Garde-fou de volume, contre le dernier import appliqué de la même source.
-    const prec = await client.query(
-      `select (stats->>'lignesClient')::int as n from rcu.import_run where source = $1 and statut = 'applique' order by id desc limit 1`,
+    // Garde-fou de volume (exports COMPLETS seulement), contre le dernier import COMPLET appliqué de la même source.
+    // Les imports d'avant le 19/10 n'ont pas de `mode` : ils étaient tous complets.
+    const prec = fichier.mode !== 'complet' ? null : await client.query(
+      `select (stats->>'lignesClient')::int as n from rcu.import_run
+        where source = $1 and statut = 'applique' and coalesce(stats->>'mode', 'complet') = 'complet' order by id desc limit 1`,
       [source]);
-    const avant = prec.rows[0]?.n as number | undefined;
+    const avant = prec?.rows[0]?.n as number | undefined;
     if (avant && lecture.lignes.length < avant * (1 - SEUIL_CHUTE) && !opts.force) {
       return await refuser(
         `Volume en chute : ${lecture.lignes.length.toLocaleString('fr-FR')} lignes avec client contre ${avant.toLocaleString('fr-FR')} au dernier import (seuil ${SEUIL_CHUTE * 100} %). `
@@ -259,7 +265,7 @@ export async function importerFichier(chemin: string, opts: { force?: boolean; r
     // ⚠️ Sans statistiques, le planificateur croit le tampon vide et compare chaque ligne à chaque ligne
     // (360 000² sur l'ancienne base : plus de 10 minutes). ANALYZE après chaque remplissage.
     await client.query('analyze rcu.tampon');
-    Object.assign(stats, await appliquer(client, runId!, source));
+    Object.assign(stats, await appliquer(client, runId!, source, fichier.mode));
     await client.query('delete from rcu.tampon where run_id = $1', [runId]);
     stats.dureeSecondes = Math.round((Date.now() - t0) / 100) / 10;
     await client.query(`update rcu.import_run set statut = 'applique', fin = now(), stats = $2 where id = $1`, [runId, stats]);

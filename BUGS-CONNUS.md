@@ -41,6 +41,9 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [ ] **Bowling : Brooklyn encore généreux (30 % de strikes, cible 25 %)** et boule lente encore moins déviée qu'une rapide —
   limites du moteur (mélange des quilles), noté au correctif 94.
 - [ ] **Bowling : duel à deux comptes jamais joué avant la prod** (correctif 94) — recette de Théo en prod.
+- [ ] **SPARK : premier envoi automatique DCS (16/10) jamais parti** — aucune connexion SFTP de `dcs` depuis le 15/10.
+  Hypothèse de Théo : export complet trop lourd (15 min de calcul). Requêtes réduites à 30 jours (correctif 95) ; à confirmer
+  au prochain envoi. Si rien n'arrive encore : planification DCSNETneo / poste éteint.
 - [ ] **VPS : connexion SSH par mot de passe ouverte à TOUS les comptes** (constaté le 15/10) : `50-cloud-init.conf` (19/06) met
   `PasswordAuthentication yes` (ubuntu compris ; root `prohibit-password`), pas de fail2ban. Seul `dcs` en a besoin (bloc `Match`
   du `70-dcs-sftp.conf`). À arbitrer par Théo : passer le global à `no` (clé seule pour ubuntu), après `sshd -t`, session ouverte.

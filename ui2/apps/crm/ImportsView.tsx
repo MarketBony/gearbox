@@ -53,7 +53,7 @@ const RunItem = React.memo(function RunItem({ run, sel, onOpen }: { run: Run; se
   return (
     <button className={`crm-run ${run.statut !== 'applique' ? 'ko' : ''} ${sel ? 'sel' : ''}`} style={{ '--c': RUN_ST[run.statut].c } as React.CSSProperties} onClick={() => onOpen(run.id)}>
       <div className="n"><Pill source={run.source} /><b className="num">n° {run.id}</b><span className="faint ellipsis grow">{jour(run.debut)} · {hm(run.debut)}</span><Badge run={run} /></div>
-      <div className="s"><span className="grow ellipsis">{s.lignesLues != null ? `${n(s.lignesLues)} lignes` : 'fichier non lu'}{s.ventesNouvelles != null ? ` · +${n(s.ventesNouvelles)} ventes` : ''}</span><span className="num">{duree(s.dureeSecondes)}</span></div>
+      <div className="s"><span className="grow ellipsis">{s.mode === 'maj' ? '30 j · ' : ''}{s.lignesLues != null ? `${n(s.lignesLues)} lignes` : 'fichier non lu'}{s.ventesNouvelles != null ? ` · +${n(s.ventesNouvelles)} ventes` : ''}</span><span className="num">{duree(s.dureeSecondes)}</span></div>
     </button>
   );
 });
@@ -63,7 +63,10 @@ const Detail: React.FC<{ run: Run | undefined; runs: Run[]; win: AppProps['win']
   if (!run) return <div className="empty" style={{ height: '100%' }}><Icon name="upload" />Sélectionnez un import</div>;
   const s = run.stats || {}, st = RUN_ST[run.statut];
   const msg = run.message || '';
-  const prev = runs.filter((y) => y.source === run.source && y.id < run.id && y.statut === 'applique').sort((a, b) => b.id - a.id)[0];
+  // Mise à jour (30 derniers jours, depuis le 19/10/2026) : ni garde-fou de volume ni ventes disparues. Les imports
+  // d'avant n'ont pas de `mode` : ils étaient tous complets.
+  const maj = s.mode === 'maj';
+  const prev = runs.filter((y) => y.source === run.source && y.id < run.id && y.statut === 'applique' && (y.stats?.mode ?? 'complet') === 'complet').sort((a, b) => b.id - a.id)[0];
   const avant = s.lignesAvant ?? prev?.stats?.lignesClient;
   const variation = avant && s.lignesClient != null ? ((s.lignesClient - avant) / avant) * 100 : null;
   const manque = msg.startsWith('Colonnes obligatoires absentes');
@@ -93,7 +96,7 @@ const Detail: React.FC<{ run: Run | undefined; runs: Run[]; win: AppProps['win']
       <div className="crm-crumb"><span className="c">Imports <span>/</span> <b>n° {run.id}</b></span>
         <div className="acts">{forcable ? <button className="btn" style={{ color: 'var(--warn)' }} onClick={forcer}><Icon name="bolt" size="sm" />Appliquer quand même…</button> : null}</div></div>
       <div>
-        <div className="crm-eye">{run.source === 'BSO' ? 'Import unique · ancienne base Sud-Ouest' : `Requête ${run.source} du soir`}</div>
+        <div className="crm-eye">{run.source === 'BSO' ? 'Import unique · ancienne base Sud-Ouest' : maj ? `Requête ${run.source} du soir · mise à jour (30 derniers jours)` : `Requête ${run.source} · export complet`}</div>
         <h2 className="crm-name" style={{ fontSize: 22 }}>{run.fichier}</h2>
         <div className="crm-tags"><Badge run={run} />{run.recu_le ? <span className="badge"><Icon name="clock" size="sm" />reçu {quand(run.recu_le)}</span> : null}
           <span className="badge">traité de {hm(run.debut)} à {hm(run.fin)} · {duree(s.dureeSecondes)}</span>
@@ -106,7 +109,8 @@ const Detail: React.FC<{ run: Run | undefined; runs: Run[]; win: AppProps['win']
           <Check ok={manque ? false : s.lignesClient != null ? true : null} label={manque ? 'En-têtes : colonne obligatoire absente' : 'En-têtes reconnus par leur nom'} />
           {run.source === 'BSO' ? <Check ok={null} label="Ligne de total" hint="absente dans ce fichier (normal)" />
             : <Check ok={totalKo ? false : s.totalAnnonce != null ? s.totalAnnonce === s.lignesLues : null} label="Ligne de total présente et égale au nombre de lignes" hint={s.totalAnnonce != null ? `${n(s.totalAnnonce)} = ${n(s.lignesLues)}` : ''} />}
-          {run.source === 'BSO' || variation == null ? <Check ok={null} label="Volume comparé à l’import précédent" hint={run.source === 'BSO' ? 'import unique' : 'premier import'} />
+          {maj ? <Check ok={null} label="Volume comparé à l’import précédent" hint="sans objet : mise à jour sur 30 jours" />
+            : run.source === 'BSO' || variation == null ? <Check ok={null} label="Volume comparé à l’import précédent" hint={run.source === 'BSO' ? 'import unique' : 'premier import'} />
             : <Check ok={variation > -10} label={`Volume comparé à l’import précédent (seuil −10 %)`} hint={`${variation > 0 ? '+' : ''}${variation.toFixed(1).replace('.', ',')} %`} />}
           <Check ok={run.statut === 'erreur' ? false : run.statut === 'applique' ? true : null} label="Écriture en base (transaction unique)" hint={run.statut === 'erreur' ? 'annulée' : run.statut === 'refuse' ? 'non tentée' : run.statut === 'applique' ? 'validée' : ''} />
         </div></div>
@@ -129,7 +133,7 @@ const Detail: React.FC<{ run: Run | undefined; runs: Run[]; win: AppProps['win']
         <div className="card crm-panel"><h3 className="crm-h2">Ce qui a changé</h3><div className="crm-cnt">
           <div><span className="crm-lbl">Ventes nouvelles</span><b style={{ color: 'var(--ok)' }}>+{n(s.ventesNouvelles)}</b></div>
           <div><span className="crm-lbl">Ventes modifiées</span><b>{n(s.ventesModifiees)}</b></div>
-          <div><span className="crm-lbl">Ventes disparues</span><b style={s.ventesDisparues ? { color: 'var(--warn)' } : undefined}>{n(s.ventesDisparues)}</b></div>
+          {maj ? null : <div><span className="crm-lbl">Ventes disparues</span><b style={s.ventesDisparues ? { color: 'var(--warn)' } : undefined}>{n(s.ventesDisparues)}</b></div>}
           {s.ventesReapparues ? <div><span className="crm-lbl">Ventes réapparues</span><b style={{ color: 'var(--ok)' }}>{n(s.ventesReapparues)}</b></div> : null}
           <div><span className="crm-lbl">Identités nouvelles</span><b>+{n(s.identitesNouvelles)}</b></div>
           <div><span className="crm-lbl">Véhicules nouveaux</span><b>+{n(s.vehiculesNouveaux)}</b></div>
