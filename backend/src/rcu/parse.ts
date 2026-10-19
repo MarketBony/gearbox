@@ -121,7 +121,21 @@ export interface FichierLu {
   lignes: string[][];          // lignes de données, sans la ligne de total
   totalAnnonce: number | null; // nombre lu sur la ligne de total (VN, VO)
   complet: boolean;            // VN / VO : ligne de total présente ; BSO : toujours vrai (pas de total)
+  mode: ModeImport;
 }
+
+/**
+ * Mode d'un import (19/10/2026). Les requêtes DCS du vendredi soir ne renvoient plus la base entière (15 min de calcul
+ * côté DCS, l'envoi du 16/10 n'est jamais parti) mais les **30 derniers jours** (filtre DCS sur la date de livraison).
+ *  - `maj` (DÉFAUT des VN / VO) : ajoute et met à jour ; ne marque RIEN « disparu » (une vente hors fenêtre n'a pas
+ *    disparu) ; pas de garde-fou de volume (le volume d'une fenêtre de 30 jours varie naturellement).
+ *  - `complet` : base entière — marque les ventes absentes « disparues » et garde le garde-fou de volume. Plus aucun
+ *    envoi automatique de ce type ; reconnu à un titre contenant « complet » (ex. « clients VN complet »), pour un
+ *    rechargement manuel. L'ancienne base Sud-Ouest (BSO) est un import unique traité comme complet (sans disparues).
+ */
+export type ModeImport = 'maj' | 'complet';
+export const modeDuTitre = (source: Source, titre: string): ModeImport =>
+  source === 'BSO' || /\bcomplet\b/.test(cleEntete(titre)) ? 'complet' : 'maj';
 
 /** Source déduite de la ligne de titre (« clients VN », « Clients VO », « CLIENTS VNVO - BSO »). */
 export function sourceDuTitre(titre: string): Source | null {
@@ -157,7 +171,7 @@ export function decouper(contenu: string): FichierLu {
     totalAnnonce = valeurTotal(derniere);
     lignes = lignes.slice(0, -1);
   }
-  return { source, titre, entetes, lignes, totalAnnonce, complet: source === 'BSO' || totalAnnonce != null };
+  return { source, titre, entetes, lignes, totalAnnonce, complet: source === 'BSO' || totalAnnonce != null, mode: modeDuTitre(source, titre) };
 }
 
 // ─── Colonnes par source ─────────────────────────────────────────────────────────
