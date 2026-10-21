@@ -4645,6 +4645,19 @@
 - **Déconnexion = jeton toujours valide 24 h** (JWT sans état) : le cookie est effacé, pas le jeton. Révocation à étudier.
 
 ### Fonctionnel / produit
+- **EMAILING / SARBACANE (étudié le 19–20/10, GARDÉ DE CÔTÉ par Théo)** :
+  - Facture Sarbacane 2026 : **5 772 € HT/an** (échéance 06/07) = 3 Campaigns 2 484 + crédits 240 + Accompagnement Premium 960 +
+    3 Forms 1 044 + 3 Page 1 044. **Forms et Page inutilisés depuis 2 ans** (LP sur le site Bony, formulaires sur Gearbox) →
+    à retirer au renouvellement / demander un avoir ; dénoncer la tacite reconduction par LRAR (contrat B2B : pas de Chatel).
+  - Volume : ~87 000 emails / an glissant, campagnes de 150 à 45 000, la plupart 100–500. Envoyeurs : l'équipe marketing.
+  - Plateforme maison voulue AVEC UN VRAI BUILDER façon Forms Bony (blocs, ambiances chartées, aperçu) — Email Builder (session
+    Claude Code de Théo qui produit des zip HTML pour Sarbacane) ne le remplace pas. Rendu proposé : MJML. Fournisseur à choisir
+    (Resend / Scaleway TEM / Brevo, sous-traitant RGPD). DNS : `bonyauto-mobile.com` chez **Gandi** (pas Hostinger) ;
+    `info.bonyauto-mobile.com` **délégué à Sarbacane** (`dns.customizedurl.com`, SPF sbr-master, DMARC quarantine) → nouveau
+    sous-domaine d'envoi pendant la transition ; pas de DMARC sur le domaine racine.
+  - **Alternative courte : connecter SPARK à l'API Sarbacane** (REST, accountId + apiKey, `GET /v1/info`) : liste du Requêteur
+    poussée dans Sarbacane, listes noires (désinscrits, bounces, plaintes) rapatriées en « ne plus contacter », stats de
+    campagne → « déjà ciblés ». Réutilisable pour la plateforme maison.
 - **Chantiers d'octobre 2026 (liste de Théo du 01/10) — arbitrages, ne pas les rediscuter :**
   - Nouveautés **dans la v2 seulement**.
   - **SPARK, second temps (Théo, 15/10)** : **relances** (lot 5 : règles réglables, « à rappeler » des échanges) et **GRID**
