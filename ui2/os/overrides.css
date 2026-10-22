@@ -105,3 +105,11 @@ input[type="checkbox"].switch:disabled { opacity: .5; cursor: default; }
   .win .bud-body { overflow: auto; }
   .win .bud-real { min-height: 500px; }
 }
+
+/* [GEARBOX] Fond « Ma photo » (22/10/2026) : photo de l'utilisateur gardée dans ce navigateur (GX.wall.perso, wallpapers.ts),
+   posée en URL d'objet sur l'hôte (--wp-perso) avec sa couleur moyenne assombrie (--wp-perso-tint) pour teinter les verres. */
+.wp-perso { background: var(--wp-perso, none) center / cover no-repeat, #16161d; }
+:host([data-wallpaper="perso"]) { --tint: var(--wp-perso-tint, #16161d); }
+/* Liquid Glass + thème clair : texte blanc sur les widgets et le Dock, comme sur les autres fonds (une photo est souvent chargée). */
+:host([data-theme="light"][data-material="liquid"][data-wallpaper="perso"]) :is(#widgets .wdg.glass, .dock.glass) { --text: #fff; --text-2: rgba(255,255,255,.84); --text-3: rgba(255,255,255,.64); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
+:host([data-wallpaper="perso"]) .set-panel { --tint-d: var(--wp-perso-tint, #16161d); --tint-l: #ebe7f1; }

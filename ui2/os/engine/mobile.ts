@@ -45,6 +45,7 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       <div class="m-banners" id="mban"></div></div>`);
     root = $('#mroot'); home = $('#mhome'); pill = $('#mpill');
     if (GX.wall?.is(prefs.wallpaper)) { const wp = $('#wp'); wp.className = 'wallpaper wp-anim'; GX.wall.mount(wp, prefs.wallpaper); }
+    if (prefs.wallpaper === 'perso') GX.wall?.perso?.restaurer().then((ok) => { if (!ok) $('#wp').className = 'wallpaper wp-ruban'; }); /* [GEARBOX] « Ma photo » absente de ce navigateur */
     setTimeout(() => GX.wall?.previews(), 1500);
     installShims(); buildHome(); buildPill(); wireHome(); wirePill(); wireHistory();
     /* Teinte du fond : textes de l'accueil clairs sur fond sombre (thème sombre, ou fond animé, sombre partout). */

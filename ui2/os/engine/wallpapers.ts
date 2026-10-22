@@ -186,7 +186,46 @@ void main(){
   W.ids = W.catalog.map((w) => w.id);
   W.is = (id) => W.ids.includes(id);
   /* Fond inconnu (retiré, ancien identifiant) → Ruban, le fond par défaut (CSS, maquette.css). */
-  W.normalize = (id) => (id === 'ruban' || W.is(id) ? id : 'ruban');
+  W.normalize = (id) => (id === 'ruban' || id === 'perso' || W.is(id) ? id : 'ruban');
+
+  /* [GEARBOX] « Ma photo » (22/10/2026, demande de Théo) : un fond choisi par l'utilisateur, gardé DANS CE NAVIGATEUR
+     (IndexedDB, une photo par compte), jamais envoyé au serveur — même règle que les autres préférences d'affichage
+     (GX.store, localStorage). L'image est réduite à 2560 px de côté et recompressée en JPEG avant d'être gardée.
+     Rendu : `.wp-perso` lit `--wp-perso` (URL d'objet) et `--wp-perso-tint` (couleur moyenne, assombrie) posées sur
+     l'hôte. Si la photo manque (autre navigateur, données effacées), `restaurer()` répond false et l'appelant revient à Ruban. */
+  const P = (W.perso = {});
+  const uid = () => { try { return String(GX.bridge().user.id || '_'); } catch (e) { return '_'; } };
+  const idb = () => new Promise((ok, ko) => { const r = indexedDB.open('gxos-fond', 1); r.onupgradeneeded = () => r.result.createObjectStore('fonds'); r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); });
+  const tx = async (mode, fn) => { const db = await idb(); return new Promise((ok, ko) => { const t = db.transaction('fonds', mode), q = fn(t.objectStore('fonds')); t.oncomplete = () => ok(q && q.result); t.onerror = () => ko(t.error); }); };
+  let url = null;
+  P.dispo = false;
+  function poser(rec) {
+    if (url) URL.revokeObjectURL(url);
+    url = rec ? URL.createObjectURL(rec.blob) : null;
+    if (url) { GX.host.style.setProperty('--wp-perso', `url("${url}")`); GX.host.style.setProperty('--wp-perso-tint', rec.tint || '#16161d'); }
+    else { GX.host.style.removeProperty('--wp-perso'); GX.host.style.removeProperty('--wp-perso-tint'); }
+    P.dispo = !!url; GX.emit && GX.emit('wallpaper:perso', P.dispo);
+  }
+  /** Charge la photo de ce compte (si ce navigateur en a une). Rend true si elle est posée. */
+  P.restaurer = async () => { try { const rec = await tx('readonly', (s) => s.get(uid())); poser(rec || null); return !!rec; } catch (e) { poser(null); return false; } };
+  /** Réduit, compresse et garde le fichier choisi ; rend true si c'est fait. */
+  P.enregistrer = async (file) => {
+    if (!file || !/^image\//.test(file.type)) return false;
+    const img = await createImageBitmap(file);
+    const k = Math.min(1, 2560 / Math.max(img.width, img.height)), w = Math.round(img.width * k), h = Math.round(img.height * k);
+    const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
+    const m = document.createElement('canvas'); m.width = m.height = 16; const x = m.getContext('2d'); x.drawImage(img, 0, 0, 16, 16);
+    const d = x.getImageData(0, 0, 16, 16).data; let r = 0, g = 0, b = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+    const n = d.length / 4, hex = (v) => Math.round(v / n * 0.45).toString(16).padStart(2, '0'); // couleur moyenne assombrie : teinte des verres
+    const blob = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.86));
+    if (!blob) return false;
+    const rec = { blob, tint: `#${hex(r)}${hex(g)}${hex(b)}`, nom: file.name, le: Date.now() };
+    await tx('readwrite', (s) => s.put(rec, uid()));
+    poser(rec); return true;
+  };
+  /** Oublie la photo de ce compte dans ce navigateur. */
+  P.retirer = async () => { try { await tx('readwrite', (s) => s.delete(uid())); } catch (e) { /* stockage indisponible */ } poser(null); };
+  // CSS de `.wp-perso` : dans ui2/os/overrides.css (GX.css est inerte dans Gearbox, la CSS du moteur est extraite).
   W.get = (id) => W.catalog.find((w) => w.id === id);
 
   /* ------------------------------------------------ moteur WebGL */

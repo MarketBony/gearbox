@@ -1,7 +1,7 @@
 import React from 'react';
 import { useBridge } from '../../os/bridge';
 import { getPushState } from '../../../services/pushNotifications';
-import { gx, hud, Icon, Seg, useEngineStore } from '../ui/kit';
+import { gx, hud, Icon, Seg, useEngineEvent, useEngineStore } from '../ui/kit';
 import { Head, Row, Switch, css, roleLabel, type SectionDef } from './common';
 
 // =====================================================================
@@ -26,7 +26,19 @@ const setPref = (k: string, v: unknown) => gx().shell.setPref(k, v);
 export function AppearancePanel({ s }: { s: SectionDef }) {
   const p = prefs();
   const theme = useBridge()?.theme || p.theme;
-  const wps: [string, string][] = [...STATIC_WPS, ...(gx().wall ? gx().wall.catalog.map((d: any) => [d.id, d.name + (d.still ? '' : ' ✦')]) : [])];
+  // « Ma photo » (22/10/2026) : gardée dans CE navigateur (IndexedDB, moteur `GX.wall.perso`), jamais envoyée au serveur.
+  const [, majPerso] = React.useReducer((n: number) => n + 1, 0);
+  useEngineEvent('wallpaper:perso', majPerso);
+  React.useEffect(() => { gx().wall?.perso?.restaurer().then(majPerso); }, []);
+  const perso = !!gx().wall?.perso?.dispo;
+  const fichier = React.useRef<HTMLInputElement>(null);
+  const choisirPhoto = async (f?: File | null) => {
+    if (!f) return;
+    const ok = await gx().wall.perso.enregistrer(f).catch(() => false);
+    if (ok) { setPref('wallpaper', 'perso'); hud('Fond d’écran : votre photo'); } else hud('Ce fichier n’est pas une image lisible');
+  };
+  const retirerPhoto = async () => { await gx().wall.perso.retirer(); if (prefs().wallpaper === 'perso') setPref('wallpaper', 'ruban'); hud('Photo retirée'); };
+  const wps: [string, string][] = [...(perso ? [['perso', 'Ma photo'] as [string, string]] : []), ...STATIC_WPS, ...(gx().wall ? gx().wall.catalog.map((d: any) => [d.id, d.name + (d.still ? '' : ' ✦')]) : [])];
   const mini = (t: string) => (
     <div className={`set-mini ${t}`}><div className={`wallpaper wp-${p.wallpaper}`} /><div className="mb" /><div className="w"><i style={{ top: '14%', width: '40%' }} /><i style={{ top: '30%', width: '52%' }} /><i style={{ top: '46%', width: '30%' }} /><i style={{ top: '62%', width: '46%' }} /></div><div className="mdk" /></div>
   );
@@ -54,7 +66,13 @@ export function AppearancePanel({ s }: { s: SectionDef }) {
       <div className="set-note">Le flou d’arrière-plan (backdrop-filter) est l’effet le plus coûteux pour la carte graphique : le mode économe le supprime partout, sans rien changer d’autre.</div>
       <div className="set-gt">Fond d’écran</div>
       <div className="set-group enter" style={css({ '--i': 2 })} data-anchor="wallpaper"><div className="set-wps">{wps.map(([w, l]) => (
-        <button key={w} className="set-wp" aria-pressed={p.wallpaper === w} onClick={() => setPref('wallpaper', w)}><div className="v"><div className={`wallpaper wp-${w}`} /><span className="ck"><Icon name="check" /></span></div>{l}</button>))}</div></div>
+        <button key={w} className="set-wp" aria-pressed={p.wallpaper === w} onClick={() => setPref('wallpaper', w)}><div className="v"><div className={`wallpaper wp-${w}`} /><span className="ck"><Icon name="check" /></span></div>{l}</button>))}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '0 16px 16px' }}>
+          <input ref={fichier} type="file" accept="image/*" hidden onChange={(e) => { choisirPhoto(e.target.files?.[0]); e.target.value = ''; }} />
+          <button className="btn sm" onClick={() => fichier.current?.click()}><Icon name="image" size="sm" />{perso ? 'Changer ma photo…' : 'Choisir une photo…'}</button>
+          {perso ? <button className="btn sm" onClick={retirerPhoto}><Icon name="close" size="sm" />Retirer ma photo</button> : null}
+          <small style={{ color: 'var(--text-3)' }}>Gardée dans ce navigateur uniquement, jamais envoyée au serveur.</small>
+        </div></div>
       <div className="set-gt">Bureau</div>
       <div className="set-group enter" style={css({ '--i': 3 })} data-anchor="widgets"><Row t="Widgets du bureau" d="Budget, projets en retard, prochaines publications, absents et Chat, posés sur le fond d’écran"><Switch on={!!p.widgets} label="Widgets du bureau" onChange={(v) => setPref('widgets', v)} /></Row></div>
     </div>

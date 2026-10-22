@@ -80,6 +80,8 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
       <div class="panel glass glass-strong" id="cc"></div>
       <aside class="nc" id="nc"><div class="nc-head glass glass-strong" style="padding:10px 14px;border-radius:14px"><span>Notifications</span><button class="btn sm ghost" id="ncClear">Tout effacer</button></div><div class="nc-list scroll" id="ncList"></div></aside>
       <div class="banners" id="banners"></div>`);
+    /* [GEARBOX] « Ma photo » : la photo vit dans ce navigateur ; absente ici → Ruban (sans l'enregistrer). */
+    if (prefs.wallpaper === 'perso') GX.wall?.perso?.restaurer().then((ok) => { if (!ok) setWallpaper('ruban', false); });
     GX.wm.init($('#desk'));
     GX.wm.initMissionEvents();
     setWallpaper(prefs.wallpaper, false);
