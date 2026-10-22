@@ -190,7 +190,7 @@ void main(){
 
   /* [GEARBOX] « Ma photo » (22/10/2026, demande de Théo) : un fond choisi par l'utilisateur, gardé DANS CE NAVIGATEUR
      (IndexedDB, une photo par compte), jamais envoyé au serveur — même règle que les autres préférences d'affichage
-     (GX.store, localStorage). L'image est réduite à 2560 px de côté et recompressée en JPEG avant d'être gardée.
+     (GX.store, localStorage). Le fichier d'origine est gardé tel quel (réduit seulement s'il est démesuré, voir enregistrer).
      Rendu : `.wp-perso` lit `--wp-perso` (URL d'objet) et `--wp-perso-tint` (couleur moyenne, assombrie) posées sur
      l'hôte. Si la photo manque (autre navigateur, données effacées), `restaurer()` répond false et l'appelant revient à Ruban. */
   const P = (W.perso = {});
@@ -212,12 +212,20 @@ void main(){
   P.enregistrer = async (file) => {
     if (!file || !/^image\//.test(file.type)) return false;
     const img = await createImageBitmap(file);
-    const k = Math.min(1, 2560 / Math.max(img.width, img.height)), w = Math.round(img.width * k), h = Math.round(img.height * k);
-    const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
-    const m = document.createElement('canvas'); m.width = m.height = 16; const x = m.getContext('2d'); x.drawImage(img, 0, 0, 16, 16);
+    // Teinte des verres : couleur moyenne assombrie (vignette 16 × 16, lissage de qualité).
+    const m = document.createElement('canvas'); m.width = m.height = 16; const x = m.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(img, 0, 0, 16, 16);
     const d = x.getImageData(0, 0, 16, 16).data; let r = 0, g = 0, b = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
-    const n = d.length / 4, hex = (v) => Math.round(v / n * 0.45).toString(16).padStart(2, '0'); // couleur moyenne assombrie : teinte des verres
-    const blob = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.86));
+    const n = d.length / 4, hex = (v) => Math.round(v / n * 0.45).toString(16).padStart(2, '0');
+    // Qualité (Théo, 22/10 : « rendu dégueu même en 4K ») : on garde le FICHIER D'ORIGINE, sans recompression, tant qu'il
+    // reste raisonnable (≤ 6000 px de côté et ≤ 25 Mo). Au-delà seulement, réduction à 5120 px (écrans 4K / 5K et mise à
+    // l'échelle Windows comprises), lissage de haute qualité, JPEG 0,95. Avant : 2560 px + JPEG 0,86 + lissage par défaut
+    // → image agrandie, floue et compressée sur un écran 4K.
+    let blob = file;
+    if (Math.max(img.width, img.height) > 6000 || file.size > 25 * 1024 * 1024) {
+      const k = 5120 / Math.max(img.width, img.height), w = Math.round(img.width * k), h = Math.round(img.height * k);
+      const c = document.createElement('canvas'); c.width = w; c.height = h; const cx = c.getContext('2d'); cx.imageSmoothingQuality = 'high'; cx.drawImage(img, 0, 0, w, h);
+      blob = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.95));
+    }
     if (!blob) return false;
     const rec = { blob, tint: `#${hex(r)}${hex(g)}${hex(b)}`, nom: file.name, le: Date.now() };
     await tx('readwrite', (s) => s.put(rec, uid()));
