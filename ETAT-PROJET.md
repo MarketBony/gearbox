@@ -31,8 +31,8 @@
   push. `GET /api/tasks` : un rôle de la To-do qui n'édite pas (Guest) ne reçoit que SES tâches libres (filtre serveur).
   **Non vérifié** : Guest et chef de site avec de vrais comptes ; 1536x730 ; ancienne interface. **Le bureau de Théo est déjà
   abîmé par l'ancien bug** (widgets sous le bas de l'écran) : à refaire une fois.
-- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 96**
-  (19/10, Forms : boutons de l'image lisibles, `web` seul). Avant lui le **95** (19/10, SPARK imports 30 jours, ci-dessus). Avant lui le **94** (18/10, bowling). Avant lui le **93** (16/10). Avant lui le **92** (16/10, `api` + `web` : Jeux, thèmes Bony / Grève CGT des 3 jeux + lobby multi-jeux). Avant lui le **91**
+- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 97**
+  (22/10, fond d'écran « Ma photo », `web` seul). Avant lui le **96** (19/10, Forms : boutons de l'image lisibles, `web` seul). Avant lui le **95** (19/10, SPARK imports 30 jours, ci-dessus). Avant lui le **94** (18/10, bowling). Avant lui le **93** (16/10). Avant lui le **92** (16/10, `api` + `web` : Jeux, thèmes Bony / Grève CGT des 3 jeux + lobby multi-jeux). Avant lui le **91**
   (15/10, `web` seul : minigolf, tour par tour réparé — tir bloqué dès le trou 2, coups en double). Avant lui le **90**
   (15/10, `api` + `web` + migration Supabase `game_challenge_options` : **4e jeu, le MINIGOLF**, v2 seulement). Avant lui le
   **89** (15/10, `web` seul : molette bloquée au survol d'un tableau, v2). Avant lui le **88** (15/10, `rcu-worker` + `api` + `web` :
@@ -71,6 +71,12 @@
   vendeurs du Sud-Ouest (MAEVA dit « Renault » partout : les clients Dacia d'Albi tombent « à attribuer ») ; codes postaux des
   8 vendeurs Secteur qui n'en ont pas ; départs / arrivées notés dans les feuilles par plaque (« départ fin octobre »…, non repris).
   Puis Règles › Simuler › « Activer et lancer le premier calcul ».
+- **CORRECTIF 97 EN PRODUCTION (22/10, `web` seul)** — v2 : fond d'écran **« Ma photo »** (Réglages › Apparence : « Choisir /
+  Changer ma photo… », « Retirer ma photo »). Photo gardée DANS LE NAVIGATEUR (IndexedDB `gxos-fond`, une par compte), jamais
+  envoyée au serveur ; réduite à 2560 px et recompressée en JPEG ; couleur moyenne assombrie → teinte des verres. Moteur :
+  `GX.wall.perso` (`ui2/os/engine/wallpapers.ts`), démarrage bureau (`shell.ts`) et téléphone (`mobile.ts`) : photo absente de ce
+  navigateur → Ruban. ⚠️ `GX.css` est INERTE dans Gearbox (CSS du moteur extraite) : la CSS de `.wp-perso` est dans
+  `ui2/os/overrides.css`. Testé en local (choix, rechargement, retrait).
 - **CORRECTIF 96 EN PRODUCTION (19/10, `web` seul)** — Forms Bony : les boutons « Remplacer » / « Retirer » de l'image
   d'accueil et de fin existaient mais étaient INVISIBLES sur la photo (verre Liquid transparent) → fond sombre opaque
   (`ui2/apps/forms/forms.css`, `!important` obligatoire : la règle `:host([data-material]) :is(.btn…)` de maquette.css
@@ -156,7 +162,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 96 (19/10)** — Forms Bony : boutons Remplacer / Retirer lisibles sur l'image (`web` seul).
+- **En production : correctif 97 (22/10)** — v2 : fond d'écran « Ma photo » (`web` seul).
+  Avant lui le **correctif 96 (19/10)** — Forms Bony : boutons Remplacer / Retirer lisibles sur l'image (`web` seul).
   Avant lui le **correctif 95 (19/10)** — SPARK : imports DCS en mise à jour 30 jours (`rcu-worker` + `api` + `web`).
   Avant lui le **correctif 94 (18/10)** — Jeux : bowling 3D, 5e jeu de la v2 (`api` + `web`, aucune migration).
   Avant lui le **correctif 93 (16/10)** — widgets du bureau stables, tâches multi-assignées, prestataire sur les dépenses,
@@ -1288,7 +1295,8 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 96** (19 octobre 2026) — Forms Bony, boutons de l'image lisibles, **`web` seul**,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 97** (22 octobre 2026) — v2, fond d'écran « Ma photo », **`web` seul**, aucune migration.
+  Avant lui le **correctif 96** (19 octobre 2026) — Forms Bony, boutons de l'image lisibles, **`web` seul**,
   aucune migration.
   Avant lui le **correctif 95** (19 octobre 2026) — SPARK, imports DCS en mise à jour 30 jours,
   **`rcu-worker` + `api` + `web`**, aucune migration.
