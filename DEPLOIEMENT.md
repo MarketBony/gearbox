@@ -254,3 +254,14 @@ Déployé À PART du VPS, depuis ce poste, avec la session `wrangler` de Théo (
 Ne jamais écrire ni lister le KV à chaque requête ou à chaque minute (compteurs, caches → mémoire de l'isolat).
 
 Ne pas toucher aux autres Workers du compte (`forum-2026`, `grid`).
+
+## SSH / fail2ban (23/10/2026)
+
+- **fail2ban 1.1.0** installé (`apt`), prison `sshd` dans `/etc/fail2ban/jail.d/gearbox.local` : lecture du journal systemd
+  (`journalmatch = _SYSTEMD_UNIT=ssh.service` — ⚠️ OpenSSH 10 journalise sous `sshd-session`, la correspondance par défaut
+  `_COMM=sshd` en raterait la plupart), **5 échecs en 10 min → 1 h de bannissement**, doublé à chaque récidive jusqu'à 1 semaine,
+  bannissement par nftables. `ignoreip` : `127.0.0.1/8 ::1 195.25.28.4` (DCS, compte SFTP `dcs`).
+- Contrôles : `sudo fail2ban-client status sshd` (échecs, IP bannies) ; débannir : `sudo fail2ban-client set sshd unbanip <IP>`.
+- Une connexion par CLÉ ne produit jamais d'échec : impossible de se bannir soi-même en se connectant normalement.
+- **Reste à faire** : connexion par clé seule pour `ubuntu` (`PasswordAuthentication no` dans un `05-…conf`, `Match User dcs`
+  conservé) — en attente de l'accès à la console OVH (voir `BUGS-CONNUS.md`).

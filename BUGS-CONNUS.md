@@ -47,7 +47,8 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
   Hypothèse de Théo : export complet trop lourd (15 min de calcul). Requêtes réduites à 30 jours (correctif 95) ; à confirmer
   au prochain envoi. Si rien n'arrive encore : planification DCSNETneo / poste éteint.
 - [ ] **VPS : connexion SSH par mot de passe ouverte à TOUS les comptes** (constaté le 15/10) : `50-cloud-init.conf` (19/06) met
-  `PasswordAuthentication yes` (ubuntu compris ; root `prohibit-password`), pas de fail2ban. Seul `dcs` en a besoin (bloc `Match`
+  `PasswordAuthentication yes` (ubuntu compris ; root `prohibit-password`), pas de fail2ban (**installé le 23/10**, DEPLOIEMENT.md
+  § SSH / fail2ban : reste la clé seule, en attente de la console OVH). Seul `dcs` en a besoin (bloc `Match`
   du `70-dcs-sftp.conf`). À arbitrer par Théo : passer le global à `no` (clé seule pour ubuntu), après `sshd -t`, session ouverte.
   **Audit du 16/10 (lecture seule), lot reporté au lundi 19/10 par Théo** (après le 1er import DCS) : le `yes` de
   `50-cloud-init.conf` gagne sur le `no` de `60-cloudimg-settings.conf` (sshd garde la PREMIÈRE valeur lue) → plan : un fichier

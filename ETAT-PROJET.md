@@ -71,6 +71,11 @@
   vendeurs du Sud-Ouest (MAEVA dit « Renault » partout : les clients Dacia d'Albi tombent « à attribuer ») ; codes postaux des
   8 vendeurs Secteur qui n'en ont pas ; départs / arrivées notés dans les feuilles par plaque (« départ fin octobre »…, non repris).
   Puis Règles › Simuler › « Activer et lancer le premier calcul ».
+- **INFRA 23/10 — fail2ban EN PLACE sur le VPS** (prison sshd, 5 échecs / 10 min → 1 h, croissant jusqu'à 1 semaine ; DCS
+  `195.25.28.4` exclu). Mesure du 23/10 : ~842 000 tentatives de mot de passe depuis le 19/06, **6 000 à 7 000 / jour, stable**
+  (pas d'intensification), 1 206 IP en octobre, `ubuntu` visé 3 401 fois en octobre, aucune intrusion. ⚠️ Les chiffres « 17 355
+  en 24 h » et « 2 382 d'une IP » donnés le 16/10 étaient SURESTIMÉS (deux lignes de journal par tentative). **Reste : clé seule
+  pour `ubuntu`, bloquée par l'accès à la console OVH** (relance de Théo au responsable marketing, 22/10).
 - **CORRECTIF 98 EN PRODUCTION (22/10, `web` seul)** — « Ma photo » : rendu « dégueu même en 4K » (Théo) → le FICHIER
   D'ORIGINE est gardé sans recompression (réduit seulement au-delà de 6000 px ou 25 Mo : 5120 px, lissage haute qualité,
   JPEG 0,95) ; plus de grain (`.wallpaper::after`) sur la photo. Avant : 2560 px + JPEG 0,86 + lissage par défaut.
