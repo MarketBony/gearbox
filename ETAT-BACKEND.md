@@ -1692,3 +1692,12 @@ est le bon comportement (`restart: always` côté Docker).
 - `rcu/parse.ts` : `ModeImport` = `maj` | `complet`, `modeDuTitre()` (VN / VO = `maj` sauf titre contenant « complet » ; BSO =
   `complet`). `rcu/importer.ts` : en `maj`, aucune vente marquée disparue et pas de garde-fou de volume ; en `complet`, le
   garde-fou compare au dernier import COMPLET appliqué (`coalesce(stats->>'mode','complet')`). `stats.mode` enregistré.
+
+## Correctif 100 (26/10/2026) — SPARK sur invitation
+- **Porte unique `auth/crmAccess.ts`** : `peutAccederCrm` (interrupteur `crm.enabled` éteint → personne ; Master d'office ; sinon
+  id dans `crm.users` ET rôle COURANT dans `CRM_INVITABLE_ROLES` = internes sauf chef de site, Guest et Master), `requireCrm` sur
+  tout `/api/crm`, `requireCrmMaster` sur `GET /imports`, `POST /imports/:id/forcer`, `POST /sites`. Rôle relu en base (cache 15 s),
+  pas dans le jeton. 403 refus, 503 si le contrôle échoue. `CRM_ROLES` supprimé (→ `CRM_MASTER_ROLES`).
+- `settings/appSettings.ts` : `crm.enabled` (absence = allumé) et `crm.users` (JSON), cache invalidé à l'écriture ; base
+  injoignable → « allumé, aucun invité ». `routes/settings.ts` : `GET /` (+ `crmEnabled`, `crmAccess`), `GET|PUT /crm` (Master ;
+  PUT valide ids existants et rôles invitables, remplace la liste, diffuse `settings:updated` SANS la liste).

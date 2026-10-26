@@ -154,6 +154,6 @@ export const TODO_ROLES = INTERNAL_ROLES.filter(r => r !== SITE_MANAGER_ROLE);
  * (`auth/crmAccess.ts`) : un invité devenu External ou chef de site perd l'accès même s'il reste dans la liste.
  * Même valeur que TODO_ROLES moins le Master ce jour, règle DIFFÉRENTE : ne pas les aliaser.
  */
-export const CRM_INVITABLE_ROLES = INTERNAL_ROLES.filter(r => r !== SITE_MANAGER_ROLE && !CRM_MASTER_ROLES.includes(r));
+export const CRM_INVITABLE_ROLES = INTERNAL_ROLES.filter(r => r !== SITE_MANAGER_ROLE && r !== 'Guest' && !CRM_MASTER_ROLES.includes(r)); // Guest exclu (Théo, 26/10/2026)
 /** Rôles qui ont le Chat (et donc ses fichiers) : ceux de `hasSocialFeatures`. */
 export const CHAT_ROLES = (VALID_ROLES as readonly string[]).filter(r => !NO_SOCIAL_ROLES.includes(r));

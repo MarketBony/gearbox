@@ -754,7 +754,7 @@ export const canSeeCrm = (role: string | undefined | null, crmAccess: boolean) =
 // Master ayant accès d'office. AFFICHAGE seulement — alignée sur `CRM_INVITABLE_ROLES` de backend/src/auth/roles.ts,
 // qui valide l'écriture (PUT /api/settings/crm) et revérifie le rôle courant à chaque appel de /api/crm.
 export const estInvitableCrm = (role: string | undefined | null) =>
-  !!role && !['Master', 'External', 'Site Manager'].includes(role);
+  !!role && !['Master', 'External', 'Site Manager', 'Guest'].includes(role); // Guest exclu (Théo, 26/10/2026) — miroir de CRM_INVITABLE_ROLES (backend)
 // Assistant IA « mIAouss » (interface v2 SEULEMENT, 08/10/2026) : équipe marketing seulement — ni Guest, ni External,
 // ni chef de site (décision de Théo). Alignée sur `ASSISTANT_ROLES` de backend/src/auth/roles.ts, le VRAI refus.
 export const ASSISTANT_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
