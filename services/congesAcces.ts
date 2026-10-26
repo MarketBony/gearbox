@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { db, ApiError } from './dataService';
 import { peutGererConges, peutLireConges } from '../constants';
 
@@ -51,6 +51,10 @@ export const congesAccesStore = {
   async refresh(role?: string, userId?: string): Promise<void> {
     // Rôle sans la rubrique (chef de site, External) : réponse connue d'avance, on n'appelle pas le serveur (12/10/2026).
     if (!userId || !peutLireConges(role)) { state = { visible: false, membres: [], charge: true }; notify(); return; }
+    // Gestionnaires (Master, Administrator, Director) : la rubrique leur est TOUJOURS ouverte — c'est eux qui gèrent le
+    // périmètre. On l'affiche donc tout de suite, sans attendre la lecture : avant, un aller-retour lent, un jeton expiré
+    // ou une erreur passagère la masquaient (« je suis Master et je n'ai pas accès aux Congés », Théo, 26/10/2026).
+    if (peutGererConges(role) && !state.visible) { state = { ...state, visible: true }; notify(); }
     try {
       // Période volontairement vide de sens : on ne veut que le périmètre. Une fenêtre
       // d'un jour évite de tirer l'année entière juste pour savoir si l'onglet s'affiche.
@@ -65,7 +69,9 @@ export const congesAccesStore = {
       if (!(e instanceof ApiError) || e.status !== 403) {
         console.error('Congés : accès non déterminé', e);
       }
-      state = { visible: false, membres: [], charge: true };
+      // Un échec de lecture ne retire pas la rubrique à un gestionnaire (son droit ne dépend pas du périmètre) ; un
+      // membre simple la perd jusqu'à la prochaine lecture réussie (défaut prudent, voir l'en-tête).
+      state = { visible: peutGererConges(role), membres: [], charge: true };
     }
     notify();
   },
@@ -76,8 +82,10 @@ export const congesAccesStore = {
   },
 };
 
-export const useCongesAcces = (): EtatAcces => {
-  const [etat, setEtat] = useState<EtatAcces>(congesAccesStore.get());
-  useEffect(() => congesAccesStore.subscribe(() => setEtat(congesAccesStore.get())), []);
-  return etat;
-};
+/**
+ * ⚠️ `useSyncExternalStore`, pas `useState` + abonnement dans un `useEffect` (corrigé le 26/10/2026) : avec l'ancien motif,
+ * une notification arrivée ENTRE le premier rendu et l'abonnement était perdue — le composant restait figé sur l'état du
+ * premier rendu (« rubrique masquée ») jusqu'à la notification suivante. C'est ce qui retirait les Congés au Master dans
+ * la v2 (Dock et `canOpen` lisent la navigation calculée par OsHost avec ce crochet).
+ */
+export const useCongesAcces = (): EtatAcces => useSyncExternalStore(congesAccesStore.subscribe, congesAccesStore.get);
