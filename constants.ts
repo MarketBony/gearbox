@@ -744,11 +744,17 @@ export const EXPORT_ALLOWED_ROLES: string[] = ['Master', 'Administrator', 'Direc
 // Alignée sur `FORMS_ROLES` de backend/src/auth/roles.ts, qui est le VRAI refus (chaque route de /api/forms).
 export const FORMS_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
 export const canSeeForms = (role: string | undefined | null) => FORMS_ROLES.includes(role ?? '');
-// Rubrique CRM (référentiel client unique, interface v2 SEULEMENT, 12/10/2026). Cible : les rôles de Jeux (Director et
-// chef de site exclus). Pendant la construction : **Master seul** (Théo). Alignée sur `CRM_ROLES` de
-// backend/src/auth/roles.ts, le VRAI refus. Données nominatives : jamais d'External ni de Guest.
-export const CRM_ALLOWED_ROLES: string[] = ['Master'];
-export const canSeeCrm = (role: string | undefined | null) => CRM_ALLOWED_ROLES.includes(role ?? '');
+// Rubrique CRM / SPARK (référentiel client unique, interface v2 SEULEMENT, 12/10/2026). Depuis le 26/10/2026, l'accès
+// ne dépend plus du rôle : interrupteur + invités du Master, calculés PAR LE SERVEUR (`crmAccess` de GET /api/settings,
+// porte unique backend/src/auth/crmAccess.ts, qui est le VRAI refus). Ici, on ne fait qu'AFFICHER ce que le serveur a
+// dit — avec un filet : jamais pour un External ni un chef de site (SPARK n'est pas cloisonné par concession).
+export const canSeeCrm = (role: string | undefined | null, crmAccess: boolean) =>
+  crmAccess && !!role && role !== 'External' && role !== 'Site Manager';
+// Rôles que le Master peut cocher dans Réglages › Application › SPARK : tous les internes sauf le chef de site, le
+// Master ayant accès d'office. AFFICHAGE seulement — alignée sur `CRM_INVITABLE_ROLES` de backend/src/auth/roles.ts,
+// qui valide l'écriture (PUT /api/settings/crm) et revérifie le rôle courant à chaque appel de /api/crm.
+export const estInvitableCrm = (role: string | undefined | null) =>
+  !!role && !['Master', 'External', 'Site Manager', 'Guest'].includes(role); // Guest exclu (Théo, 26/10/2026) — miroir de CRM_INVITABLE_ROLES (backend)
 // Assistant IA « mIAouss » (interface v2 SEULEMENT, 08/10/2026) : équipe marketing seulement — ni Guest, ni External,
 // ni chef de site (décision de Théo). Alignée sur `ASSISTANT_ROLES` de backend/src/auth/roles.ts, le VRAI refus.
 export const ASSISTANT_ROLES: string[] = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];

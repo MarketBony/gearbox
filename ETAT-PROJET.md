@@ -31,8 +31,8 @@
   push. `GET /api/tasks` : un rôle de la To-do qui n'édite pas (Guest) ne reçoit que SES tâches libres (filtre serveur).
   **Non vérifié** : Guest et chef de site avec de vrais comptes ; 1536x730 ; ancienne interface. **Le bureau de Théo est déjà
   abîmé par l'ancien bug** (widgets sous le bas de l'écran) : à refaire une fois.
-- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 99**
-  (26/10, Congés masqué au Master dans la v2, `web` seul). Avant lui le **98** (22/10, « Ma photo » en qualité d'origine, `web` seul). Avant lui le **97** (22/10, fond d'écran « Ma photo », `web` seul). Avant lui le **96** (19/10, Forms : boutons de l'image lisibles, `web` seul). Avant lui le **95** (19/10, SPARK imports 30 jours, ci-dessus). Avant lui le **94** (18/10, bowling). Avant lui le **93** (16/10). Avant lui le **92** (16/10, `api` + `web` : Jeux, thèmes Bony / Grève CGT des 3 jeux + lobby multi-jeux). Avant lui le **91**
+- **ÉTAT : tout est en production, `master` = `origin` = prod, rien en cours de code.** Dernier déploiement : **correctif 100**
+  (26/10, SPARK sur invitation, `api` + `web`). Avant lui le **99** (26/10, Congés masqué au Master dans la v2, `web` seul). Avant lui le **98** (22/10, « Ma photo » en qualité d'origine, `web` seul). Avant lui le **97** (22/10, fond d'écran « Ma photo », `web` seul). Avant lui le **96** (19/10, Forms : boutons de l'image lisibles, `web` seul). Avant lui le **95** (19/10, SPARK imports 30 jours, ci-dessus). Avant lui le **94** (18/10, bowling). Avant lui le **93** (16/10). Avant lui le **92** (16/10, `api` + `web` : Jeux, thèmes Bony / Grève CGT des 3 jeux + lobby multi-jeux). Avant lui le **91**
   (15/10, `web` seul : minigolf, tour par tour réparé — tir bloqué dès le trou 2, coups en double). Avant lui le **90**
   (15/10, `api` + `web` + migration Supabase `game_challenge_options` : **4e jeu, le MINIGOLF**, v2 seulement). Avant lui le
   **89** (15/10, `web` seul : molette bloquée au survol d'un tableau, v2). Avant lui le **88** (15/10, `rcu-worker` + `api` + `web` :
@@ -71,6 +71,16 @@
   vendeurs du Sud-Ouest (MAEVA dit « Renault » partout : les clients Dacia d'Albi tombent « à attribuer ») ; codes postaux des
   8 vendeurs Secteur qui n'en ont pas ; départs / arrivées notés dans les feuilles par plaque (« départ fin octobre »…, non repris).
   Puis Règles › Simuler › « Activer et lancer le premier calcul ».
+- **CORRECTIF 100 EN PRODUCTION (26/10, `api` + `web`) — SPARK OUVERT SUR INVITATION.** Décisions de Théo : interrupteur
+  SPARK dans Réglages › Application › Modules (Master), comme les Jeux — **éteint = disparu pour TOUT LE MONDE, Master compris**
+  (absence de ligne = ALLUMÉ, inverse des Jeux, pour ne rien couper au déploiement) ; le Master coche au cas par cas qui a accès
+  (invitables : rôles internes SAUF External, chef de site et **Guest**) ; les personnes cochées ont tout SPARK (Équipes compris)
+  SAUF **Imports** (Master seul : `GET /imports`, `POST /imports/:id/forcer`, `POST /sites`). Porte unique serveur
+  `backend/src/auth/crmAccess.ts` (`requireCrm`, `requireCrmMaster`, rôle relu en base avec cache 15 s) ; réglages `crm.enabled`
+  / `crm.users` dans `AppSetting` (aucune migration) ; `GET /api/settings` → `crmEnabled`, `crmAccess` ; liste réservée au Master
+  (`GET|PUT /api/settings/crm`). Coque v2 : le Dock et l'accueil mobile se reconstruisent quand les rubriques autorisées changent
+  (sert aussi Jeux / Congés). `services/appSettings.ts` en `useSyncExternalStore`. Vérifié en Master (lecture seule) ; **chemin
+  d'un vrai invité NON testé** — recette de Théo avec un collègue.
 - **CORRECTIF 99 EN PRODUCTION (26/10, `web` seul)** — Congés MASQUÉ au Master dans la v2 (Dock, `canOpen`) : `useCongesAcces`
   (`services/congesAcces.ts`) s'abonnait dans un `useEffect` APRÈS le premier rendu ; la notification « visible » arrivée entre
   les deux était perdue et OsHost restait sur « masqué ». → `useSyncExternalStore`. En plus, les gestionnaires (Master,
@@ -175,7 +185,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 99 (26/10)** — v2 : Congés à nouveau visible pour le Master (`web` seul).
+- **En production : correctif 100 (26/10)** — SPARK ouvert sur invitation du Master (`api` + `web`, aucune migration).
+  Avant lui le **correctif 99 (26/10)** — v2 : Congés à nouveau visible pour le Master (`web` seul).
   Avant lui le **correctif 98 (22/10)** — « Ma photo » en qualité d'origine, sans grain (`web` seul).
   Avant lui le **correctif 97 (22/10)** — v2 : fond d'écran « Ma photo » (`web` seul).
   Avant lui le **correctif 96 (19/10)** — Forms Bony : boutons Remplacer / Retirer lisibles sur l'image (`web` seul).
@@ -1310,7 +1321,8 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 99** (26 octobre 2026) — Congés masqué au Master dans la v2, **`web` seul**.
+- master = prod, synchronisés. Dernier lot déployé : **correctif 100** (26 octobre 2026) — SPARK ouvert sur invitation, **`api` + `web`**, aucune migration.
+  Avant lui le **correctif 99** (26 octobre 2026) — Congés masqué au Master dans la v2, **`web` seul**.
   Avant lui le **correctif 98** (22 octobre 2026) — « Ma photo » en qualité d'origine, **`web` seul**.
   Avant lui le **correctif 97** (22 octobre 2026) — v2, fond d'écran « Ma photo », **`web` seul**, aucune migration.
   Avant lui le **correctif 96** (19 octobre 2026) — Forms Bony, boutons de l'image lisibles, **`web` seul**,

@@ -20,7 +20,7 @@ import { EXPORT_ALLOWED_ROLES, canSeeForms, canSeeCrm } from './constants';
 import Conges from './pages/Conges';
 import { useCongesAcces, congesAccesStore } from './services/congesAcces';
 import { canSeeGames, SITE_MANAGER_SECTIONS, isSiteManager } from './constants';
-import { appSettingsStore, useAppSettings } from './services/appSettings';
+import { appSettingsStore, useAppSettings, aAccesCrm } from './services/appSettings';
 import { useRealtimeSync, RT_EVENTS } from './services/realtime';
 import AnimatedBackground from './components/AnimatedBackground';
 import { db } from './services/dataService';
@@ -44,17 +44,20 @@ const InnerApp: React.FC = () => {
   // Interrupteurs de fonctionnalité : chargés une fois à l'ouverture de session,
   // puis suivis en temps réel — une extinction par le Master doit être immédiate
   // chez tout le monde, sans rechargement.
-  const { gamesEnabled } = useAppSettings();
+  const appSettings = useAppSettings();
+  const { gamesEnabled } = appSettings;
+  // SPARK : accès calculé par le serveur pour CE compte (interrupteur + invités, 26/10/2026).
+  const crmAccess = aAccesCrm(appSettings, user?.id);
 
   // Réglages d'application : rechargés à chaque ouverture de session (le store part
   // du défaut prudent « éteint », donc la rubrique n'apparaît qu'une fois la réponse
-  // reçue — jamais l'inverse).
+  // reçue — jamais l'inverse). Rechargés aussi quand le RÔLE change : l'accès SPARK en dépend.
   useEffect(() => {
-    if (user) appSettingsStore.refresh();
+    if (user) appSettingsStore.refresh(user.id);
   }, [user]);
 
   // Bascule par le Master : répercutée chez tout le monde sans rechargement.
-  useRealtimeSync(RT_EVENTS.settings, () => { appSettingsStore.refresh(); });
+  useRealtimeSync(RT_EVENTS.settings, () => { if (user) appSettingsStore.refresh(user.id); });
 
   // Congés : le PÉRIMÈTRE décide de la visibilité de la rubrique. Rechargé à l'ouverture
   // de session, puis suivi en temps réel — être ajouté au planning doit faire apparaître
@@ -102,8 +105,8 @@ const InnerApp: React.FC = () => {
     if (resolvedTab === 'export' && !canExport) resolvedTab = 'dashboard';
     // Forms : rôles de la rubrique (le refus réel est côté serveur, chaque route de /api/forms).
     if (resolvedTab === 'forms' && !canSeeForms(user?.role)) resolvedTab = 'dashboard';
-    // CRM : données nominatives, CRM_ALLOWED_ROLES (le refus réel est côté serveur, /api/crm).
-    if (resolvedTab === 'crm' && !canSeeCrm(user?.role)) resolvedTab = 'dashboard';
+    // SPARK : données nominatives, accès calculé par le serveur (le refus réel est côté serveur, /api/crm).
+    if (resolvedTab === 'crm' && !canSeeCrm(user?.role, crmAccess)) resolvedTab = 'dashboard';
     // ⚠️ Même raison que pour les autres gardes : l'onglet actif est mémorisé en session,
     // une rubrique retirée du menu reste ATTEIGNABLE sans ceci. Le refus réel est de toute
     // façon côté serveur (`routes/conges.ts` rend 403, même sur le GET).

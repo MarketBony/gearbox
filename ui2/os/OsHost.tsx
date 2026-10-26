@@ -18,7 +18,7 @@ import { bridgeStore, useLegacyIds, usePortedMounts, tabOf } from './bridge';
 import { PORTED_APPS } from '../apps/registry';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useAppSettings } from '../../services/appSettings';
+import { useAppSettings, aAccesCrm } from '../../services/appSettings';
 import { useCongesAcces } from '../../services/congesAcces';
 import { computeNav } from '../../services/navigation';
 import { useNavBadges } from '../../services/navBadges';
@@ -72,9 +72,10 @@ const LegacyPage = React.memo<{ id: string; render: (tab: string) => React.React
 const OsHost: React.FC<OsHostProps> = ({ tab, setTab, resolveTab, renderPage, onExit }) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { gamesEnabled } = useAppSettings();
+  const appSettings = useAppSettings();
+  const { gamesEnabled } = appSettings;
   const { visible: voitConges } = useCongesAcces();
-  const nav = computeNav({ role: user?.role, gamesEnabled, voitConges, ui2: true });
+  const nav = computeNav({ role: user?.role, gamesEnabled, voitConges, crmAccess: aAccesCrm(appSettings, user?.id), ui2: true });
   const { chatUnread, gamesChallenges } = useNavBadges(user, gamesEnabled);
   const feed = useActivityFeed();
   const slotRef = useRef<HTMLDivElement>(null);

@@ -57,6 +57,9 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     GX.on('data:projects', () => buildHome()); GX.on('data:users', () => buildHome());
     GX.on('data:tasks', () => buildHome()); GX.on('data:hello', () => buildHome());   /* [GEARBOX] Mes tâches, musique, actus */
     GX.on('ctx', () => { buildHome(); buildPill(); });
+    /* [GEARBOX] rubriques autorisées modifiées en cours de session (engine/boot.ts) : écran ouvert devenu interdit
+       fermé, accueil et pilule reconstruits. */
+    GX.on('nav', () => { open.filter((w) => !GX.shell.canOpen(w.app?.parent || w.appId)).forEach((w) => M.close(w)); buildHome(); buildPill(); });
     GX.on('widgets:saved', () => buildHome());
     setInterval(() => { if (!current && home.querySelector('.wclock')) buildHome(); }, 60000);
     const direct = new URLSearchParams(location.search).get('app');

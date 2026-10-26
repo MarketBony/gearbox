@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
+import { authenticateToken, AuthRequest } from '../auth/middleware';
 import { ALL_SITES } from '../auth/siteScope';
 import { prisma } from '../db';
-import { CRM_ROLES } from '../auth/roles';
+import { requireCrm, requireCrmMaster } from '../auth/crmAccess';
 import { PoolClient } from 'pg';
 import { rcu, rcuConfigured } from '../rcu/db';
 import { majResumes } from '../rcu/resume';
@@ -15,13 +15,14 @@ import { COLONNES, COLONNES_APERCU, COLONNES_TABLEAU, TRIS, Requete, RequeteInva
 /**
  * Rubrique CRM — lecture du RCU (référentiel client unique), base dédiée du VPS.
  *
- * ⚠️ Données NOMINATIVES : chaque route est derrière CRM_ROLES (Master seul pendant la construction).
+ * ⚠️ Données NOMINATIVES : chaque route est derrière `requireCrm` (auth/crmAccess.ts, SEULE porte : interrupteur +
+ * invités du Master, 26/10/2026). Imports (journal, forçage, classement des sites) : `requireCrmMaster`, Master seul.
  * Lot 1 : journal des imports. Lot 2 : clients (liste paginée, fiche), arbitrage, séparation.
  * Contrat d'API : ui2/apps/crm/CONTRAT-API.md.
  */
 const router = Router();
 
-router.use(authenticateToken, requireRole(CRM_ROLES));
+router.use(authenticateToken, requireCrm);
 router.use((_req, res, next) => {
   if (!rcuConfigured()) return res.status(503).json({ error: 'La base du CRM n\'est pas configurée sur ce serveur.' });
   next();
@@ -29,7 +30,7 @@ router.use((_req, res, next) => {
 
 // GET /api/crm/imports — les 100 derniers imports, toutes sources, avec leurs compteurs, et la demande
 // « appliquer quand même » en attente le cas échéant.
-router.get('/imports', async (_req, res) => {
+router.get('/imports', requireCrmMaster, async (_req, res) => {
   const { rows } = await rcu().query(
     `select r.id, r.source, r.fichier, r.empreinte, r.recu_le, r.debut, r.fin, r.statut, r.force, r.stats, r.message,
             d.cree_le as force_demande_le, d.demandeur as force_demandeur
@@ -44,7 +45,7 @@ export const nomDe = async (req: AuthRequest) =>
 
 // POST /api/crm/imports/:id/forcer — « Appliquer quand même » un import REFUSÉ par le garde-fou de volume.
 // Seul le worker a le fichier (archive du VPS) : on inscrit une demande, qu'il traite dans la minute.
-router.post('/imports/:id/forcer', async (req: AuthRequest, res) => {
+router.post('/imports/:id/forcer', requireCrmMaster, async (req: AuthRequest, res) => {
   const id = Number(req.params.id);
   const run = (await rcu().query(`select statut, stats from rcu.import_run where id = $1`, [id])).rows[0];
   if (!run) return res.status(404).json({ error: 'Import introuvable.' });
@@ -58,8 +59,10 @@ router.post('/imports/:id/forcer', async (req: AuthRequest, res) => {
 });
 
 // POST /api/crm/sites — « Classer… » un libellé de site inconnu. Effet au prochain import.
+// ⚠️ Administration : écrit dans les tables de RÉFÉRENCE de l'import (ref_site_libelle, ref_compte_bso), donc change le
+// rattachement de site de clients au prochain passage. Appelé seulement depuis l'onglet Imports → Master seul.
 //   VN / VO : { affaire, libelle, site } → ref_site_libelle ; ancienne base : { compte, site } → ref_compte_bso.
-router.post('/sites', async (req: AuthRequest, res) => {
+router.post('/sites', requireCrmMaster, async (req: AuthRequest, res) => {
   const { affaire, libelle, compte, site } = req.body ?? {};
   if (typeof site !== 'string' || !ALL_SITES.includes(site)) return res.status(400).json({ error: 'Site Gearbox inconnu.' });
   const auteur = await nomDe(req);

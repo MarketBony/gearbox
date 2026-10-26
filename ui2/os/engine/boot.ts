@@ -120,8 +120,16 @@ export function boot(host: HTMLElement, root: ShadowRoot, body: HTMLElement): Sh
     if (b.nav.allowedIds.has(tab) || tab === 'settings') { if (b.tab !== tab) { pushed = tab; b.setTab(tab); } }
   });
   let lastTab = b0.tab;
+  // [GEARBOX] Droits qui changent EN COURS DE SESSION (interrupteurs Jeux / SPARK, invitation SPARK, périmètre des
+  // Congés, 26/10/2026) : le Dock et l'accueil mobile étaient construits UNE fois au démarrage et ne suivaient pas.
+  // On signale `nav` quand la liste des rubriques autorisées change ; la coque reconstruit et ferme les fenêtres
+  // devenues interdites (le refus réel reste côté serveur).
+  let lastNav = [...(b0.nav?.allowedIds || [])].sort().join('|');
   bridgeStore.subscribe(() => {
-    const b = GX.bridge(); if (!b || b.tab === lastTab) return;
+    const b = GX.bridge(); if (!b) return;
+    const navKey = [...(b.nav?.allowedIds || [])].sort().join('|');
+    if (navKey !== lastNav) { lastNav = navKey; GX.emit('nav'); }
+    if (b.tab === lastTab) return;
     lastTab = b.tab;
     if (b.tab === pushed) { pushed = null; return; }
     openTab(b.tab);

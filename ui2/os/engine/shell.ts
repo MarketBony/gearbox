@@ -92,6 +92,9 @@ const GX = (window as any).GX; // lu au démarrage (le noyau l'a créé), pas à
     GX.on('wm:change', () => { refreshDock(); S.widgetsDim(); applyDock(); buildMenubar(); });
     GX.on('wm:title', () => buildMenubar());
     GX.on('badges', refreshDock);
+    /* [GEARBOX] rubriques autorisées modifiées en cours de session (engine/boot.ts) : Dock reconstruit, fenêtres
+       devenues interdites fermées (ex. SPARK éteint par le Master, invitation retirée). */
+    GX.on('nav', () => { GX.wm.list().filter((w) => !S.canOpen(w.app?.parent || w.appId)).forEach((w) => GX.wm.close(w)); buildDock(); buildMenubar(); });
     GX.on('presence', refreshDockPresence); GX.on('data:users', refreshDockPresence);
     tick(); setInterval(tick, 15000);
     start(); /* [GEARBOX] écran verrouillé retiré (décision Théo) */

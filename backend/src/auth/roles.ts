@@ -51,10 +51,11 @@ export const USER_DELETE_ROLES = ['Master', 'Administrator'];
 // Doit rester aligné sur `GAMES_ALLOWED_ROLES` de `constants.ts` côté frontend.
 export const GAMES_ROLES = ['Master', 'Administrator', 'Coordinator', 'Digital Manager'];
 
-// Rubrique CRM (référentiel client unique, 12/10/2026). Cible : les rôles de Jeux (Director et chef de site
-// EXCLUS, décision de Théo). Le temps de la construire : **Master seul**. Élargir = remplacer par GAMES_ROLES,
-// ici ET dans `CRM_ALLOWED_ROLES` de `constants.ts`. Ces données sont nominatives : jamais d'External ni de Guest.
-export const CRM_ROLES = ['Master'];
+// Rubrique CRM / SPARK (référentiel client unique, 12/10/2026). Depuis le 26/10/2026, l'accès ne dépend plus
+// du rôle seul : interrupteur + liste d'invités tenus par le Master (Réglages). La règle complète vit dans
+// `auth/crmAccess.ts`, SEULE porte ; voir `CRM_INVITABLE_ROLES` plus bas pour les rôles invitables.
+// Le Master a accès d'office (interrupteur allumé) et garde seul les Imports.
+export const CRM_MASTER_ROLES = ['Master'];
 
 // --- Chef de site (05/08/2026) ------------------------------------------------
 //
@@ -146,5 +147,13 @@ export const UNSCOPED_READ_ROLES = INTERNAL_ROLES.filter(r => r !== SITE_MANAGER
  * DIFFÉRENTE : ne pas les aliaser.
  */
 export const TODO_ROLES = INTERNAL_ROLES.filter(r => r !== SITE_MANAGER_ROLE);
+/**
+ * Rôles que le Master peut INVITER dans SPARK (26/10/2026, décision de Théo) : tous les rôles internes SAUF le chef
+ * de site (SPARK n'est pas cloisonné par concession : il verrait tout le réseau). L'External n'est déjà pas dans
+ * INTERNAL_ROLES. Le Master n'y figure pas : il a accès d'office. ⚠️ Contrôlé sur le rôle COURANT à chaque appel
+ * (`auth/crmAccess.ts`) : un invité devenu External ou chef de site perd l'accès même s'il reste dans la liste.
+ * Même valeur que TODO_ROLES moins le Master ce jour, règle DIFFÉRENTE : ne pas les aliaser.
+ */
+export const CRM_INVITABLE_ROLES = INTERNAL_ROLES.filter(r => r !== SITE_MANAGER_ROLE && r !== 'Guest' && !CRM_MASTER_ROLES.includes(r)); // Guest exclu (Théo, 26/10/2026)
 /** Rôles qui ont le Chat (et donc ses fichiers) : ceux de `hasSocialFeatures`. */
 export const CHAT_ROLES = (VALID_ROLES as readonly string[]).filter(r => !NO_SOCIAL_ROLES.includes(r));

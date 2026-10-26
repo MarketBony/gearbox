@@ -4,7 +4,8 @@ import { type Source, VH_C, nf } from './common';
 import { type Run, Badge, quand } from './ImportsView';
 
 /**
- * Accueil : chiffres de GET /apercu, dernier import de chaque source (journal GET /imports), raccourcis.
+ * Accueil : chiffres de GET /apercu, dernier import de chaque source (journal GET /imports pour le Master, résumé de
+ * GET /apercu pour un invité), raccourcis.
  * Maquette : `homeBuild`. Les deux graphiques de la maquette (clients par plaque, fins de financement sur 12 mois)
  * n'ont pas de route au lot 2 : ils ne sont PAS affichés (aucun chiffre fabriqué côté client).
  */
@@ -19,6 +20,8 @@ const SrcLine: React.FC<{ k: Source; runs: Run[]; canImports: boolean; onRun: (i
       <div className="l1">{k === 'BSO' ? 'Ancienne base Sud-Ouest' : k === 'VN' ? 'Requête VN du soir' : 'Requête VO du soir'} {x ? <Badge run={x} /> : null}{k === 'BSO' ? <span className="crm-tag">Import unique</span> : null}</div>
       <span>{canImports && x ? <button className="btn sm ghost" onClick={() => onRun(x.id)}>Rapport <Icon name="chevron" size="sm" /></button> : null}</span>
       <div className="l2">{!x ? 'Aucun import reçu pour l’instant.'
+        // Invité : résumé de GET /apercu (source, statut, date), sans les compteurs ni le message du journal.
+        : !canImports ? (x.statut === 'applique' ? `Appliqué ${quand(x.fin)}` : 'Dernier fichier non appliqué : les données précédentes restent en place.')
         : x.statut === 'applique' ? `${quand(x.fin)} · ${nf(s.lignesLues)} lignes lues · ${nf(s.retenues)} retenues${s.ventesNouvelles != null ? ` · +${nf(s.ventesNouvelles)} ventes nouvelles` : ''}`
         : `${quand(x.debut)} — ${x.message || ''} ${ok ? `Dernier import appliqué : ${quand(ok.fin)}.` : 'Aucun import appliqué.'}`}</div>
     </div>

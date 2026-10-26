@@ -52,8 +52,79 @@ export const setJeuxActives = async (actives: boolean, parUtilisateur: string): 
   return cacheJeux;
 };
 
+// =============================================================================
+// SPARK (rubrique CRM, 26/10/2026) — interrupteur + liste d'invités.
+//
+// ⚠️ ABSENCE DE LIGNE = ALLUMÉ, à l'INVERSE des Jeux, et c'est VOULU : SPARK était déjà en service pour le Master
+// avant l'arrivée de l'interrupteur. Un défaut « éteint » l'aurait coupé au déploiement, sans que personne n'ait rien
+// touché. Le risque reste borné : allumé sans liste d'invités = Master seul, exactement l'état d'avant.
+// Même logique en cas de base injoignable : on rend « allumé, aucun invité » (= Master seul), jamais plus large.
+//
+// La liste d'invités est une liste JSON d'ids de comptes (`crm.users`). Elle ne dit pas tout : le rôle COURANT est
+// revérifié à chaque appel par `auth/crmAccess.ts`, SEULE porte d'accès à SPARK. Ne jamais lire ce réglage ailleurs
+// pour décider d'un accès.
+// =============================================================================
+
+export const CLE_CRM = 'crm.enabled';
+export const CLE_CRM_INVITES = 'crm.users';
+
+export interface ReglagesCrm { enabled: boolean; users: string[] }
+
+let cacheCrm: ReglagesCrm | undefined;
+
+/** Liste d'ids propre : chaînes non vides, dédoublonnées. Une valeur illisible en base vaut « aucun invité ». */
+const lireListe = (brut: string | null | undefined): string[] => {
+  if (!brut) return [];
+  try {
+    const v = JSON.parse(brut);
+    return Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && x.length > 0))] : [];
+  } catch {
+    return [];
+  }
+};
+
+/** Réglages SPARK. Lecture mémoire, avec repli base au premier appel. */
+export const reglagesCrm = async (): Promise<ReglagesCrm> => {
+  if (cacheCrm !== undefined) return cacheCrm;
+  try {
+    const lignes = await prisma.appSetting.findMany({ where: { key: { in: [CLE_CRM, CLE_CRM_INVITES] } } });
+    const val = (k: string) => lignes.find((l) => l.key === k)?.value;
+    const enabled = val(CLE_CRM);
+    cacheCrm = { enabled: enabled === undefined ? true : enabled === 'true', users: lireListe(val(CLE_CRM_INVITES)) };
+  } catch (e) {
+    // Défaut borné : Master seul (état d'avant l'interrupteur). Non mémorisé, on retente au prochain appel.
+    console.error('[settings] lecture SPARK impossible, Master seul :', (e as Error).message);
+    return { enabled: true, users: [] };
+  }
+  return cacheCrm;
+};
+
+/** Écrit l'interrupteur SPARK et rafraîchit le cache. */
+export const setCrmActive = async (actif: boolean, parUtilisateur: string): Promise<ReglagesCrm> => {
+  await prisma.appSetting.upsert({
+    where: { key: CLE_CRM },
+    create: { key: CLE_CRM, value: String(actif), updatedBy: parUtilisateur },
+    update: { value: String(actif), updatedBy: parUtilisateur },
+  });
+  cacheCrm = undefined;
+  return reglagesCrm();
+};
+
+/** Écrit la liste d'invités SPARK (déjà validée par l'appelant) et rafraîchit le cache. */
+export const setCrmInvites = async (ids: string[], parUtilisateur: string): Promise<ReglagesCrm> => {
+  const value = JSON.stringify([...new Set(ids)]);
+  await prisma.appSetting.upsert({
+    where: { key: CLE_CRM_INVITES },
+    create: { key: CLE_CRM_INVITES, value, updatedBy: parUtilisateur },
+    update: { value, updatedBy: parUtilisateur },
+  });
+  cacheCrm = undefined;
+  return reglagesCrm();
+};
+
 /** Préchargement au démarrage : le premier appel ne paie pas la lecture. */
 export const chargerReglages = async (): Promise<void> => {
   await jeuxActives();
-  console.log(`[settings] Jeux ${cacheJeux ? 'ALLUMES' : 'eteints'}.`);
+  const crm = await reglagesCrm();
+  console.log(`[settings] Jeux ${cacheJeux ? 'ALLUMES' : 'eteints'} ; SPARK ${crm.enabled ? 'ALLUME' : 'eteint'} (${crm.users.length} invite(s)).`);
 };

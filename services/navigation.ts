@@ -22,6 +22,8 @@ export interface NavContext {
   role: string | undefined;
   gamesEnabled: boolean;
   voitConges: boolean;
+  /** SPARK : accès du compte calculé par le serveur (`aAccesCrm`, services/appSettings.ts). Absent = pas d'accès. */
+  crmAccess?: boolean;
   /** Interface v2 (Gearbox OS). Certaines rubriques n'existent QUE dans la v2 (Forms) : l'ancienne
    *  interface n'a pas de page pour elles, elles n'apparaissent donc ni dans son menu ni dans ses gardes. */
   ui2?: boolean;
@@ -31,7 +33,7 @@ export interface NavGroup { label: string; items: NavItem[] }
 
 const I = (id: string, icon: LucideIcon, label: string): NavItem => ({ id, icon, label });
 
-export function computeNav({ role, gamesEnabled, voitConges, ui2 = false }: NavContext) {
+export function computeNav({ role, gamesEnabled, voitConges, crmAccess = false, ui2 = false }: NavContext) {
   const isExternal = role === 'External';
   const isSm = isSiteManager(role);
   const canAccessGames = canSeeGames(role, gamesEnabled);
@@ -50,8 +52,8 @@ export function computeNav({ role, gamesEnabled, voitConges, ui2 = false }: NavC
     // Campagnes : retirée de la v2 le 09/10/2026 (Théo : « elle sert à rien »). Reste dans l'ancienne interface jusqu'à la bascule.
     ...(!ui2 ? [I('campaigns', Megaphone, 'Campagnes')] : []),
     ...(ui2 && canSeeForms(role) ? [I('forms', ClipboardList, 'Forms')] : []),
-    // CRM : interface v2 seulement (12/10/2026), comme Forms.
-    ...(ui2 && canSeeCrm(role) ? [I('crm', Handshake, 'SPARK')] : []),
+    // CRM : interface v2 seulement (12/10/2026), comme Forms. Accès : interrupteur + invités (26/10/2026).
+    ...(ui2 && canSeeCrm(role, crmAccess) ? [I('crm', Handshake, 'SPARK')] : []),
     I('material', Package, 'Matériel'),
     I('agenda', CalendarDays, 'Agenda'),
     I('budget', PiggyBank, 'Budget'),
