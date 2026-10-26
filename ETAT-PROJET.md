@@ -3,7 +3,36 @@
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
-## ▶ POINT DE REPRISE — 16/10/2026 (lire en premier)
+## ▶ POINT DE REPRISE — 26/10/2026 (lire en premier)
+- **ÉTAT (fin de session du 26/10)** : tout est en production, `master` = `origin` = VPS, aucune branche ouverte. Dernier
+  déploiement : **correctif 100** (SPARK ouvert sur invitation). Session du 16 au 26/10 : correctifs **93 → 100** (détail
+  juste en dessous) + **fail2ban** sur le VPS (23/10, infra, pas de numéro). Théo a recetté 93 à 100 (SPARK sur invitation :
+  « ça fonctionne bien »).
+- **BLOQUÉ PAR UN TIERS** : **clé seule pour `ubuntu` en SSH** — attend l'accès à l'espace client OVH (utilisateur limité au
+  VPS) que Théo a demandé à son responsable marketing et à « Michel » (relance du 22/10, réponse « on revient vers toi »). Plan
+  prêt (`DEPLOIEMENT.md` § SSH / fail2ban, `BUGS-CONNUS.md`) : clé de secours + minuteur de retour arrière 10 min + `sshd -t`
+  + session ouverte + test dans une 2e session ; `Match User dcs` (mot de passe) conservé.
+- **DCS (SPARK) — aucun envoi n'arrive** : requêtes VN / VO passées en **30 derniers jours** (date de livraison, titre inchangé,
+  correctif 95) mais AUCUNE connexion SFTP de `dcs` depuis le test du 15/10 (contrôlé le 26/10). Ce n'est donc pas la taille :
+  la planification DCSNETneo ne part pas. Prochaine étape : Théo règle une planification à une heure proche en journée, on
+  surveille le VPS en direct (`journalctl -u ssh`, `/srv/dcs/depot`, `docker compose logs rcu-worker`) ; sinon historique des
+  tâches DCS / machine qui exécute les tâches (veille la nuit ?). Théo ne peut pas « pousser à la main » depuis DCS.
+- **PROCHAINS LOTS (recommandation du 26/10, à confirmer avec Théo)** : 1) **trou serveur `GET /api/budget`** + lecture des
+  dépenses fixes sans garde de rôle (External) — court ; 2) **audit du motif « signal perdu »** (`useState` + abonnement dans un
+  `useEffect` dans les petits stores : cause du bug Congés, correctif 99 ; `appSettings` et `congesAcces` déjà passés en
+  `useSyncExternalStore`) — court ; 3) **sauvegarde des fichiers HORS VPS** (`uploads_data` 3,2 Go, `bonyforms_files`) ;
+  puis clés à renouveler (OpenWeather, secret Google, mot de passe `dcs`), « Réinitialiser les widgets » qui ne vide pas le
+  bureau serveur, barre « escamotable » jamais active, répartitions personnalisées (question ouverte), fichiers maison, mIAouss
+  P2 / P3, SPARK (« déjà ciblés », lot 5 relances, lot 6 GRID, activation des portefeuilles après le classement de Théo).
+- **GARDÉ DE CÔTÉ par Théo** : plateforme d'emailing maison + API Sarbacane (backlog § EMAILING / SARBACANE).
+- **Recettes de Théo en attente** : duel de bowling à deux comptes en prod ; rôles restreints dans la v2 (chef de site, External).
+- **Leçons de cette session** : (1) `GX.css` est INERTE dans Gearbox — la CSS d'une fonction du moteur va dans
+  `ui2/os/overrides.css` ; (2) la règle `:host([data-material]) :is(.btn…)` du verre Liquid l'emporte sur tout sélecteur de
+  rubrique (`!important` nécessaire, cf. correctif 96) ; (3) compter les attaques SSH sur « Failed password » seul (une
+  tentative = parfois deux lignes de journal) ; (4) OpenSSH 10 journalise sous `sshd-session` (fail2ban : `journalmatch =
+  _SYSTEMD_UNIT=ssh.service`) ; (5) DNS : `bonyauto-mobile.com` chez **Gandi**, `info.` délégué à Sarbacane.
+
+### Historique du point de reprise (16 → 26/10)
 - **CORRECTIF 94 EN PRODUCTION (18/10, `api` + `web`) — 🎳 BOWLING 3D, 5e jeu de la v2** (branche `feat/bowling-v2`, qui
   contient aussi le prototype `maquettes/jeux/bowling/`). Physique Rapier DÉTERMINISTE (`@dimforge/rapier3d-deterministic-compat`
   0.21.0, versions EXACTES racine + backend, contrôlées par `scripts/check-bowling-sync.mjs` dans `predev`/`prebuild`) :
