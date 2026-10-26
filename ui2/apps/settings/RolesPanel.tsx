@@ -16,14 +16,16 @@ import { AppIco, Head, RANKS, READ_ONLY, ROLE_SHORT, SecIco, css, roleLabel, typ
 const MATRIX_APPS = ['hello', 'dashboard', 'projects', 'todo', 'digital', 'chat', 'material', 'agenda', 'budget', 'fixed', 'conges', 'export', 'games', 'crm', 'archives', 'settings'];
 
 export function RolesPanel({ s, cur }: { s: SectionDef; cur: string }) {
-  const { gamesEnabled } = useAppSettings();
+  const { gamesEnabled, crmEnabled } = useAppSettings();
   const apps = MATRIX_APPS.filter((id) => gx().app(id));
   // Congés : visibles des membres du périmètre et des gestionnaires (services/congesAcces.ts) — pour
   // un RÔLE, on montre donc les rôles qui PEUVENT lire le planning (CONGES_LECTURE_ROLES).
   const access = useMemo(() => Object.fromEntries(RANKS.map((r) => {
-    const nav = computeNav({ role: r, gamesEnabled, voitConges: peutLireConges(r), ui2: true });
+    // SPARK : pour un RÔLE, seul le Master y a accès d'office (interrupteur allumé) ; les autres rôles invitables
+    // l'ont au cas par cas (Réglages › Application), ce que la matrice ne peut pas montrer : voir la note.
+    const nav = computeNav({ role: r, gamesEnabled, voitConges: peutLireConges(r), crmAccess: r === 'Master' && crmEnabled, ui2: true });
     return [r, new Set(apps.filter((id) => id === 'settings' || nav.allowedIds.has(tabOf(id))))];
-  })), [gamesEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  })), [gamesEnabled, crmEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
   const cell = (r: string, id: string) => access[r].has(id)
     ? (READ_ONLY.includes(r) ? <span className="set-ro" data-tip="Lecture seule"><Icon name="eye" /></span> : <span className="set-yes"><Icon name="check" /></span>)
     : <span className="set-no">—</span>;
@@ -35,7 +37,7 @@ export function RolesPanel({ s, cur }: { s: SectionDef; cur: string }) {
         <tbody>{apps.map((id) => <tr key={id}><td><div className="row" style={{ gap: 8 }}><AppIco id={id} s={20} /><span className="ellipsis">{gx().app(id).name}</span></div></td>{RANKS.map((r) => <td key={r} className={r === cur ? 'cur' : ''}>{cell(r, id)}</td>)}</tr>)}</tbody>
       </table></div>
         <div className="set-legend2"><span><span className="set-yes"><Icon name="check" /></span>Accès</span><span><span className="set-ro"><Icon name="eye" /></span>Lecture seule</span><span><span className="set-no">—</span>Aucun accès</span></div></div>
-      <div className="set-note">Congés : réservé aux membres du planning et à ceux qui le gèrent. Jeux : selon l’interrupteur « Espace détente » ({gamesEnabled ? 'visible' : 'masqué'} actuellement).</div>
+      <div className="set-note">Congés : réservé aux membres du planning et à ceux qui le gèrent. Jeux : selon l’interrupteur « Espace détente » ({gamesEnabled ? 'visible' : 'masqué'} actuellement). SPARK : selon l’interrupteur SPARK ({crmEnabled ? 'allumé' : 'éteint pour tous'} actuellement) — le Master d’office, les autres rôles (sauf chef de site et External) seulement s’il les invite, personne par personne ; les Imports restent au Master.</div>
       <div className="set-group set-notecard enter" style={css({ '--i': 2 })} data-anchor="note"><SecIco s={{ icon: 'building', c: 'var(--danger)' }} cls="lg" /><div><b>Chef de site (Site Manager)</b>
         <ul><li><b>Lecture seule partout</b> : aucun bouton de création ni d’édition, il ne figure dans aucune liste de rôles éditeurs.</li>
           <li><b>Limité à ses concessions</b> (rattachées à son compte). Les projets multi-sites n’affichent que sa part (« +N masqués »).</li>

@@ -17,8 +17,9 @@ import EquipesView from './equipes/EquipesView';
  * Contrat d'API : ./CONTRAT-API.md (tout passe par `db.*`, jamais `fetch` direct).
  *
  * Lot 1 (12/10/2026) : l'écran « Imports ». Lot 2 : Accueil, Clients (liste paginée par le serveur + fiche),
- * À arbitrer. Lot 3 : Requêteur (./requeteur/). Lot 4 : Équipes et portefeuilles (./equipes/). Accès : CRM_ALLOWED_ROLES (Master pendant la construction) — le refus réel est côté serveur
- * (`/api/crm`, CRM_ROLES). Onglet Imports : Master seul (maquette).
+ * À arbitrer. Lot 3 : Requêteur (./requeteur/). Lot 4 : Équipes et portefeuilles (./equipes/). Accès : interrupteur SPARK + invités du Master (26/10/2026) — le refus réel est côté serveur
+ * (`/api/crm`, porte unique backend/src/auth/crmAccess.ts). Onglet Imports : Master seul (`requireCrmMaster` côté serveur) ;
+ * un invité ne le voit pas et l'Accueil lui montre le dernier import de chaque source depuis GET /apercu, sans détail.
  */
 
 type View = 'home' | 'clients' | 'arb' | 'req' | 'equipes' | 'imports';
@@ -50,10 +51,14 @@ export default function CrmApp({ win, inst }: AppProps) {
   const rqStore = useRef<RqStore | null>(null);
 
   const load = useCallback(() => {
-    db.getCrmApercu().then((a) => { setApercu(a); setErreur(null); if (typeof a?.a_arbitrer === 'number') setArbTotal(a.a_arbitrer); })
-      .catch((e) => setErreur(e.message || 'Chargement impossible.'));
-    db.getCrmImports().then(setRuns).catch(() => setRuns((r) => r ?? []));
-  }, []);
+    // Journal complet des imports : Master seul (le serveur refuse GET /imports aux invités). Un invité garde le
+    // résumé « dernier import par source » de GET /apercu (source, statut, date : aucune donnée nominative).
+    db.getCrmApercu().then((a) => {
+      setApercu(a); setErreur(null); if (typeof a?.a_arbitrer === 'number') setArbTotal(a.a_arbitrer);
+      if (!canImports) setRuns(Array.isArray(a?.imports) ? a.imports : []);
+    }).catch((e) => { setErreur(e.message || 'Chargement impossible.'); if (!canImports) setRuns((r) => r ?? []); });
+    if (canImports) db.getCrmImports().then(setRuns).catch(() => setRuns((r) => r ?? []));
+  }, [canImports]);
   useEffect(() => { load(); }, [load]);
   // Une demande « appliquer quand même » en attente : on relit toutes les 20 s jusqu'à son traitement.
   const enAttente = !!runs?.some((r) => r.force_demande_le);

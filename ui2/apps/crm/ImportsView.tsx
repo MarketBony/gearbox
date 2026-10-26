@@ -6,7 +6,7 @@ import type { Source } from './common';
 
 /**
  * Onglet « Imports » (lot 1, journal `rcu.import_run`) — l'écran du correctif 82, déplacé tel quel dans un onglet.
- * Réservé au rôle Master (maquette) ; le refus réel est côté serveur (`/api/crm`, CRM_ROLES).
+ * Réservé au rôle Master ; le refus réel est côté serveur (`requireCrmMaster`, backend/src/auth/crmAccess.ts).
  */
 
 export interface Run {

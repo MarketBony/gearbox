@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { PoolClient } from 'pg';
-import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
-import { CRM_ROLES } from '../auth/roles';
+import { authenticateToken, AuthRequest } from '../auth/middleware';
+import { requireCrm } from '../auth/crmAccess';
 import { rcu, rcuConfigured } from '../rcu/db';
 import { CANAUX, TYPES_ECHANGE } from '../rcu/bony';
 import { chargerVendeurs, majAlias, recalculer } from '../rcu/portefeuille';
@@ -10,11 +10,11 @@ import { nomDe } from './crm';
 
 /**
  * SPARK lot 4 — onglet Équipes (référentiel vendeurs, noms DCS, règles, à attribuer) et couche Bony de la fiche client
- * (portefeuille, ne plus contacter, échanges). Monté sur /api/crm, derrière CRM_ROLES comme le reste de SPARK.
+ * (portefeuille, ne plus contacter, échanges). Monté sur /api/crm, derrière `requireCrm` (auth/crmAccess.ts) comme le reste de SPARK.
  * Toute décision de portefeuille passe par `rcu/portefeuille.ts` (seule porte) ; ici on n'écrit que des choix humains.
  */
 const router = Router();
-router.use(authenticateToken, requireRole(CRM_ROLES));
+router.use(authenticateToken, requireCrm);
 router.use((_req, res, next) => {
   if (!rcuConfigured()) return res.status(503).json({ error: 'La base du CRM n\'est pas configurée sur ce serveur.' });
   next();

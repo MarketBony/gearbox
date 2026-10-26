@@ -2,17 +2,21 @@ import React, { useEffect, useState } from 'react';
 import type { StorageInfo } from '../../../types';
 import { db } from '../../../services/dataService';
 import { appSettingsStore, useAppSettings } from '../../../services/appSettings';
+import { RT_EVENTS, useRealtimeSync } from '../../../services/realtime';
+import { estInvitableCrm } from '../../../constants';
+import { useWorkspace } from '../../store/workspace';
 import { type PushState, getPushState, subscribeToPush, unsubscribeFromPush } from '../../../services/pushNotifications';
 import { type Platform, canPrompt, getPlatform, isFirefoxDesktop, isStandalone, onInstallStateChange, promptInstall } from '../../../services/pwaInstall';
 import { canUseUi2, setUi2Beta, useUi2BetaPref } from '../../beta';
 import { gx, hud, Icon } from '../ui/kit';
-import { AppIco, Head, RoleBadge, Row, Switch, css, octets, LIBELLES_TYPE, type SectionDef } from './common';
+import { AppIco, Head, RoleBadge, Row, Switch, UAv, css, octets, LIBELLES_TYPE, type SectionDef } from './common';
 
 // =====================================================================
 // Panneaux « Application » et « Stockage » — blocs 1bis et 1ter de pages/Settings.tsx :
 //  - installation PWA (`InstallAppModal` : services/pwaInstall) ;
 //  - notifications de l'appareil (`NotificationsToggle` : services/pushNotifications), 5 états ;
 //  - « Espace détente » (`GamesToggle`) : Master seul, refus réel côté serveur ;
+//  - « SPARK » (26/10/2026) : interrupteur + invités, Master seul, refus réel côté serveur (/api/settings/crm) ;
 //  - « Nouvelle interface (bêta) » (`BetaToggle`) : préférence locale, c'est la SORTIE de la v2 ;
 //  - Stockage : GET /api/storage, visible de tous.
 // =====================================================================
@@ -93,6 +97,77 @@ export function InstallSheet({ close }: { close: (v?: unknown) => void }) {
   );
 }
 
+// ---------------------------------------------------------------- SPARK (Master seul)
+// Interrupteur + liste d'invités. La liste ne sort du serveur que par GET /api/settings/crm (Master seul) ; chaque
+// changement est écrit tout de suite (PUT, comme l'interrupteur Jeux) et diffusé `settings:updated` : chacun relit SON
+// accès. Le serveur valide (comptes existants, rôles invitables) et revérifie le rôle COURANT à chaque appel de
+// /api/crm (backend/src/auth/crmAccess.ts) : décocher ici ferme l'accès au prochain appel, sans attendre.
+const sansAccents = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+function SparkModule({ meId }: { meId: string }) {
+  const users = useWorkspace((s) => s.users);
+  const [conf, setConf] = useState<{ enabled: boolean; users: string[] } | null>(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [q, setQ] = useState('');
+  const load = () => { db.getCrmSettings().then((v) => { setConf(v); setErr(''); }).catch((e) => setErr(e instanceof Error ? e.message : 'Lecture impossible.')); };
+  useEffect(() => { load(); }, []);
+  // Un autre onglet du Master a changé le réglage : on relit (l'onglet auteur n'est pas notifié, d'où le `setConf` du PUT).
+  useRealtimeSync(RT_EVENTS.settings, load);
+
+  const masters = users.filter((u) => u.role === 'Master');
+  const invitables = users.filter((u) => estInvitableCrm(u.role)).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  const invites = new Set(conf?.users ?? []);
+  const nbInvites = invitables.filter((u) => invites.has(u.id)).length;
+  // Invités restés dans la liste mais devenus non invitables (External, chef de site) ou supprimés : sans accès (le
+  // serveur revérifie le rôle). Retirés de la liste au prochain enregistrement, que le serveur refuserait sinon.
+  const horsJeu = (conf?.users ?? []).filter((id) => !invitables.some((u) => u.id === id)).length;
+
+  const save = async (body: { enabled?: boolean; users?: string[] }, msg: (r: { enabled: boolean; users: string[] }) => string) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await db.setCrmSettings(body);
+      setConf(r); hud(msg(r));
+      void appSettingsStore.refresh(meId);   // l'auteur est exclu de la diffusion : son propre accès (Dock) suit ici
+    } catch (e) { hud(e instanceof Error ? e.message : 'Échec de la modification.'); }
+    setBusy(false);
+  };
+  const toggle = (id: string, nom: string) => {
+    const on = invites.has(id);
+    const next = invitables.map((u) => u.id).filter((x) => (x === id ? !on : invites.has(x)));
+    save({ users: next }, () => (on ? `${nom} n’a plus accès à SPARK` : `${nom} a accès à SPARK`));
+  };
+  const n = sansAccents(q.trim());
+  const shown = n ? invitables.filter((u) => sansAccents(u.name).includes(n)) : invitables;
+  const ligne = (u: (typeof users)[number], fin: React.ReactNode) => (
+    <><UAv u={u} /><div className="grow" style={{ minWidth: 0 }}><div className="row" style={{ gap: 6 }}><b className="ellipsis">{u.name}</b><RoleBadge r={u.role} /></div></div>{fin}</>
+  );
+
+  if (!conf) return <div className="set-group" style={{ padding: 18 }} data-anchor="spark">{err ? <span style={{ color: 'var(--danger)', fontWeight: 600 }}>{err}</span> : <span className="muted">Chargement…</span>}</div>;
+  return (
+    <div className="set-group enter" style={css({ '--i': 3 })} data-anchor="spark">
+      <Row t="SPARK" d={conf.enabled ? `Allumé : le Master et ${nbInvites} personne${nbInvites > 1 ? 's' : ''} cochée${nbInvites > 1 ? 's' : ''}` : 'Éteint pour tous, Master compris'} ico={<AppIco id="crm" s={26} />}>
+        <input type="checkbox" className="switch" checked={conf.enabled} disabled={busy} aria-label="Ouvrir SPARK" title={conf.enabled ? 'Éteindre SPARK pour tous' : 'Rallumer SPARK'}
+          onChange={() => save({ enabled: !conf.enabled }, (r) => (r.enabled ? 'SPARK rallumé' : 'SPARK éteint pour tous, Master compris'))} />
+      </Row>
+      <div style={{ padding: '4px 20px 16px', display: 'grid', gap: 8 }}>
+        <label className="search" style={{ minWidth: 160 }}><Icon name="search" size="sm" /><input placeholder="Rechercher une personne" value={q} onChange={(e) => setQ(e.target.value)} /></label>
+        <div className="scroll" style={{ maxHeight: 380, display: 'grid', gap: 2 }}>
+          {!n ? masters.map((u) => <div key={u.id} className="list-row">{ligne(u, <span className="faint" style={{ fontSize: 12 }}>accès d’office</span>)}</div>) : null}
+          {shown.map((u) => (
+            <label key={u.id} className="list-row" style={{ cursor: busy ? 'progress' : 'pointer' }}>
+              {ligne(u, <input type="checkbox" checked={invites.has(u.id)} disabled={busy} aria-label={`Accès SPARK pour ${u.name}`} onChange={() => toggle(u.id, u.name)} />)}
+            </label>
+          ))}
+          {!shown.length ? <div className="empty">{n ? 'Personne ne correspond' : 'Aucun compte invitable'}</div> : null}
+        </div>
+        {horsJeu ? <div className="faint" style={{ fontSize: 12 }}>{horsJeu} invitation{horsJeu > 1 ? 's' : ''} sans effet (compte supprimé, ou rôle devenu External ou chef de site), retirée{horsJeu > 1 ? 's' : ''} au prochain changement.</div> : null}
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Application
 export function ApplicationPanel({ s, user, onInstall }: { s: SectionDef; user: { id: string; role: string }; onInstall: () => void }) {
   const master = user.role === 'Master';
@@ -134,6 +209,8 @@ export function ApplicationPanel({ s, user, onInstall }: { s: SectionDef; user: 
           </Row>
         </div>
         <div className="set-note">Visible du Master seul. Le refus réel est côté serveur : masquer ce réglage ne ferme rien. Le Directeur a les droits d’un Administrateur, sauf les Jeux.</div>
+        <SparkModule meId={user.id} />
+        <div className="set-note">SPARK contient les données nominatives de 180 000 clients : l’accès est personnel, et chaque export est journalisé au nom de la personne qui le lance. Les personnes cochées ont tout SPARK sauf les Imports, qui restent au Master. Chef de site et External ne peuvent pas être invités (SPARK n’est pas cloisonné par concession).</div>
       </> : null}
     </div>
   );
