@@ -41,6 +41,8 @@ Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec
 - [ ] **Bowling : Brooklyn encore généreux (30 % de strikes, cible 25 %)** et boule lente encore moins déviée qu'une rapide —
   limites du moteur (mélange des quilles), noté au correctif 94.
 - [ ] **Bowling : duel à deux comptes jamais joué avant la prod** (correctif 94) — recette de Théo en prod.
+- [x] **v2 : rubrique Congés masquée au Master** (Théo, 26/10) — notification perdue avant l'abonnement du crochet
+  `useCongesAcces` → `useSyncExternalStore`. Corrigé au correctif 99. À auditer : même motif dans d'autres petits stores.
 - [x] **Forms Bony : impossible de changer / retirer l'image d'accueil ou de fin** (Théo, 19/10) — les boutons existaient mais
   étaient invisibles sur la photo (verre transparent). Corrigé au correctif 96.
 - [ ] **SPARK : premier envoi automatique DCS (16/10) jamais parti** — aucune connexion SFTP de `dcs` depuis le 15/10.
