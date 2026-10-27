@@ -3,7 +3,7 @@ import type { StorageInfo } from '../../../types';
 import { db } from '../../../services/dataService';
 import { appSettingsStore, useAppSettings } from '../../../services/appSettings';
 import { RT_EVENTS, useRealtimeSync } from '../../../services/realtime';
-import { estInvitableCrm } from '../../../constants';
+import { estInvitableCrm, canUseAssistant } from '../../../constants';
 import { useWorkspace } from '../../store/workspace';
 import { type PushState, getPushState, subscribeToPush, unsubscribeFromPush } from '../../../services/pushNotifications';
 import { type Platform, canPrompt, getPlatform, isFirefoxDesktop, isStandalone, onInstallStateChange, promptInstall } from '../../../services/pwaInstall';
@@ -168,6 +168,70 @@ function SparkModule({ meId }: { meId: string }) {
   );
 }
 
+// ---------------------------------------------------------------- mIAouss (Master seul, 27/10/2026)
+// Même forme que SPARK, logique inverse : toute l'équipe marketing a mIAouss, le Master DÉCOCHE ceux qui n'en veulent
+// pas (« certains se sont plaints de lui »). Le serveur stocke les personnes COUPÉES (`assistant.off`) : un nouvel
+// arrivant de l'équipe l'a d'office. Refus réel : backend/src/auth/assistantAccess.ts, sur chaque route de /api/assistant.
+function AssistantModule({ meId }: { meId: string }) {
+  const users = useWorkspace((s) => s.users);
+  const [conf, setConf] = useState<{ enabled: boolean; off: string[] } | null>(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [q, setQ] = useState('');
+  const load = () => { db.getAssistantSettings().then((v) => { setConf(v); setErr(''); }).catch((e) => setErr(e instanceof Error ? e.message : 'Lecture impossible.')); };
+  useEffect(() => { load(); }, []);
+  useRealtimeSync(RT_EVENTS.settings, load);
+
+  const masters = users.filter((u) => u.role === 'Master');
+  const equipe = users.filter((u) => u.role !== 'Master' && canUseAssistant(u.role)).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  const coupes = new Set(conf?.off ?? []);
+  const nbActifs = equipe.filter((u) => !coupes.has(u.id)).length;
+
+  const save = async (body: { enabled?: boolean; off?: string[] }, msg: (r: { enabled: boolean; off: string[] }) => string) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await db.setAssistantSettings(body);
+      setConf(r); hud(msg(r));
+      void appSettingsStore.refresh(meId);   // l'auteur est exclu de la diffusion : sa propre mascotte suit ici
+    } catch (e) { hud(e instanceof Error ? e.message : 'Échec de la modification.'); }
+    setBusy(false);
+  };
+  const toggle = (id: string, nom: string) => {
+    const coupe = coupes.has(id);
+    // Seuls les membres actuels de l'équipe restent dans la liste : le serveur refuserait un compte devenu hors équipe.
+    const next = equipe.map((u) => u.id).filter((x) => (x === id ? !coupe : coupes.has(x)));
+    save({ off: next }, () => (coupe ? `mIAouss réactivé pour ${nom}` : `mIAouss désactivé pour ${nom}`));
+  };
+  const n = sansAccents(q.trim());
+  const shown = n ? equipe.filter((u) => sansAccents(u.name).includes(n)) : equipe;
+  const ligne = (u: (typeof users)[number], fin: React.ReactNode) => (
+    <><UAv u={u} /><div className="grow" style={{ minWidth: 0 }}><div className="row" style={{ gap: 6 }}><b className="ellipsis">{u.name}</b><RoleBadge r={u.role} /></div></div>{fin}</>
+  );
+
+  if (!conf) return <div className="set-group" style={{ padding: 18 }} data-anchor="miaouss">{err ? <span style={{ color: 'var(--danger)', fontWeight: 600 }}>{err}</span> : <span className="muted">Chargement…</span>}</div>;
+  return (
+    <div className="set-group enter" style={css({ '--i': 4 })} data-anchor="miaouss">
+      <Row t="mIAouss" d={conf.enabled ? `Allumé : le Master et ${nbActifs} personne${nbActifs > 1 ? 's' : ''} sur ${equipe.length}` : 'Éteint pour tous, Master compris'} ico={<span className="set-ico" style={css({ '--c': 'var(--bony-orange)' })}><Icon name="bolt" /></span>}>
+        <input type="checkbox" className="switch" checked={conf.enabled} disabled={busy} aria-label="Activer mIAouss" title={conf.enabled ? 'Éteindre mIAouss pour tous' : 'Rallumer mIAouss'}
+          onChange={() => save({ enabled: !conf.enabled }, (r) => (r.enabled ? 'mIAouss rallumé' : 'mIAouss éteint pour tous, Master compris'))} />
+      </Row>
+      <div style={{ padding: '4px 20px 16px', display: 'grid', gap: 8 }}>
+        <label className="search" style={{ minWidth: 160 }}><Icon name="search" size="sm" /><input placeholder="Rechercher une personne" value={q} onChange={(e) => setQ(e.target.value)} /></label>
+        <div className="scroll" style={{ maxHeight: 380, display: 'grid', gap: 2 }}>
+          {!n ? masters.map((u) => <div key={u.id} className="list-row">{ligne(u, <span className="faint" style={{ fontSize: 12 }}>accès d’office</span>)}</div>) : null}
+          {shown.map((u) => (
+            <label key={u.id} className="list-row" style={{ cursor: busy ? 'progress' : 'pointer' }}>
+              {ligne(u, <input type="checkbox" checked={!coupes.has(u.id)} disabled={busy} aria-label={`mIAouss pour ${u.name}`} onChange={() => toggle(u.id, u.name)} />)}
+            </label>
+          ))}
+          {!shown.length ? <div className="empty">{n ? 'Personne ne correspond' : 'Aucun membre de l’équipe marketing'}</div> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Application
 export function ApplicationPanel({ s, user, onInstall }: { s: SectionDef; user: { id: string; role: string }; onInstall: () => void }) {
   const master = user.role === 'Master';
@@ -211,6 +275,8 @@ export function ApplicationPanel({ s, user, onInstall }: { s: SectionDef; user: 
         <div className="set-note">Visible du Master seul. Le refus réel est côté serveur : masquer ce réglage ne ferme rien. Le Directeur a les droits d’un Administrateur, sauf les Jeux.</div>
         <SparkModule meId={user.id} />
         <div className="set-note">SPARK contient les données nominatives de 180 000 clients : l’accès est personnel, et chaque export est journalisé au nom de la personne qui le lance. Les personnes cochées ont tout SPARK sauf les Imports, qui restent au Master. Chef de site et External ne peuvent pas être invités (SPARK n’est pas cloisonné par concession).</div>
+        <AssistantModule meId={user.id} />
+        <div className="set-note">mIAouss est ouvert à l’équipe marketing : décocher une personne lui retire la mascotte, le widget et la rubrique mIAouss des Réglages, sans effacer sa mémoire ni ses compteurs. Un nouvel arrivant de l’équipe l’a d’office.</div>
       </> : null}
     </div>
   );

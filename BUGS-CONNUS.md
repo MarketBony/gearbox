@@ -2,6 +2,23 @@
 
 Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec référence du commit).
 
+- [ ] **Serveur : écritures de `/api/expenses` SANS garde de rôle** (audit du 26/10). `POST`, `PUT /:id`, `DELETE /:id` de
+  `routes/expenses.ts` n'ont que `authenticateToken` : External, chef de site ou Guest peuvent créer / modifier / supprimer une
+  dépense ponctuelle (`OneOffExpense`, table DORMANTE, aucun écran ne l'appelle) et l'écriture est diffusée en temps réel.
+  Correctif proposé : `requireRole` avec les `EDIT_ROLES` de `fixedExpenses.ts` (ou retrait des routes, à arbitrer par Théo).
+- [ ] **Serveur : journal d'activité falsifiable** (audit du 26/10). `POST /api/activity-log` prend `userId` / `userName` dans le
+  CORPS sans les comparer à `req.user` : n'importe quel compte peut écrire une entrée au nom d'un autre ; le chef de site peut
+  écrire alors que la lecture lui est refusée. Plus mineur : l'External lit ce fil, qui nomme des projets.
+- [ ] **v2 : motif « signal perdu » restant** (audit du 26/10, impact faible) — `useState` + abonnement dans un `useEffect`
+  SANS relecture : `ui2/os/DataHub.tsx` (`chatTick` l. 90, `avTick` l. 97) et `ui2/apps/ui/kit.tsx` (`useAvatarTick`). Une
+  notification arrivée entre le premier rendu et l'abonnement est perdue (pastille / photo périmée jusqu'à l'événement suivant).
+  Sains : `presenceStore`, `useChatConvs`, `pages/Chat.tsx`, `Avatar.tsx`, `navBadges`, `activityFeed`, `collections` /
+  `workspace` (zustand), `appSettings`, `congesAcces`. Correctif : `useSyncExternalStore` (compteur de version).
+- [ ] **v2 : le flux du widget mIAouss ne démarre jamais ?** (relevé le 27/10, non vérifié) — `useAssistantFeed(uid,
+  allowed.has('assistant'))` dans `ui2/os/DataHub.tsx`, or `'assistant'` n'est jamais dans `nav.allowedIds` (ce n'est pas une
+  rubrique) : `GX.assistantFeed` resterait nul et les compteurs du widget ne se chargeraient pas. À regarder sur un bureau qui a
+  le widget.
+
 - [ ] **CRM : Figeac, Millau et Carmaux absents des extractions DCS** (12/10). Ni VN ni VO pour `VNVORFIG`, `VNVORMILLAU`,
   `VNVORCARM` : le compte DCS de Théo n'a pas ces sites (droits à faire ouvrir par l'IT). Leurs codes sont déjà dans
   `rcu.ref_affaire` : rien à coder, ils seront importés dès qu'ils remonteront.

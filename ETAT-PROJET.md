@@ -3,7 +3,21 @@
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
-## ▶ POINT DE REPRISE — 26/10/2026 (lire en premier)
+## ▶ POINT DE REPRISE — 27/10/2026 (lire en premier)
+- **CORRECTIF 101 EN PRODUCTION (27/10, `api` + `web`, aucune migration) — mIAouss AU CAS PAR CAS.** Demande de Théo : « comme
+  pour SPARK, activer / désactiver mIAouss au cas par cas, certains se sont plaints de lui ». Réglages › Application › Modules
+  (Master) : interrupteur mIAouss (éteint = personne, Master compris) + une case par membre de l'équipe marketing, **cochée par
+  défaut** ; décocher = coupé. Logique INVERSE de SPARK : on stocke les COUPÉS (`assistant.off`), un nouvel arrivant l'a
+  d'office ; absence de ligne = allumé, personne de coupé (rien ne change au déploiement). Porte unique serveur
+  `backend/src/auth/assistantAccess.ts` (`requireAssistant` sur tout `/api/assistant`). Front : `assistantAccess` dans
+  `services/appSettings.ts` (`aAccesAssistant`) ; la mascotte (`MascotLayer`, + redessin du widget) et la rubrique mIAouss des
+  Réglages suivent sans rechargement. Mémoire et compteurs d'une personne coupée CONSERVÉS. Testé en local (Master) : décocher /
+  recocher, interrupteur éteint (mascotte et rubrique disparues, `/api/assistant/me` → 403) puis rallumé, 4 refus 400 sans
+  écriture. **Non testé** : côté d'une personne coupée avec son vrai compte ; redessin du widget mIAouss du bureau.
+- **AUDIT DU 26/10 (rien codé)** : le « trou serveur `GET /api/budget` » était DÉJÀ FERMÉ au correctif 80 (12/10) — le point de
+  reprise et `ETAT-BACKEND.md` étaient périmés. Vrais restes (fiches `BUGS-CONNUS.md`) : écritures de `/api/expenses` sans garde,
+  journal d'activité falsifiable, motif « signal perdu » à 3 endroits (`DataHub` ×2, `useAvatarTick`), flux du widget mIAouss
+  peut-être jamais démarré. Plan proposé à Théo, mis en attente au profit du 101.
 - **ÉTAT (fin de session du 26/10)** : tout est en production, `master` = `origin` = VPS, aucune branche ouverte. Dernier
   déploiement : **correctif 100** (SPARK ouvert sur invitation). Session du 16 au 26/10 : correctifs **93 → 100** (détail
   juste en dessous) + **fail2ban** sur le VPS (23/10, infra, pas de numéro). Théo a recetté 93 à 100 (SPARK sur invitation :
@@ -17,8 +31,8 @@
   la planification DCSNETneo ne part pas. Prochaine étape : Théo règle une planification à une heure proche en journée, on
   surveille le VPS en direct (`journalctl -u ssh`, `/srv/dcs/depot`, `docker compose logs rcu-worker`) ; sinon historique des
   tâches DCS / machine qui exécute les tâches (veille la nuit ?). Théo ne peut pas « pousser à la main » depuis DCS.
-- **PROCHAINS LOTS (recommandation du 26/10, à confirmer avec Théo)** : 1) **trou serveur `GET /api/budget`** + lecture des
-  dépenses fixes sans garde de rôle (External) — court ; 2) **audit du motif « signal perdu »** (`useState` + abonnement dans un
+- **PROCHAINS LOTS (recommandation du 26/10, à confirmer avec Théo)** : 1) ~~trou serveur `GET /api/budget`~~ (déjà fermé au
+  80, cf. audit du 26/10) → **écritures de `/api/expenses` + journal d'activité** — court ; 2) **audit du motif « signal perdu »** (`useState` + abonnement dans un
   `useEffect` dans les petits stores : cause du bug Congés, correctif 99 ; `appSettings` et `congesAcces` déjà passés en
   `useSyncExternalStore`) — court ; 3) **sauvegarde des fichiers HORS VPS** (`uploads_data` 3,2 Go, `bonyforms_files`) ;
   puis clés à renouveler (OpenWeather, secret Google, mot de passe `dcs`), « Réinitialiser les widgets » qui ne vide pas le
@@ -214,7 +228,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 100 (26/10)** — SPARK ouvert sur invitation du Master (`api` + `web`, aucune migration).
+- **En production : correctif 101 (27/10)** — mIAouss au cas par cas (`api` + `web`, aucune migration).
+  Avant lui le **correctif 100 (26/10)** — SPARK ouvert sur invitation du Master (`api` + `web`, aucune migration).
   Avant lui le **correctif 99 (26/10)** — v2 : Congés à nouveau visible pour le Master (`web` seul).
   Avant lui le **correctif 98 (22/10)** — « Ma photo » en qualité d'origine, sans grain (`web` seul).
   Avant lui le **correctif 97 (22/10)** — v2 : fond d'écran « Ma photo » (`web` seul).
@@ -1350,7 +1365,8 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 100** (26 octobre 2026) — SPARK ouvert sur invitation, **`api` + `web`**, aucune migration.
+- master = prod, synchronisés. Dernier lot déployé : **correctif 101** (27 octobre 2026) — mIAouss au cas par cas (interrupteur + personnes coupées), **`api` + `web`**, aucune migration.
+  Avant lui le **correctif 100** (26 octobre 2026) — SPARK ouvert sur invitation, **`api` + `web`**, aucune migration.
   Avant lui le **correctif 99** (26 octobre 2026) — Congés masqué au Master dans la v2, **`web` seul**.
   Avant lui le **correctif 98** (22 octobre 2026) — « Ma photo » en qualité d'origine, **`web` seul**.
   Avant lui le **correctif 97** (22 octobre 2026) — v2, fond d'écran « Ma photo », **`web` seul**, aucune migration.

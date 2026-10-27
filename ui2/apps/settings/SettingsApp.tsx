@@ -15,6 +15,7 @@ import { RolesPanel } from './RolesPanel';
 import { GooglePanel } from './GooglePanel';
 import { AssistantPanel } from './AssistantPanel';
 import { canSeeForms, canUseAssistant } from '../../../constants';
+import { useAppSettings, aAccesAssistant } from '../../../services/appSettings';
 
 // =====================================================================
 // Rubrique « Réglages » — transposition de maquettes/v2/js/apps/settings.js (barre latérale profil +
@@ -41,7 +42,7 @@ const SECTIONS: (SectionDef & { manage?: boolean; master?: boolean; forms?: bool
 /** Réglages cherchables : [libellé, section, ancre]. */
 const ITEMS: [string, string, string][] = [
   ['Nom affiché', 'compte', 'identite'], ['Ville de référence (météo)', 'compte', 'identite'], ['Date de naissance', 'compte', 'identite'], ['Mot de passe', 'compte', 'securite'], ['Identifiant de connexion', 'compte', 'carte'], ['Photo de profil', 'compte', 'carte'],
-  ['Barre du haut escamotable', 'bureau', 'dock'], ['Notifications de cet appareil (push)', 'application', 'push'], ['Espace détente (Jeux)', 'application', 'modules'], ['SPARK : interrupteur et invités', 'application', 'spark'], ['Nouvelle interface (bêta)', 'application', 'beta'], ['Ménage automatique des fichiers', 'stockage', 'menage'],
+  ['Barre du haut escamotable', 'bureau', 'dock'], ['Notifications de cet appareil (push)', 'application', 'push'], ['Espace détente (Jeux)', 'application', 'modules'], ['SPARK : interrupteur et invités', 'application', 'spark'], ['mIAouss : activer ou couper par personne', 'application', 'miaouss'], ['Nouvelle interface (bêta)', 'application', 'beta'], ['Ménage automatique des fichiers', 'stockage', 'menage'],
   ['Thème clair ou sombre', 'apparence', 'theme'], ['Matière (Pixel, Liquid Glass, Opaque)', 'apparence', 'matiere'], ['Style d’icônes', 'apparence', 'icones'], ['Effets économes (flou, transparence)', 'apparence', 'effets'], ['Fond d’écran', 'apparence', 'wallpaper'], ['Widgets du bureau', 'apparence', 'widgets'],
   ['Taille du Dock', 'bureau', 'dock'], ['Agrandissement du Dock', 'bureau', 'dock'], ['Masquer automatiquement le Dock', 'bureau', 'dock'], ['Dock intelligent', 'bureau', 'dock'], ['Personnaliser les widgets du bureau', 'bureau', 'wdg'], ['Réinitialiser les widgets', 'bureau', 'wdg'], ['Réinitialiser la session des fenêtres', 'bureau', 'session'], ['Balayage à deux doigts entre les fenêtres', 'bureau', 'session'],
   ['Ne pas déranger', 'notifs', 'notifs'], ['Bulles de discussion', 'notifs', 'bulles'], ['Notification de test', 'notifs', 'notifs'],
@@ -68,7 +69,9 @@ export default function SettingsApp({ win, inst }: AppProps) {
   useEngineEvent('wm:change', tick); // nombre de fenêtres de la session (Bureau et Dock)
 
   const mobile = gx().host?.dataset?.shell === 'mobile';
-  const allowed = useMemo(() => SECTIONS.filter((s) => (!s.manage || canManageUsers(role)) && (!s.master || role === 'Master') && (!s.forms || canSeeForms(role)) && (!s.assistant || canUseAssistant(role)) && (!s.desktop || !mobile)), [role, mobile]);
+  // mIAouss : rôle de l'équipe ET pas coupé par le Master (27/10/2026) — sinon ses routes rendent 403.
+  const mia = canUseAssistant(role) && aAccesAssistant(useAppSettings(), user?.id);
+  const allowed = useMemo(() => SECTIONS.filter((s) => (!s.manage || canManageUsers(role)) && (!s.master || role === 'Master') && (!s.forms || canSeeForms(role)) && (!s.assistant || mia) && (!s.desktop || !mobile)), [role, mobile, mia]);
   const ok = (id?: string) => !!id && allowed.some((s) => s.id === id);
   const tab0 = win.params?.tab;
   const [sec, setSec] = useState<string>(() => (ok(tab0) ? tab0 : 'compte'));

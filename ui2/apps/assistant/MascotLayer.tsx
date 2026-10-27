@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canUseAssistant } from '../../../constants';
+import { useAppSettings, aAccesAssistant } from '../../../services/appSettings';
 import { gx } from '../ui/kit';
 import { Buddy } from './mascot';
 import ChatPane from './ChatPane';
@@ -36,7 +37,9 @@ const reducedMotion = () => { try { return matchMedia('(prefers-reduced-motion: 
 
 export default React.memo(function MascotLayer() {
   const { user } = useAuth();
-  const allowed = canUseAssistant(user?.role);
+  // Rôle de l'équipe marketing ET accès confirmé par le serveur (interrupteur, personne non coupée par le Master,
+  // 27/10/2026) : une coupure fait disparaître la mascotte sans rechargement (`settings:updated`).
+  const allowed = canUseAssistant(user?.role) && aAccesAssistant(useAppSettings(), user?.id);
   const [open, setOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [anchor, setAnchor] = useState<{ left: number; bottom: number } | null>(null);
@@ -100,8 +103,12 @@ export default React.memo(function MascotLayer() {
   // --- porte unique
   useEffect(() => {
     const G = gx(); if (!G) return;
-    if (!allowed) { G.assistant = { available: false, open() {}, close() {}, toggle() {} }; return; }
+    // L'accès arrive avec la réponse du serveur (et peut tomber en cours de session, 27/10/2026) : le widget mIAouss
+    // du bureau ne se filtre qu'à son rendu, on le redessine donc à chaque bascule.
+    const redraw = () => { try { G.widgets?.render?.(); } catch { /* bureau pas encore monté */ } };
+    if (!allowed) { G.assistant = { available: false, open() {}, close() {}, toggle() {} }; redraw(); return; }
     G.assistant = { available: true, open: doOpen, close: doClose, toggle: () => (buddyRef.current?.listening ? doClose() : doOpen()) };
+    redraw();
     return () => { G.assistant = { available: false, open() {}, close() {}, toggle() {} }; };
   }, [allowed, doOpen, doClose]);
 
