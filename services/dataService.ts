@@ -906,8 +906,15 @@ class DataService {
   // ---- Réglages d'application (interrupteurs de fonctionnalité) ----
   // Lecture ouverte à tous ; la bascule est refusée par le SERVEUR à tout rôle
   // autre que Master — masquer le bouton ne suffirait pas.
-  async getAppSettings(): Promise<{ gamesEnabled: boolean; crmEnabled: boolean; crmAccess: boolean }> {
+  async getAppSettings(): Promise<{ gamesEnabled: boolean; crmEnabled: boolean; crmAccess: boolean; assistantAccess: boolean }> {
     return apiFetch('/settings');
+  }
+  // mIAouss (27/10/2026) : interrupteur + personnes coupées. Master seul côté serveur.
+  async getAssistantSettings(): Promise<{ enabled: boolean; off: string[] }> {
+    return apiFetch('/settings/assistant');
+  }
+  async setAssistantSettings(body: { enabled?: boolean; off?: string[] }): Promise<{ enabled: boolean; off: string[] }> {
+    return apiFetch('/settings/assistant', { method: 'PUT', body: JSON.stringify(body) });
   }
   // SPARK (26/10/2026) : interrupteur + invités. Lecture ET écriture refusées par le serveur à tout autre que le Master
   // (la liste des invités ne sort que par cette route).

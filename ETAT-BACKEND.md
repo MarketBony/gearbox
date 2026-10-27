@@ -2,10 +2,19 @@
 
 > **Point au 01/10/2026** : aucun changement backend depuis le **correctif 58** (24/09, dernière migration
 > `20260924150000_social_co2_multi_et_proplus`). Le correctif 59 (interface v2 en bêta) n'a touché que `web`.
-> ⚠️ **Ouvert, relevé par l'audit des droits du 30/09** : `GET /api/budget` (`routes/budget.ts`) et la lecture des
-> dépenses fixes (`routes/fixedExpenses.ts`) n'ont que `authenticateToken` — un External peut lire budgets et
-> dépenses de tout le réseau par appel direct, quelle que soit l'interface. À fermer (`requireRole` + périmètre
-> `budgetScopeOf`) dans un lot backend dédié (`BUGS-CONNUS.md`).
+> ✅ **Fermé au correctif 80 (12/10)** — et non plus « ouvert » comme l'écrivait ce bandeau jusqu'au 27/10 : `GET /api/budget`
+> (`requireRole(INTERNAL_ROLES)` + `budgetScopeOf`), `GET /api/fixed-expenses` (`INTERNAL_ROLES`), `GET /api/expenses`
+> (`UNSCOPED_READ_ROLES`). ⚠️ **Reste ouvert (audit du 26/10)** : les ÉCRITURES de `/api/expenses` et `POST /api/activity-log`
+> sans garde de rôle — voir `BUGS-CONNUS.md`.
+>
+> **Correctif 101 (27/10/2026) — mIAouss au cas par cas.** Porte unique `auth/assistantAccess.ts` (`requireAssistant`, posé sur
+> TOUT `/api/assistant` à la place de `requireRole(ASSISTANT_ROLES)`) : interrupteur éteint → personne, Master compris ; rôle
+> COURANT (relu en base, cache 15 s via `roleCourant` de `crmAccess.ts`) dans `ASSISTANT_ROLES` ; Master d'office ; les autres
+> sauf s'ils sont dans la liste des COUPÉS. Réglages `assistant.enabled` (absence = allumé) et `assistant.off` (ids JSON,
+> absence = personne) dans `AppSetting`, lus par `reglagesAssistant()` (`settings/appSettings.ts`) — aucune migration.
+> `GET /api/settings` → `assistantAccess` ; `GET|PUT /api/settings/assistant` Master seul (`{ enabled?, off? }`, `off` remplace
+> la liste, ids existants et coupables seulement : équipe marketing hors Master, sinon 400 sans écriture), diffusé
+> `settings:updated` sans la liste.
 
 Étape 7 (branchement frontend↔backend) **terminée**. Tous les modules de données **et** la
 gestion des fichiers uploadés sont branchés sur le backend Express/Supabase et **vérifiés en

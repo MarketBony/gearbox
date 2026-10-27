@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
-import { jeuxActives, setJeuxActives, reglagesCrm, setCrmActive, setCrmInvites } from '../settings/appSettings';
+import { jeuxActives, setJeuxActives, reglagesCrm, setCrmActive, setCrmInvites, reglagesAssistant, setAssistantActif, setAssistantCoupes } from '../settings/appSettings';
 import { peutAccederCrm, estInvitableCrm } from '../auth/crmAccess';
+import { peutUtiliserAssistant, estCoupableAssistant } from '../auth/assistantAccess';
 import { prisma } from '../db';
 
 const router = Router();
@@ -24,10 +25,12 @@ const MASTER_ONLY = ['Master'];
 //   `crmEnabled` : interrupteur SPARK (non sensible, visible de tous).
 //   `crmAccess`  : CE compte a-t-il accès à SPARK, calculé par la porte unique (auth/crmAccess.ts). Le frontend n'en
 //                  fait qu'un AFFICHAGE ; le refus réel est sur chaque route de /api/crm.
-// ⚠️ La LISTE des invités n'est jamais ici : elle ne sort que par GET /api/settings/crm, Master seul.
+//   `assistantAccess` : CE compte a-t-il mIAouss (équipe marketing, interrupteur, non coupé) — porte auth/assistantAccess.ts.
+// ⚠️ La LISTE des invités n'est jamais ici : elle ne sort que par GET /api/settings/crm, Master seul. Idem pour la liste
+// des personnes coupées de mIAouss (GET /api/settings/assistant).
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
-  const [gamesEnabled, crm, crmAccess] = await Promise.all([jeuxActives(), reglagesCrm(), peutAccederCrm(req.user)]);
-  res.json({ gamesEnabled, crmEnabled: crm.enabled, crmAccess });
+  const [gamesEnabled, crm, crmAccess, assistantAccess] = await Promise.all([jeuxActives(), reglagesCrm(), peutAccederCrm(req.user), peutUtiliserAssistant(req.user)]);
+  res.json({ gamesEnabled, crmEnabled: crm.enabled, crmAccess, assistantAccess });
 });
 
 // PUT /api/settings/games — allumer/éteindre la rubrique Jeux.
@@ -86,6 +89,49 @@ router.put('/crm', authenticateToken, requireRole(MASTER_ONLY), async (req: Auth
   // rechargement). ⚠️ Jamais la liste dans l'événement : `emitEvent` est un broadcast.
   emitEvent('settings:updated', { crmEnabled: crm.enabled });
   res.json({ enabled: crm.enabled, users: crm.users });
+});
+
+// GET /api/settings/assistant — interrupteur mIAouss ET personnes coupées. Master seul.
+router.get('/assistant', authenticateToken, requireRole(MASTER_ONLY), async (_req: AuthRequest, res) => {
+  const { enabled, off } = await reglagesAssistant();
+  res.json({ enabled, off });
+});
+
+// PUT /api/settings/assistant — { enabled?: boolean, off?: string[] }. Master seul (27/10/2026).
+// `off` REMPLACE la liste des personnes coupées : ids dédoublonnés, chacun doit exister et être de l'équipe marketing
+// (hors Master, qui a accès d'office). Un id invalide → 400, rien n'est écrit.
+router.put('/assistant', authenticateToken, requireRole(MASTER_ONLY), async (req: AuthRequest, res) => {
+  const { enabled, off } = req.body ?? {};
+  if (enabled === undefined && off === undefined) {
+    return res.status(400).json({ error: 'Champ "enabled" (booléen) ou "off" (liste d’ids) requis.' });
+  }
+  if (enabled !== undefined && typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'Champ "enabled" : booléen attendu.' });
+  }
+  let ids: string[] | undefined;
+  if (off !== undefined) {
+    if (!Array.isArray(off) || off.some((x) => typeof x !== 'string' || !x)) {
+      return res.status(400).json({ error: 'Champ "off" : liste d’identifiants attendue.' });
+    }
+    ids = [...new Set(off as string[])];
+    const comptes = ids.length
+      ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, role: true } })
+      : [];
+    const parId = new Map(comptes.map((c) => [c.id, c.role]));
+    const inconnus = ids.filter((id) => !parId.has(id));
+    if (inconnus.length) return res.status(400).json({ error: `Compte(s) introuvable(s) : ${inconnus.join(', ')}.` });
+    const refuses = ids.filter((id) => !estCoupableAssistant(parId.get(id)));
+    if (refuses.length) {
+      return res.status(400).json({ error: 'Hors équipe marketing, ou Master (accès d’office) : ' + refuses.join(', ') + '.' });
+    }
+  }
+  if (enabled !== undefined) await setAssistantActif(enabled, req.user!.id);
+  if (ids !== undefined) await setAssistantCoupes(ids, req.user!.id);
+  const mia = await reglagesAssistant();
+  // Diffusé à TOUS : chacun relit GET /api/settings et son `assistantAccess` (la mascotte apparaît ou disparaît sans
+  // rechargement). ⚠️ Jamais la liste dans l'événement : `emitEvent` est un broadcast.
+  emitEvent('settings:updated', {});
+  res.json({ enabled: mia.enabled, off: mia.off });
 });
 
 export default router;

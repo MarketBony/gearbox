@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import crypto from 'crypto';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { ASSISTANT_ROLES, ASSISTANT_TEAM_ROLES, ASSISTANT_CAP_ROLES } from '../auth/roles';
+import { requireAssistant } from '../auth/assistantAccess';
 import { emitToUser } from '../realtime';
 import { prisma } from '../db';
 import { complete, AssistantUnavailable, anyProviderConfigured, type ChatMsg, type ToolCall, type LlmReply } from '../assistant/providers';
@@ -25,7 +26,8 @@ const router = Router();
 // que des résultats, jamais l'historique — il ne peut pas réécrire la conversation ni le prompt.
 // ═══════════════════════════════════════════════════════════════════════════
 
-router.use(authenticateToken, requireRole(ASSISTANT_ROLES));
+// Équipe marketing ET non coupé par le Master (27/10/2026) : porte unique `auth/assistantAccess.ts`.
+router.use(authenticateToken, requireAssistant);
 
 const MESSAGE_MAX = 2_000;
 const NOTE_MAX = 200;

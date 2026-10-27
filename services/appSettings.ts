@@ -30,8 +30,11 @@ export interface AppSettings {
   crmEnabled: boolean;
   /** Accès SPARK du compte `crmPour`, calculé par le serveur. Lire avec `aAccesCrm`, jamais seul. */
   crmAccess: boolean;
-  /** Compte pour lequel `crmAccess` a été calculé. */
+  /** Compte pour lequel `crmAccess` (et `assistantAccess`) a été calculé. */
   crmPour: string | null;
+  /** mIAouss (27/10/2026) : accès du compte `crmPour`, calculé par le serveur. Lire avec `aAccesAssistant`, jamais seul.
+   *  Pas d'amorce : la mascotte n'est pas une fenêtre restaurée, elle peut apparaître une fois la réponse reçue. */
+  assistantAccess: boolean;
 }
 
 type Listener = () => void;
@@ -43,7 +46,7 @@ const ecrireAmorce = (uid: string | null) => {
 };
 
 const amorce = lireAmorce();
-let state: AppSettings = { gamesEnabled: false, crmEnabled: false, crmAccess: !!amorce, crmPour: amorce };
+let state: AppSettings = { gamesEnabled: false, crmEnabled: false, crmAccess: !!amorce, crmPour: amorce, assistantAccess: false };
 const listeners = new Set<Listener>();
 const notify = () => listeners.forEach(l => l());
 
@@ -66,7 +69,7 @@ export const appSettingsStore = {
       const pour = userId ?? null;
       const crmAccess = !!pour && !!s?.crmAccess;
       ecrireAmorce(crmAccess ? pour : null);
-      appSettingsStore.set({ gamesEnabled: !!s?.gamesEnabled, crmEnabled: !!s?.crmEnabled, crmAccess, crmPour: pour });
+      appSettingsStore.set({ gamesEnabled: !!s?.gamesEnabled, crmEnabled: !!s?.crmEnabled, crmAccess, crmPour: pour, assistantAccess: !!pour && !!s?.assistantAccess });
     } catch {
       /* état conservé */
     }
@@ -76,6 +79,10 @@ export const appSettingsStore = {
 /** SPARK visible pour ce compte ? (`crmAccess` ne vaut que pour le compte où il a été calculé.) */
 export const aAccesCrm = (s: AppSettings, userId: string | null | undefined): boolean =>
   !!userId && s.crmAccess && s.crmPour === userId;
+
+/** mIAouss pour ce compte ? (équipe marketing, interrupteur, non coupé par le Master : auth/assistantAccess.ts) */
+export const aAccesAssistant = (s: AppSettings, userId: string | null | undefined): boolean =>
+  !!userId && s.assistantAccess && s.crmPour === userId;
 
 /**
  * Réglages courants, re-rendus à chaque changement (y compris temps réel).

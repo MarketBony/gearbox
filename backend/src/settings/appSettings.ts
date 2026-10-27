@@ -122,9 +122,66 @@ export const setCrmInvites = async (ids: string[], parUtilisateur: string): Prom
   return reglagesCrm();
 };
 
+// =============================================================================
+// mIAouss (assistant IA, 27/10/2026) — interrupteur + liste des personnes COUPÉES.
+//
+// Même forme que SPARK, logique INVERSE pour la liste : mIAouss est déjà ouvert à toute l'équipe marketing, et Théo veut
+// le retirer « au cas par cas » (certains s'en sont plaints). On retient donc les EXCLUS (`assistant.off`), pas les
+// invités : un nouvel arrivant de l'équipe l'a d'office, comme aujourd'hui.
+// ⚠️ ABSENCE DE LIGNE = ALLUMÉ, personne de coupé : l'état d'avant l'interrupteur. Base injoignable : même défaut
+// (mIAouss n'expose aucune donnée qui ne soit déjà celle de l'interlocuteur, c'est son état de toujours).
+// SEULE porte d'accès : `auth/assistantAccess.ts`. Ne jamais lire ce réglage ailleurs pour décider d'un accès.
+// =============================================================================
+
+export const CLE_ASSISTANT = 'assistant.enabled';
+export const CLE_ASSISTANT_COUPES = 'assistant.off';
+
+export interface ReglagesAssistant { enabled: boolean; off: string[] }
+
+let cacheAssistant: ReglagesAssistant | undefined;
+
+/** Réglages mIAouss. Lecture mémoire, avec repli base au premier appel. */
+export const reglagesAssistant = async (): Promise<ReglagesAssistant> => {
+  if (cacheAssistant !== undefined) return cacheAssistant;
+  try {
+    const lignes = await prisma.appSetting.findMany({ where: { key: { in: [CLE_ASSISTANT, CLE_ASSISTANT_COUPES] } } });
+    const val = (k: string) => lignes.find((l) => l.key === k)?.value;
+    const enabled = val(CLE_ASSISTANT);
+    cacheAssistant = { enabled: enabled === undefined ? true : enabled === 'true', off: lireListe(val(CLE_ASSISTANT_COUPES)) };
+  } catch (e) {
+    console.error('[settings] lecture mIAouss impossible, etat par defaut :', (e as Error).message);
+    return { enabled: true, off: [] };
+  }
+  return cacheAssistant;
+};
+
+/** Écrit l'interrupteur mIAouss et rafraîchit le cache. */
+export const setAssistantActif = async (actif: boolean, parUtilisateur: string): Promise<ReglagesAssistant> => {
+  await prisma.appSetting.upsert({
+    where: { key: CLE_ASSISTANT },
+    create: { key: CLE_ASSISTANT, value: String(actif), updatedBy: parUtilisateur },
+    update: { value: String(actif), updatedBy: parUtilisateur },
+  });
+  cacheAssistant = undefined;
+  return reglagesAssistant();
+};
+
+/** Écrit la liste des personnes coupées (déjà validée par l'appelant) et rafraîchit le cache. */
+export const setAssistantCoupes = async (ids: string[], parUtilisateur: string): Promise<ReglagesAssistant> => {
+  const value = JSON.stringify([...new Set(ids)]);
+  await prisma.appSetting.upsert({
+    where: { key: CLE_ASSISTANT_COUPES },
+    create: { key: CLE_ASSISTANT_COUPES, value, updatedBy: parUtilisateur },
+    update: { value, updatedBy: parUtilisateur },
+  });
+  cacheAssistant = undefined;
+  return reglagesAssistant();
+};
+
 /** Préchargement au démarrage : le premier appel ne paie pas la lecture. */
 export const chargerReglages = async (): Promise<void> => {
   await jeuxActives();
   const crm = await reglagesCrm();
-  console.log(`[settings] Jeux ${cacheJeux ? 'ALLUMES' : 'eteints'} ; SPARK ${crm.enabled ? 'ALLUME' : 'eteint'} (${crm.users.length} invite(s)).`);
+  const mia = await reglagesAssistant();
+  console.log(`[settings] Jeux ${cacheJeux ? 'ALLUMES' : 'eteints'} ; SPARK ${crm.enabled ? 'ALLUME' : 'eteint'} (${crm.users.length} invite(s)) ; mIAouss ${mia.enabled ? 'ALLUME' : 'eteint'} (${mia.off.length} coupe(s)).`);
 };
