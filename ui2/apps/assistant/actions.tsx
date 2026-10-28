@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { AssistantActionOutcome, AssistantActionView, Project, Task, TaskStatus, User } from '../../../types';
+import type { AssistantActionOutcome, AssistantActionView, BrandType, DigitalTags, Project, ProjectType, ServiceType, SocialServiceType, SocialTarget, Task, TaskStatus, User } from '../../../types';
 import { db } from '../../../services/dataService';
-import { canEditProjects } from '../../../constants';
-import { nouvelleTache, poserAssignes } from '../../../utils/projet';
-import { workspace, useWorkspace, mutateProject, mutateTask, createStandalone, updateStandalone, currentRole, echo } from '../../store/workspace';
+import { canEditProjects, canEditDigital, BRANDS, SERVICES, PROJECT_TYPES, RDM_BRANDS, SOCIAL_SERVICES, DIGITAL_CONCESSIONS, isHoldingBrand, siteSharesOf, splitShareToBuckets, libelleMarqueDigital } from '../../../constants';
+import { nouvelleTache, poserAssignes, nouveauProjet, recalculerProjet, poserSites, basculerMarque, basculerService, marqueAutorisee, sitesDuProjet, groupeDuProjet, type GroupeProjet } from '../../../utils/projet';
+import { workspace, useWorkspace, mutateProject, mutateTask, createStandalone, updateStandalone, createProject, currentRole, echo } from '../../store/workspace';
+import { createSocialPost, digitalTags } from '../../store/collections';
 import { slotOf, minOf } from '../todo/postitLogic';
-import { Icon, gx } from '../ui/kit';
+import { resolveSites } from './tools';
+import { GROUP_LABEL, LABEL_GROUP, brandHex } from '../projects/common';
+import { Icon, gx, hud, PickerBtn } from '../ui/kit';
 
 // =====================================================================
 // mIAouss QUI AGIT (lot 1a, 28/10/2026) — cartes d'action et EXÉCUTEURS, dans le navigateur.
@@ -18,6 +21,9 @@ import { Icon, gx } from '../ui/kit';
 //
 // Résolution des noms (projet, personnes, tâche) ICI, sur les données déjà cloisonnées du workspace : le modèle ne
 // voit aucun identifiant. Ambigu ou introuvable → la carte demande un choix avant « Valider ».
+//
+// Lot 1b (28/10/2026) : `creer_projet` (ACTIF par défaut — décision de Théo : la carte montre tout ce qui pèse sur
+// les chiffres, dont la répartition par enveloppe) et `creer_publication` (statut « Rédigé »).
 // =====================================================================
 
 /** Même normalisation que tools.ts (accents, casse, ponctuation). */
@@ -65,8 +71,89 @@ const findTask = (key: string): TaskRef | null => {
   return p && t ? { key, task: t, project: p } : null;
 };
 
+// ---------------------------------------------------------------- projets et publications (lot 1b, 28/10/2026)
+// Les règles d'un projet (sites, répartition, marques, services) sont celles de `utils/projet.ts` — les mêmes que la
+// fiche projet v2 ; le routage budgétaire de l'aperçu est celui de `constants.ts`. RIEN n'est réécrit ici.
+
+/** Liste d'arguments du modèle : tableau, chaîne seule ou rien. */
+const listOf = (v: unknown): string[] => (Array.isArray(v) ? v : v ? [v] : []).map((x) => String(x).trim()).filter(Boolean);
+
+/** Marque canonique (`BRANDS`) ; « GROUPE BONY » / « Groupe » = Holding (libellé Digital, ancienne valeur). */
+const brandOf = (raw: string): BrandType | null => {
+  const h = match(BRANDS, (b) => b, raw, (b) => (b === 'Holding' ? ['GROUPE BONY', 'Groupe'] : []));
+  return h.length === 1 ? h[0] : null;
+};
+/** Marques dans l'ordre donné, par `basculerMarque` : Holding exclusif (le poser retire les autres, et inversement). */
+function marquesDe(raws: string[]): { marques: BrandType[]; ignorees: string[] } {
+  let marques: BrandType[] = []; const ignorees: string[] = [];
+  for (const raw of raws) {
+    const b = brandOf(raw);
+    if (!b) ignorees.push(raw); else if (!marques.includes(b)) marques = basculerMarque({ brands: marques } as Project, b).brands;
+  }
+  return { marques, ignorees };
+}
+
+/**
+ * « GROUPE BONY » (pondéré global ou R/N) : périmètre groupé du projet. « tout le réseau », « tous les sites » :
+ * le modèle n'a pas tranché entre les deux tables de ventilation → '' (choix demandé dans la carte). null : pas un groupe.
+ */
+const GROUPE_FLOU = /^(tout|toutes|tous|reseau|groupe|tout le reseau|tout le groupe|toutes les concessions|tous les sites|toutes les concessions du groupe)$/;
+function groupeDit(raw: string): GroupeProjet | '' | null {
+  const n = norm(raw).replace(/^(la |le |les |l )/, '');
+  if (n === 'groupe bony r n' || n === 'groupe bony rn') return 'GROUPE BONY (R/N)';
+  if (n === 'groupe bony' || n === 'groupe bony global') return 'GROUPE BONY';
+  return GROUPE_FLOU.test(n) ? '' : null;
+}
+
+/** Curseur reçu du modèle (0-100) ; vide = null = 100 % sur la marque (règle de `splitShareToBuckets`). */
+const shareIn = (v: unknown): number | null => (v === undefined || v === null || v === '' || !Number.isFinite(Number(v)) ? null : Math.max(0, Math.min(100, Math.round(Number(v)))));
+
+/**
+ * Curseurs Alpine / Nissan AFFICHÉS — même condition que la fiche projet v2 (`shareBrands`, ProjectDetail.tsx) : une
+ * marque RDM est présente, et Alpine passe avant Nissan (le curseur Nissan, sans effet, n'est pas montré).
+ * ⚠️ Condition jumelle de celle de la fiche : si l'une change, l'autre aussi.
+ */
+const curseurs = (p: Project): ('Alpine' | 'Nissan')[] => {
+  const b = p.brands || [];
+  if (!b.some((x) => RDM_BRANDS.includes(x))) return [];
+  return (['Alpine', 'Nissan'] as const).filter((x) => b.includes(x)).filter((x, _i, all) => !(x === 'Nissan' && all.includes('Alpine')));
+};
+
+/** Projet tel qu'il sera ÉCRIT (et tel que l'aperçu le répartit) : un curseur non affiché n'est pas envoyé. */
+function projetFinal(p: Project): Project {
+  const shown = curseurs(p);
+  const { alpineShare, nissanShare, ...rest } = p;
+  return recalculerProjet({
+    ...rest, name: (p.name || '').trim(), description: (p.description || '').trim(),
+    ...(shown.includes('Alpine') && alpineShare != null ? { alpineShare } : {}),
+    ...(shown.includes('Nissan') && nissanShare != null ? { nissanShare } : {}),
+  } as Project);
+}
+
+/**
+ * Aperçu : part (0 → 1) de chaque ENVELOPPE, par les fonctions du Budget et du Dashboard (`isHoldingBrand`,
+ * `siteSharesOf`, `splitShareToBuckets` de constants.ts) — même enchaînement que `computeBudgetStats` pour un projet.
+ * La carte multiplie par le budget prévu.
+ */
+function repartition(p: Project): { hors: boolean; lignes: [string, number][] } {
+  if (isHoldingBrand(p.brands)) return { hors: true, lignes: [] };
+  const acc: Record<string, number> = {};
+  for (const [raw, pct] of Object.entries(siteSharesOf(p))) {
+    if (!raw || !(pct > 0)) continue;
+    for (const { site, ratio } of splitShareToBuckets(raw, p.brands, null, { alpineShare: p.alpineShare, nissanShare: p.nissanShare })) {
+      acc[site] = (acc[site] || 0) + (pct / 100) * ratio;
+    }
+  }
+  return { hors: false, lignes: Object.entries(acc).sort((x, y) => y[1] - x[1]) };
+}
+
+/** Le Budget n'impute un projet qu'à ses services VN / VO / PR / APV (`computeBudgetStats`, « Tous Services » = les 4). */
+const sansServiceBudget = (p: Project) => !(p.service || []).some((s) => ['VN', 'VO', 'PR', 'APV', 'Tous Services'].includes(s));
+
 // ---------------------------------------------------------------- brouillon de la carte (champs modifiables)
 interface Pending { raw: string; hits: User[] }
+/** Valeur citée par le modèle, à trancher dans la carte (réseau, concession) : correspondances, ou rien. */
+interface PendingS { raw: string; hits: string[] }
 export interface Draft {
   titre?: string; echeance?: string; statut?: TaskStatus | '';
   /** Projet : id, '' = tâche libre, null = à choisir (nom ambigu ou introuvable). */
@@ -75,10 +162,86 @@ export interface Draft {
   /** `modifier_tache` : clé de la tâche, null = à choisir. */
   tache?: string | null; tacheRaw?: string; tacheHits?: TaskRef[];
   texte?: string; date?: string; heure?: string; duree?: number; journee?: boolean;
+  /** `creer_projet` : le projet en préparation, édité par les règles de utils/projet.ts. */
+  prj?: Project;
+  /** Concessions citées introuvables, et « tout le réseau » non tranché (groupe global ou R/N ?). */
+  inconnus?: string[]; flou?: string;
+  /** Marques citées non reconnues, ou retirées faute de site éligible (affichage seul). */
+  ignorees?: string[]; retirees?: string[];
+  /** `creer_publication`. */
+  reseaux?: string[]; reseauxP?: PendingS[]; marques?: BrandType[]; concessions?: string[]; concessionsP?: PendingS[];
+  service?: SocialServiceType; cibles?: SocialTarget[]; points?: string[];
+  /** Compte connecté (journal d'activité de la publication). */
+  uid?: string;
+}
+
+function initProjet(p: Record<string, any>, uid?: string): Draft {
+  // Sites : « GROUPE BONY » → périmètre groupé ; le reste par `resolveSites` (plaque → ses sites, alias Thiers → Ricoux).
+  let groupe: GroupeProjet | null = null, flou = '';
+  const sites: string[] = [], inconnus: string[] = [];
+  for (const raw of listOf(p.sites)) {
+    const g = groupeDit(raw);
+    if (g) { groupe = groupe || g; continue; }
+    if (g === '') { flou = flou || raw; continue; }
+    const r = resolveSites([raw]);
+    r.sites.forEach((x) => { if (!sites.includes(x)) sites.push(x); });
+    inconnus.push(...r.inconnus);
+  }
+  const { marques, ignorees } = marquesDe(listOf(p.marques));
+  const svc = listOf(p.services).map((raw) => (SERVICES as string[]).find((x) => norm(x) === norm(raw)) || (/^tous/.test(norm(raw)) ? 'Tous Services' : '')).filter(Boolean) as ServiceType[];
+  const services = svc.includes('Tous Services') ? ['Tous Services'] as ServiceType[] : [...new Set(svc)];
+  const type = (PROJECT_TYPES as string[]).find((t) => norm(t) === norm(p.type)) as ProjectType | undefined;
+  const debut = isDay(p.debut) ? p.debut : '', fin = isDay(p.fin) ? p.fin : debut;
+  const budget = Number(p.budget);
+  // Valeurs par défaut de la création à la main (`nouveauProjet`) pour ce que le modèle n'a pas donné (marque, service,
+  // type), puis les règles de la fiche : `poserSites` (répartition à parts égales, ou pondérée d'un groupe) qui retire
+  // une marque sans site éligible.
+  const base: Project = {
+    ...nouveauProjet(String(p.nom || '').trim(), uid),
+    ...(marques.length ? { brands: marques } : {}), ...(services.length ? { service: services } : {}), ...(type ? { projectType: type } : {}),
+    status: norm(p.statut) === 'brouillon' ? 'Draft' : 'Active',   // décision de Théo (28/10) : actif par défaut
+    startDate: debut, endDate: fin && debut && fin < debut ? debut : fin,
+    budgetPlanned: Number.isFinite(budget) && budget > 0 ? Math.round(budget * 100) / 100 : 0,
+    description: String(p.description || ''),
+  };
+  const a = shareIn(p.part_alpine), n = shareIn(p.part_nissan);
+  if (a !== null) base.alpineShare = a;
+  if (n !== null) base.nissanShare = n;
+  const prj = groupe ? poserSites(base, { groupe }) : poserSites(base, { sites });
+  const retirees = (base.brands || []).filter((b) => !(prj.brands || []).includes(b));
+  return { prj, inconnus, flou, ignorees, retirees };
+}
+
+function initPublication(p: Record<string, any>, tags: DigitalTags | null | undefined, uid?: string): Draft {
+  // Réseaux : tags Digital EXISTANTS seulement (un nom inconnu se choisit dans la liste, jamais créé ici).
+  const nets = tags?.networks || [];
+  const reseaux: string[] = [], reseauxP: PendingS[] = [];
+  for (const raw of listOf(p.reseaux)) {
+    const h = match(nets, (x) => x, raw);
+    if (h.length === 1) { if (!reseaux.includes(h[0])) reseaux.push(h[0]); } else reseauxP.push({ raw, hits: h });
+  }
+  // Concessions : liste du Digital (`DIGITAL_CONCESSIONS`), puis plaque → ses sites par `resolveSites`.
+  const concessions: string[] = [], concessionsP: PendingS[] = [];
+  const add = (x: string) => { if (!concessions.includes(x)) concessions.push(x); };
+  for (const raw of listOf(p.concessions)) {
+    const h = match(DIGITAL_CONCESSIONS, (x) => x, raw);
+    if (h.length === 1) { add(h[0]); continue; }
+    const r = resolveSites([raw]), ok = r.sites.filter((x) => DIGITAL_CONCESSIONS.includes(x));
+    if (ok.length && !r.inconnus.length) ok.forEach(add); else concessionsP.push({ raw, hits: h });
+  }
+  const service = (SOCIAL_SERVICES as string[]).find((x) => norm(x) === norm(p.service)) as SocialServiceType | undefined;
+  const cibles = (['Internet', 'Collaborateurs'] as SocialTarget[]).filter((c) => listOf(p.cibles).some((x) => norm(x) === norm(c)));
+  return {
+    titre: String(p.titre || ''), date: isDay(p.date) ? p.date : '', texte: String(p.texte || ''),
+    reseaux, reseauxP, marques: marquesDe(listOf(p.marques)).marques, ignorees: marquesDe(listOf(p.marques)).ignorees,
+    concessions, concessionsP, service: service || 'Tous Services', cibles, points: listOf(p.points_a_verifier), uid,
+  };
 }
 
 function initDraft(a: AssistantActionView, s = workspace.getState(), uid?: string): Draft {
   const p = a.payload || {};
+  if (a.type === 'creer_projet') return initProjet(p, uid);
+  if (a.type === 'creer_publication') return initPublication(p, digitalTags.get(), uid);
   if (a.type === 'creer_tache') {
     const projets = s.projects.filter((x) => x.status !== 'Archived');
     const hits = p.projet ? match(projets, (x) => x.name, p.projet) : [];
@@ -130,6 +293,31 @@ function missing(a: AssistantActionView, d: Draft | null): string | null {
     if (!d.journee && !isTime(d.heure)) return 'Choisis l’heure.';
     return null;
   }
+  if (a.type === 'creer_projet') {
+    const p = d.prj;
+    if (!canEditProjects(role)) return 'Ton rôle ne permet pas de créer un projet.';
+    if (!p) return 'Chargement…';
+    if (!p.name?.trim()) return 'Donne un nom au projet.';
+    if (p.name.trim().length > 200) return 'Nom trop long (200 caractères max).';
+    if (d.flou) return `« ${d.flou} » : choisis le périmètre.`;
+    if (d.inconnus?.length) return `Concession inconnue : ${d.inconnus.join(', ')}. Retire-la ou choisis les sites.`;
+    if (!sitesDuProjet(p).length && !groupeDuProjet(p)) return 'Choisis au moins un site.';
+    if (!isDay(p.startDate) || !isDay(p.endDate)) return 'Choisis les dates.';
+    if (p.endDate < p.startDate) return 'La fin précède le début.';
+    if (!(p.budgetPlanned >= 0) || p.budgetPlanned > 10_000_000) return 'Budget prévu invalide.';
+    return null;
+  }
+  if (a.type === 'creer_publication') {
+    if (!canEditDigital(role) || gx()?.ctx?.readOnly) return 'Ton rôle ne permet pas d’écrire dans le Digital.';
+    if (!d.titre?.trim()) return 'Donne un titre à la publication.';
+    if (d.titre.trim().length > 200) return 'Titre trop long (200 caractères max).';
+    if (!isDay(d.date)) return 'Choisis la date.';
+    if (d.reseauxP?.length) return 'Précise les réseaux.';
+    if (d.concessionsP?.length) return 'Précise les concessions.';
+    if (!d.texte?.trim()) return 'Le texte est vide.';
+    if (d.texte.length > 3000) return 'Texte trop long (3 000 caractères max).';
+    return null;
+  }
   return 'Action inconnue de cette version de Gearbox.';
 }
 
@@ -146,6 +334,26 @@ function payloadOf(a: AssistantActionView, d: Draft): Record<string, unknown> | 
   }
   if (a.type === 'creer_postit') {
     return { texte: d.texte!.trim(), date: d.date, ...(d.journee ? { journee: true } : { heure: d.heure, duree_min: d.duree || 60 }) };
+  }
+  if (a.type === 'creer_projet' && d.prj) {
+    const p = projetFinal(d.prj), gm = groupeDuProjet(p);
+    // « Tous Services » n'est pas dans l'énumération de l'outil : envoyé comme les 4 services (même effet au Budget).
+    // Le projet écrit garde « Tous Services » : c'est le brouillon qui s'exécute, pas ce payload.
+    const svc = (p.service || []).includes('Tous Services') ? ['VN', 'VO', 'APV', 'PR'] : p.service || [];
+    return {
+      nom: p.name, sites: gm ? [gm] : sitesDuProjet(p), marques: p.brands || [], ...(svc.length ? { services: svc } : {}),
+      type: p.projectType, debut: p.startDate, fin: p.endDate,
+      ...(p.budgetPlanned > 0 || a.payload?.budget !== undefined ? { budget: p.budgetPlanned || 0 } : {}),
+      ...(p.description ? { description: p.description } : {}), statut: p.status === 'Draft' ? 'brouillon' : 'actif',
+      ...(p.alpineShare != null ? { part_alpine: p.alpineShare } : {}), ...(p.nissanShare != null ? { part_nissan: p.nissanShare } : {}),
+    };
+  }
+  if (a.type === 'creer_publication') {
+    return {
+      titre: d.titre!.trim(), date: d.date, reseaux: d.reseaux || [], texte: d.texte!.trim(), marques: d.marques || [],
+      concessions: d.concessions || [], service: d.service || 'Tous Services', cibles: d.cibles || [],
+      ...(d.points?.length ? { points_a_verifier: d.points } : {}),
+    };
   }
   return undefined;
 }
@@ -202,6 +410,34 @@ async function creerPostit(d: Draft): Promise<Outcome> {
   } catch (e) { return { ok: false, error: errMsg(e, 'Création du post-it impossible.') }; }
 }
 
+async function creerProjet(d: Draft): Promise<Outcome> {
+  if (!canEditProjects(currentRole())) return { ok: false, error: 'Droits insuffisants pour créer un projet.' };
+  // Même chemin que « Nouveau projet » de la rubrique : `createProject` (recalcul, écho, journal d'activité). Il rend
+  // null en cas d'échec (message déjà affiché par la coque) : on le dit, on ne prétend rien.
+  const p = projetFinal(d.prj!);
+  const srv = await createProject(p);
+  if (!srv) return { ok: false, error: 'Échec de la création du projet (serveur injoignable ?).' };
+  return { ok: true, summary: `Projet « ${srv.name} » créé (${srv.status === 'Draft' ? 'brouillon' : 'actif'})`, ref: srv.id };
+}
+
+async function creerPublication(d: Draft): Promise<Outcome> {
+  if (!canEditDigital(currentRole()) || gx()?.ctx?.readOnly) return { ok: false, error: 'Droits insuffisants pour écrire dans le Digital.' };
+  const title = d.titre!.trim();
+  try {
+    // Valeurs par défaut d'une publication neuve de la rubrique Digital (DigitalApp.newPost), statut « Rédigé ».
+    const c = await createSocialPost({
+      title, status: 'Rédigé', date: d.date!, targets: d.cibles || [], brands: d.marques || [], service: d.service || 'Tous Services',
+      networks: d.reseaux || [], concessions: d.concessions || [], mediaFiles: [], mediaNames: [], link: '', wording: d.texte!.trim(),
+      lom: '', co2: '', co2s: [], proPlus: false, archived: false,
+    } as any);
+    if (!c?.id) return { ok: false, error: 'Échec de la création de la publication.' };
+    // Journal d'activité, comme la rubrique (sans effet sur l'issue s'il se perd).
+    const u: any = workspace.getState().users.find((x) => x.id === d.uid);
+    if (u) Promise.resolve(db.logActivity({ id: `act-${Date.now()}`, userId: u.id, userName: u.name, userColor: u.avatarColor || '#f75632', action: 'a créé la publication', entity: 'post', entityName: title, entityId: c.id, timestamp: new Date().toISOString() } as any)).catch(() => { /* journal seulement */ });
+    return { ok: true, summary: `Publication « ${title} » rédigée pour le ${frDay(d.date!)}`, ref: c.id };
+  } catch (e) { return { ok: false, error: errMsg(e, 'Échec de la création de la publication.') }; }
+}
+
 async function ouvrir(payload: Record<string, any>): Promise<Outcome> {
   const G = gx(), app = String(payload.rubrique || '');
   const nomApp = G?.app?.(app)?.name || app;
@@ -227,6 +463,8 @@ async function execute(a: AssistantActionView, d: Draft | null): Promise<Outcome
   if (a.type === 'creer_tache') return creerTache(dd);
   if (a.type === 'modifier_tache') return modifierTache(dd);
   if (a.type === 'creer_postit') return creerPostit(dd);
+  if (a.type === 'creer_projet') return creerProjet(dd);
+  if (a.type === 'creer_publication') return creerPublication(dd);
   return { ok: false, error: 'Action inconnue de cette version de Gearbox.' };
 }
 
@@ -245,8 +483,139 @@ export async function runAction(a: AssistantActionView, d: Draft | null = null):
   return out;
 }
 
+// ---------------------------------------------------------------- champs des cartes « projet » et « publication »
+
+/** Valeurs choisies (puces) + valeurs citées par le modèle à trancher + ajout depuis la liste. */
+const Choix: React.FC<{ values: string[]; pending: PendingS[]; options: string[]; add: string; onChange: (values: string[], pending: PendingS[]) => void }> = ({ values, pending, options, add, onChange }) => (
+  <div className="mia-act-ppl">
+    {values.map((v) => <span key={v} className="mia-act-chip">{v}<button type="button" title="Retirer" onClick={() => onChange(values.filter((x) => x !== v), pending)}><Icon name="close" /></button></span>)}
+    {pending.map((pd, i) => (
+      <select key={`p${i}`} className="select need" value="" onChange={(e) => {
+        const v = e.target.value, rest = pending.filter((_, j) => j !== i);
+        onChange(v === '__drop' || values.includes(v) ? values : [...values, v], rest);
+      }}>
+        <option value="" disabled>{pd.hits.length ? `« ${pd.raw} » : lequel ?` : `« ${pd.raw} » introuvable`}</option>
+        {(pd.hits.length ? pd.hits : options).map((o) => <option key={o} value={o}>{o}</option>)}
+        <option value="__drop">— Ignorer</option>
+      </select>
+    ))}
+    <select className="select add" value="" onChange={(e) => e.target.value && onChange([...values, e.target.value], pending)}>
+      <option value="" disabled>{add}</option>
+      {options.filter((o) => !values.includes(o)).map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
+  </div>
+);
+
+type Upd = (f: (x: Draft) => Draft) => void;
+const pctTxt = (f: number) => `${+(f * 100).toFixed(1)} %`.replace('.', ',');
+const eur = (n: number) => (gx()?.fmt?.eur ? gx().fmt.eur(Math.round(n)) : `${Math.round(n)} €`);
+
+/** Carte `creer_projet` : tout ce qui pèse sur les chiffres, modifiable, et la répartition par enveloppe. */
+const ProjetFields: React.FC<{ d: Draft; upd: Upd }> = ({ d, upd }) => {
+  const p = d.prj!;
+  const setP = (f: (x: Project) => Project) => upd((x) => ({ ...x, prj: f(x.prj!) }));
+  const gm = groupeDuProjet(p), sites = sitesDuProjet(p);
+  const siteLbl = gm ? `${gm} · ${sites.length} sites` : sites.join(', ') || 'Choisir…';
+  // Sites : `poserSites` (règle de la fiche), qui remet la répartition à parts égales et retire une marque sans site éligible.
+  const poser = (choix: { groupe: GroupeProjet } | { sites: string[] }) => upd((x) => {
+    const y = poserSites(x.prj!, choix);
+    const out = (x.prj!.brands || []).filter((b) => !(y.brands || []).includes(b));
+    if (out.length) hud('Marque retirée : aucun site éligible');
+    return { ...x, prj: y, flou: '', inconnus: [], retirees: [...new Set([...(x.retirees || []), ...out])] };
+  });
+  // Même sélecteur que la fiche projet (variante `project` : plaques et périmètres groupés).
+  const pickSites = (el: HTMLElement) => gx()?.ui?.sitePicker?.(el, gm ? [GROUP_LABEL[gm]] : sites, (values: string[]) => {
+    const picked = values.map((v) => LABEL_GROUP[v]).find((g) => g && g !== gm);
+    if (picked) { poser({ groupe: picked }); gx().ui.closePick(); return; }
+    const next = values.filter((v) => !LABEL_GROUP[v]);
+    if (!next.length) { hud('Un projet garde au moins un site'); return; }
+    if (gm) gx().ui.closePick();
+    poser({ sites: next });
+  }, { variant: 'project', title: 'Site / Plaque' });
+
+  const fin = projetFinal(p), rep = repartition(fin), total = fin.budgetPlanned || 0;
+  const notes = [d.ignorees?.length ? `Marque inconnue ignorée : ${d.ignorees.join(', ')}` : '', d.retirees?.length ? `Retirée (aucun site éligible) : ${d.retirees.join(', ')}` : ''].filter(Boolean);
+  return <>
+    <label className="full"><span>Nom</span><input className="input" value={p.name} onChange={(e) => { const v = e.target.value; setP((x) => ({ ...x, name: v })); }} /></label>
+    <div className="full"><span>Sites</span>
+      {(d.flou || !!d.inconnus?.length) && <div className="mia-act-ppl">
+        {d.flou && (
+          <select className="select need" value="" onChange={(e) => { const v = e.target.value; if (LABEL_GROUP[v]) poser({ groupe: LABEL_GROUP[v] }); else upd((x) => ({ ...x, flou: '' })); }}>
+            <option value="" disabled>« {d.flou} » : quel périmètre ?</option>
+            {Object.keys(LABEL_GROUP).map((l) => <option key={l} value={l}>{l}</option>)}
+            <option value="__sites">{sites.length ? 'Seulement les sites cités' : 'Je choisis les sites'}</option>
+          </select>
+        )}
+        {(d.inconnus || []).map((raw) => <span key={raw} className="mia-act-chip bad">« {raw} » introuvable<button type="button" title="Retirer" onClick={() => upd((x) => ({ ...x, inconnus: (x.inconnus || []).filter((r) => r !== raw) }))}><Icon name="close" /></button></span>)}
+      </div>}
+      <PickerBtn icon={gm ? 'lock' : 'pin'} label={siteLbl} onClick={pickSites} />
+    </div>
+    <div className="full"><span>Marques</span>
+      <div className="mia-act-tags">{BRANDS.filter((b) => marqueAutorisee(sites, b)).map((b) => (
+        <button type="button" key={b} className={`mia-act-tog ${(p.brands || []).includes(b) ? 'on' : ''}`} style={{ '--c': brandHex(b) } as React.CSSProperties} onClick={() => setP((x) => basculerMarque(x, b))}>{b}</button>
+      ))}</div>
+    </div>
+    {!!notes.length && <div className="full mia-act-note">{notes.join(' · ')}</div>}
+    <div className="full"><span>Services</span>
+      <div className="mia-act-tags">{SERVICES.map((s) => <button type="button" key={s} className={`mia-act-tog ${(p.service || []).includes(s) ? 'on' : ''}`} onClick={() => setP((x) => basculerService(x, s))}>{s}</button>)}</div>
+    </div>
+    <label><span>Type</span><select className="select" value={p.projectType} onChange={(e) => { const v = e.target.value as ProjectType; setP((x) => ({ ...x, projectType: v })); }}>{PROJECT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select></label>
+    <label><span>Statut</span><select className="select" value={p.status} onChange={(e) => { const v = e.target.value as Project['status']; setP((x) => ({ ...x, status: v })); }}><option value="Active">Actif</option><option value="Draft">Brouillon</option></select></label>
+    <label><span>Début</span><input type="date" className="input" value={p.startDate} onChange={(e) => { const v = e.target.value; setP((x) => (x.endDate && v > x.endDate ? { ...x, startDate: v, endDate: v } : { ...x, startDate: v })); }} /></label>
+    <label><span>Fin</span><input type="date" className="input" min={p.startDate} value={p.endDate} onChange={(e) => { const v = e.target.value; setP((x) => ({ ...x, endDate: x.startDate && v < x.startDate ? x.startDate : v })); }} /></label>
+    <label><span>Budget prévu (€)</span><input type="number" min={0} step={100} className="input" value={p.budgetPlanned || ''} placeholder="0" onChange={(e) => { const v = Math.max(0, +e.target.value || 0); setP((x) => ({ ...x, budgetPlanned: v })); }} /></label>
+    <div />
+    {curseurs(p).map((b) => {
+      const k = b === 'Alpine' ? 'alpineShare' : 'nissanShare', v = p[k] ?? 100;   // curseur vide = 100 % sur la marque
+      return (
+        <div key={k} className="full mia-act-share"><span>Part {b} / RDM : {v} % · {100 - v} %</span>
+          <input type="range" min={0} max={100} step={1} value={v} aria-label={`Part ${b} (%)`} onChange={(e) => { const n = Math.max(0, Math.min(100, +e.target.value || 0)); setP((x) => ({ ...x, [k]: n })); }} />
+        </div>
+      );
+    })}
+    <label className="full"><span>Description</span><textarea className="textarea" rows={2} value={p.description} onChange={(e) => { const v = e.target.value; setP((x) => ({ ...x, description: v })); }} /></label>
+    <div className="full mia-act-rep"><span>Répartition du budget prévu</span>
+      {rep.hors ? <div className="mia-act-note">Holding : suivi, mais imputé à <b>aucun</b> budget (hors budget).</div>
+        : !rep.lignes.length ? <div className="mia-act-note">Aucun site : rien à répartir.</div>
+          : <ul>{rep.lignes.map(([env, f]) => <li key={env}><span className="n">{env}</span><small className="num">{pctTxt(f)}</small><b className="num">{eur(total * f)}</b></li>)}</ul>}
+      {p.status === 'Draft' && <div className="mia-act-note">Brouillon : compté dans aucun budget ni tableau de bord tant qu’il n’est pas actif.</div>}
+      {!rep.hors && sansServiceBudget(p) && <div className="mia-act-note">Aucun service VN, VO, PR ou APV : le Budget n’imputera rien.</div>}
+      {!rep.hors && !!rep.lignes.length && <div className="mia-act-note">Le Budget impute ensuite le réel (coûts des tâches) selon cette répartition.</div>}
+    </div>
+  </>;
+};
+
+/** Carte `creer_publication` : wording rédigé par mIAouss, statut « Rédigé » fixe. */
+const PublicationFields: React.FC<{ d: Draft; upd: Upd; tags: DigitalTags | null | undefined }> = ({ d, upd, tags }) => {
+  const set = (p: Partial<Draft>) => upd((x) => ({ ...x, ...p }));
+  const nets = [...(tags?.networks || []), ...(d.reseaux || []).filter((x) => !(tags?.networks || []).includes(x))];
+  const n = (d.texte || '').length;
+  return <>
+    <label className="full"><span>Titre</span><input className="input" value={d.titre} onChange={(e) => set({ titre: e.target.value })} /></label>
+    <label><span>Date</span><input type="date" className="input" value={d.date} onChange={(e) => set({ date: e.target.value })} /></label>
+    <label><span>Service</span><select className="select" value={d.service || 'Tous Services'} onChange={(e) => set({ service: e.target.value as SocialServiceType })}>{SOCIAL_SERVICES.map((s) => <option key={s} value={s}>{s}</option>)}</select></label>
+    <div className="full"><span>Réseaux</span><Choix values={d.reseaux || []} pending={d.reseauxP || []} options={nets} add="+ Réseau" onChange={(v, pd) => set({ reseaux: v, reseauxP: pd })} /></div>
+    <label className="full"><span>Texte · <b className={`num ${n > 3000 ? 'mia-act-over' : ''}`}>{n}</b> / 3 000</span><textarea className="textarea" rows={7} value={d.texte} onChange={(e) => set({ texte: e.target.value })} /></label>
+    <div className="full"><span>Marques</span>
+      <div className="mia-act-tags">{BRANDS.map((b) => (
+        <button type="button" key={b} className={`mia-act-tog ${(d.marques || []).includes(b) ? 'on' : ''}`} style={{ '--c': brandHex(b) } as React.CSSProperties}
+          onClick={() => upd((x) => ({ ...x, marques: basculerMarque({ brands: x.marques || [] } as Project, b).brands }))}>{libelleMarqueDigital(b)}</button>
+      ))}</div>
+    </div>
+    {!!d.ignorees?.length && <div className="full mia-act-note">Marque inconnue ignorée : {d.ignorees.join(', ')}</div>}
+    <div className="full"><span>Concessions</span><Choix values={d.concessions || []} pending={d.concessionsP || []} options={DIGITAL_CONCESSIONS} add="+ Site" onChange={(v, pd) => set({ concessions: v, concessionsP: pd })} /></div>
+    <div><span>Cibles</span>
+      <div className="mia-act-ppl">{(['Internet', 'Collaborateurs'] as SocialTarget[]).map((c) => (
+        <label key={c} className="mia-act-check"><input type="checkbox" checked={(d.cibles || []).includes(c)} onChange={(e) => { const on = e.target.checked; upd((x) => ({ ...x, cibles: on ? [...(x.cibles || []).filter((y) => y !== c), c] : (x.cibles || []).filter((y) => y !== c) })); }} /><span>{c}</span></label>
+      ))}</div>
+    </div>
+    <div><span>Statut</span><div className="mia-act-what">Rédigé</div></div>
+    {!!d.points?.length && <div className="full mia-act-todo"><span>Points à vérifier</span><ul>{d.points.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
+  </>;
+};
+
 // ---------------------------------------------------------------- la carte
-const ICON: Record<string, string> = { ouvrir: 'arrowr', creer_tache: 'todo', modifier_tache: 'edit', creer_postit: 'pin' };
+const ICON: Record<string, string> = { ouvrir: 'arrowr', creer_tache: 'todo', modifier_tache: 'edit', creer_postit: 'pin', creer_projet: 'projects', creer_publication: 'digital' };
 const STATE_L: Record<string, string> = { executing: 'En cours…', done: 'Fait', failed: 'Échec', refused: 'Refusée', expired: 'Expirée' };
 
 /** `uid` : compte connecté (assigné par défaut d'une tâche libre). `onChanged` : relire la discussion. */
@@ -260,11 +629,15 @@ export const ActionCard: React.FC<{ a: AssistantActionView; uid: string; onChang
   const expired = a.status === 'expired' || (a.status === 'proposed' && Date.now() - new Date(a.createdAt).getTime() > EXPIRY_MS);
   const st = busy === 'run' ? 'executing' : expired ? 'expired' : a.status;
   const live = st === 'proposed';
+  // Tags Digital : chargés pour la seule carte « publication » (les réseaux se choisissent parmi les existants).
+  const pub = a.type === 'creer_publication';
+  const tags = digitalTags.useWhen(pub && live);
   // Brouillon posé une fois les données chargées (sinon « Marie » ne trouverait personne) ; ensuite, il est à la personne.
   useEffect(() => {
-    if (live && !d && ready && users.length) setD(initDraft(a, workspace.getState(), uid));
-  }, [live, d, ready, users.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (live && !d && ready && users.length && (!pub || tags !== undefined)) setD(initDraft(a, workspace.getState(), uid));
+  }, [live, d, ready, users.length, tags === undefined]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (p: Partial<Draft>) => setD((x) => ({ ...(x || {}), ...p }));
+  const upd: Upd = (f) => setD((x) => (x ? f(x) : x));
   const manque = live ? missing(a, d) : null;
 
   const validate = async () => {
@@ -283,7 +656,9 @@ export const ActionCard: React.FC<{ a: AssistantActionView; uid: string; onChang
   const projOptions = useMemo(() => projects.filter((p) => p.status !== 'Archived').sort((x, y) => x.name.localeCompare(y.name)), [projects]);
 
   const fields = !live || !d ? null : (
-    <div className="mia-act-f">
+    <div className={`mia-act-f ${a.type === 'creer_projet' || pub ? 'long' : ''}`}>
+      {a.type === 'creer_projet' && d.prj && <ProjetFields d={d} upd={upd} />}
+      {pub && <PublicationFields d={d} upd={upd} tags={tags} />}
       {a.type === 'creer_tache' && <>
         <label className="full"><span>Titre</span><input className="input" value={d.titre} onChange={(e) => set({ titre: e.target.value })} /></label>
         <label className="full"><span>Projet</span>

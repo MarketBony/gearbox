@@ -7,7 +7,7 @@ import { emitToUser } from '../realtime';
 import { prisma } from '../db';
 import { Prisma } from '@prisma/client';
 import { complete, AssistantUnavailable, anyProviderConfigured, type ChatMsg, type ToolCall, type LlmReply } from '../assistant/providers';
-import { CLIENT_TOOLS, systemPrompt } from '../assistant/prompt';
+import { CLIENT_TOOLS, systemPrompt, consignesRedaction } from '../assistant/prompt';
 import { DATA_INTENT, ANNONCE_FAITE, toolsFor, isActionTool, isAutoAction, checkAction, describeProposed, openTarget, ACTION_EXPIRY_MS, ACTIONS_PER_TURN, STATUS_FR } from '../assistant/actions';
 import { record, capOf, questionsSince, parisMidnight, personalUsage, capacity, UNLIMITED } from '../assistant/usage';
 
@@ -51,7 +51,7 @@ const TOOL_RESULT_CHARS = 8_000;
 const TOOL_ROUNDS_MAX = 3;
 const PENDING_TTL = 3 * 60_000;
 
-interface Pending { userId: string; question: string; forced: boolean; messages: ChatMsg[]; calls: ToolCall[]; rounds: number; counted: boolean; noted: string[]; tools: string[]; actions: string[]; at: number }
+interface Pending { userId: string; question: string; forced: boolean; messages: ChatMsg[]; calls: ToolCall[]; rounds: number; counted: boolean; noted: string[]; tools: string[]; actions: string[]; at: number; redaction?: boolean }
 const pending = new Map<string, Pending>();
 const sweep = () => { const now = Date.now(); for (const [k, v] of pending) if (now - v.at > PENDING_TTL) pending.delete(k); };
 
@@ -88,7 +88,7 @@ const fail503 = (res: Response, e: AssistantUnavailable) => {
 };
 
 /**
- * Fait avancer un tour : appelle le modèle, exécute `retenir` sur place, rend la main au
+ * Fait avancer un tour : appelle le modèle, exécute `retenir` et `consignes_redaction` sur place, rend la main au
  * navigateur pour les outils de lecture, ou termine en enregistrant la réponse.
  */
 async function advance(req: AuthRequest, res: Response, st: Pending) {
@@ -101,7 +101,11 @@ async function advance(req: AuthRequest, res: Response, st: Pending) {
     const kind = st.counted ? 'suite' : 'question';
     try {
       // 2 000 jetons (28/10/2026) : la réflexion de Groq (providers.ts) se paie sur la sortie.
-      reply = await complete(st.messages, lastRound ? null : tools, {
+      // Consignes de rédaction déjà lues (`st.redaction`) : le tour suivant n'a plus qu'à écrire → seul l'outil
+      // `creer_publication`. Mesuré le 28/10 : une publication coûtait ~7 300 jetons en deux appels rapprochés, pour un
+      // plafond Groq de 8 000/min partagé par l'équipe — saturé dès qu'un collègue écrivait en même temps.
+      const offered = st.redaction ? tools.filter((t) => t.function.name === 'creer_publication') : tools;
+      reply = await complete(st.messages, lastRound ? null : offered, {
         maxTokens: 2_000,
         toolChoice: st.forced && st.rounds === 0 ? 'required' : 'auto',
         onFailure: (f) => void record(userId, { provider: f.provider, model: f.model, kind, ms: f.ms, ok: false, error: f.error }),
@@ -128,12 +132,18 @@ async function advance(req: AuthRequest, res: Response, st: Pending) {
     // ⚠️ Jamais la réflexion du modèle dans l'historique : `content` arrive déjà nettoyé (providers.ts, stripThink).
     st.messages.push({ role: 'assistant', content: reply.content || '', tool_calls: reply.toolCalls });
     const clientCalls: ToolCall[] = [];
-    let proposed = 0, actionErrors = 0, others = 0;
+    let proposed = 0, actionErrors = 0, others = 0, readsServer = 0;
     const opened: string[] = [];
     for (const c of reply.toolCalls) {
       const name = c.function.name;
       if (name === 'retenir') {
         st.messages.push({ role: 'tool', tool_call_id: c.id, content: await retenir(userId, c.function.arguments, st) });
+      } else if (name === 'consignes_redaction') {
+        // Lot 1b (28/10/2026) : consignes lues sur le serveur, sans aller-retour navigateur. Contenu DE CONFIANCE (fichiers
+        // du dépôt) : PAS balisé <donnees_gearbox>. Refusé au rôle qui ne l'a pas reçu (il ne peut pas publier).
+        const allowed = tools.some((t) => t.function.name === name);
+        st.messages.push({ role: 'tool', tool_call_id: c.id, content: allowed ? consignesRedaction(safeJson(c.function.arguments)) : JSON.stringify({ erreur: 'Outil non disponible pour ton rôle.' }) });
+        if (allowed) { readsServer += 1; st.tools.push(name); st.redaction = true; } else others += 1;
       } else if ((CLIENT_TOOLS as readonly string[]).includes(name)) {
         clientCalls.push(c);
         st.tools.push(name);
@@ -148,7 +158,8 @@ async function advance(req: AuthRequest, res: Response, st: Pending) {
     }
     // Raccourci : un tour fait UNIQUEMENT d'actions acceptées (aucun outil de lecture, aucune erreur à corriger)
     // se termine sans rappeler le modèle — il n'a rien de neuf à lire, et chaque appel est payé sur le quota.
-    if (!clientCalls.length && proposed && !actionErrors && !others) {
+    // ⚠️ Pas si le tour a lu `consignes_redaction` (28/10/2026) : le modèle doit encore ÉCRIRE le texte avec.
+    if (!clientCalls.length && proposed && !actionErrors && !others && !readsServer) {
       const content = reply.content.trim()
         || (opened.length === proposed ? `J'ouvre ${opened.join(' et ')}.` : 'Voici ce que je te propose :');
       return { done: await finish(userId, st, reply.provider, content) };

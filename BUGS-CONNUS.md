@@ -2,7 +2,12 @@
 
 Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec référence du commit).
 
-- [ ] **mIAouss : débit de Groq vite saturé** (mesuré aux evals du 28/10) — chaque question envoie ~2 500 à 5 000 jetons
+- [ ] **mIAouss : post-it demandé sans date → date du jour** (Gemini, banc du 28/10) au lieu d'une question ; visible et
+  modifiable sur la carte. Qwen corrigé par la règle 8 du prompt.
+- [ ] **mIAouss : note « marque retirée » de la carte projet qui ne s'efface pas** si la marque est remise (signalé par
+  l'agent client du lot 1b, mineur).
+- [ ] **mIAouss : débit de Groq vite saturé** — ⚠️ en plus des 8 000 jetons/min, **200 000 jetons/JOUR** (mesuré le 28/10) :
+  relais Gemini ajouté au correctif 104 ; l'allègement du prompt reste à faire. (mesuré aux evals du 28/10) — chaque question envoie ~2 500 à 5 000 jetons
   (prompt + définitions d'outils) ; plafond gratuit ~8 000 jetons/min pour TOUTE l'équipe → au-delà de ~2 questions/min,
   bascule sur Cloudflare, SANS réflexion et plus lent. À traiter avant d'ajouter des outils : alléger le prompt, n'envoyer
   que les outils utiles à la question.

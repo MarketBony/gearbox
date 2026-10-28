@@ -31,6 +31,10 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
       CLOUDFLARE_AI_TOKEN: ${CLOUDFLARE_AI_TOKEN:-}
+      # Relais Gemini 3.5 Flash-Lite (28/10/2026) : pris quand Groq a épuisé son quota (200 000 jetons/jour). Absente,
+      # le relais est simplement sauté. ASSISTANT_CHAIN (facultatif) change l'ordre : « groq,gemini,cloudflare » par défaut.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      ASSISTANT_CHAIN: ${ASSISTANT_CHAIN:-}
       # Météo (relais /api/weather, 12/10/2026) : la clé ne doit plus figurer dans le code client.
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
       # CRM / RCU (12/10/2026) : base dédiée `rcu-db` ci-dessous, sur le réseau interne seulement.

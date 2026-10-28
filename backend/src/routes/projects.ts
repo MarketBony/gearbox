@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
-import { INTERNAL_ROLES } from '../auth/roles';
+import { INTERNAL_ROLES, PROJECT_EDIT_ROLES } from '../auth/roles';
 import { emitEvent } from '../realtime';
 import { withDates } from '../utils/dates';
 import { scopeOf, arrayScopeWhere, redactSiteFields } from '../auth/siteScope';
@@ -17,7 +17,7 @@ const router = Router();
 // dépenses fixes, les tags et le Digital, mais pas les projets.
 // Doit rester aligné sur `canEdit` de `pages/Projects.tsx` — sinon l'interface affiche
 // des boutons que l'API refuse en 403.
-const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+const EDIT_ROLES = PROJECT_EDIT_ROLES;   // source unique : auth/roles.ts (28/10/2026, lue aussi par mIAouss)
 
 router.get('/', authenticateToken, requireRole(INTERNAL_ROLES), async (req: AuthRequest, res) => {
   // Cloisonnement par concession : `scopeOf` rend `null` pour tous les rôles

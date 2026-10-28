@@ -4,6 +4,34 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 28/10/2026 (lire en premier)
+- **CORRECTIF 104 EN PRODUCTION (28/10, `api` + `web`, aucune migration, nouvelle variable `GEMINI_API_KEY` au `.env` du VPS)
+  — mIAouss : PROJETS, PUBLICATIONS RÉDIGÉES et RELAIS GEMINI (lot 1b).** Construit par 3 sous-agents sur un contrat commun,
+  intégré et testé par Claude ; recetté par Théo.
+  - **`creer_projet`** (`PROJECT_EDIT_ROLES`) : **ACTIF par défaut** (décision de Théo : la validation de la carte est une
+    décision humaine ; « Brouillon » au choix dans la carte). La carte montre sites (plaque → ses concessions), marques,
+    service, type, dates, budget et la **RÉPARTITION par enveloppe** calculée par `siteSharesOf` + `splitShareToBuckets`
+    (constants.ts) — Holding « hors budget », curseurs Alpine/Nissan à la même condition que ProjectDetail. Serveur : nom
+    « Projet + site » refusé (mesuré : le modèle l'inventait 2 fois sur 2 malgré la consigne).
+  - **`creer_publication`** (`SOCIAL_EDIT_ROLES` — Coordinator N'A PAS l'écriture Digital, pas de proposition) : statut
+    **« Rédigé »**, texte rédigé par mIAouss, « points à vérifier » sur la carte. Outil serveur **`consignes_redaction`**
+    chargé À LA DEMANDE (`backend/src/assistant/redaction/` : fiche-post, ton-bony, relecture, ~360 mots, tirés des 105
+    publications réelles : vouvoiement + « nous », ~380 caractères, émojis repères, mention légale « Pensez à covoiturer /
+    marche ou vélo #SeDéplacerMoinsPolluer », [À COMPLÉTER] au lieu d'inventer). Après les consignes, le modèle ne reçoit
+    plus que `creer_publication` (économie de jetons). ⚠️ `backend/Dockerfile` copie `src/assistant/redaction` dans
+    l'image (tsc ne copie pas les .md : sans ça, consignes absentes en prod).
+  - **QUOTA GROQ MESURÉ : 200 000 jetons PAR JOUR** (TPD, glissant ; `max_tokens` compté) en plus de 8 000/min → ~30-50
+    questions/jour pour l'équipe. Les evals du 28/10 l'ont vidé (+ quota Cloudflare) : mIAouss quasi indisponible
+    l'après-midi. **Règle : jamais de série complète d'evals en journée.** Mistral testé : Large 4 / Large 3 / Medium
+    FERMÉS sur l'offre gratuite (403 / 0 req/min) — clé `MISTRAL_API_KEY` dans backend/.env local, inutilisée, à régénérer.
+  - **RELAIS GEMINI 3.5 Flash-Lite** (décision de Théo) : chaîne `groq → gemini → cloudflare` (`providers.ts`,
+    `ASSISTANT_CHAIN` pour changer l'ordre, `--provider gemini` dans le banc). Banc du 28/10 : **36/38, 19/19 critiques**
+    (même niveau que Qwen), mais **11-36 s par appel** (15-45 s par question) contre 1-3 s chez Groq. ~500 requêtes/jour
+    annoncées chez Google. Défaut connu : post-it sans date → date du jour au lieu d'une question (visible sur la carte).
+  - **Testé en local (Master, 5G)** : projet créé actif (Rodez/Millau 50/50, 3 000 €) puis supprimé ; publication rédigée via
+    le relais Gemini (< 40 s) puis supprimée ; 0 résidu. **Non testé** : autre rôle, téléphone, sélecteur de sites dans la
+    carte. Textes à relire (une faute d'accord vue au test : « nos équipes étaient ravis »).
+  - **Suite** : alléger le prompt (n'envoyer que les outils utiles, réduire `max_tokens`), vérifier la mise en cache Groq ;
+    nouveaux outils de lecture par rubrique.
 - **CORRECTIF 103 EN PRODUCTION (28/10, `api` + `web`, migration additive `20261028120000_assistant_actions`) — mIAouss
   QUI AGIT, lot 1a.** Demande de Théo : « il faut que mIAouss puisse faire des choses dans Gearbox », réflexion activée.
   Plan revu avec les principes de son projet perso ai-office (gateway d'actions, données balisées, evals). Construit par
@@ -281,7 +309,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 103 (28/10)** — mIAouss qui agit, lot 1a (`api` + `web`, migration `assistant_actions`).
+- **En production : correctif 104 (28/10)** — mIAouss : projets, publications rédigées, relais Gemini (`api` + `web`, variable `GEMINI_API_KEY`).
+  Avant lui le **correctif 103 (28/10)** — mIAouss qui agit, lot 1a (`api` + `web`, migration `assistant_actions`).
   Avant lui le **correctif 102 (28/10)** — mIAouss personnalisable (`api` + `web`, migration `assistant_look`).
   Avant lui le **correctif 101 (27/10)** — mIAouss au cas par cas (`api` + `web`, aucune migration).
   Avant lui le **correctif 100 (26/10)** — SPARK ouvert sur invitation du Master (`api` + `web`, aucune migration).
@@ -1420,7 +1449,10 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 103** (28 octobre 2026) — mIAouss qui agit (lot 1a), **`api` + `web`**,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 104** (28 octobre 2026) — mIAouss : projets, publications rédigées, relais
+  Gemini, **`api` + `web`**, aucune migration ; **nouvelle variable `GEMINI_API_KEY`** ajoutée au `.env` du VPS et passée au conteneur
+  `api` par `docker-compose.yml` (avec `ASSISTANT_CHAIN`, facultative) ; `backend/Dockerfile` copie `src/assistant/redaction`.
+  Avant lui le **correctif 103** (28 octobre 2026) — mIAouss qui agit (lot 1a), **`api` + `web`**,
   migration Supabase additive `20261028120000_assistant_actions` (table `AssistantAction`), appliquée par `db execute` +
   `migrate resolve --applied` le 28/10 (via la 5G), avant le push.
   Avant lui le **correctif 102** (28 octobre 2026) — mIAouss personnalisable, **`api` + `web`**,
