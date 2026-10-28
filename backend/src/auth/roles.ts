@@ -155,5 +155,16 @@ export const TODO_ROLES = INTERNAL_ROLES.filter(r => r !== SITE_MANAGER_ROLE);
  * Même valeur que TODO_ROLES moins le Master ce jour, règle DIFFÉRENTE : ne pas les aliaser.
  */
 export const CRM_INVITABLE_ROLES = INTERNAL_ROLES.filter(r => r !== SITE_MANAGER_ROLE && r !== 'Guest' && !CRM_MASTER_ROLES.includes(r)); // Guest exclu (Théo, 26/10/2026)
+/**
+ * Écriture des TÂCHES (projets et tâches libres) — source unique depuis le 28/10/2026 : `routes/tasks.ts` et le catalogue
+ * d'actions de mIAouss (`assistant/actions.ts`) la lisent ; mIAouss ne propose une action que si le rôle la permet.
+ * Chef de site absent (pas de To-do), Guest et External absents (lecture seule).
+ */
+export const TASK_EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+/**
+ * Agenda Post-it (01/10/2026). ⚠️ Guest y figure ALORS QU'IL EST EN LECTURE SEULE partout ailleurs : décision de Théo, ses
+ * post-it sont SES données personnelles. Ce n'est pas un `EDIT_ROLES` : ne pas s'en servir ailleurs.
+ */
+export const POSTIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager', 'Guest'];
 /** Rôles qui ont le Chat (et donc ses fichiers) : ceux de `hasSocialFeatures`. */
 export const CHAT_ROLES = (VALID_ROLES as readonly string[]).filter(r => !NO_SOCIAL_ROLES.includes(r));

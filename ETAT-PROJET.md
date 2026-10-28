@@ -4,6 +4,43 @@
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
 ## ▶ POINT DE REPRISE — 28/10/2026 (lire en premier)
+- **CORRECTIF 103 EN PRODUCTION (28/10, `api` + `web`, migration additive `20261028120000_assistant_actions`) — mIAouss
+  QUI AGIT, lot 1a.** Demande de Théo : « il faut que mIAouss puisse faire des choses dans Gearbox », réflexion activée.
+  Plan revu avec les principes de son projet perso ai-office (gateway d'actions, données balisées, evals). Construit par
+  3 sous-agents sur un contrat commun (serveur / volet / evals), intégré et testé par Claude.
+  - **Réflexion** : Groq `reasoning_effort: 'medium'` (mesuré : +~240 jetons, +0,6 s), `max_tokens` 2000 ; Cloudflare reste
+    sans réflexion (56 s avec). `stripThink` retire toute réflexion de l'historique.
+  - **Catalogue d'actions, porte unique `backend/src/assistant/actions.ts`** : `ouvrir` (navigation, automatique),
+    `creer_tache`, `modifier_tache` (`TASK_EDIT_ROLES`), `creer_postit` (`POSTIT_ROLES`) — listes désormais exportées par
+    `auth/roles.ts` et lues par `routes/tasks.ts` / `postits.ts`. `checkAction` valide à la main (dates réelles, longueurs,
+    statuts, titres bidons refusés) et ne résout AUCUN nom (le navigateur écrit à partir des ids résolus dans la carte).
+  - **Journal `AssistantAction`** (proposed → executing → done / failed, refused, expired à 24 h) : `POST
+    /api/assistant/actions/:id/claim` (réservation ATOMIQUE, une seule exécution), `/result`, `/refuse` ; statut ET note
+    de discussion dans UNE transaction (5G coupée en recette entre les deux : note perdue → corrigé). Navigation réussie :
+    pas de note (bruit).
+  - **Le modèle sait** qu'une action proposée « N'EST PAS faite » ; raccourci : un tour qui ne contient que des actions se
+    termine sans rappeler l'IA. Résultats d'outils balisés `<donnees_gearbox>` (règle 7 : donnée, jamais instruction) ;
+    règle 8 : information indispensable manquante → UNE question.
+  - **`DATA_INTENT`** (outil obligatoire) ne vise QUE les données — mesuré : élargi aux verbes d'action, il forçait un outil
+    à tort (« rappeler ce que veut dire APV » → absences ; « crée-moi une tâche » → titre inventé). Garde-fou `ANNONCE_FAITE`
+    sur la RÉPONSE (« c'est fait » sans outil → jetée).
+  - **Volet** (`ui2/apps/assistant/actions.tsx`, `ChatPane.tsx`) : cartes à champs modifiables (projet, assignés résolus par
+    nom, échéance, statut, créneau du post-it), Valider / Refuser, états proposée / en cours / faite / échec / refusée /
+    expirée ; `ouvrir` d'une réponse fraîche exécuté seul.
+  - **Evals v0** : `backend/src/assistant/evals/` (27 cas, 9 critiques : aucun chiffre inventé, jamais « c'est fait »,
+    refus par rôle, injection) — `cd backend && npx ts-node src/assistant/evals/run.ts [--case …]`, rapport dans
+    `..\miaouss-evals\`. Résultat 28/10 : 26/27 puis la navigation 3/3 après correction du prompt.
+  - **Testé en local (Master, 5G)** : création de tâche libre, modification de statut, refus de post-it, navigation, double
+    validation (une seule passe, rien d'écrit en double) ; tâche de test supprimée. **Non testé** : tâche DANS un projet
+    (pour ne pas toucher un vrai projet), autre rôle, téléphone.
+  - ⚠️ **Débit Groq** : chaque question envoie ~2 500 à 5 000 jetons (consignes + outils) ; à 8 000 jetons/min, Groq tient
+    ~2 questions/min pour toute l'équipe, puis bascule sur Cloudflare (sans réflexion). Chantier suivant utile : alléger le
+    prompt avant d'ajouter des outils. Prochain lot prévu : **1b** (brouillon de projet, brouillon de publication rédigé +
+    fiche de consignes + document « ton Bony » ; statut « Rédigé » proposé).
+- **RÉSEAU DU BUREAU (28/10)** : sortants ouverts 80, 443, 8443, 993, 465, 587 ; bloqués 22, 5432, 6543 (et 2222, 8080).
+  NetSetMan n'y peut rien (le blocage est au pare-feu). Message pour l'IT rédigé (ouverture SORTANTE depuis le poste en IP
+  fixe 200.8.192.135 vers 51.83.75.181:22 et le pooler Supabase 5432/6543) ; IT injoignable le 28/10. Tunnel par 8443
+  possible techniquement mais = contourner le pare-feu : pas sans accord de l'IT.
 - **CORRECTIF 102 EN PRODUCTION (28/10, `api` + `web`, migration additive `20261027120000_assistant_look`) — mIAouss
   PERSONNALISABLE.** Demande de Théo : « chaque utilisateur a son mIAouss » (yeux, pelage, accessoires, tenues…), « pousse
   encore plus la personnalisation ». Réglages › mIAouss › « Mon mIAouss » : aperçu ANIMÉ, prénom (16 car., nettoyé pareil côté
@@ -244,7 +281,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 102 (28/10)** — mIAouss personnalisable (`api` + `web`, migration `assistant_look`).
+- **En production : correctif 103 (28/10)** — mIAouss qui agit, lot 1a (`api` + `web`, migration `assistant_actions`).
+  Avant lui le **correctif 102 (28/10)** — mIAouss personnalisable (`api` + `web`, migration `assistant_look`).
   Avant lui le **correctif 101 (27/10)** — mIAouss au cas par cas (`api` + `web`, aucune migration).
   Avant lui le **correctif 100 (26/10)** — SPARK ouvert sur invitation du Master (`api` + `web`, aucune migration).
   Avant lui le **correctif 99 (26/10)** — v2 : Congés à nouveau visible pour le Master (`web` seul).
@@ -1382,7 +1420,10 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 102** (28 octobre 2026) — mIAouss personnalisable, **`api` + `web`**,
+- master = prod, synchronisés. Dernier lot déployé : **correctif 103** (28 octobre 2026) — mIAouss qui agit (lot 1a), **`api` + `web`**,
+  migration Supabase additive `20261028120000_assistant_actions` (table `AssistantAction`), appliquée par `db execute` +
+  `migrate resolve --applied` le 28/10 (via la 5G), avant le push.
+  Avant lui le **correctif 102** (28 octobre 2026) — mIAouss personnalisable, **`api` + `web`**,
   migration Supabase additive `20261027120000_assistant_look` (colonne `AssistantUser.look`), appliquée par `db execute` +
   `migrate resolve --applied` le 27/10, avant le push.
   Avant lui le **correctif 101** (27 octobre 2026) — mIAouss au cas par cas (interrupteur + personnes coupées), **`api` + `web`**, aucune migration.
@@ -4739,6 +4780,27 @@
 
 > Réordonné le 05/08/2026. Les éléments barrés ont été retirés : leur trace est dans
 > l'historique des correctifs ci-dessus et dans `BUGS-CONNUS.md`.
+
+### 🔒 CONFIDENTIALITÉ DU CHAT — chantier décidé par Théo le 28/10/2026, « on s'y attèlera plus tard »
+Exigence de Théo : « personne n'a à avoir accès à leurs discussions entre eux », « personne ne doit pouvoir fliquer les
+messages de personne », « plus aucune trace » sur GitHub. Audit du 28/10 :
+- **Dans Gearbox, c'est déjà sain** : seuls les participants lisent une conversation (REST `routes/chat.ts` et temps réel
+  `realtime/chat.ts`), le Master n'a aucune porte dérobée.
+- **FUITE : les dumps hebdomadaires** (`.github/workflows/backup.yml`, lundi 03:43 UTC, `pg_dump` de TOUTE la base commité
+  dans `backups/`). **19 dumps dans l'historique git depuis le 07/07/2026** (la rétention « 8 fichiers » ne retire rien de
+  l'historique) ; celui du 26/10 contient 1 450 `ChatMessage` en clair, + conversations et notes de mIAouss. Copies : GitHub,
+  ce PC (`.git` 59 Mo), le clone du VPS (`~/gearbox`, NON vérifié : SSH fermé au bureau le 28/10), tout autre clone.
+- Le reste en clair : la base Supabase (console, backend local de ce poste), l'aperçu `ChatConversation.lastMessage`, les
+  pièces jointes du Chat sur le volume `uploads_data`.
+**Plan proposé (ordre)** : 1) dumps CHIFFRÉS dans le workflow (clé publique `age` dans le dépôt, clé privée chez Théo, hors
+GitHub) — et aucun dump en clair d'ici là ; 2) purge de l'historique (`git filter-repo` sur `backups/`, push forcé, demande
+au support GitHub de purger ses caches, re-clonage VPS + PC) UNE FOIS un dump chiffré de remplacement en place (ces dumps
+sont aujourd'hui la seule sauvegarde hors serveur) — irréversible, plan exact à montrer à Théo avant ; 3) **option A** :
+chiffrement côté serveur (AES-256-GCM) du texte, de `lastMessage` et des pièces jointes, clé SEULEMENT sur le VPS (pas dans
+`backend/.env` du poste : le Chat devient illisible en local, y compris pour Claude), passe de chiffrement des messages
+existants. Limite dite à Théo : un administrateur du VPS pourrait encore déchiffrer en le faisant exprès ; seul le bout en
+bout (option B, éventuellement réservée aux conversations privées) l'empêche. Hotspot 4G obligatoire (VPS + Supabase).
+⚠️ **Tant que l'étape 1 n'est pas faite, chaque lundi ajoute un dump en clair** (prochain : lundi 02/11, 03:43 UTC).
 
 ### Sécurité (suite du correctif 80)
 - **Cloisonnement des fichiers FICHIER PAR FICHIER** : `/uploads` exige une session et un rôle par dossier, mais une pièce

@@ -7,6 +7,18 @@
 > (`UNSCOPED_READ_ROLES`). ⚠️ **Reste ouvert (audit du 26/10)** : les ÉCRITURES de `/api/expenses` et `POST /api/activity-log`
 > sans garde de rôle — voir `BUGS-CONNUS.md`.
 >
+> **Correctif 103 (28/10/2026) — mIAouss qui agit (lot 1a).** Migration additive `20261028120000_assistant_actions` :
+> table `AssistantAction` (`userId`, `messageId?`, `type`, `payload` Json, `summary`, `status` proposed | executing | done |
+> failed | refused | expired, `result` Json?, `error`), index (userId, createdAt). Porte unique du catalogue :
+> `assistant/actions.ts` (`toolsFor(role)`, `checkAction`, `describeProposed`, `DATA_INTENT`, `ANNONCE_FAITE`,
+> `TITRE_BIDON`, expiration 24 h). Routes : `POST /api/assistant/actions/:id/claim` (`updateMany` conditionnel = une seule
+> exécution ; payload corrigé revalidé ; 409 si déjà prise / expirée / refusée, 400 si invalide ou rôle plus autorisé),
+> `/result` (depuis `executing`), `/refuse` (depuis `proposed`) — statut + note `meta.kind='action'` dans
+> `prisma.$transaction`. `GET /conversation` et la réponse `done` portent `actions: AssistantActionView[]`. Le SERVEUR
+> n'écrit jamais l'action : le navigateur l'exécute par les routes normales (mêmes droits, mêmes listes blanches).
+> `TASK_EDIT_ROLES` et `POSTIT_ROLES` vivent dans `auth/roles.ts` (lus par `routes/tasks.ts`, `routes/postits.ts` et le
+> catalogue). Groq : `reasoning_effort: 'medium'`, `max_tokens` 2000.
+>
 > **Correctif 102 (28/10/2026) — mIAouss personnalisable.** Migration additive `20261027120000_assistant_look` :
 > `AssistantUser.look Json?` (null = le mIAouss d'origine). Routes `GET|PUT /api/assistant/look` (derrière `requireAssistant`) —
 > route À PART de `PUT /prefs`, qui réécrit `memoryPaused` à chaque appel. Le serveur ne connaît PAS le catalogue (il vit dans

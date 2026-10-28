@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { emitEvent } from '../realtime';
 import { prisma } from '../db';
-import { TODO_ROLES } from '../auth/roles';
+import { TODO_ROLES, TASK_EDIT_ROLES } from '../auth/roles';
 import { normaliserAssignes, nouveauxAssignes, verifierNouveauxAssignes, AssigneInvalideError } from '../utils/taskAssignees';
 
 const router = Router();
@@ -27,7 +27,7 @@ const router = Router();
 // auth/roles.ts). Il est donc absent de cette liste — mais ce n'est pas parce que
 // l'interface la lui masque : masquer une rubrique ne ferme pas une route, leçon qui
 // a coûté deux passes au lot du chef de site. Le refus est ici, côté serveur.
-const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+const EDIT_ROLES = TASK_EDIT_ROLES;   // source unique : auth/roles.ts (28/10/2026)
 
 // Champs acceptés en écriture — liste blanche, comme `TASK_FIELDS` de projects.ts :
 // le frontend renvoie des objets issus d'un GET, `id`/`createdAt`/`projectId` ne sont
