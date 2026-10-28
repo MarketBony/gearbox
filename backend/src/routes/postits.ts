@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticateToken, requireRole, AuthRequest } from '../auth/middleware';
 import { emitToUser } from '../realtime';
 import { prisma } from '../db';
+import { POSTIT_ROLES } from '../auth/roles';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ const router = Router();
  * (01/10/2026). Ses post-it sont SES données personnelles, pas les données partagées que
  * la lecture seule protège. Ce n'est pas un `EDIT_ROLES` : ne pas s'en servir ailleurs.
  */
-const POSTIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager', 'Guest'];
+// Liste dans auth/roles.ts depuis le 28/10/2026 (lue aussi par le catalogue d'actions de mIAouss).
 
 /** Palette — liste blanche (le schéma n'a aucun enum). Mêmes clés que ui2/apps/todo/postit. */
 export const POSTIT_COLORS = ['yellow', 'peach', 'pink', 'lavender', 'sky', 'mint', 'lime', 'slate'];

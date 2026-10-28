@@ -1,5 +1,5 @@
 
-import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment, CongeJour, CongeType, CongeDemi, CongeDroit, PostIt, GoogleStatus, GForm, GFormDetail, GFormLog, BonyFormRow, BonyFormDetail, BonyResponse, BonyKit, BonyFont, AssistantMessage, AssistantTurn, AssistantNote, AssistantMe, AssistantUsageView } from '../types';
+import { Project, Task, Campaign, Equipment, EquipmentBooking, BudgetLine, User, SocialPost, DigitalTags, FixedExpense, ChatConversation, ChatMessage, ActivityLog, FeedInfo, StorageInfo, ProjectFile, SocialComment, CongeJour, CongeType, CongeDemi, CongeDroit, PostIt, GoogleStatus, GForm, GFormDetail, GFormLog, BonyFormRow, BonyFormDetail, BonyResponse, BonyKit, BonyFont, AssistantMessage, AssistantTurn, AssistantNote, AssistantMe, AssistantUsageView, AssistantActionView, AssistantActionOutcome } from '../types';
 import type { LobbyData, GameSession, GameChallenge, GameType } from '../components/games/gameTypes';
 import { MOCK_PROJECTS, INITIAL_BUDGET_SCENARIO, SITES, SOCIAL_NETWORKS, CO2_OPTIONS, LOI_LOM_OPTIONS } from '../constants';
 import { primeAvatarCache } from './avatarCache';
@@ -1018,6 +1018,17 @@ class DataService {
   async assistantAsk(message: string, orga?: string): Promise<AssistantTurn> { return apiFetch<AssistantTurn>('/assistant/chat', { method: 'POST', body: JSON.stringify({ message, orga }) }); }
   async assistantToolResults(turnId: string, results: { id: string; content: string }[]): Promise<AssistantTurn> {
     return apiFetch<AssistantTurn>('/assistant/chat/tools', { method: 'POST', body: JSON.stringify({ turnId, results }) });
+  }
+  // Actions proposées (lot 1a, 28/10/2026) : le serveur RÉSERVE l'action (une seule exécution, 409 sinon), le navigateur
+  // l'exécute par les écritures de l'interface, puis rend compte. `payload` = champs corrigés dans la carte (revalidés).
+  async assistantClaimAction(id: string, payload?: Record<string, unknown>): Promise<{ action: AssistantActionView }> {
+    return apiFetch(`/assistant/actions/${id}/claim`, { method: 'POST', body: JSON.stringify(payload ? { payload } : {}) });
+  }
+  async assistantActionResult(id: string, outcome: AssistantActionOutcome): Promise<{ action: AssistantActionView }> {
+    return apiFetch(`/assistant/actions/${id}/result`, { method: 'POST', body: JSON.stringify(outcome) });
+  }
+  async assistantRefuseAction(id: string): Promise<{ action: AssistantActionView }> {
+    return apiFetch(`/assistant/actions/${id}/refuse`, { method: 'POST', body: JSON.stringify({}) });
   }
   async assistantReset(): Promise<void> { await apiFetch('/assistant/conversation', { method: 'DELETE' }); }
   async assistantNotes(): Promise<AssistantNote[]> { return apiFetch<AssistantNote[]>('/assistant/notes'); }

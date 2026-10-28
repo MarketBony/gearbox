@@ -2,6 +2,18 @@
 
 Suivi des bugs identifiés, non corrigés à ce jour. Cocher quand résolu (avec référence du commit).
 
+- [ ] **mIAouss : débit de Groq vite saturé** (mesuré aux evals du 28/10) — chaque question envoie ~2 500 à 5 000 jetons
+  (prompt + définitions d'outils) ; plafond gratuit ~8 000 jetons/min pour TOUTE l'équipe → au-delà de ~2 questions/min,
+  bascule sur Cloudflare, SANS réflexion et plus lent. À traiter avant d'ajouter des outils : alléger le prompt, n'envoyer
+  que les outils utiles à la question.
+- [ ] **mIAouss : une action restée « en cours » n'expire jamais** (onglet fermé entre la réservation et le compte rendu) :
+  la carte affiche « Exécution en cours ailleurs, ou interrompue : vérifie dans la rubrique ». Rare ; à décider.
+- [ ] **mIAouss : tâche créée DANS un projet non testée en local** (28/10, pour ne toucher aucun vrai projet en prod) :
+  passe par `mutateProject` (file de sauvegarde, pas d'attente) ; un refus serveur s'affiche par `saveError`, mais la carte
+  a déjà dit « fait ». À vérifier sur un projet de test.
+- [x] **mIAouss : statut d'action et note de discussion désynchronisés** sur une connexion instable (5G, 28/10 : refus
+  enregistré, note perdue). Corrigé au correctif 103 : les deux dans une transaction.
+
 - [ ] **Serveur : écritures de `/api/expenses` SANS garde de rôle** (audit du 26/10). `POST`, `PUT /:id`, `DELETE /:id` de
   `routes/expenses.ts` n'ont que `authenticateToken` : External, chef de site ou Guest peuvent créer / modifier / supprimer une
   dépense ponctuelle (`OneOffExpense`, table DORMANTE, aucun écran ne l'appelle) et l'écriture est diffusée en temps réel.

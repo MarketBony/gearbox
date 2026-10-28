@@ -7,6 +7,7 @@ import { Icon, gx, hud, useEngineEvent } from '../ui/kit';
 import { runTool, TOOL_LABEL, orgaContext } from './tools';
 import { Rig } from './mascot';
 import { botName, catFor, useMiaoussLook, type Look } from './look';
+import { ActionCard, runAction } from './actions';
 
 // =====================================================================
 // mIAouss — la discussion (P0 08/10/2026 ; P1 : vit dans le VOLET de la mascotte, MascotLayer.tsx — la
@@ -17,6 +18,8 @@ import { botName, catFor, useMiaoussLook, type Look } from './look';
 // l'état du tour : on ne lui renvoie jamais l'historique.
 // La discussion vit sur le serveur (tous les appareils) ; « Nouvelle discussion » ou une
 // déconnexion volontaire l'effacent (AuthContext.logout). La mémoire est dans Paramètres.
+// Lot 1a (28/10/2026) : une réponse peut porter des ACTIONS proposées (actions.tsx) — cartes à valider sous la
+// bulle ; `ouvrir` d'une réponse fraîche part toute seule. Les notes d'état (« ✅ … ») sont des messages `kind: 'action'`.
 // =====================================================================
 
 const MAX = 2000;
@@ -126,6 +129,10 @@ export default function ChatPane({ onClose, onBusy }: { onClose?: () => void; on
       }
       const answer = turn.message;
       setMsgs((m) => [...(m || []).map((x) => (x.id === temp.id ? { ...x, id: turn.userMessageId || x.id } : x)), answer]);
+      // Navigation demandée DANS CE TOUR : exécutée toute seule (rien n'est écrit). Jamais au rechargement de la
+      // discussion — rouvrir le volet ne doit pas rouvrir des fenêtres. Le serveur refuse un second `claim` (409).
+      const autos = (answer.actions || []).filter((a) => a.auto && a.type === 'ouvrir' && a.status === 'proposed');
+      if (autos.length) { setBusy(`${nom} ouvre la rubrique…`); for (const a of autos) await runAction(a); void reload(); }
     } catch (e: any) {
       setMsgs((m) => (m || []).filter((x) => x.id !== temp.id));
       setText(q);   // la question n'est pas perdue
@@ -186,11 +193,14 @@ export default function ChatPane({ onClose, onBusy }: { onClose?: () => void; on
             </div>
           ) : msgs.map((m) => {
             const noted = (m.meta?.noted || []).filter((id) => !undone.includes(id));
+            // Note d'état d'une action (écrite par le serveur) : une petite ligne, pas une bulle.
+            if (m.role !== 'user' && m.meta?.kind === 'action') return <div key={m.id} className="mia-note">{m.content}</div>;
+            const acts = m.role !== 'user' ? m.actions || [] : [];
             return (
               <div key={m.id} className={`mia-msg ${m.role === 'user' ? 'me' : 'ai'}`}>
-                
-                <div className="mia-col">
+                <div className={`mia-col ${acts.length ? 'wide' : ''}`}>
                   <div className="mia-bub">{m.role === 'user' ? m.content : <Rich text={m.content} />}</div>
+                  {acts.length ? <div className="mia-acts">{acts.map((a) => <ActionCard key={a.id} a={a} uid={user?.id || ''} onChanged={reload} />)}</div> : null}
                   {m.role !== 'user' && (m.meta?.tools?.length || noted.length) ? (
                     <div className="mia-meta">
                       {!!m.meta?.tools?.length && <span>Calculé par Gearbox : {[...new Set(m.meta.tools.map((t) => TOOL_LABEL[t] || t))].join(', ')}</span>}

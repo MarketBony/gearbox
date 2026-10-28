@@ -5,9 +5,13 @@
 // qualité qui change selon qui répond (mesuré le 08/10 : réponses quasi identiques mot pour mot).
 // Ordre : Groq (~1 s) → Cloudflare Workers AI (1 à 10 s). Les deux parlent le format OpenAI.
 //
-// ⚠️ Toujours SANS réflexion (`reasoning_effort: none` / `enable_thinking: false`) : Groq plafonne
-// la SORTIE à 1 000 jetons/min (limite non documentée, mesurée), et une réponse réfléchie la dépasse
-// à elle seule. C'est tenable parce que le modèle ne CALCULE rien : les chiffres viennent des outils.
+// Réflexion (28/10/2026, lot 1a « mIAouss qui agit ») : Groq passe à `reasoning_effort: medium` — proposer
+// une action demande de convertir « vendredi » en date et de choisir le bon outil. Mesuré le 28/10 sur Groq :
+// +~240 jetons de sortie et +0,6 s par appel. ⚠️ Cloudflare reste SANS réflexion (`enable_thinking: false`) :
+// mesuré 56 s avec, au-delà de toute patience. ⚠️ Groq plafonne la SORTIE à 1 000 jetons/min (limite non
+// documentée, mesurée) : la réflexion reste tenable parce que le modèle ne CALCULE rien (les chiffres viennent
+// des outils). La réflexion ne sort JAMAIS de ce module : `<think>…</think>` est retiré du contenu (`stripThink`),
+// et le champ `reasoning` n'est pas lu — elle ne repart donc ni dans l'historique ni vers le navigateur.
 //
 // ⚠️ GRATUIT et le restera (décision de Théo) : aucun fournisseur payant ne s'ajoute ici.
 //
@@ -63,7 +67,7 @@ const PROVIDERS: Provider[] = [
     configured: () => !!env('GROQ_API_KEY'),
     url: () => 'https://api.groq.com/openai/v1/chat/completions',
     key: () => env('GROQ_API_KEY'),
-    extra: { reasoning_effort: 'none' },
+    extra: { reasoning_effort: 'medium' },
   },
   {
     id: 'cloudflare', name: 'Cloudflare', model: '@cf/qwen/qwen3.8-27b', timeoutMs: 60_000,
@@ -139,7 +143,7 @@ async function callOne(p: Provider, messages: ChatMsg[], tools: ToolDef[] | null
     const m = j?.choices?.[0]?.message || {};
     return {
       provider: p.id, model: p.model,
-      content: typeof m.content === 'string' ? m.content : '',
+      content: typeof m.content === 'string' ? stripThink(m.content) : '',
       toolCalls: Array.isArray(m.tool_calls) ? m.tool_calls.filter((c: any) => c?.function?.name) : [],
       inTokens: Number(j?.usage?.prompt_tokens) || 0,
       outTokens: Number(j?.usage?.completion_tokens) || 0,
@@ -154,6 +158,9 @@ async function callOne(p: Provider, messages: ChatMsg[], tools: ToolDef[] | null
     clearTimeout(timer);
   }
 }
+
+/** Retire la réflexion laissée dans le contenu (format « raw » : `<think>…</think>`, ou bloc non refermé si coupé). */
+const stripThink = (s: string) => s.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<think>[\s\S]*$/i, '').trim();
 
 class ProviderError extends Error { constructor(message: string, public retryable: boolean) { super(message); } }
 

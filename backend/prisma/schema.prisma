@@ -961,6 +961,32 @@ model AssistantUser {
   updatedAt    DateTime @updatedAt
 }
 
+/// Journal des ACTIONS proposées par mIAouss (lot 1a « mIAouss qui agit », 28/10/2026). mIAouss PROPOSE, la personne
+/// VALIDE une carte, le NAVIGATEUR écrit par les routes habituelles (mêmes droits). Ici : la réservation atomique (une
+/// action ne s'exécute qu'UNE fois) et l'expiration (24 h, calculée à la lecture). Routes : routes/assistant.ts ;
+/// validation : assistant/actions.ts (`checkAction`, seule porte). `payload` = arguments NORMALISÉS (mêmes clés que les
+/// arguments de l'outil : il repasse tel quel dans `checkAction`).
+model AssistantAction {
+  id        String   @id @default(uuid())
+  userId    String
+  /// Message assistant qui porte la carte (null tant que le tour n'est pas terminé).
+  messageId String?
+  /// Nom de l'outil : 'ouvrir' | 'creer_tache' | 'modifier_tache' | 'creer_postit'
+  type      String
+  payload   Json
+  /// Phrase lisible (« Créer la tâche « … » (Projet), échéance 30/10/2026 »).
+  summary   String
+  /// 'proposed' | 'executing' | 'done' | 'failed' | 'refused' | 'expired'
+  status    String   @default("proposed")
+  /// Compte rendu du navigateur ({ summary, ref }) une fois exécutée.
+  result    Json?
+  error     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+}
+
 /// Bureau de l'interface v2 : disposition des widgets PAR UTILISATEUR (09/10/2026, refonte des widgets W3).
 /// Une ligne par compte ; `desktop` et `phone` = listes de widgets ({ id, type, size, x, y, cfg }). Route : routes/widgets.ts
 /// (liste blanche WIDGET_FIELDS). Table à part, et non colonne de `User`, pour que rien ne passe dans `publicUser`.

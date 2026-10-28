@@ -540,10 +540,32 @@ export interface AssistantMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  /** Réponses : fournisseur, outils consultés, notes retenues (ids). */
-  meta?: { provider?: string; tools?: string[]; noted?: string[] } | null;
+  /** Réponses : fournisseur, outils consultés, notes retenues (ids), actions proposées (ids, lot 1a du 28/10/2026).
+   *  `kind: 'action'` = note d'état d'une action (« ✅ … », « ⚠️ Échec : … », « ❌ Refusé : … »), écrite par le serveur. */
+  meta?: { provider?: string; tools?: string[]; noted?: string[]; actions?: string[]; kind?: 'action' } | null;
+  /** Actions proposées par ce message, jointes par le serveur (`GET /conversation` et réponse `done` d'un tour). */
+  actions?: AssistantActionView[];
   createdAt: string;
 }
+/** Action proposée par mIAouss (lot 1a « mIAouss qui agit », 28/10/2026). Le serveur la PROPOSE et tient le journal
+ *  (une seule exécution, expiration 24 h) ; le NAVIGATEUR l'exécute par les mêmes fonctions que l'interface. */
+export type AssistantActionType = 'ouvrir' | 'creer_tache' | 'modifier_tache' | 'creer_postit';
+export type AssistantActionStatus = 'proposed' | 'executing' | 'done' | 'failed' | 'refused' | 'expired';
+export interface AssistantActionView {
+  id: string;
+  type: AssistantActionType | string;
+  /** Arguments normalisés par le serveur (`checkAction`), dans la forme des outils du modèle. */
+  payload: Record<string, any>;
+  summary: string;
+  status: AssistantActionStatus;
+  error: string | null;
+  result: any;
+  createdAt: string;
+  /** Navigation (`ouvrir`) : exécutée toute seule quand la réponse arrive. */
+  auto: boolean;
+}
+/** Compte rendu d'exécution renvoyé au serveur (`POST /assistant/actions/:id/result`). */
+export interface AssistantActionOutcome { ok: boolean; summary?: string; ref?: string; error?: string }
 export interface AssistantToolCall { id: string; name: 'projets' | 'budget' | 'absences'; args: Record<string, any> }
 /** Un tour : soit la réponse, soit des outils de lecture à exécuter dans le navigateur. */
 export type AssistantTurn =
