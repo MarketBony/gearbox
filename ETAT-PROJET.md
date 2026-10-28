@@ -3,7 +3,23 @@
 > Mémoire de référence sur l'état actuel du projet, à mettre à jour à chaque
 > session (comme ETAT-BACKEND.md l'est pour le backend).
 
-## ▶ POINT DE REPRISE — 27/10/2026 (lire en premier)
+## ▶ POINT DE REPRISE — 28/10/2026 (lire en premier)
+- **CORRECTIF 102 EN PRODUCTION (28/10, `api` + `web`, migration additive `20261027120000_assistant_look`) — mIAouss
+  PERSONNALISABLE.** Demande de Théo : « chaque utilisateur a son mIAouss » (yeux, pelage, accessoires, tenues…), « pousse
+  encore plus la personnalisation ». Réglages › mIAouss › « Mon mIAouss » : aperçu ANIMÉ, prénom (16 car., nettoyé pareil côté
+  client et serveur, repris par le prompt de l'IA), « Surprends-moi », « Revenir au mIAouss d'origine », et 10 catégories :
+  pelage (8), motif (5), oreilles (3), yeux (8 dont vairons), pupilles (3), tenue (7), couleur des vêtements (8), tête (9),
+  lunettes (5), cou (6). Catalogue = SEULE liste des pièces, `ui2/apps/assistant/look.ts` (`DEFAULT_LOOK` = le mIAouss
+  d'origine au trait près ; `catFor()` compose le chat, en cache) ; moteur `mascot.ts` étendu (oreilles, pupilles, vairons,
+  emplacements `back` / `neck` / `face` / `arm` / `hatUnder` + `earClip`, `Buddy.setDef` pour changer de chat en direct).
+  Stockage : `AssistantUser.look` (JSON, null = origine) ; `GET|PUT /api/assistant/look` (liste blanche `LOOK_KEYS`, ids
+  `[a-z0-9-]`, prénom `cleanBotName`), événement privé `assistant:look` (ses autres appareils). Store en
+  `useSyncExternalStore`, écritures GROUPÉES et en ordre (des clics rapides étaient perdus quand les boutons se bloquaient).
+  **2e passe après le retour de Théo** (« ça déborde, ça fait bâclé ») : vêtements découpés DANS le corps (clip sur l'ellipse,
+  ombrage `og` / `vol`, ourlet), vraies manches, oreilles qui passent À TRAVERS les chapeaux couvrants, cou sous le menton.
+  Identifiants SVG préfixés par copie du moteur (deux copies — rechargement à chaud — se volaient leurs dégradés).
+  Testé en local (Master, planches de contrôle en grand) ; **non testé** : prénom repris par l'IA (aurait coûté une question),
+  page sur téléphone, autre compte. Le compte de Théo garde un look de test (prénom « Moustache b »).
 - **CORRECTIF 101 EN PRODUCTION (27/10, `api` + `web`, aucune migration) — mIAouss AU CAS PAR CAS.** Demande de Théo : « comme
   pour SPARK, activer / désactiver mIAouss au cas par cas, certains se sont plaints de lui ». Réglages › Application › Modules
   (Master) : interrupteur mIAouss (éteint = personne, Master compris) + une case par membre de l'équipe marketing, **cochée par
@@ -228,7 +244,8 @@
     `C:\Users\Operateur\AppData\Local\Python\bin\python.exe` ; `python` n'est pas dans le PATH du Bash).
   - Le panneau navigateur perd parfois la session de Théo et ses serveurs locaux (relancer `gearbox-web` / `gearbox-api` par
     leur nom). Bureau des widgets : enregistré sur le SERVEUR (`/api/widgets`).
-- **En production : correctif 101 (27/10)** — mIAouss au cas par cas (`api` + `web`, aucune migration).
+- **En production : correctif 102 (28/10)** — mIAouss personnalisable (`api` + `web`, migration `assistant_look`).
+  Avant lui le **correctif 101 (27/10)** — mIAouss au cas par cas (`api` + `web`, aucune migration).
   Avant lui le **correctif 100 (26/10)** — SPARK ouvert sur invitation du Master (`api` + `web`, aucune migration).
   Avant lui le **correctif 99 (26/10)** — v2 : Congés à nouveau visible pour le Master (`web` seul).
   Avant lui le **correctif 98 (22/10)** — « Ma photo » en qualité d'origine, sans grain (`web` seul).
@@ -1365,7 +1382,10 @@
   via Caddy/Let's Encrypt, base Gearbox sur Supabase ; base du CRM (RCU) en Postgres SUR LE VPS, jamais exposée
 - Repo GitHub privé : MarketBony/gearbox — clone sur VPS via deploy key SSH dédiée
   (lecture seule)
-- master = prod, synchronisés. Dernier lot déployé : **correctif 101** (27 octobre 2026) — mIAouss au cas par cas (interrupteur + personnes coupées), **`api` + `web`**, aucune migration.
+- master = prod, synchronisés. Dernier lot déployé : **correctif 102** (28 octobre 2026) — mIAouss personnalisable, **`api` + `web`**,
+  migration Supabase additive `20261027120000_assistant_look` (colonne `AssistantUser.look`), appliquée par `db execute` +
+  `migrate resolve --applied` le 27/10, avant le push.
+  Avant lui le **correctif 101** (27 octobre 2026) — mIAouss au cas par cas (interrupteur + personnes coupées), **`api` + `web`**, aucune migration.
   Avant lui le **correctif 100** (26 octobre 2026) — SPARK ouvert sur invitation, **`api` + `web`**, aucune migration.
   Avant lui le **correctif 99** (26 octobre 2026) — Congés masqué au Master dans la v2, **`web` seul**.
   Avant lui le **correctif 98** (22 octobre 2026) — « Ma photo » en qualité d'origine, **`web` seul**.
@@ -5042,6 +5062,11 @@ générées, et un raccourci `p-*` préfixé `md:` **écrase** un `pt-*` écrit 
 (l'ordre des règles générées ne suit pas l'ordre des classes).
 
 ## Pièges connus qui font perdre du temps (à relire avant de débugger)
+- **mIAouss : deux copies du moteur de la mascotte dans la même racine se volent leurs dégradés SVG** (`url(#…)` résout le
+  PREMIER identifiant du document). Vu le 27/10 sur une planche de contrôle chargée par `import()` : un chat prenait les couleurs
+  d'un autre. Corrigé par un préfixe aléatoire par copie (`UIDP`, `mascot.ts`) ; pour contrôler un dessin, importer
+  `/ui2/apps/assistant/look.ts` SANS paramètre de requête (même copie que l'appli). Et une pièce de tenue se dessine DANS le
+  corps (`shell`, clip `bc`), jamais en forme libre à côté : c'est ce qui débordait au premier jet.
 - **`overscroll-behavior: contain` sur une boîte qui défile en largeur bloque la molette VERTICALE de la page** au survol (correctif
   89). Pour un tableau large dans une page qui défile, ne retenir que l'axe x (`overscroll-behavior-x: contain`).
 - **Artefact GPU = invisible dans les captures du panneau navigateur** (rendu hors écran) : demander une capture d'ÉCRAN à Théo,

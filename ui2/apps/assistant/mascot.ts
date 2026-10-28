@@ -39,49 +39,67 @@ function faces(r, s, def) {
 const blinkEye = (el, cx, cy, b, lx, ly) => T(el, `translate(${lx} ${ly}) ` + about(cx, cy, `scale(1 ${Math.max(.08, 1 - b * .94)})`));
 
 // ---------------------------------------------------------------- le chat (viewBox 120 × 120, sol à y = 110)
-const EAR = { L: 'M33 42 Q28.5 17 36 10 Q47.5 18.5 51.5 30Z', Li: 'M37 35 Q34.3 20.6 38.2 16.2 Q45.4 21.8 47.3 30Z', R: 'M87 42 Q91.5 17 84 10 Q72.5 18.5 68.5 30Z', Ri: 'M83 35 Q85.7 20.6 81.8 16.2 Q74.6 21.8 72.7 30Z' };
-function makeCat(o) {
+// [GEARBOX] 27/10/2026 (mIAouss personnalisable) : les trois formes d'oreilles de la maquette, les pupilles, des yeux
+// vairons (`iris2`), et des emplacements `back` (cape), `neck` (cou), `face` (lunettes), `paw`, `ear` (fourrure des
+// oreilles), `muzzleOp`, `shine`, `blush`. Tous FACULTATIFS : sans eux, le dessin est celui d'avant, au trait près.
+const EARS = {
+  normal: { L: 'M33 42 Q28.5 17 36 10 Q47.5 18.5 51.5 30Z', Li: 'M37 35 Q34.3 20.6 38.2 16.2 Q45.4 21.8 47.3 30Z', R: 'M87 42 Q91.5 17 84 10 Q72.5 18.5 68.5 30Z', Ri: 'M83 35 Q85.7 20.6 81.8 16.2 Q74.6 21.8 72.7 30Z' },
+  tall: { L: 'M32 43 Q25 12 33 3 Q47 15 52 30Z', Li: 'M36.5 36 Q32 16 35 10 Q44.5 19 47.5 30Z', R: 'M88 43 Q95 12 87 3 Q73 15 68 30Z', Ri: 'M83.5 36 Q88 16 85 10 Q75.5 19 72.5 30Z' },
+  round: { L: 'M32 42 Q27 22 35 14 Q47 17 52 30Z', Li: 'M36.5 35 Q33.5 23 37.5 19 Q45 21 47.5 30Z', R: 'M88 42 Q93 22 85 14 Q73 17 68 30Z', Ri: 'M83.5 35 Q86.5 23 82.5 19 Q75 21 72.5 30Z' },
+};
+export function makeCat(o) {
   const E = o.eye, ex = [60 - E.dx, 60 + E.dx], ey = E.y;
-  const eye = (cx, u) => `<ellipse cx="${cx}" cy="${ey}" rx="${E.rx}" ry="${E.ry}" fill="url(#i${u})"/>
+  const pupil = (cx) => (E.pupil === 'slit' ? `<ellipse cx="${cx}" cy="${ey + .4}" rx="${E.pw || 1.7}" ry="${E.ry * .74}" fill="#07040a"/>`
+    : E.pupil === 'round' ? `<circle cx="${cx}" cy="${ey + .5}" r="${E.pr || 2.6}" fill="#07040a"/>` : '');
+  const eye = (cx, u, g = 'i') => `<ellipse cx="${cx}" cy="${ey}" rx="${E.rx}" ry="${E.ry}" fill="url(#${g}${u})"/>
       <ellipse cx="${cx}" cy="${ey}" rx="${E.rx}" ry="${E.ry}" fill="none" stroke="${E.ring}" stroke-width="1" opacity=".7"/>
-      <circle cx="${cx - E.rx * .36}" cy="${ey - E.ry * .4}" r="${E.rx * .38}" fill="#fff"/><circle cx="${cx + E.rx * .36}" cy="${ey + E.ry * .38}" r="${E.rx * .16}" fill="#fff" opacity=".85"/>`;
-  const ears = EAR;
+      ${pupil(cx)}<circle cx="${cx - E.rx * .36}" cy="${ey - E.ry * .4}" r="${E.rx * .38}" fill="#fff"/><circle cx="${cx + E.rx * .36}" cy="${ey + E.ry * .38}" r="${E.rx * .16}" fill="#fff" opacity=".85"/>`;
+  const ears = EARS[o.ears || 'normal'] || EARS.normal;
+  const g2 = E.iris2 ? 'j' : 'i';   // œil droit : second dégradé si vairons
+  const paw = (u) => o.paw || `url(#f${u})`, earFill = (u) => (o.ear ? o.ear(u) : `url(#f${u})`);
+  // [GEARBOX] 27/10 : `earClip` (chapeau qui COUVRE la tête) — les oreilles passent alors PAR-DESSUS la calotte
+  // (`hatUnder`), rognées à la zone où elles sortent du chapeau, puis le bord du chapeau (`hat`) recouvre leur base.
+  // Sans `earClip`, les oreilles restent derrière la tête comme avant. `arm(u, cx, paw)` : manches (bras habillés).
+  const earsSvg = (u) => `<g data-r="earL"><path d="${ears.L}" fill="${earFill(u)}"/><path d="${ears.Li}" fill="url(#p${u})"/></g>
+          <g data-r="earR"><path d="${ears.R}" fill="${earFill(u)}"/><path d="${ears.Ri}" fill="url(#p${u})"/></g>`;
   return {
     id: o.id, name: o.name, speed: o.speed || 55,
     svg: (u) => `<defs>${blurDefs(u)}
       <radialGradient id="f${u}" cx="36%" cy="26%" r="85%"><stop offset="0" stop-color="${o.fur[0]}"/><stop offset=".48" stop-color="${o.fur[1]}"/><stop offset="1" stop-color="${o.fur[2]}"/></radialGradient>
       <radialGradient id="c${u}" cx="45%" cy="30%" r="75%"><stop offset="0" stop-color="${o.cream[0]}"/><stop offset="1" stop-color="${o.cream[1]}"/></radialGradient>
       <radialGradient id="i${u}" cx="50%" cy="72%" r="75%"><stop offset="0" stop-color="${E.iris[0]}"/><stop offset=".55" stop-color="${E.iris[1]}"/><stop offset="1" stop-color="${E.iris[2]}"/></radialGradient>
+      ${E.iris2 ? `<radialGradient id="j${u}" cx="50%" cy="72%" r="75%"><stop offset="0" stop-color="${E.iris2[0]}"/><stop offset=".55" stop-color="${E.iris2[1]}"/><stop offset="1" stop-color="${E.iris2[2]}"/></radialGradient>` : ''}
       <linearGradient id="p${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${o.earIn[0]}"/><stop offset="1" stop-color="${o.earIn[1]}"/></linearGradient>
       ${o.defs ? o.defs(u) : ''}</defs>
       <ellipse data-r="shadow" cx="60" cy="111" rx="27" ry="5" fill="#000" opacity=".35" filter="url(#b3${u})"/>
       <g data-r="root">
+        ${o.back ? o.back(u) : ''}
         <path data-r="tail" fill="none" stroke="${o.tail[0]}" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
         <path data-r="tailTip" fill="none" stroke="${o.tail[1]}" stroke-width="9.5" stroke-linecap="round"/>
-        <g data-r="legL"><ellipse cx="49" cy="106" rx="8.6" ry="5.6" fill="url(#f${u})"/><ellipse cx="49" cy="108.6" rx="5.6" ry="1.8" fill="#fff" opacity=".18"/></g>
-        <g data-r="legR"><ellipse cx="71" cy="106" rx="8.6" ry="5.6" fill="url(#f${u})"/><ellipse cx="71" cy="108.6" rx="5.6" ry="1.8" fill="#fff" opacity=".18"/></g>
+        <g data-r="legL"><ellipse cx="49" cy="106" rx="8.6" ry="5.6" fill="${paw(u)}"/><ellipse cx="49" cy="108.6" rx="5.6" ry="1.8" fill="#fff" opacity=".18"/></g>
+        <g data-r="legR"><ellipse cx="71" cy="106" rx="8.6" ry="5.6" fill="${paw(u)}"/><ellipse cx="71" cy="108.6" rx="5.6" ry="1.8" fill="#fff" opacity=".18"/></g>
         <g data-r="body">
           <ellipse cx="60" cy="92" rx="21.5" ry="17.5" fill="url(#f${u})"/>
-          ${o.body(u)}
+          ${o.body ? o.body(u) : `<ellipse cx="60" cy="96" rx="12" ry="11" fill="url(#c${u})"/>`}
           <ellipse cx="60" cy="106.5" rx="17" ry="3.4" fill="#000" opacity=".2" filter="url(#b1${u})"/>
         </g>
-        <g data-r="armL"><ellipse cx="39.3" cy="93" rx="6.4" ry="5.8" fill="url(#f${u})"/></g>
-        <g data-r="armR"><ellipse cx="80.7" cy="93" rx="6.4" ry="5.8" fill="url(#f${u})"/></g>
+        ${o.neck ? o.neck(u) : ''}
+        <g data-r="armL">${o.arm ? o.arm(u, 39.3, paw(u)) : `<ellipse cx="39.3" cy="93" rx="6.4" ry="5.8" fill="${paw(u)}"/>`}</g>
+        <g data-r="armR">${o.arm ? o.arm(u, 80.7, paw(u)) : `<ellipse cx="80.7" cy="93" rx="6.4" ry="5.8" fill="${paw(u)}"/>`}</g>
         <g data-r="head">
-          <g data-r="earL"><path d="${ears.L}" fill="url(#f${u})"/><path d="${ears.Li}" fill="url(#p${u})"/></g>
-          <g data-r="earR"><path d="${ears.R}" fill="url(#f${u})"/><path d="${ears.Ri}" fill="url(#p${u})"/></g>
+          ${o.earClip ? '' : earsSvg(u)}
           <path d="M31.5 59 L22.5 62.5 L31 65 L25.5 70.5 L35.5 67.5Z" fill="${o.fluff}"/><path d="M88.5 59 L97.5 62.5 L89 65 L94.5 70.5 L84.5 67.5Z" fill="${o.fluff}"/>
           <ellipse cx="60" cy="52" rx="31.5" ry="28.5" fill="url(#f${u})"/>
-          ${o.marks()}
-          <ellipse cx="60" cy="64.5" rx="14" ry="9.8" fill="url(#c${u})"/>
-          <ellipse cx="45.5" cy="34.5" rx="11.5" ry="6" fill="#fff" opacity=".45" filter="url(#b1${u})" transform="rotate(-22 45.5 34.5)"/>
+          ${o.marks ? o.marks(u) : ''}
+          <ellipse cx="60" cy="64.5" rx="14" ry="9.8" fill="url(#c${u})" opacity="${o.muzzleOp ?? 1}"/>
+          <ellipse cx="45.5" cy="34.5" rx="11.5" ry="6" fill="#fff" opacity="${o.shine ?? .45}" filter="url(#b1${u})" transform="rotate(-22 45.5 34.5)"/>
           <path d="M80 27.5 Q89.5 34 91.2 47" stroke="${o.rim}" stroke-width="2.2" fill="none" opacity=".65" stroke-linecap="round"/>
-          <ellipse data-r="blushL" cx="39.5" cy="64" rx="5.8" ry="3.3" fill="#ff86aa" filter="url(#b1${u})"/><ellipse data-r="blushR" cx="80.5" cy="64" rx="5.8" ry="3.3" fill="#ff86aa" filter="url(#b1${u})"/>
-          <g data-r="eye_open"><g data-r="eL">${eye(ex[0], u)}</g><g data-r="eR">${eye(ex[1], u)}</g></g>
+          <ellipse data-r="blushL" cx="39.5" cy="64" rx="5.8" ry="3.3" fill="${o.blush || '#ff86aa'}" filter="url(#b1${u})"/><ellipse data-r="blushR" cx="80.5" cy="64" rx="5.8" ry="3.3" fill="${o.blush || '#ff86aa'}" filter="url(#b1${u})"/>
+          <g data-r="eye_open"><g data-r="eL">${eye(ex[0], u)}</g><g data-r="eR">${eye(ex[1], u, g2)}</g></g>
           <path data-r="eye_happy" d="M${ex[0] - 6.7} ${ey + 2.5} Q${ex[0]} ${ey - 7} ${ex[0] + 6.7} ${ey + 2.5} M${ex[1] - 6.7} ${ey + 2.5} Q${ex[1]} ${ey - 7} ${ex[1] + 6.7} ${ey + 2.5}" stroke="${o.line}" stroke-width="3.1" fill="none" stroke-linecap="round"/>
           <path data-r="eye_closed" d="M${ex[0] - 6.7} ${ey + .5} Q${ex[0]} ${ey + 6} ${ex[0] + 6.7} ${ey + .5} M${ex[1] - 6.7} ${ey + .5} Q${ex[1]} ${ey + 6} ${ex[1] + 6.7} ${ey + .5}" stroke="${o.line}" stroke-width="2.7" fill="none" stroke-linecap="round"/>
           <g data-r="eye_wide"><ellipse cx="${ex[0]}" cy="${ey - 1}" rx="${E.rx + 1.4}" ry="${E.ry + 1.6}" fill="url(#i${u})"/><circle cx="${ex[0]}" cy="${ey}" r="2" fill="#07040a"/><circle cx="${ex[0] - 3}" cy="${ey - 4}" r="2.6" fill="#fff"/>
-            <ellipse cx="${ex[1]}" cy="${ey - 1}" rx="${E.rx + 1.4}" ry="${E.ry + 1.6}" fill="url(#i${u})"/><circle cx="${ex[1]}" cy="${ey}" r="2" fill="#07040a"/><circle cx="${ex[1] - 3}" cy="${ey - 4}" r="2.6" fill="#fff"/></g>
+            <ellipse cx="${ex[1]}" cy="${ey - 1}" rx="${E.rx + 1.4}" ry="${E.ry + 1.6}" fill="url(#${g2}${u})"/><circle cx="${ex[1]}" cy="${ey}" r="2" fill="#07040a"/><circle cx="${ex[1] - 3}" cy="${ey - 4}" r="2.6" fill="#fff"/></g>
           <g data-r="eye_dizzy" fill="none" stroke="${o.line}" stroke-width="2" stroke-linecap="round">${[ex[0], ex[1]].map((c) => `<path d="M${c} ${ey} m0 -1.2 a1.2 1.2 0 1 1 -1.2 1.6 a3 3 0 1 1 3.4 3 a5 5 0 1 1 -4.6 -6.6"/>`).join('')}</g>
           <g data-r="eye_love" fill="#ff4f8b"><path d="M${ex[0]} ${ey + 7} C${ex[0] - 10} ${ey - 1} ${ex[0] - 6} ${ey - 9} ${ex[0]} ${ey - 4} C${ex[0] + 6} ${ey - 9} ${ex[0] + 10} ${ey - 1} ${ex[0]} ${ey + 7}Z"/><path d="M${ex[1]} ${ey + 7} C${ex[1] - 10} ${ey - 1} ${ex[1] - 6} ${ey - 9} ${ex[1]} ${ey - 4} C${ex[1] + 6} ${ey - 9} ${ex[1] + 10} ${ey - 1} ${ex[1]} ${ey + 7}Z"/></g>
           <path d="M57.3 60.3 Q60 58.8 62.7 60.3 Q61.7 62.8 60 63.2 Q58.3 62.8 57.3 60.3Z" fill="${o.nose}"/>
@@ -89,7 +107,10 @@ function makeCat(o) {
           <g data-r="mouth_open"><path d="M54.3 64.8 Q60 74 65.7 64.8 Q60 66.8 54.3 64.8Z" fill="#6b2236"/><ellipse cx="60" cy="69.6" rx="3.1" ry="1.9" fill="#ff7b98"/></g>
           <ellipse data-r="mouth_o" cx="60" cy="67" rx="3" ry="3.6" fill="#6b2236"/>
           <path d="M41 62.3 L27 59.8 M41 65.8 L27.5 67.8 M79 62.3 L93 59.8 M79 65.8 L92.5 67.8" stroke="#fff" stroke-width="1.15" opacity=".85" stroke-linecap="round"/>
-          ${o.hat(u)}
+          ${o.face ? o.face(u, ex, ey) : ''}
+          ${o.hatUnder ? o.hatUnder(u) : ''}
+          ${o.earClip ? `<clipPath id="eh${u}"><path d="${o.earClip}"/></clipPath><g clip-path="url(#eh${u})">${earsSvg(u)}</g>` : ''}
+          ${o.hat ? o.hat(u) : ''}
         </g>
       </g>`,
     pose(r, s, dt) {
@@ -138,11 +159,13 @@ export const MIAOUSS = makeCat({
 });
 
 // ---------------------------------------------------------------- RIG : ressorts, saut, clignement
-let UID = 0;
+// Préfixe propre à CETTE copie du module : deux copies (rechargement à chaud de Vite, page de contrôle) ne partagent
+// jamais un identifiant de dégradé — sinon un chat prenait les couleurs d'un autre dans la même racine (27/10).
+let UID = 0; const UIDP = 'mia' + Math.random().toString(36).slice(2, 6) + '-';
 export class Rig {
   constructor(def, size = 100) {
     this.el = document.createElement('div'); this.el.className = 'mia-rig'; this.el.style.width = this.el.style.height = size + 'px';
-    this.def = def; const u = 'mia' + ++UID;
+    this.def = def; const u = UIDP + ++UID;
     this.el.innerHTML = `<svg viewBox="0 0 120 120" aria-hidden="true">${def.svg(u)}</svg>`;
     this.r = {}; this.el.querySelectorAll('[data-r]').forEach((n) => (this.r[n.dataset.r] = n));
     this.s = { t: Math.random() * 10, ph: 0, walk: 0, lean: 0, sx: 1, sy: 1, jumpY: 0, jumpV: 0, lookX: 0, lookY: 0, blink: 0, wave: 0, wph: 0, sit: 0, tilt: 0, earL: 0, earR: 0, mood: 'neutral', rot: 0, dangle: 0 };
@@ -210,6 +233,13 @@ export class Buddy {
     this.el.__buddy = this;   // débogage (console : élément .mia-buddy → __buddy)
     this.off = []; this.bind();
     this.wake();
+  }
+  /** [GEARBOX] 27/10/2026 : change le chat dessiné SANS rien perdre de sa vie (position, humeur, piste) — l'apparence
+   *  choisie dans Réglages › mIAouss s'applique tout de suite. Le nouveau squelette repart de ses ressorts au repos. */
+  setDef(def) {
+    if (!def || def === this.def || this.dead) return;
+    this.def = def; const old = this.rig; this.rig = new Rig(def, this.size);
+    this.rig.el.classList.toggle('flip', this.dir < 0); old.el.replaceWith(this.rig.el); this.wake();
   }
   destroy() { this.dead = true; cancelAnimationFrame(this.raf); clearTimeout(this.tm); this.off.forEach((f) => f()); this.bubble?.remove(); this.stars?.remove(); this.el.remove(); }
   on(t, ev, fn, o) { t.addEventListener(ev, fn, o); this.off.push(() => t.removeEventListener(ev, fn, o)); }

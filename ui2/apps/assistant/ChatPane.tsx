@@ -5,7 +5,8 @@ import { getSocket, connectSocket } from '../../../services/socket';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Icon, gx, hud, useEngineEvent } from '../ui/kit';
 import { runTool, TOOL_LABEL, orgaContext } from './tools';
-import { Rig, MIAOUSS } from './mascot';
+import { Rig } from './mascot';
+import { botName, catFor, useMiaoussLook, type Look } from './look';
 
 // =====================================================================
 // mIAouss — la discussion (P0 08/10/2026 ; P1 : vit dans le VOLET de la mascotte, MascotLayer.tsx — la
@@ -55,18 +56,22 @@ function Rich({ text }: { text: string }) {
 }
 
 /** Le chat en portrait FIXE (une seule image du moteur : rien ne tourne dans le volet). */
-export const CatFace = React.memo(function CatFace({ size = 28, mood = 'happy' }: { size?: number; mood?: string }) {
+// 27/10/2026 : le portrait suit l'apparence choisie par la personne (Réglages › mIAouss), passée en `look` ou lue dans
+// le store. Le dessin est mis en cache par apparence (`catFor`) : changer d'humeur ne le recompose pas.
+export const CatFace = React.memo(function CatFace({ size = 28, mood = 'happy', look }: { size?: number; mood?: string; look?: Look }) {
   const ref = useRef<HTMLSpanElement>(null);
+  const mine = useMiaoussLook(), L = look || mine;
   useLayoutEffect(() => {
     const el = ref.current; if (!el) return;
-    const rig: any = new Rig(MIAOUSS, size); rig.update(0.016, { mood, lx: .3, ly: .1 }); el.replaceChildren(rig.el);
-  }, [size, mood]);
+    const rig: any = new Rig(catFor(L), size); rig.update(0.016, { mood, lx: .3, ly: .1 }); el.replaceChildren(rig.el);
+  }, [size, mood, L]);
   return <span ref={ref} className="mia-face" style={{ width: size, height: size }} aria-hidden="true" />;
 });
 
 /** Le contenu du volet. `onBusy` : la mascotte réfléchit pendant la réponse. */
 export default function ChatPane({ onClose, onBusy }: { onClose?: () => void; onBusy?: (busy: boolean) => void }) {
   const { user } = useAuth();
+  const nom = botName(useMiaoussLook());   // prénom choisi dans Réglages › mIAouss (27/10/2026)
   const [msgs, setMsgs] = useState<AssistantMessage[] | null>(null);
   const [me, setMe] = useState<AssistantMe | null>(null);
   const [text, setText] = useState('');
@@ -109,14 +114,14 @@ export default function ChatPane({ onClose, onBusy }: { onClose?: () => void; on
     setText('');
     const temp: AssistantMessage = { id: `tmp-${Date.now()}`, role: 'user', content: q, createdAt: new Date().toISOString() };
     setMsgs((m) => [...(m || []), temp]);
-    setBusy('mIAouss réfléchit…');
+    setBusy(`${nom} réfléchit…`);
     try {
       let turn: AssistantTurn = await db.assistantAsk(q, orgaContext());
       while (turn.status === 'tools') {
         const calls = turn.calls;
-        setBusy(`mIAouss consulte ${[...new Set(calls.map((c) => TOOL_LABEL[c.name] || c.name))].join(', ')}…`);
+        setBusy(`${nom} consulte ${[...new Set(calls.map((c) => TOOL_LABEL[c.name] || c.name))].join(', ')}…`);
         const results = await Promise.all(calls.map(async (c) => ({ id: c.id, content: await runTool(c.name, c.args, user as any) })));
-        setBusy('mIAouss rédige…');
+        setBusy(`${nom} rédige…`);
         turn = await db.assistantToolResults(turn.turnId, results);
       }
       const answer = turn.message;
@@ -124,7 +129,7 @@ export default function ChatPane({ onClose, onBusy }: { onClose?: () => void; on
     } catch (e: any) {
       setMsgs((m) => (m || []).filter((x) => x.id !== temp.id));
       setText(q);   // la question n'est pas perdue
-      setErr(e?.message || 'mIAouss est injoignable.');
+      setErr(e?.message || `${nom} est injoignable.`);
       void reload();
     } finally {
       busyRef.current = false;
@@ -164,7 +169,7 @@ export default function ChatPane({ onClose, onBusy }: { onClose?: () => void; on
     <div className="mia">
       <div className="mia-head">
         <CatFace size={34} />
-        <div className="grow"><b>mIAouss</b><span title="Questions posées aujourd’hui (le compteur repart à minuit)">{busy || capLabel || 'Ton chat mécano'}</span></div>
+        <div className="grow"><b>{nom}</b><span title="Questions posées aujourd’hui (le compteur repart à minuit)">{busy || capLabel || 'Ton chat assistant'}</span></div>
         <button className="btn sm ghost" onClick={openMemory} title="Mémoire et consommation"><Icon name="sliders" /></button>
         <button className="btn sm ghost" onClick={reset} disabled={!!busy || !msgs?.length} title="Nouvelle discussion"><Icon name="plus" /></button>
         {onClose && <button className="btn sm ghost" onClick={onClose} title="Fermer (Échap)"><Icon name="close" /></button>}
@@ -189,7 +194,7 @@ export default function ChatPane({ onClose, onBusy }: { onClose?: () => void; on
                   {m.role !== 'user' && (m.meta?.tools?.length || noted.length) ? (
                     <div className="mia-meta">
                       {!!m.meta?.tools?.length && <span>Calculé par Gearbox : {[...new Set(m.meta.tools.map((t) => TOOL_LABEL[t] || t))].join(', ')}</span>}
-                      {!!noted.length && <span className="mia-noted">📝 mIAouss a retenu {noted.length > 1 ? `${noted.length} notes` : 'une note'} · <button onClick={() => undo(noted)}>Annuler</button> · <button onClick={openMemory}>Voir la mémoire</button></span>}
+                      {!!noted.length && <span className="mia-noted">📝 {nom} a retenu {noted.length > 1 ? `${noted.length} notes` : 'une note'} · <button onClick={() => undo(noted)}>Annuler</button> · <button onClick={openMemory}>Voir la mémoire</button></span>}
                     </div>
                   ) : null}
                 </div>
@@ -202,7 +207,7 @@ export default function ChatPane({ onClose, onBusy }: { onClose?: () => void; on
       {err && <div className="mia-err"><Icon name="alert" /><span>{err}</span></div>}
       <div className="mia-compose">
         <textarea
-          ref={inputRef} value={text} rows={1} maxLength={MAX} placeholder="Pose ta question à mIAouss…"
+          ref={inputRef} value={text} rows={1} maxLength={MAX} placeholder={`Pose ta question à ${nom}…`}
           onChange={(e) => setText(e.target.value)} onKeyDown={onKey} disabled={!!busy}
         />
         <button className="btn primary mia-send" onClick={() => send(text)} disabled={!!busy || !text.trim()} title="Envoyer (Entrée)"><Icon name="arrowup" /></button>

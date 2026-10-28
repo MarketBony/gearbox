@@ -955,6 +955,9 @@ model AssistantUser {
   memoryPaused Boolean  @default(false)
   /// Questions par jour fixées par le Master : null = défaut, -1 = sans limite.
   dailyCap     Int?
+  /// Apparence choisie par la personne (27/10/2026) : { name, fur, motif, ears, eyes, pupil, outfit, outfitColor, hat,
+  /// glasses, neck }. null = le mIAouss d'origine. Écrit seulement par PUT /api/assistant/look (liste blanche LOOK_KEYS).
+  look         Json?
   updatedAt    DateTime @updatedAt
 }
 

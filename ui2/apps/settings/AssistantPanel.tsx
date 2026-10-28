@@ -5,6 +5,8 @@ import { getSocket } from '../../../services/socket';
 import { ASSISTANT_TEAM_ROLES } from '../../../constants';
 import { hud, Icon } from '../ui/kit';
 import { Head, Row, Switch, css, type SectionDef } from './common';
+import { Rig } from '../assistant/mascot';
+import { CATALOGUE, DEFAULT_LOOK, NAME_MAX, cleanName, botName, catFor, isDefaultLook, lookStore, randomLook, useMiaoussLook, type Look } from '../assistant/look';
 
 // =====================================================================
 // Réglages › « mIAouss » — consommation, mémoire personnelle, équipe (Master / Administrateur).
@@ -181,6 +183,79 @@ function Team({ rows, canSetCaps, onSet }: { rows: AssistantTeamRow[]; canSetCap
   );
 }
 
+// ---------------------------------------------------------------- Mon mIAouss (apparence personnelle, 27/10/2026)
+// Chaque choix est ENREGISTRÉ tout de suite (comme les autres réglages) et s'applique en direct à la mascotte du Dock
+// et au volet. Le catalogue vit dans ui2/apps/assistant/look.ts ; le serveur ne garde que la liste blanche des clés.
+const MOODS = ['happy', 'neutral', 'love', 'surprised', 'think', 'neutral'];
+/** Aperçu ANIMÉ (le moteur de la mascotte, sur place) : tourne seulement tant que le panneau est affiché. */
+function LivePreview({ look, size = 150 }: { look: Look; size?: number }) {
+  const ref = useRef<HTMLDivElement>(null), rigRef = useRef<any>(null);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const rig: any = new Rig(catFor(look), size); rigRef.current = rig; el.replaceChildren(rig.el);
+    let raf = 0, last = performance.now(), t0 = last;
+    const calm = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } })();
+    const loop = (t: number) => {
+      const dt = Math.min(.05, (t - last) / 1000); last = t;
+      const k = Math.floor((t - t0) / 2200) % MOODS.length, ph = (t - t0) / 1000;
+      rig.update(dt, { mood: MOODS[k], lx: Math.sin(ph * .7) * .6, ly: Math.cos(ph * .5) * .3, wave: k === 0 && (t - t0) % 2200 < 1200 });
+      if (!calm) raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [look, size]);
+  return <div ref={ref} onClick={() => rigRef.current?.jump(220)} title="Clique : il saute"
+    style={{ width: size, height: size, cursor: 'pointer', borderRadius: 22, background: 'radial-gradient(120% 90% at 50% 100%, #3a2d4f, #18131f 70%)', flex: 'none' }} />;
+}
+
+function MyMiaouss() {
+  const look = useMiaoussLook();
+  const [name, setName] = useState(look.name);
+  useEffect(() => { setName(look.name); }, [look.name]);
+  // Rien n'est bloqué pendant l'enregistrement : le store affiche tout de suite et groupe les envois (look.ts).
+  // Chaque choix part de l'état COURANT du store, jamais d'une copie de rendu (clics rapides).
+  const save = (change: (cur: Look) => Look, msg?: string) => {
+    lookStore.save(change(lookStore.get())).then(() => { if (msg) hud(msg); }, (e) => hud(e instanceof Error ? e.message : 'Échec de l’enregistrement.'));
+  };
+  const pick = (key: keyof Look, v: string) => { if (lookStore.get()[key] !== v) save((cur) => ({ ...cur, [key]: v })); };
+  const commitName = () => { const n = cleanName(name).trim(); if (n !== (lookStore.get().name || '').trim()) save((cur) => ({ ...cur, name: n }), n ? `Il s’appelle désormais ${n}` : 'Il redevient mIAouss'); };
+  return (
+    <>
+      <div className="set-gt">Mon {botName(look)}</div>
+      <div className="set-group enter" style={{ padding: '18px 20px', display: 'grid', gap: 16 }} data-anchor="apparence">
+        <div className="row wrap" style={{ gap: 18, alignItems: 'center' }}>
+          <LivePreview look={look} />
+          <div className="grow" style={{ display: 'grid', gap: 10, minWidth: 200 }}>
+            <label style={{ display: 'grid', gap: 4 }}>
+              <span className="faint" style={{ fontSize: 12 }}>Son prénom (pour toi seul)</span>
+              <input className="input" value={name} maxLength={NAME_MAX} placeholder="mIAouss"
+                onChange={(e) => setName(cleanName(e.target.value))} onBlur={commitName} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+            </label>
+            <div className="row wrap" style={{ gap: 8 }}>
+              <button className="btn" onClick={() => save((cur) => randomLook(cur), 'Nouveau look !')}><Icon name="bolt" size="sm" />Surprends-moi</button>
+              <button className="btn ghost" disabled={isDefaultLook(look)} onClick={() => save(() => ({ ...DEFAULT_LOOK }), 'mIAouss d’origine retrouvé')}>Revenir au mIAouss d’origine</button>
+            </div>
+            <span className="faint" style={{ fontSize: 12, lineHeight: 1.45 }}>Ton chat n’est visible que par toi, sur tous tes appareils. Les changements s’appliquent tout de suite.</span>
+          </div>
+        </div>
+        {CATALOGUE.map((cat) => (
+          <div key={cat.key} style={{ display: 'grid', gap: 6 }}>
+            <b style={{ fontSize: 12.5 }}>{cat.l}</b>
+            <div className="row wrap" style={{ gap: 6 }}>
+              {cat.items.map(([id, label, sw]) => (
+                <button key={id} className="chip" aria-pressed={look[cat.key] === id} onClick={() => pick(cat.key, id)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  {sw ? <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 99, background: sw, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.25)' }} /> : null}{label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 // ---------------------------------------------------------------- panneau
 export function AssistantPanel({ s, role, openSheet }: Props) {
   const team = ASSISTANT_TEAM_ROLES.includes(role);
@@ -190,6 +265,7 @@ export function AssistantPanel({ s, role, openSheet }: Props) {
   return (
     <div className="set-panel"><Head s={s} />
       {err ? <div className="set-err" style={{ marginBottom: 8 }}>{err}</div> : null}
+      <MyMiaouss />
       <Usage me={me} usage={usage} />
       <Memory me={me} notes={notes} setMe={setMe} setNotes={setNotes} load={load} openSheet={openSheet} />
       {team && usage.team ? <Team rows={usage.team} canSetCaps={!!usage.canSetCaps} onSet={setCap} /> : null}

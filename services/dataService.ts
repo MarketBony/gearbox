@@ -1026,6 +1026,11 @@ class DataService {
   async assistantDeleteNote(id: string): Promise<void> { await apiFetch(`/assistant/notes/${id}`, { method: 'DELETE' }); }
   async assistantClearNotes(): Promise<void> { await apiFetch('/assistant/notes', { method: 'DELETE' }); }
   async assistantMe(): Promise<AssistantMe> { return apiFetch<AssistantMe>('/assistant/me'); }
+  // Apparence personnelle de mIAouss (27/10/2026) : null = le mIAouss d'origine.
+  async assistantLook(): Promise<{ look: Record<string, string> | null }> { return apiFetch('/assistant/look'); }
+  async assistantSetLook(look: Record<string, string> | null): Promise<{ look: Record<string, string> | null }> {
+    return apiFetch('/assistant/look', { method: 'PUT', body: JSON.stringify({ look }) });
+  }
   async assistantSetPrefs(p: { memoryPaused: boolean }): Promise<AssistantMe> { return apiFetch<AssistantMe>('/assistant/prefs', { method: 'PUT', body: JSON.stringify(p) }); }
   async assistantUsage(): Promise<AssistantUsageView> { return apiFetch<AssistantUsageView>('/assistant/usage'); }
   /** Master seul. `cap` : null = défaut, -1 = sans limite, 0..500. */
