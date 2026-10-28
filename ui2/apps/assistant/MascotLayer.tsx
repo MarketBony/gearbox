@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canUseAssistant } from '../../../constants';
 import { useAppSettings, aAccesAssistant } from '../../../services/appSettings';
+import { getSocket } from '../../../services/socket';
+import { catFor, lookStore, useMiaoussLook } from './look';
 import { gx } from '../ui/kit';
 import { Buddy } from './mascot';
 import ChatPane from './ChatPane';
@@ -89,6 +91,7 @@ export default React.memo(function MascotLayer() {
         onClick: () => { if (buddyRef.current?.listening) doClose(); else doOpen(); },
       });
       buddyRef.current = buddy;
+      buddy.setDef(catFor(lookStore.get()));   // son apparence à lui (27/10/2026) ; suivie ensuite par l'effet plus bas
       // La piste revient (plein écran quitté, pilule réaffichée), un réglage change : on relance la boucle.
       mo = new MutationObserver(() => buddy.wake()); mo.observe(t.watch, { attributes: true, attributeFilter: ['class'] });
       // ⚠️ Téléphone : la coque RECONSTRUIT la pilule (`pill.innerHTML = …`, engine/mobile.ts) à chaque mise à jour des
@@ -99,6 +102,18 @@ export default React.memo(function MascotLayer() {
     start();
     return () => { stop = true; mo?.disconnect(); mo2?.disconnect(); offPrefs?.(); buddy?.destroy(); buddyRef.current = null; };
   }, [allowed]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- apparence personnelle (27/10/2026) : lue au montage, relue quand un autre onglet / appareil la change
+  // (`assistant:look`, événement privé), appliquée en direct — y compris pendant qu'on la règle dans les Réglages.
+  const look = useMiaoussLook();
+  useEffect(() => {
+    if (!allowed) return;
+    void lookStore.load();
+    const s = getSocket(); const h = () => { void lookStore.load(); };
+    s?.on('assistant:look', h);
+    return () => { s?.off('assistant:look', h); };
+  }, [allowed]);
+  useEffect(() => { buddyRef.current?.setDef(catFor(look)); }, [look]);
 
   // --- porte unique
   useEffect(() => {

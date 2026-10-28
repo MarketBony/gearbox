@@ -5,6 +5,7 @@ import { ASSISTANT_ROLES, ASSISTANT_TEAM_ROLES, ASSISTANT_CAP_ROLES } from '../a
 import { requireAssistant } from '../auth/assistantAccess';
 import { emitToUser } from '../realtime';
 import { prisma } from '../db';
+import { Prisma } from '@prisma/client';
 import { complete, AssistantUnavailable, anyProviderConfigured, type ChatMsg, type ToolCall, type LlmReply } from '../assistant/providers';
 import { TOOLS, CLIENT_TOOLS, systemPrompt } from '../assistant/prompt';
 import { record, capOf, questionsSince, parisMidnight, personalUsage, capacity, UNLIMITED } from '../assistant/usage';
@@ -177,7 +178,7 @@ router.post('/chat', async (req: AuthRequest, res) => {
     const st: Pending = {
       userId, question: message, forced: false, rounds: 0, counted: false, noted: [], tools: [], calls: [], at: Date.now(),
       messages: [
-        { role: 'system', content: systemPrompt(me, notes, orga) },
+        { role: 'system', content: systemPrompt(me, notes, orga, cleanBotName((s?.look as any)?.name)) },
         ...history.reverse().map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: clip(m.content, HISTORY_CHARS) } as ChatMsg)),
         { role: 'user', content: message },
       ],
@@ -295,6 +296,50 @@ router.put('/prefs', async (req: AuthRequest, res) => {
   await prisma.assistantUser.upsert({ where: { userId }, create: { userId, memoryPaused }, update: { memoryPaused } });
   emitToUser(userId, 'assistant:notes');
   res.json(await meOut(userId, req.user!.role));
+});
+
+// ---------------------------------------------------------------- apparence personnelle (27/10/2026)
+// Chacun habille SON mIAouss (Réglages › mIAouss). Le serveur ne connaît pas le catalogue (il vit côté client,
+// ui2/apps/assistant/look.ts) : il garde seulement une LISTE BLANCHE de clés, des identifiants courts et un prénom
+// propre. Un identifiant inconnu du catalogue est ramené au défaut par le client, il ne casse rien.
+// ⚠️ Route à part de PUT /prefs, qui réécrit `memoryPaused` à chaque appel.
+const LOOK_KEYS = ['fur', 'motif', 'ears', 'eyes', 'pupil', 'outfit', 'outfitColor', 'hat', 'glasses', 'neck'] as const;
+const LOOK_ID = /^[a-z0-9-]{1,24}$/;
+const NAME_MAX = 16;
+/** Prénom affiché : lettres (accents compris), espaces, tirets, apostrophes ; vide = « mIAouss ». */
+export const cleanBotName = (v: unknown): string => {
+  const s = typeof v === 'string' ? v.replace(/[^\p{L}\p{N} '’-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX) : '';
+  return s;
+};
+function cleanLook(raw: any): Record<string, string> | null {
+  if (raw === null) return null;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Apparence invalide.');
+  const out: Record<string, string> = {};
+  for (const k of LOOK_KEYS) {
+    const v = raw[k];
+    if (v === undefined) continue;
+    if (typeof v !== 'string' || !LOOK_ID.test(v)) throw new Error(`Valeur invalide pour « ${k} ».`);
+    out[k] = v;
+  }
+  const name = cleanBotName(raw.name);
+  if (name) out.name = name;
+  return out;
+}
+
+router.get('/look', async (req: AuthRequest, res) => {
+  const s = await settingsOf(req.user!.id);
+  res.json({ look: (s?.look as any) ?? null });
+});
+
+router.put('/look', async (req: AuthRequest, res) => {
+  const userId = req.user!.id;
+  let look: Record<string, string> | null;
+  try { look = cleanLook(req.body?.look); } catch (e) { return res.status(400).json({ error: (e as Error).message }); }
+  const value = look === null ? Prisma.DbNull : look;
+  await prisma.assistantUser.upsert({ where: { userId }, create: { userId, look: value }, update: { look: value } });
+  // Ses autres onglets / appareils relisent leur mascotte (événement PRIVÉ : c'est son chat à lui).
+  emitToUser(userId, 'assistant:look');
+  res.json({ look });
 });
 
 /** Capacité de l'équipe (tous) + détail par personne (Master et Administrator). */

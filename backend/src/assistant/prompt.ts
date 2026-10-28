@@ -94,10 +94,12 @@ export const TOOLS: ToolDef[] = [
 const dateLongue = () => new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
 const dateIso = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
 
-export function systemPrompt(u: { name: string; role: string }, notes: string[] | null, orga = ''): string {
+export function systemPrompt(u: { name: string; role: string }, notes: string[] | null, orga = '', botName = ''): string {
   const prenom = (u.name || '').split(' ')[0] || 'toi';
+  // Prénom choisi par la personne dans Réglages › mIAouss (27/10/2026) : déjà nettoyé par `cleanBotName`.
+  const moi = botName && botName.toLowerCase() !== 'miaouss' ? `${botName} (l'assistant mIAouss, que ${prenom} a rebaptisé ainsi)` : 'mIAouss';
   const parts = [
-    `Tu es mIAouss, le chat mécano qui assiste l'équipe marketing du groupe Bony auto-mobile (concessions automobiles en Auvergne et dans le Sud-Ouest) dans Gearbox, leur outil de travail.`,
+    `Tu es ${moi}, le chat qui assiste l'équipe marketing du groupe Bony auto-mobile (concessions automobiles en Auvergne et dans le Sud-Ouest) dans Gearbox, leur outil de travail.`,
     `Nous sommes le ${dateLongue()} (${dateIso()}). Tu parles à ${prenom} (${u.role}).`,
     `Règles :`,
     `1. Français, tutoiement, ton chaleureux et un brin malicieux, mais concis : droit au but.`,

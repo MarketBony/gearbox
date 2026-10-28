@@ -48,7 +48,7 @@ const ITEMS: [string, string, string][] = [
   ['Ne pas déranger', 'notifs', 'notifs'], ['Bulles de discussion', 'notifs', 'bulles'], ['Notification de test', 'notifs', 'notifs'],
   ['Installer l’application', 'application', 'install'],
   ['Compte Google (Forms)', 'comptes', 'google'], ['Connecter Google', 'comptes', 'google'],
-  ['Ma consommation mIAouss', 'miaouss', 'conso'], ['Capacité de l’équipe (questions restantes)', 'miaouss', 'capacite'], ['Mémoire de mIAouss', 'miaouss', 'memoire-notes'], ['Mémoire en pause', 'miaouss', 'memoire-pause'], ['Consommation de l’équipe (plafonds)', 'miaouss', 'equipe'],
+  ['Mon mIAouss : pelage, yeux, tenue, prénom', 'miaouss', 'apparence'], ['Ma consommation mIAouss', 'miaouss', 'conso'], ['Capacité de l’équipe (questions restantes)', 'miaouss', 'capacite'], ['Mémoire de mIAouss', 'miaouss', 'memoire-notes'], ['Mémoire en pause', 'miaouss', 'memoire-pause'], ['Consommation de l’équipe (plafonds)', 'miaouss', 'equipe'],
   ['Utilisation du stockage', 'stockage', 'usage'], ['Fichiers par type', 'stockage', 'types'],
   ['Gestion des Utilisateurs', 'users', 'users'], ['Nouvel Utilisateur', 'users', 'users'], ['Concessions rattachées', 'users', 'users'],
   ['Matrice des accès', 'roles', 'matrix'], ['Chef de site', 'roles', 'note'],

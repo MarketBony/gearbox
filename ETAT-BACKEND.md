@@ -7,6 +7,13 @@
 > (`UNSCOPED_READ_ROLES`). ⚠️ **Reste ouvert (audit du 26/10)** : les ÉCRITURES de `/api/expenses` et `POST /api/activity-log`
 > sans garde de rôle — voir `BUGS-CONNUS.md`.
 >
+> **Correctif 102 (28/10/2026) — mIAouss personnalisable.** Migration additive `20261027120000_assistant_look` :
+> `AssistantUser.look Json?` (null = le mIAouss d'origine). Routes `GET|PUT /api/assistant/look` (derrière `requireAssistant`) —
+> route À PART de `PUT /prefs`, qui réécrit `memoryPaused` à chaque appel. Le serveur ne connaît PAS le catalogue (il vit dans
+> `ui2/apps/assistant/look.ts`) : liste blanche de clés `LOOK_KEYS` (une nouvelle catégorie s'y ajoute dans le même lot, sinon
+> 400), valeurs `[a-z0-9-]{1,24}`, prénom nettoyé par `cleanBotName` (16 car.) et passé à `systemPrompt(…, botName)`.
+> Écriture → `emitToUser(id, 'assistant:look')` (privé). `{ look: null }` remet le mIAouss d'origine (`Prisma.DbNull`).
+>
 > **Correctif 101 (27/10/2026) — mIAouss au cas par cas.** Porte unique `auth/assistantAccess.ts` (`requireAssistant`, posé sur
 > TOUT `/api/assistant` à la place de `requireRole(ASSISTANT_ROLES)`) : interrupteur éteint → personne, Master compris ; rôle
 > COURANT (relu en base, cache 15 s via `roleCourant` de `crmAccess.ts`) dans `ASSISTANT_ROLES` ; Master d'office ; les autres
