@@ -7,13 +7,14 @@ import { scopeOf, arrayScopeWhere, redactSiteFields } from '../auth/siteScope';
 import { withDates } from '../utils/dates';
 import { UPLOADS_ROOT } from './uploads';
 import { publicUser } from '../utils/publicUser';
+import { SOCIAL_EDIT_ROLES } from '../auth/roles';
 import { prisma } from '../db';
 
 const router = Router();
 // Aligné sur le gating de Digital.tsx (canEdit + External sur le calendrier
 // éditorial — pas de granularité par onglet côté API). Corrige au passage
 // l'ancien 'DigitalManager' sans espace qui ne matchait jamais le vrai rôle.
-const EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Digital Manager', 'External'];
+const EDIT_ROLES = SOCIAL_EDIT_ROLES;   // source unique : auth/roles.ts (28/10/2026, lue aussi par mIAouss)
 
 // ⚠️ VALIDATION DE `mediaFiles` — le POST et le PUT passaient jusqu'ici req.body BRUT à
 // Prisma : n'importe quel compte des EDIT_ROLES pouvait y écrire `javascript:…`,

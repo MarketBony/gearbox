@@ -7,6 +7,14 @@
 > (`UNSCOPED_READ_ROLES`). ⚠️ **Reste ouvert (audit du 26/10)** : les ÉCRITURES de `/api/expenses` et `POST /api/activity-log`
 > sans garde de rôle — voir `BUGS-CONNUS.md`.
 >
+> **Correctif 104 (28/10/2026) — mIAouss lot 1b.** Actions `creer_projet` (`PROJECT_EDIT_ROLES`) et `creer_publication`
+> (`SOCIAL_EDIT_ROLES`), désormais exportées par `auth/roles.ts` et lues par `routes/projects.ts` / `routes/social.ts`. Outil
+> serveur `consignes_redaction` (`SERVER_TOOLS`, `consignesRedaction()` de prompt.ts : lit `assistant/redaction/*.md`, mis en
+> cache, copié dans l'image par le Dockerfile) ; un tour qui le lit n'est jamais raccourci, et le suivant ne reçoit que
+> `creer_publication` (`st.redaction`). Fournisseurs : chaîne `groq → gemini → cloudflare` (`providers.ts`, `chain()`,
+> `ASSISTANT_CHAIN`), Gemini 3.5 Flash-Lite par le point d'accès OpenAI de Google (`GEMINI_API_KEY`, délai 45 s).
+> Quotas mesurés : Groq 200 000 jetons/jour en plus de 8 000/min.
+>
 > **Correctif 103 (28/10/2026) — mIAouss qui agit (lot 1a).** Migration additive `20261028120000_assistant_actions` :
 > table `AssistantAction` (`userId`, `messageId?`, `type`, `payload` Json, `summary`, `status` proposed | executing | done |
 > failed | refused | expired, `result` Json?, `error`), index (userId, createdAt). Porte unique du catalogue :

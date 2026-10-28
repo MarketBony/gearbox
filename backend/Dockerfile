@@ -28,5 +28,8 @@ RUN npx prisma generate
 COPY --from=build /app/dist ./dist
 # Migrations SQL du RCU (base dédiée `rcu-db`), appliquées au démarrage du conteneur `rcu-worker`.
 COPY rcu-migrations ./rcu-migrations
+# Consignes de rédaction de mIAouss (28/10/2026) : des .md que `tsc` ne copie PAS dans dist/ — sans cette ligne, l'outil
+# `consignes_redaction` répondrait son texte de secours en production. Lues dans /app/src/assistant/redaction.
+COPY src/assistant/redaction ./src/assistant/redaction
 EXPOSE 3000
 CMD ["node", "dist/index.js"]

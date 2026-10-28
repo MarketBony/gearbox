@@ -162,6 +162,19 @@ export const CRM_INVITABLE_ROLES = INTERNAL_ROLES.filter(r => r !== SITE_MANAGER
  */
 export const TASK_EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
 /**
+ * Écriture des PROJETS — source unique depuis le 28/10/2026 (lot 1b de mIAouss) : `routes/projects.ts` et l'action
+ * `creer_projet` (`assistant/actions.ts`) la lisent. ⚠️ 'Digital Manager' AVEC l'espace (valeur réelle en base).
+ * Doit rester aligné sur `canEdit` de `pages/Projects.tsx` / `canEditProjects` (v2). Même valeur que TASK_EDIT_ROLES
+ * ce jour, règle DIFFÉRENTE : ne pas les aliaser.
+ */
+export const PROJECT_EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Coordinator', 'Digital Manager'];
+/**
+ * Écriture du DIGITAL (publications, commentaires) — source unique depuis le 28/10/2026 : `routes/social.ts` et
+ * l'action `creer_publication` la lisent. External INCLUS (calendrier éditorial), Coordinator ABSENT : mIAouss ne
+ * lui propose donc jamais de publication. External n'a pas mIAouss : sans effet là-bas, la liste reste la source unique.
+ */
+export const SOCIAL_EDIT_ROLES = ['Master', 'Administrator', 'Director', 'Digital Manager', 'External'];
+/**
  * Agenda Post-it (01/10/2026). ⚠️ Guest y figure ALORS QU'IL EST EN LECTURE SEULE partout ailleurs : décision de Théo, ses
  * post-it sont SES données personnelles. Ce n'est pas un `EDIT_ROLES` : ne pas s'en servir ailleurs.
  */

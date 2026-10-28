@@ -1,9 +1,12 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // FOURNISSEURS D'IA de mIAouss (08/10/2026) — PORTE UNIQUE vers les modèles.
 //
-// UN SEUL MODÈLE, Qwen3.8 27B, chez DEUX hébergeurs : Théo veut une IA « constante », jamais une
-// qualité qui change selon qui répond (mesuré le 08/10 : réponses quasi identiques mot pour mot).
-// Ordre : Groq (~1 s) → Cloudflare Workers AI (1 à 10 s). Les deux parlent le format OpenAI.
+// Ordre (28/10/2026, décision de Théo) : Groq · Qwen3.8 27B (~1-3 s) → Gemini 3.5 Flash-Lite en RELAIS (11-45 s)
+// → Cloudflare · Qwen3.8 27B (sans réflexion). Tous parlent le format OpenAI.
+// Pourquoi un second modèle alors que Théo voulait une IA « constante » (08/10) : Groq gratuit plafonne à 200 000
+// jetons/JOUR (mesuré le 28/10) = ~30-50 questions pour toute l'équipe. Banc du 28/10 (`evals/`, 38 cas) : Gemini
+// Flash-Lite réussit 36/38, les 19 critiques compris — même niveau que Qwen ; seule différence, la lenteur. D'où le
+// relais : rapide tant que Groq tient, plus lent mais disponible ensuite (~500 requêtes/jour chez Google).
 //
 // Réflexion (28/10/2026, lot 1a « mIAouss qui agit ») : Groq passe à `reasoning_effort: medium` — proposer
 // une action demande de convertir « vendredi » en date et de choisir le bon outil. Mesuré le 28/10 sur Groq :
@@ -16,11 +19,12 @@
 // ⚠️ GRATUIT et le restera (décision de Théo) : aucun fournisseur payant ne s'ajoute ici.
 //
 // Variables (backend/.env et .env du VPS, listées dans docker-compose.yml) :
-//   GROQ_API_KEY, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_AI_TOKEN (jeton limité à Workers AI).
+//   GROQ_API_KEY, GEMINI_API_KEY, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_AI_TOKEN (jeton limité à Workers AI) ;
+//   ASSISTANT_CHAIN (facultatif) pour changer l'ordre — le banc d'evals s'en sert (`--provider gemini`).
 // Aucune clé ne sort de ce module : ni vers le navigateur, ni dans les logs.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type ProviderId = 'groq' | 'cloudflare';
+export type ProviderId = 'groq' | 'cloudflare' | 'gemini';
 
 export interface ToolCall { id: string; type: 'function'; function: { name: string; arguments: string } }
 export interface ChatMsg {
@@ -76,7 +80,21 @@ const PROVIDERS: Provider[] = [
     key: () => env('CLOUDFLARE_AI_TOKEN'),
     extra: { chat_template_kwargs: { enable_thinking: false } },
   },
+  {
+    // RELAIS (28/10/2026) : Gemini 3.5 Flash-Lite, offre gratuite Google (~500 requêtes/jour annoncées), point d'accès
+    // compatible OpenAI. Réflexion « low ». Délai de 45 s : mesuré 11 à 36 s par appel, deux pointes au-delà.
+    id: 'gemini', name: 'Gemini', model: 'gemini-3.5-flash-lite', timeoutMs: 45_000,
+    configured: () => !!env('GEMINI_API_KEY'),
+    url: () => 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    key: () => env('GEMINI_API_KEY'),
+    extra: { reasoning_effort: 'low' },
+  },
 ];
+/** Chaîne active : `ASSISTANT_CHAIN` (ex. « gemini,groq »), sinon Groq → Gemini (relais) → Cloudflare. */
+const chain = (): Provider[] => {
+  const ids = (env('ASSISTANT_CHAIN') || 'groq,gemini,cloudflare').split(',').map((s) => s.trim()).filter(Boolean);
+  return ids.map((id) => PROVIDERS.find((p) => p.id === id)).filter((p): p is Provider => !!p);
+};
 
 // ---------------------------------------------------------------- état « au repos »
 // En mémoire, par process (un seul conteneur `api`, comme le cache des Jeux) : un redémarrage
@@ -91,7 +109,7 @@ const nextUtcMidnight = () => { const d = new Date(); d.setUTCHours(24, 0, 0, 0)
 const rest = (p: Provider, ms: number, reason: string) => restUntil.set(p.id, { until: Date.now() + ms, reason });
 
 /** Statut public des fournisseurs (sans aucune clé). */
-export const providerStatus = () => PROVIDERS.map((p) => {
+export const providerStatus = () => chain().map((p) => {
   const r = restUntil.get(p.id);
   const resting = !!r && r.until > Date.now();
   return { id: p.id, name: p.name, model: p.model, configured: p.configured(), resting, until: resting ? r!.until : null, reason: resting ? r!.reason : null };
@@ -173,7 +191,7 @@ export async function complete(
   opts: { maxTokens?: number; toolChoice?: 'auto' | 'required'; onFailure?: (f: LlmFailure) => void } = {},
 ): Promise<LlmReply> {
   const failures: LlmFailure[] = [];
-  for (const p of PROVIDERS) {
+  for (const p of chain()) {
     if (!p.configured()) continue;
     const r = restUntil.get(p.id);
     if (r && r.until > Date.now()) continue;
@@ -190,4 +208,4 @@ export async function complete(
   throw new AssistantUnavailable(failures, nexts.length ? Math.min(...nexts) : null);
 }
 
-export const anyProviderConfigured = () => PROVIDERS.some((p) => p.configured());
+export const anyProviderConfigured = () => chain().some((p) => p.configured());

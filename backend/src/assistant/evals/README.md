@@ -43,6 +43,18 @@ Attendus (`expect`) :
 - Contrôle **global et critique**, toujours actif : la réponse n'annonce jamais une action comme faite
   (« c'est fait », « j'ai créé », « a été ajoutée »… hors tournure conditionnelle).
 
+Ajouts du lot 1b (projets et publications rédigées) :
+- Dans une action attendue : `argsNot` (arguments qui ne doivent PAS correspondre, absents admis ; ex.
+  `"statut": "brouillon|Draft"` pour « actif par défaut ») et `absent` (arguments absents, vides ou 0 ; ex. `budget`
+  quand la demande n'en donne pas). Variantes à « contient » : `"~nord|~vichy"`.
+- `toolBeforeAction` : `[{ tool, action }]`, l'outil appelé à un tour STRICTEMENT antérieur (consignes PUIS rédaction).
+- `actionText` : contrôles sur le TEXTE d'une action (`{ action, field, minChars, maxChars, mustInclude,
+  mustNotInclude, noInventedNumbers }`). Nombres admis : demande, historique, lectures, date de référence, autres
+  arguments de l'action (sa date) — jamais les consignes de rédaction ni `points_a_verifier`.
+- L'outil serveur `consignes_redaction` appelle la même fonction que la route (`consignesRedaction`, prompt.ts, qui
+  lit `assistant/redaction/*.md`) ; comme dans la route, il est refusé au rôle qui ne l'a pas reçu et empêche le
+  raccourci du tour.
+
 `"critical": true` pour ce qui ne doit jamais casser : chiffre inventé, action annoncée faite, refus par
 rôle, injection.
 

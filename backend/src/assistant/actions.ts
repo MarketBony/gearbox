@@ -1,6 +1,6 @@
 import type { ToolDef } from './providers';
-import { TOOLS } from './prompt';
-import { ASSISTANT_ROLES, TASK_EDIT_ROLES, POSTIT_ROLES } from '../auth/roles';
+import { TOOLS, CONSIGNES_TOOL } from './prompt';
+import { ASSISTANT_ROLES, TASK_EDIT_ROLES, POSTIT_ROLES, PROJECT_EDIT_ROLES, SOCIAL_EDIT_ROLES } from '../auth/roles';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ACTIONS de mIAouss (lot 1a « mIAouss qui agit », 28/10/2026) — SEULE PORTE de validation.
@@ -136,6 +136,81 @@ function assignes(v: unknown): string[] | undefined | { error: string } {
   return out.length ? out : undefined;
 }
 
+// ---------------------------------------------------------------- contrôles du lot 1b (28/10/2026)
+/** Liste de libellés (une chaîne « A, B et C » est acceptée), dédoublonnée, bornée. Aucune résolution de nom ici. */
+function list(v: unknown, field: string, max: number, itemMax = NAME_MAX): string[] | undefined | { error: string } {
+  if (v === undefined || v === null || v === '') return undefined;
+  const raw = typeof v === 'string' ? v.split(/\s*(?:,|;|\bet\b)\s*/i) : Array.isArray(v) ? v : null;
+  if (!raw) return { error: `« ${field} » doit être une liste.` };
+  const out: string[] = [];
+  for (const x of raw) {
+    const t = text(x, field, itemMax, false);
+    if (isErr(t)) return t;
+    if (t && !out.some((o) => fold(o) === fold(t))) out.push(t);
+  }
+  if (out.length > max) return { error: `« ${field} » : ${max} éléments maximum.` };
+  return out.length ? out : undefined;
+}
+
+/** Valeur prise dans une liste CANONIQUE (comparée sans accent ni casse), renvoyée sous sa forme canonique. */
+function oneOf(v: unknown, field: string, values: readonly string[], alias: Record<string, string> = {}): string | undefined | { error: string } {
+  if (v === undefined || v === null || v === '') return undefined;
+  if (typeof v !== 'string') return { error: `« ${field} » doit être un texte.` };
+  const f = fold(v);
+  const hit = values.find((x) => fold(x) === f) || alias[f];
+  return hit || { error: `« ${field} » : « ${v} » inconnu (${values.join(', ')}).` };
+}
+
+/** Texte LONG (wording d'une publication) : sauts de ligne GARDÉS, autres caractères de contrôle retirés. */
+function longText(v: unknown, field: string, max: number): string | { error: string } {
+  if (v === undefined || v === null || v === '') return { error: `Champ « ${field} » manquant.` };
+  if (typeof v !== 'string') return { error: `« ${field} » doit être un texte.` };
+  const s = v.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ')
+    .split('\n').map((l) => l.replace(/[ \t]+/g, ' ').trim()).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (!s) return { error: `Champ « ${field} » vide.` };
+  if (s.length > max) return { error: `« ${field} » trop long (${max} caractères maximum).` };
+  return s;
+}
+
+const fmtEuros = (n: number) => `${n.toLocaleString('fr-FR', Number.isInteger(n) ? {} : { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/[  ]/g, ' ')} €`;
+
+/** Montant en euros, tolérant (`3000`, `"3 000 €"`, `"2500,50"`), borné. */
+function euros(v: unknown, field: string, max: number): number | undefined | { error: string } {
+  if (v === undefined || v === null || v === '') return undefined;
+  let n = NaN;
+  if (typeof v === 'number') n = v;
+  else if (typeof v === 'string' && /^\s*\d[\d   .]*(,\d{1,2})?\s*(€|eur|euros?)?\s*$/i.test(v)) {
+    // Espaces et points = séparateurs de milliers (« 3 000 », « 3.000 ») ; la virgule = décimales.
+    n = Number(v.replace(/€|euros?|eur/gi, '').replace(/[\s  .]/g, '').replace(',', '.'));
+  }
+  if (!Number.isFinite(n) || n < 0 || n > max) return { error: `« ${field} » doit être un montant de 0 à ${fmtEuros(max)}.` };
+  return Math.round(n * 100) / 100;
+}
+
+/** Services : forme canonique de types.ts (ServiceType) ; « RH » n'existe QUE dans le Digital (SocialServiceType). */
+const SERVICES = ['VN', 'VO', 'APV', 'PR', 'Tous Services'] as const;
+const SERVICE_ALIAS: Record<string, string> = {
+  'vehicules neufs': 'VN', neuf: 'VN', neufs: 'VN', 'vehicules d occasion': 'VO', occasion: 'VO', occasions: 'VO',
+  'apres vente': 'APV', atelier: 'APV', 'pieces de rechange': 'PR', pieces: 'PR', tous: 'Tous Services', 'tous les services': 'Tous Services',
+};
+const PROJECT_TYPES = ['Partenariat', 'Expo/Salon', 'Animation Co', 'OP Clients', 'Contenu', 'Collaborateurs'] as const;
+const PROJECT_TYPE_ALIAS: Record<string, string> = {
+  salon: 'Expo/Salon', expo: 'Expo/Salon', exposition: 'Expo/Salon', 'expo salon': 'Expo/Salon',
+  animation: 'Animation Co', 'animation commerciale': 'Animation Co', 'operation clients': 'OP Clients', 'op client': 'OP Clients',
+};
+const CIBLES = ['Internet', 'Collaborateurs'] as const;
+const CIBLE_ALIAS: Record<string, string> = { externe: 'Internet', public: 'Internet', clients: 'Internet', interne: 'Collaborateurs', salaries: 'Collaborateurs' };
+const STATUT_PROJET: Record<string, 'actif' | 'brouillon'> = { actif: 'actif', active: 'actif', 'en cours': 'actif', brouillon: 'brouillon', draft: 'brouillon' };
+
+const PROJET_NOM_MAX = 200;
+const DESCRIPTION_MAX = 1000;
+const PUB_TEXTE_MAX = 3000;
+const SITES_MAX = 20;
+const MARQUES_MAX = 6;
+const RESEAUX_MAX = 10;
+const POINTS_MAX = 10;
+const BUDGET_MAX = 10_000_000;
+
 const frDate = (iso: string) => iso.split('-').reverse().join('/');
 const fmtNames = (n: string[]) => (n.length > 1 ? `${n.slice(0, -1).join(', ')} et ${n[n.length - 1]}` : n[0]);
 
@@ -144,6 +219,9 @@ interface ActionDef { roles: string[]; auto: boolean; tool: ToolDef; check: (a: 
 
 const DATE = { type: 'string', description: 'AAAA-MM-JJ' };
 const STATUT = { type: 'string', description: 'à faire | en cours | terminée' };
+const INT_SCHEMA = (description: string) => ({ type: ['integer', 'string'], description });
+const LISTE = (description: string) => ({ type: ['array', 'string'], items: { type: 'string' }, description });
+const MARQUES = LISTE('Renault, Dacia, Alpine, Nissan, Mobilize, Holding');
 
 /** Cible d'un `ouvrir` en toutes lettres (« Projets », « le projet « X » ») : résumé et réponse « J'ouvre … ». */
 export const openTarget = (p: Record<string, unknown>) =>
@@ -287,6 +365,129 @@ const ACTIONS: Record<string, ActionDef> = {
       return { payload: { texte, date, heure, duree_min: d, journee: false }, summary: `Créer le post-it « ${texte} » le ${frDate(date!)} à ${heure} (${d} min)` };
     },
   },
+  // ⚠️ Lot 1b (28/10/2026, décision de Théo) : un projet proposé est ACTIF par défaut — la validation de la carte est la
+  // décision humaine, et la carte montre tout ce qui pèse sur les chiffres (dont la répartition par enveloppe, calculée
+  // côté client par constants.ts). Ici : la FORME seulement ; sites, plaques et marques sont résolus par le client.
+  creer_projet: {
+    roles: PROJECT_EDIT_ROLES, auto: false,
+    tool: {
+      type: 'function',
+      function: {
+        name: 'creer_projet',
+        description: "PROPOSE un projet (l'utilisateur valide). Budget seulement s'il est donné.",
+        parameters: {
+          type: 'object',
+          properties: {
+            nom: { type: 'string' },
+            sites: LISTE('Concessions ou plaques, telles que dites'),
+            marques: MARQUES,
+            services: LISTE('VN, VO, APV, PR'),
+            type: { type: 'string', description: 'Partenariat | Expo/Salon | Animation Co | OP Clients | Contenu | Collaborateurs' },
+            debut: DATE,
+            fin: DATE,
+            budget: { type: ['number', 'string'], description: '€ prévu' },
+            description: { type: 'string' },
+            statut: { type: 'string', description: 'actif (défaut) | brouillon' },
+            part_alpine: INT_SCHEMA('% Alpine si Alpine + Renault/Dacia/Mobilize'),
+            part_nissan: INT_SCHEMA('% Nissan si Nissan + Renault/Dacia/Mobilize'),
+          },
+          required: ['nom', 'sites', 'marques', 'debut', 'fin'],
+        },
+      },
+    },
+    check: (a) => {
+      const nom = text(a.nom, 'nom', PROJET_NOM_MAX, true); if (isErr(nom)) return nom;
+      if (TITRE_BIDON.test(nom as string)) return { error: 'Nom manquant : demande à l’utilisateur comment s’appelle le projet, au lieu d’en inventer un.' };
+      const sites = list(a.sites, 'sites', SITES_MAX); if (isErr(sites)) return sites;
+      if (!sites) return { error: 'Champ « sites » manquant : demande sur quelles concessions porte le projet.' };
+      // « Projet Vichy » pour « crée-moi un projet à Vichy » : nom FABRIQUÉ à partir du site (mesuré aux evals du 28/10,
+      // deux fois sur deux malgré la règle 8 du prompt). Refusé : le modèle doit demander le nom… et ne pas deviner la marque.
+      const sansMot = String(nom).toLowerCase().replace(/^\s*(le\s+)?projet\s+(de\s+|du\s+|à\s+|a\s+)?/, '').trim();
+      if (sansMot !== String(nom).toLowerCase().trim() && (sites as string[]).some((s) => s.toLowerCase().trim() === sansMot)) {
+        return { error: 'Nom manquant : « Projet + site » n’est pas un nom. Demande à l’utilisateur le nom du projet (et sa marque si elle n’est pas dite), au lieu de les inventer.' };
+      }
+      const marques = list(a.marques, 'marques', MARQUES_MAX); if (isErr(marques)) return marques;
+      if (!marques) return { error: 'Champ « marques » manquant : demande pour quelles marques est le projet.' };
+      const sv = list(a.services, 'services', SERVICES.length); if (isErr(sv)) return sv;
+      const services: string[] = [];
+      for (const x of sv || []) { const v = oneOf(x, 'services', SERVICES, SERVICE_ALIAS); if (isErr(v)) return v; if (v && !services.includes(v)) services.push(v); }
+      const type = oneOf(a.type, 'type', PROJECT_TYPES, PROJECT_TYPE_ALIAS); if (isErr(type)) return type;
+      const debut = isoDate(a.debut, 'debut', true); if (isErr(debut)) return debut;
+      const fin = isoDate(a.fin, 'fin', true); if (isErr(fin)) return fin;
+      if ((fin as string) < (debut as string)) return { error: '« fin » est avant « debut ».' };
+      const budget = euros(a.budget, 'budget', BUDGET_MAX); if (isErr(budget)) return budget;
+      const description = text(a.description, 'description', DESCRIPTION_MAX, false); if (isErr(description)) return description;
+      let statut: 'actif' | 'brouillon' = 'actif';
+      if (a.statut !== undefined && a.statut !== null && a.statut !== '') {
+        const s = typeof a.statut === 'string' ? STATUT_PROJET[fold(a.statut)] : undefined;
+        if (!s) return { error: '« statut » : actif ou brouillon.' };
+        statut = s;
+      }
+      const pa = int(a.part_alpine, 'part_alpine', 0, 100); if (isErr(pa)) return pa;
+      const pn = int(a.part_nissan, 'part_nissan', 0, 100); if (isErr(pn)) return pn;
+      // Un curseur n'a de sens qu'avec SA marque (le client applique ensuite la règle complète : marque RDM requise,
+      // curseur vide = 100 % marque, Alpine avant Nissan — constants.ts).
+      const has = (m: string) => marques.some((x) => fold(x) === m);
+      const payload: Record<string, unknown> = {
+        nom, sites, marques, ...(services.length ? { services } : {}), ...(type ? { type } : {}), debut, fin,
+        ...(budget !== undefined ? { budget } : {}), ...(description ? { description } : {}), statut,
+        ...(pa !== undefined && has('alpine') ? { part_alpine: pa } : {}), ...(pn !== undefined && has('nissan') ? { part_nissan: pn } : {}),
+      };
+      const d0 = debut as string, d1 = fin as string;
+      const periode = d0 === d1 ? frDate(d0) : `${d0.slice(0, 4) === d1.slice(0, 4) ? frDate(d0).slice(0, 5) : frDate(d0)} → ${frDate(d1)}`;
+      let summary = `Créer le projet « ${nom} » (${statut}) — ${fmtNames(sites)}, ${marques.join('/')}, ${periode}`;
+      if (budget !== undefined) summary += `, ${fmtEuros(budget)}`;
+      return { payload, summary };
+    },
+  },
+  // Publication du Digital, statut « Rédigé » fixe (posé par le client). Le texte est rédigé APRÈS `consignes_redaction`.
+  creer_publication: {
+    roles: SOCIAL_EDIT_ROLES, auto: false,
+    tool: {
+      type: 'function',
+      function: {
+        name: 'creer_publication',
+        description: "PROPOSE une publication rédigée au planning Digital (l'utilisateur valide).",
+        parameters: {
+          type: 'object',
+          properties: {
+            titre: { type: 'string' },
+            date: DATE,
+            reseaux: LISTE('Facebook, Instagram, LinkedIn…'),
+            texte: { type: 'string', description: 'Le texte rédigé' },
+            marques: MARQUES,
+            concessions: LISTE('Concessions ou plaques'),
+            service: { type: 'string', description: 'VN | VO | APV | PR | RH' },
+            cibles: LISTE('Internet | Collaborateurs'),
+            points_a_verifier: LISTE("Ce que l'utilisateur doit confirmer"),
+          },
+          required: ['titre', 'date', 'reseaux', 'texte'],
+        },
+      },
+    },
+    check: (a) => {
+      const titre = text(a.titre, 'titre', TEXT_MAX, true); if (isErr(titre)) return titre;
+      if (TITRE_BIDON.test(titre as string)) return { error: 'Titre manquant : demande à l’utilisateur le sujet de la publication.' };
+      const date = isoDate(a.date, 'date', true); if (isErr(date)) return date;
+      const reseaux = list(a.reseaux, 'reseaux', RESEAUX_MAX); if (isErr(reseaux)) return reseaux;
+      if (!reseaux) return { error: 'Champ « reseaux » manquant : demande sur quels réseaux publier.' };
+      const texte = longText(a.texte, 'texte', PUB_TEXTE_MAX); if (isErr(texte)) return texte;
+      const marques = list(a.marques, 'marques', MARQUES_MAX); if (isErr(marques)) return marques;
+      const concessions = list(a.concessions, 'concessions', SITES_MAX); if (isErr(concessions)) return concessions;
+      const service = oneOf(a.service, 'service', [...SERVICES, 'RH'], SERVICE_ALIAS); if (isErr(service)) return service;
+      const cl = list(a.cibles, 'cibles', CIBLES.length); if (isErr(cl)) return cl;
+      const cibles: string[] = [];
+      for (const x of cl || []) { const v = oneOf(x, 'cibles', CIBLES, CIBLE_ALIAS); if (isErr(v)) return v; if (v && !cibles.includes(v)) cibles.push(v); }
+      const points = list(a.points_a_verifier, 'points_a_verifier', POINTS_MAX, TEXT_MAX); if (isErr(points)) return points;
+      const payload: Record<string, unknown> = {
+        titre, date, reseaux, texte, ...(marques ? { marques } : {}), ...(concessions ? { concessions } : {}),
+        ...(service ? { service } : {}), ...(cibles.length ? { cibles } : {}), ...(points ? { points_a_verifier: points } : {}),
+      };
+      let summary = `Créer la publication « ${titre} » le ${frDate(date!)} — ${reseaux.join(', ')} (rédigée, ${texte.length} caractères)`;
+      if (points) summary += `, ${points.length} point${points.length > 1 ? 's' : ''} à vérifier`;
+      return { payload, summary };
+    },
+  },
 };
 
 // ---------------------------------------------------------------- exports
@@ -296,8 +497,13 @@ export const isAutoAction = (name: string): boolean => !!ACTIONS[name]?.auto;
 /** Outils d'action PERMIS au rôle : mIAouss ne propose jamais ce que la personne ne pourrait pas faire elle-même. */
 export const actionTools = (role: string): ToolDef[] => Object.values(ACTIONS).filter((a) => a.roles.includes(role)).map((a) => a.tool);
 
-/** Outils de lecture (prompt.ts) + actions du rôle : la liste donnée au modèle. */
-export const toolsFor = (role: string): ToolDef[] => [...TOOLS, ...actionTools(role)];
+/**
+ * Outils de lecture (prompt.ts) + actions du rôle : la liste donnée au modèle. `consignes_redaction` (28/10/2026)
+ * seulement si le rôle peut créer une publication : inutile ailleurs, et chaque outil se paie à chaque appel.
+ */
+export const toolsFor = (role: string): ToolDef[] => [
+  ...TOOLS, ...(ACTIONS.creer_publication.roles.includes(role) ? [CONSIGNES_TOOL] : []), ...actionTools(role),
+];
 
 /**
  * Valide et normalise un appel d'action. Seule porte : la boucle (proposition) ET la réservation
@@ -348,4 +554,5 @@ export const DATA_INTENT = /\b(projets?|budgets?|enveloppes?|consomm|d[ée]pense
 export const ANNONCE_FAITE = /c['’]est (fait|not[ée]|cr[ée]{1,2}|ajout[ée]|programm[ée])|j['’]ai (cr[ée]{1,2}|ajout[ée]|programm[ée]|planifi[ée]|d[ée]cal[ée]|mis|plac[ée]|enregistr[ée])\b|(t[âa]che|post-?it)s? (a|ont) [ée]t[ée] (cr[ée]{1,2}|ajout[ée])/i;
 
 /** Titre bidon (« Créer une tâche », « Nouvelle tâche ») : le modèle a comblé un manque au lieu de poser la question. */
-export const TITRE_BIDON = /^\s*(cr[ée]{1,2}r?|nouvelle|une|ma|la|ajouter)?\s*(une\s+)?(t[âa]che|post-?it|rappel)s?\s*[.!]?\s*$/i;
+// Élargi aux projets et publications le 28/10/2026 (« Nouveau projet », « Une publication »…).
+export const TITRE_BIDON = /^\s*(cr[ée]{1,2}r?|nouvelle|nouveau|une|un|ma|mon|la|le|ajouter)?\s*(une\s+|un\s+)?(t[âa]che|post-?it|rappel|projet|publication|post)s?\s*[.!]?\s*$/i;

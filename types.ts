@@ -549,7 +549,7 @@ export interface AssistantMessage {
 }
 /** Action proposée par mIAouss (lot 1a « mIAouss qui agit », 28/10/2026). Le serveur la PROPOSE et tient le journal
  *  (une seule exécution, expiration 24 h) ; le NAVIGATEUR l'exécute par les mêmes fonctions que l'interface. */
-export type AssistantActionType = 'ouvrir' | 'creer_tache' | 'modifier_tache' | 'creer_postit';
+export type AssistantActionType = 'ouvrir' | 'creer_tache' | 'modifier_tache' | 'creer_postit' | 'creer_projet' | 'creer_publication';
 export type AssistantActionStatus = 'proposed' | 'executing' | 'done' | 'failed' | 'refused' | 'expired';
 export interface AssistantActionView {
   id: string;
